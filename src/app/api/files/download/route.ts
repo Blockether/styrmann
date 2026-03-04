@@ -55,7 +55,9 @@ export async function GET(request: NextRequest) {
 
     if (fullPathParam) {
       // Full path provided - validate it's under PROJECTS_BASE
-      targetPath = path.normalize(fullPathParam);
+      // Expand tilde before normalizing
+      const expanded = fullPathParam.replace(/^~/, process.env.HOME || '');
+      targetPath = path.normalize(expanded);
     } else if (relativePathParam) {
       // Relative path provided
       const normalizedRelative = path.normalize(relativePathParam);

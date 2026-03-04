@@ -6,12 +6,30 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { FileText, Link as LinkIcon, Package, ExternalLink, Eye } from 'lucide-react';
+import { FileText, Link as LinkIcon, Package, ExternalLink, Eye, Download } from 'lucide-react';
 import { debug } from '@/lib/debug';
 import type { TaskDeliverable } from '@/lib/types';
 
 interface DeliverablesListProps {
   taskId: string;
+}
+
+// File extensions that can be previewed in the browser
+const PREVIEWABLE_EXTENSIONS = new Set([
+  '.html', '.htm', '.md', '.markdown', '.txt', '.csv', '.log', '.json', '.xml',
+  '.yaml', '.yml', '.js', '.ts', '.jsx', '.tsx', '.css', '.scss', '.py', '.rb',
+  '.go', '.rs', '.java', '.c', '.cpp', '.h', '.sh', '.bash', '.toml', '.ini',
+  '.sql', '.clj', '.cljs', '.cljc', '.edn', '.ex', '.exs', '.lua', '.swift',
+]);
+
+function getExtension(filePath: string): string {
+  const dot = filePath.lastIndexOf('.');
+  return dot >= 0 ? filePath.slice(dot).toLowerCase() : '';
+}
+
+function isPreviewable(filePath: string | undefined): boolean {
+  if (!filePath) return false;
+  return PREVIEWABLE_EXTENSIONS.has(getExtension(filePath));
 }
 
 export function DeliverablesList({ taskId }: DeliverablesListProps) {
@@ -56,7 +74,13 @@ export function DeliverablesList({ taskId }: DeliverablesListProps) {
       return;
     }
 
-    // Files - try to open in Finder
+    // For files: prefer preview (works on headless servers) over reveal (needs GUI)
+    if (deliverable.path && isPreviewable(deliverable.path)) {
+      handlePreview(deliverable);
+      return;
+    }
+
+    // Non-previewable files: try reveal, fall back to download
     if (deliverable.path) {
       try {
         debug.file('Opening file in Finder', { path: deliverable.path });
@@ -79,17 +103,12 @@ export function DeliverablesList({ taskId }: DeliverablesListProps) {
         } else if (res.status === 403) {
           alert(`Cannot open this location:\n${deliverable.path}\n\nPath is outside allowed directories.`);
         } else {
-          throw new Error(error.error || 'Unknown error');
+          // Headless server — reveal failed, try download
+          handleDownload(deliverable);
         }
       } catch (error) {
         console.error('Failed to open file:', error);
-        // Fallback: copy path to clipboard
-        try {
-          await navigator.clipboard.writeText(deliverable.path);
-          alert(`Could not open Finder. Path copied to clipboard:\n${deliverable.path}`);
-        } catch {
-          alert(`File path:\n${deliverable.path}`);
-        }
+        handleDownload(deliverable);
       }
     }
   };
@@ -98,6 +117,13 @@ export function DeliverablesList({ taskId }: DeliverablesListProps) {
     if (deliverable.path) {
       debug.file('Opening preview', { path: deliverable.path });
       window.open(`/api/files/preview?path=${encodeURIComponent(deliverable.path)}`, '_blank');
+    }
+  };
+
+  const handleDownload = (deliverable: TaskDeliverable) => {
+    if (deliverable.path) {
+      debug.file('Downloading file', { path: deliverable.path });
+      window.open(`/api/files/download?path=${encodeURIComponent(deliverable.path)}&raw=true`, '_blank');
     }
   };
 
@@ -142,7 +168,7 @@ export function DeliverablesList({ taskId }: DeliverablesListProps) {
 
           {/* Content */}
           <div className="flex-1 min-w-0">
-            {/* Title - clickable for URLs */}
+            {/* Title - clickable */}
             <div className="flex items-start justify-between gap-2">
               {deliverable.deliverable_type === 'url' && deliverable.path ? (
                 <a
@@ -158,8 +184,8 @@ export function DeliverablesList({ taskId }: DeliverablesListProps) {
                 <h4 className="font-medium text-mc-text">{deliverable.title}</h4>
               )}
               <div className="flex items-center gap-1">
-                {/* Preview button for HTML files */}
-                {deliverable.deliverable_type === 'file' && deliverable.path?.endsWith('.html') && (
+                {/* Preview button for previewable files */}
+                {deliverable.deliverable_type === 'file' && isPreviewable(deliverable.path) && (
                   <button
                     onClick={() => handlePreview(deliverable)}
                     className="flex-shrink-0 p-1.5 hover:bg-mc-bg-tertiary rounded text-mc-accent-cyan"
@@ -168,12 +194,22 @@ export function DeliverablesList({ taskId }: DeliverablesListProps) {
                     <Eye className="w-4 h-4" />
                   </button>
                 )}
+                {/* Download button for files */}
+                {deliverable.deliverable_type === 'file' && deliverable.path && (
+                  <button
+                    onClick={() => handleDownload(deliverable)}
+                    className="flex-shrink-0 p-1.5 hover:bg-mc-bg-tertiary rounded text-mc-text-secondary hover:text-mc-accent"
+                    title="Download file"
+                  >
+                    <Download className="w-4 h-4" />
+                  </button>
+                )}
                 {/* Open/Reveal button */}
                 {deliverable.path && (
                   <button
                     onClick={() => handleOpen(deliverable)}
                     className="flex-shrink-0 p-1.5 hover:bg-mc-bg-tertiary rounded text-mc-accent"
-                    title={deliverable.deliverable_type === 'url' ? 'Open URL' : 'Reveal in Finder'}
+                    title={deliverable.deliverable_type === 'url' ? 'Open URL' : 'Open file'}
                   >
                     <ExternalLink className="w-4 h-4" />
                   </button>
@@ -188,7 +224,7 @@ export function DeliverablesList({ taskId }: DeliverablesListProps) {
               </p>
             )}
 
-            {/* Path - clickable for URLs */}
+            {/* Path - clickable for previewable files */}
             {deliverable.path && (
               deliverable.deliverable_type === 'url' ? (
                 <a
@@ -199,6 +235,13 @@ export function DeliverablesList({ taskId }: DeliverablesListProps) {
                 >
                   {deliverable.path}
                 </a>
+              ) : isPreviewable(deliverable.path) ? (
+                <button
+                  onClick={() => handlePreview(deliverable)}
+                  className="mt-2 p-2 bg-mc-bg-tertiary rounded text-xs text-mc-accent font-mono break-all block w-full text-left hover:bg-mc-bg-tertiary/80 cursor-pointer"
+                >
+                  {deliverable.path}
+                </button>
               ) : (
                 <div className="mt-2 p-2 bg-mc-bg-tertiary rounded text-xs text-mc-text-secondary font-mono break-all">
                   {deliverable.path}
