@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS workspaces (
   name TEXT NOT NULL,
   slug TEXT NOT NULL UNIQUE,
   description TEXT,
-  icon TEXT DEFAULT '📁',
+  icon TEXT DEFAULT 'folder',
   created_at TEXT DEFAULT (datetime('now')),
   updated_at TEXT DEFAULT (datetime('now'))
 );
@@ -27,7 +27,6 @@ CREATE TABLE IF NOT EXISTS agents (
   name TEXT NOT NULL,
   role TEXT NOT NULL,
   description TEXT,
-  avatar_emoji TEXT DEFAULT '🤖',
   status TEXT DEFAULT 'standby' CHECK (status IN ('standby', 'working', 'offline')),
   is_master INTEGER DEFAULT 0,
   workspace_id TEXT DEFAULT 'default' REFERENCES workspaces(id),
@@ -38,6 +37,8 @@ CREATE TABLE IF NOT EXISTS agents (
   source TEXT DEFAULT 'local',
   gateway_agent_id TEXT,
   session_key_prefix TEXT,
+  agent_dir TEXT,
+  agent_workspace_path TEXT,
   created_at TEXT DEFAULT (datetime('now')),
   updated_at TEXT DEFAULT (datetime('now'))
 );

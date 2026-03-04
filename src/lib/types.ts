@@ -20,14 +20,13 @@ export type EventType =
   | 'agent_joined'
   | 'system';
 
-export type AgentSource = 'local' | 'gateway';
+export type AgentSource = 'local' | 'gateway' | 'synced';
 
 export interface Agent {
   id: string;
   name: string;
   role: string;
   description?: string;
-  avatar_emoji: string;
   status: AgentStatus;
   is_master: boolean;
   workspace_id: string;
@@ -38,6 +37,10 @@ export interface Agent {
   source: AgentSource;
   gateway_agent_id?: string;
   session_key_prefix?: string;
+  /** Absolute path to the OpenClaw agent config directory (contains system.md) */
+  agent_dir?: string;
+  /** Absolute path to the OpenClaw agent workspace directory (contains SOUL.md, USER.md, AGENTS.md) */
+  agent_workspace_path?: string;
   created_at: string;
   updated_at: string;
 }
@@ -290,7 +293,6 @@ export interface CreateAgentRequest {
   name: string;
   role: string;
   description?: string;
-  avatar_emoji?: string;
   is_master?: boolean;
   soul_md?: string;
   user_md?: string;

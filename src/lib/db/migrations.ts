@@ -40,7 +40,7 @@ const migrations: Migration[] = [
           name TEXT NOT NULL,
           slug TEXT NOT NULL UNIQUE,
           description TEXT,
-          icon TEXT DEFAULT '📁',
+          icon TEXT DEFAULT 'folder',
           created_at TEXT DEFAULT (datetime('now')),
           updated_at TEXT DEFAULT (datetime('now'))
         );
@@ -49,7 +49,7 @@ const migrations: Migration[] = [
       // Insert default workspace if not exists
       db.exec(`
         INSERT OR IGNORE INTO workspaces (id, name, slug, description, icon) 
-        VALUES ('default', 'Default Workspace', 'default', 'Default workspace', '🏠');
+        VALUES ('default', 'Default Workspace', 'default', 'Default workspace', 'BL');
       `);
       
       // Add workspace_id to tasks if not exists
@@ -620,6 +620,36 @@ const migrations: Migration[] = [
       bootstrapCoreAgentsRaw(db, 'default', missionControlUrl);
 
       console.log('[Migration 013] Fresh start complete');
+    }
+  },
+  {
+    id: '014',
+    name: 'add_agent_sync_columns',
+    up: (db) => {
+      console.log('[Migration 014] Adding agent sync columns...');
+
+      const cols = (db.prepare(`PRAGMA table_info(agents)`).all() as { name: string }[]).map(c => c.name);
+
+      if (!cols.includes('agent_dir')) {
+        db.exec(`ALTER TABLE agents ADD COLUMN agent_dir TEXT`);
+      }
+      if (!cols.includes('agent_workspace_path')) {
+        db.exec(`ALTER TABLE agents ADD COLUMN agent_workspace_path TEXT`);
+      }
+
+      console.log('[Migration 014] Agent sync columns added');
+    }
+  },
+  {
+    id: '015',
+    name: 'drop_avatar_emoji_column',
+    up: (db) => {
+      console.log('[Migration 015] Dropping avatar_emoji column from agents...');
+      const cols = (db.prepare(`PRAGMA table_info(agents)`).all() as { name: string }[]).map(c => c.name);
+      if (cols.includes('avatar_emoji')) {
+        db.exec(`ALTER TABLE agents DROP COLUMN avatar_emoji`);
+      }
+      console.log('[Migration 015] avatar_emoji column dropped');
     }
   }
 ];
