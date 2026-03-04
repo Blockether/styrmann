@@ -20,6 +20,14 @@ export type EventType =
   | 'agent_joined'
   | 'system';
 
+export type TaskType = 'bug' | 'feature' | 'chore' | 'documentation' | 'research';
+
+export type SprintStatus = 'planning' | 'active' | 'completed' | 'cancelled';
+
+export type MilestoneStatus = 'open' | 'closed';
+
+export type ResourceType = 'link' | 'document' | 'design' | 'api' | 'reference';
+
 export type AgentSource = 'local' | 'gateway' | 'synced';
 
 export interface Agent {
@@ -57,28 +65,109 @@ export interface DiscoveredAgent {
   existing_agent_id?: string;
 }
 
+export interface Milestone {
+  id: string;
+  workspace_id: string;
+  name: string;
+  description?: string;
+  due_date?: string;
+  status: MilestoneStatus;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Sprint {
+  id: string;
+  workspace_id: string;
+  name: string;
+  goal?: string;
+  milestone_id?: string;
+  start_date: string;
+  end_date: string;
+  status: SprintStatus;
+  created_at: string;
+  updated_at: string;
+  milestone?: Milestone;
+}
+
+export interface Tag {
+  id: string;
+  workspace_id: string;
+  name: string;
+  color: string;
+}
+
+export interface TaskComment {
+  id: string;
+  task_id: string;
+  author: string;
+  content: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TaskBlocker {
+  id: string;
+  task_id: string;
+  blocked_by_task_id?: string;
+  description?: string;
+  resolved: boolean;
+  created_at: string;
+  blocked_by_task?: Task;
+}
+
+export interface TaskResource {
+  id: string;
+  task_id: string;
+  title: string;
+  url: string;
+  resource_type: ResourceType;
+  created_at: string;
+}
+
+export interface TaskAcceptanceCriteria {
+  id: string;
+  task_id: string;
+  description: string;
+  is_met: boolean;
+  sort_order: number;
+  created_at: string;
+}
+
 export interface Task {
   id: string;
   title: string;
   description?: string;
   status: TaskStatus;
   priority: TaskPriority;
+  task_type: TaskType;
+  effort?: number;
+  impact?: number;
   assigned_agent_id: string | null;
   created_by_agent_id: string | null;
   workspace_id: string;
+  sprint_id?: string;
+  milestone_id?: string;
+  parent_task_id?: string;
   business_id: string;
   due_date?: string;
   workflow_template_id?: string;
   status_reason?: string;
-  // Planning/dispatch metadata (optional fields from tasks table)
   planning_complete?: number;
   planning_dispatch_error?: string;
   planning_session_key?: string;
   created_at: string;
   updated_at: string;
-  // Joined fields
   assigned_agent?: Agent;
   created_by_agent?: Agent;
+  sprint?: Sprint;
+  milestone?: Milestone;
+  subtasks?: Task[];
+  tags?: Tag[];
+  comments?: TaskComment[];
+  blockers?: TaskBlocker[];
+  resources?: TaskResource[];
+  acceptance_criteria?: TaskAcceptanceCriteria[];
 }
 
 export interface Conversation {
@@ -317,10 +406,18 @@ export interface CreateTaskRequest {
   title: string;
   description?: string;
   priority?: TaskPriority;
+  task_type?: TaskType;
+  effort?: number;
+  impact?: number;
   assigned_agent_id?: string;
   created_by_agent_id?: string;
+  workspace_id?: string;
+  sprint_id?: string;
+  milestone_id?: string;
+  parent_task_id?: string;
   business_id?: string;
   due_date?: string;
+  tags?: string[];
 }
 
 export interface UpdateTaskRequest extends Partial<CreateTaskRequest> {

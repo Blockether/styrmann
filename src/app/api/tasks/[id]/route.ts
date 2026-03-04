@@ -96,6 +96,30 @@ export async function PATCH(
       updates.push('priority = ?');
       values.push(validatedData.priority);
     }
+    if (validatedData.task_type !== undefined) {
+      updates.push('task_type = ?');
+      values.push(validatedData.task_type);
+    }
+    if (validatedData.effort !== undefined) {
+      updates.push('effort = ?');
+      values.push(validatedData.effort);
+    }
+    if (validatedData.impact !== undefined) {
+      updates.push('impact = ?');
+      values.push(validatedData.impact);
+    }
+    if (validatedData.sprint_id !== undefined) {
+      updates.push('sprint_id = ?');
+      values.push(validatedData.sprint_id);
+    }
+    if (validatedData.milestone_id !== undefined) {
+      updates.push('milestone_id = ?');
+      values.push(validatedData.milestone_id);
+    }
+    if (validatedData.parent_task_id !== undefined) {
+      updates.push('parent_task_id = ?');
+      values.push(validatedData.parent_task_id);
+    }
     if (validatedData.due_date !== undefined) {
       updates.push('due_date = ?');
       values.push(validatedData.due_date);

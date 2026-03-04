@@ -689,6 +689,138 @@ const migrations: Migration[] = [
 
       console.log('[Migration 017] Workspace logo_url column added');
     }
+  },
+  {
+    id: '018',
+    name: 'project_management_overhaul',
+    up: (db) => {
+      console.log('[Migration 018] Adding sprints, milestones, tags, and enhanced task fields...');
+
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS milestones (
+          id TEXT PRIMARY KEY,
+          workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+          name TEXT NOT NULL,
+          description TEXT,
+          due_date TEXT,
+          status TEXT DEFAULT 'open' CHECK (status IN ('open', 'closed')),
+          created_at TEXT DEFAULT (datetime('now')),
+          updated_at TEXT DEFAULT (datetime('now'))
+        )
+      `);
+
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS sprints (
+          id TEXT PRIMARY KEY,
+          workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+          name TEXT NOT NULL,
+          goal TEXT,
+          milestone_id TEXT REFERENCES milestones(id) ON DELETE SET NULL,
+          start_date TEXT NOT NULL,
+          end_date TEXT NOT NULL,
+          status TEXT DEFAULT 'planning' CHECK (status IN ('planning', 'active', 'completed', 'cancelled')),
+          created_at TEXT DEFAULT (datetime('now')),
+          updated_at TEXT DEFAULT (datetime('now'))
+        )
+      `);
+
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS tags (
+          id TEXT PRIMARY KEY,
+          workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+          name TEXT NOT NULL,
+          color TEXT DEFAULT '#6b7280',
+          UNIQUE(workspace_id, name)
+        )
+      `);
+
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS task_tags (
+          task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+          tag_id TEXT NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
+          PRIMARY KEY (task_id, tag_id)
+        )
+      `);
+
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS task_comments (
+          id TEXT PRIMARY KEY,
+          task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+          author TEXT NOT NULL,
+          content TEXT NOT NULL,
+          created_at TEXT DEFAULT (datetime('now')),
+          updated_at TEXT DEFAULT (datetime('now'))
+        )
+      `);
+
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS task_blockers (
+          id TEXT PRIMARY KEY,
+          task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+          blocked_by_task_id TEXT REFERENCES tasks(id) ON DELETE SET NULL,
+          description TEXT,
+          resolved INTEGER DEFAULT 0,
+          created_at TEXT DEFAULT (datetime('now'))
+        )
+      `);
+
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS task_resources (
+          id TEXT PRIMARY KEY,
+          task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+          title TEXT NOT NULL,
+          url TEXT NOT NULL,
+          resource_type TEXT DEFAULT 'link' CHECK (resource_type IN ('link', 'document', 'design', 'api', 'reference')),
+          created_at TEXT DEFAULT (datetime('now'))
+        )
+      `);
+
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS task_acceptance_criteria (
+          id TEXT PRIMARY KEY,
+          task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+          description TEXT NOT NULL,
+          is_met INTEGER DEFAULT 0,
+          sort_order INTEGER DEFAULT 0,
+          created_at TEXT DEFAULT (datetime('now'))
+        )
+      `);
+
+      const taskCols = (db.prepare(`PRAGMA table_info(tasks)`).all() as { name: string }[]).map(c => c.name);
+
+      if (!taskCols.includes('task_type')) {
+        db.exec(`ALTER TABLE tasks ADD COLUMN task_type TEXT DEFAULT 'feature' CHECK (task_type IN ('bug', 'feature', 'chore', 'documentation', 'research'))`);
+      }
+      if (!taskCols.includes('effort')) {
+        db.exec(`ALTER TABLE tasks ADD COLUMN effort INTEGER CHECK (effort IS NULL OR (effort >= 1 AND effort <= 5))`);
+      }
+      if (!taskCols.includes('impact')) {
+        db.exec(`ALTER TABLE tasks ADD COLUMN impact INTEGER CHECK (impact IS NULL OR (impact >= 1 AND impact <= 5))`);
+      }
+      if (!taskCols.includes('sprint_id')) {
+        db.exec(`ALTER TABLE tasks ADD COLUMN sprint_id TEXT REFERENCES sprints(id) ON DELETE SET NULL`);
+      }
+      if (!taskCols.includes('milestone_id')) {
+        db.exec(`ALTER TABLE tasks ADD COLUMN milestone_id TEXT REFERENCES milestones(id) ON DELETE SET NULL`);
+      }
+      if (!taskCols.includes('parent_task_id')) {
+        db.exec(`ALTER TABLE tasks ADD COLUMN parent_task_id TEXT REFERENCES tasks(id) ON DELETE CASCADE`);
+      }
+
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_tasks_sprint ON tasks(sprint_id)`);
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_tasks_milestone ON tasks(milestone_id)`);
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_tasks_parent ON tasks(parent_task_id)`);
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_tasks_type ON tasks(task_type)`);
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_sprints_workspace ON sprints(workspace_id)`);
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_milestones_workspace ON milestones(workspace_id)`);
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_tags_workspace ON tags(workspace_id)`);
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_task_comments_task ON task_comments(task_id, created_at DESC)`);
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_task_blockers_task ON task_blockers(task_id)`);
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_task_resources_task ON task_resources(task_id)`);
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_task_acceptance_criteria_task ON task_acceptance_criteria(task_id, sort_order)`);
+
+      console.log('[Migration 018] Project management overhaul complete');
+    }
   }
 ];
 

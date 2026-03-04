@@ -15,6 +15,8 @@ const TaskStatus = z.enum([
 
 const TaskPriority = z.enum(['low', 'normal', 'high', 'urgent']);
 
+const TaskType = z.enum(['bug', 'feature', 'chore', 'documentation', 'research']);
+
 const ActivityType = z.enum([
   'spawned',
   'updated',
@@ -31,11 +33,18 @@ export const CreateTaskSchema = z.object({
   description: z.string().max(10000, 'Description must be 10000 characters or less').optional(),
   status: TaskStatus.optional(),
   priority: TaskPriority.optional(),
+  task_type: TaskType.optional(),
+  effort: z.number().int().min(1).max(5).optional().nullable(),
+  impact: z.number().int().min(1).max(5).optional().nullable(),
   assigned_agent_id: z.string().uuid().optional().nullable(),
   created_by_agent_id: z.string().uuid().optional().nullable(),
   business_id: z.string().optional(),
   workspace_id: z.string().optional(),
+  sprint_id: z.string().optional().nullable(),
+  milestone_id: z.string().optional().nullable(),
+  parent_task_id: z.string().optional().nullable(),
   due_date: z.string().optional().nullable(),
+  tags: z.array(z.string()).optional(),
 });
 
 export const UpdateTaskSchema = z.object({
@@ -43,10 +52,51 @@ export const UpdateTaskSchema = z.object({
   description: z.string().max(10000).optional(),
   status: TaskStatus.optional(),
   priority: TaskPriority.optional(),
+  task_type: TaskType.optional(),
+  effort: z.number().int().min(1).max(5).optional().nullable(),
+  impact: z.number().int().min(1).max(5).optional().nullable(),
   assigned_agent_id: z.string().uuid().optional().nullable(),
   workflow_template_id: z.string().optional().nullable(),
+  sprint_id: z.string().optional().nullable(),
+  milestone_id: z.string().optional().nullable(),
+  parent_task_id: z.string().optional().nullable(),
   due_date: z.string().optional().nullable(),
   updated_by_agent_id: z.string().uuid().optional(),
+  tags: z.array(z.string()).optional(),
+});
+
+export const SprintStatus = z.enum(['planning', 'active', 'completed', 'cancelled']);
+
+export const CreateSprintSchema = z.object({
+  workspace_id: z.string().min(1),
+  name: z.string().min(1).max(200),
+  goal: z.string().max(2000).optional(),
+  milestone_id: z.string().optional().nullable(),
+  start_date: z.string().min(1),
+  end_date: z.string().min(1),
+});
+
+export const UpdateSprintSchema = z.object({
+  name: z.string().min(1).max(200).optional(),
+  goal: z.string().max(2000).optional().nullable(),
+  milestone_id: z.string().optional().nullable(),
+  start_date: z.string().optional(),
+  end_date: z.string().optional(),
+  status: SprintStatus.optional(),
+});
+
+export const CreateMilestoneSchema = z.object({
+  workspace_id: z.string().min(1),
+  name: z.string().min(1).max(200),
+  description: z.string().max(2000).optional(),
+  due_date: z.string().optional().nullable(),
+});
+
+export const UpdateMilestoneSchema = z.object({
+  name: z.string().min(1).max(200).optional(),
+  description: z.string().max(2000).optional().nullable(),
+  due_date: z.string().optional().nullable(),
+  status: z.enum(['open', 'closed']).optional(),
 });
 
 // Activity validation schema

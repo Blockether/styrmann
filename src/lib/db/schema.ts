@@ -47,6 +47,32 @@ CREATE TABLE IF NOT EXISTS agents (
   updated_at TEXT DEFAULT (datetime('now'))
 );
 
+-- Milestones table
+CREATE TABLE IF NOT EXISTS milestones (
+  id TEXT PRIMARY KEY,
+  workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  description TEXT,
+  due_date TEXT,
+  status TEXT DEFAULT 'open' CHECK (status IN ('open', 'closed')),
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now'))
+);
+
+-- Sprints table
+CREATE TABLE IF NOT EXISTS sprints (
+  id TEXT PRIMARY KEY,
+  workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  goal TEXT,
+  milestone_id TEXT REFERENCES milestones(id) ON DELETE SET NULL,
+  start_date TEXT NOT NULL,
+  end_date TEXT NOT NULL,
+  status TEXT DEFAULT 'planning' CHECK (status IN ('planning', 'active', 'completed', 'cancelled')),
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now'))
+);
+
 -- Tasks table (Mission Queue)
 CREATE TABLE IF NOT EXISTS tasks (
   id TEXT PRIMARY KEY,
@@ -54,9 +80,15 @@ CREATE TABLE IF NOT EXISTS tasks (
   description TEXT,
   status TEXT DEFAULT 'inbox' CHECK (status IN ('pending_dispatch', 'planning', 'inbox', 'assigned', 'in_progress', 'testing', 'review', 'verification', 'done')),
   priority TEXT DEFAULT 'normal' CHECK (priority IN ('low', 'normal', 'high', 'urgent')),
+  task_type TEXT DEFAULT 'feature' CHECK (task_type IN ('bug', 'feature', 'chore', 'documentation', 'research')),
+  effort INTEGER CHECK (effort IS NULL OR (effort >= 1 AND effort <= 5)),
+  impact INTEGER CHECK (impact IS NULL OR (impact >= 1 AND impact <= 5)),
   assigned_agent_id TEXT REFERENCES agents(id),
   created_by_agent_id TEXT REFERENCES agents(id),
   workspace_id TEXT DEFAULT 'default' REFERENCES workspaces(id),
+  sprint_id TEXT REFERENCES sprints(id) ON DELETE SET NULL,
+  milestone_id TEXT REFERENCES milestones(id) ON DELETE SET NULL,
+  parent_task_id TEXT REFERENCES tasks(id) ON DELETE CASCADE,
   business_id TEXT DEFAULT 'default',
   due_date TEXT,
   workflow_template_id TEXT REFERENCES workflow_templates(id),
@@ -69,6 +101,62 @@ CREATE TABLE IF NOT EXISTS tasks (
   status_reason TEXT,
   created_at TEXT DEFAULT (datetime('now')),
   updated_at TEXT DEFAULT (datetime('now'))
+);
+
+-- Tags table
+CREATE TABLE IF NOT EXISTS tags (
+  id TEXT PRIMARY KEY,
+  workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  color TEXT DEFAULT '#6b7280',
+  UNIQUE(workspace_id, name)
+);
+
+-- Task-Tag junction table
+CREATE TABLE IF NOT EXISTS task_tags (
+  task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  tag_id TEXT NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
+  PRIMARY KEY (task_id, tag_id)
+);
+
+-- Task comments
+CREATE TABLE IF NOT EXISTS task_comments (
+  id TEXT PRIMARY KEY,
+  task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  author TEXT NOT NULL,
+  content TEXT NOT NULL,
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now'))
+);
+
+-- Task blockers
+CREATE TABLE IF NOT EXISTS task_blockers (
+  id TEXT PRIMARY KEY,
+  task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  blocked_by_task_id TEXT REFERENCES tasks(id) ON DELETE SET NULL,
+  description TEXT,
+  resolved INTEGER DEFAULT 0,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+-- Task resources
+CREATE TABLE IF NOT EXISTS task_resources (
+  id TEXT PRIMARY KEY,
+  task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  url TEXT NOT NULL,
+  resource_type TEXT DEFAULT 'link' CHECK (resource_type IN ('link', 'document', 'design', 'api', 'reference')),
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+-- Task acceptance criteria
+CREATE TABLE IF NOT EXISTS task_acceptance_criteria (
+  id TEXT PRIMARY KEY,
+  task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  description TEXT NOT NULL,
+  is_met INTEGER DEFAULT 0,
+  sort_order INTEGER DEFAULT 0,
+  created_at TEXT DEFAULT (datetime('now'))
 );
 
 -- Planning questions table
@@ -232,4 +320,15 @@ CREATE INDEX IF NOT EXISTS idx_workflow_templates_workspace ON workflow_template
 CREATE INDEX IF NOT EXISTS idx_task_roles_task ON task_roles(task_id);
 CREATE INDEX IF NOT EXISTS idx_knowledge_entries_workspace ON knowledge_entries(workspace_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_knowledge_entries_task ON knowledge_entries(task_id);
+CREATE INDEX IF NOT EXISTS idx_tasks_sprint ON tasks(sprint_id);
+CREATE INDEX IF NOT EXISTS idx_tasks_milestone ON tasks(milestone_id);
+CREATE INDEX IF NOT EXISTS idx_tasks_parent ON tasks(parent_task_id);
+CREATE INDEX IF NOT EXISTS idx_tasks_type ON tasks(task_type);
+CREATE INDEX IF NOT EXISTS idx_sprints_workspace ON sprints(workspace_id);
+CREATE INDEX IF NOT EXISTS idx_milestones_workspace ON milestones(workspace_id);
+CREATE INDEX IF NOT EXISTS idx_tags_workspace ON tags(workspace_id);
+CREATE INDEX IF NOT EXISTS idx_task_comments_task ON task_comments(task_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_task_blockers_task ON task_blockers(task_id);
+CREATE INDEX IF NOT EXISTS idx_task_resources_task ON task_resources(task_id);
+CREATE INDEX IF NOT EXISTS idx_task_acceptance_criteria_task ON task_acceptance_criteria(task_id, sort_order);
 `;

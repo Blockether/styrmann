@@ -1,10 +1,21 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
-import { Settings, ChevronLeft, LayoutGrid, Folder } from 'lucide-react';
+import {
+  Settings,
+  ChevronLeft,
+  LayoutGrid,
+  Folder,
+  ListTodo,
+  Inbox,
+  Calendar,
+  Flag,
+  BarChart3,
+  Activity,
+} from 'lucide-react';
 import { useMissionControl } from '@/lib/store';
 import { format } from 'date-fns';
 import type { Workspace } from '@/lib/types';
@@ -14,11 +25,63 @@ interface HeaderProps {
   isPortrait?: boolean;
 }
 
+interface NavItem {
+  label: string;
+  href: string;
+  icon: React.ReactNode;
+  matchPattern: (pathname: string, slug: string) => boolean;
+}
+
+function getNavItems(slug: string): NavItem[] {
+  return [
+    {
+      label: 'Queue',
+      href: `/workspace/${slug}`,
+      icon: <ListTodo className="w-4 h-4" />,
+      matchPattern: (pathname, s) => pathname === `/workspace/${s}` || pathname === `/workspace/${s}/`,
+    },
+    {
+      label: 'Backlog',
+      href: `/workspace/${slug}/backlog`,
+      icon: <Inbox className="w-4 h-4" />,
+      matchPattern: (pathname, s) => pathname.startsWith(`/workspace/${s}/backlog`),
+    },
+    {
+      label: 'Sprints',
+      href: `/workspace/${slug}/sprints`,
+      icon: <Calendar className="w-4 h-4" />,
+      matchPattern: (pathname, s) => pathname.startsWith(`/workspace/${s}/sprints`),
+    },
+    {
+      label: 'Milestones',
+      href: `/workspace/${slug}/milestones`,
+      icon: <Flag className="w-4 h-4" />,
+      matchPattern: (pathname, s) => pathname.startsWith(`/workspace/${s}/milestones`),
+    },
+    {
+      label: 'Pareto',
+      href: `/workspace/${slug}/pareto`,
+      icon: <BarChart3 className="w-4 h-4" />,
+      matchPattern: (pathname, s) => pathname.startsWith(`/workspace/${s}/pareto`),
+    },
+    {
+      label: 'Activity',
+      href: `/workspace/${slug}/activity`,
+      icon: <Activity className="w-4 h-4" />,
+      matchPattern: (pathname, s) => pathname.startsWith(`/workspace/${s}/activity`),
+    },
+  ];
+}
+
 export function Header({ workspace, isPortrait = true }: HeaderProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const { agents, tasks, isOnline } = useMissionControl();
   const [currentTime, setCurrentTime] = useState(new Date());
   const [activeSubAgents, setActiveSubAgents] = useState(0);
+
+  const navItems = workspace ? getNavItems(workspace.slug) : [];
+  const activeNavItem = navItems.find((item) => item.matchPattern(pathname, workspace?.slug || ''));
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -135,6 +198,28 @@ export function Header({ workspace, isPortrait = true }: HeaderProps) {
               </Link>
             )}
           </div>
+
+          {workspace && navItems.length > 0 && (
+            <nav className="hidden md:flex items-center gap-1">
+              {navItems.map((item) => {
+                const isActive = activeNavItem?.href === item.href;
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-colors ${
+                      isActive
+                        ? 'bg-mc-accent text-white font-medium'
+                        : 'text-mc-text-secondary hover:text-mc-text hover:bg-mc-bg-tertiary'
+                    }`}
+                  >
+                    {item.icon}
+                    <span className="hidden lg:inline">{item.label}</span>
+                  </Link>
+                );
+              })}
+            </nav>
+          )}
 
           {workspace && (
             <div className="hidden lg:flex items-center gap-8">
