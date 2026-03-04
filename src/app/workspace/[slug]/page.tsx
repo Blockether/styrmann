@@ -2,8 +2,9 @@
 
 import { useEffect, useState, type ReactNode } from 'react';
 import { useParams } from 'next/navigation';
+import Image from 'next/image';
 import Link from 'next/link';
-import { ChevronLeft, ListTodo, Users, Activity, Settings as SettingsIcon, ExternalLink, Home, BarChart3 } from 'lucide-react';
+import { ChevronLeft, ListTodo, Users, Activity, Settings as SettingsIcon, ExternalLink, Home, BarChart3, Folder } from 'lucide-react';
 import { Header } from '@/components/Header';
 import { AgentsSidebar } from '@/components/AgentsSidebar';
 import { MissionQueue } from '@/components/MissionQueue';
@@ -195,7 +196,7 @@ export default function WorkspacePage() {
     return (
       <div className="min-h-screen bg-mc-bg flex items-center justify-center">
         <div className="text-center">
-          <img src="/favicon.svg" alt="Blockether" className="w-10 h-10 mb-4 animate-pulse" />
+          <Image src="/logo.png" alt="Blockether" width={40} height={40} className="mb-4 animate-pulse rounded" />
           <p className="text-mc-text-secondary">Loading {slug}...</p>
         </div>
       </div>
@@ -310,7 +311,7 @@ function MobileSettingsPanel({ workspace, denseLandscape = false }: { workspace:
         <div className="bg-mc-bg-secondary border border-mc-border rounded-lg p-4">
           <div className="text-sm text-mc-text-secondary mb-2">Current workspace</div>
           <div className="flex items-center gap-2 text-base font-medium">
-            <span>{workspace.icon}</span>
+            <Folder className="w-4 h-4 text-mc-accent" />
             <span>{workspace.name}</span>
           </div>
           <div className="text-xs text-mc-text-secondary mt-1">/{workspace.slug}</div>

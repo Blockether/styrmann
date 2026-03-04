@@ -49,7 +49,7 @@ const migrations: Migration[] = [
       // Insert default workspace if not exists
       db.exec(`
         INSERT OR IGNORE INTO workspaces (id, name, slug, description, icon) 
-        VALUES ('default', 'Default Workspace', 'default', 'Default workspace', 'BL');
+        VALUES ('default', 'MissionControl Configuration', 'default', 'Main configuration workspace', 'MC');
       `);
       
       // Add workspace_id to tasks if not exists

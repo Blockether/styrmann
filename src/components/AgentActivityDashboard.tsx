@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { ArrowLeft, AlertTriangle, Activity, Clock, Filter, RefreshCw } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
@@ -191,7 +192,7 @@ export function AgentActivityDashboard({ workspace }: AgentActivityDashboardProp
     return (
       <div className="min-h-screen bg-mc-bg flex items-center justify-center">
         <div className="text-center">
-          <img src="/favicon.svg" alt="Blockether" className="w-10 h-10 mb-3 animate-pulse" />
+          <Image src="/logo.png" alt="Blockether" width={40} height={40} className="mb-3 animate-pulse rounded" />
           <p className="text-mc-text-secondary">Loading activity dashboard...</p>
         </div>
       </div>
@@ -209,7 +210,7 @@ export function AgentActivityDashboard({ workspace }: AgentActivityDashboardProp
             <div className="min-w-0">
               <h1 className="text-lg sm:text-xl font-semibold truncate">Agent Activity Dashboard</h1>
               <p className="text-xs sm:text-sm text-mc-text-secondary truncate">
-                {workspace ? `${workspace.icon} ${workspace.name}` : 'All workspaces'} · {sseConnected ? 'Live (SSE)' : 'Polling fallback'}
+                {workspace ? workspace.name : 'All workspaces'} · {sseConnected ? 'Live (SSE)' : 'Polling fallback'}
               </p>
             </div>
           </div>

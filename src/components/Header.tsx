@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import Link from 'next/link';
-import { Settings, ChevronLeft, LayoutGrid } from 'lucide-react';
+import { Settings, ChevronLeft, LayoutGrid, Folder } from 'lucide-react';
 import { useMissionControl } from '@/lib/store';
 import { format } from 'date-fns';
 import type { Workspace } from '@/lib/types';
@@ -63,7 +64,7 @@ export function Header({ workspace, isPortrait = true }: HeaderProps) {
                 <LayoutGrid className="w-4 h-4" />
               </Link>
               <div className="flex items-center gap-2 px-2.5 py-1.5 bg-mc-bg-tertiary rounded min-w-0">
-                <span className="text-base">{workspace.icon}</span>
+                <Folder className="w-4 h-4 text-mc-accent shrink-0" />
                 <span className="font-medium truncate text-sm">{workspace.name}</span>
               </div>
             </div>
@@ -101,7 +102,7 @@ export function Header({ workspace, isPortrait = true }: HeaderProps) {
         <>
           <div className="flex items-center gap-2 md:gap-4 min-w-0">
             <div className="hidden sm:flex items-center gap-2">
-              <img src="/favicon.svg" alt="Blockether" className="w-6 h-6" />
+              <Image src="/logo.png" alt="Blockether" width={24} height={24} className="rounded" />
               <span className="font-semibold text-mc-text uppercase tracking-wider text-sm">Blockether</span>
             </div>
 
@@ -113,7 +114,7 @@ export function Header({ workspace, isPortrait = true }: HeaderProps) {
                 </Link>
                 <span className="hidden sm:block text-mc-text-secondary">/</span>
                 <div className="flex items-center gap-2 px-2 md:px-3 py-1 bg-mc-bg-tertiary rounded min-w-0">
-                  <span className="text-base md:text-lg">{workspace.icon}</span>
+                  <Folder className="w-4 h-4 text-mc-accent shrink-0" />
                   <span className="font-medium truncate text-sm md:text-base">{workspace.name}</span>
                 </div>
               </div>
