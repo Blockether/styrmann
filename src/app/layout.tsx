@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { IBM_Plex_Mono, Atkinson_Hyperlegible } from 'next/font/google';
+import DemoBanner from '@/components/DemoBanner';
 
 const ibmPlexMono = IBM_Plex_Mono({
   subsets: ['latin'],
@@ -13,14 +14,6 @@ const atkinsonHyperlegible = Atkinson_Hyperlegible({
   subsets: ['latin'],
   variable: '--font-atkinson-hyperlegible',
   weight: ['400', '700'],
-  style: ['normal', 'italic'],
-  display: 'swap',
-});
-
-const instrumentSerif = Instrument_Serif({
-  subsets: ['latin'],
-  variable: '--font-instrument-serif',
-  weight: '400',
   style: ['normal', 'italic'],
   display: 'swap',
 });
