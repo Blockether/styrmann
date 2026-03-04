@@ -14,7 +14,6 @@ interface RoleAssignment {
   role: string;
   agent_id: string;
   agent_name?: string;
-  agent_emoji?: string;
 }
 
 export function TeamTab({ taskId, workspaceId }: TeamTabProps) {
@@ -39,11 +38,10 @@ export function TeamTab({ taskId, workspaceId }: TeamTabProps) {
 
         if (rolesRes.ok) {
           const data = await rolesRes.json();
-          setRoles(data.map((r: RoleAssignment & { agent_name: string; agent_emoji: string }) => ({
+          setRoles(data.map((r: RoleAssignment & { agent_name: string }) => ({
             role: r.role,
             agent_id: r.agent_id,
             agent_name: r.agent_name,
-            agent_emoji: r.agent_emoji,
           })));
         }
 
@@ -241,7 +239,7 @@ export function TeamTab({ taskId, workspaceId }: TeamTabProps) {
                   <option value="">Unassigned</option>
                   {agents.map(agent => (
                     <option key={agent.id} value={agent.id}>
-                      {agent.avatar_emoji} {agent.name} — {agent.role}
+                      {agent.name} — {agent.role}
                     </option>
                   ))}
                 </select>
@@ -249,7 +247,6 @@ export function TeamTab({ taskId, workspaceId }: TeamTabProps) {
             );
           })}
 
-          {/* Custom role slots (not from workflow) */}
           {roles.filter(r => !uniqueRoles.includes(r.role) && r.role).map((r, i) => (
             <div key={`custom-${i}`} className="flex items-center gap-3">
               <input
@@ -270,14 +267,13 @@ export function TeamTab({ taskId, workspaceId }: TeamTabProps) {
                 <option value="">Unassigned</option>
                 {agents.map(agent => (
                   <option key={agent.id} value={agent.id}>
-                    {agent.avatar_emoji} {agent.name} — {agent.role}
+                    {agent.name} — {agent.role}
                   </option>
                 ))}
               </select>
             </div>
           ))}
 
-          {/* Learner role - always show if not in uniqueRoles */}
           {!uniqueRoles.includes('learner') && (
             <div className="flex items-center gap-3 opacity-60 hover:opacity-100 transition-opacity">
               <div className="w-24 text-xs font-medium text-mc-text-secondary capitalize flex-shrink-0">
@@ -291,7 +287,7 @@ export function TeamTab({ taskId, workspaceId }: TeamTabProps) {
                 <option value="">Unassigned (optional)</option>
                 {agents.map(agent => (
                   <option key={agent.id} value={agent.id}>
-                    {agent.avatar_emoji} {agent.name} — {agent.role}
+                    {agent.name} — {agent.role}
                   </option>
                 ))}
               </select>
@@ -325,7 +321,7 @@ export function TeamTab({ taskId, workspaceId }: TeamTabProps) {
       <button
         onClick={handleSave}
         disabled={saving}
-        className="w-full min-h-11 flex items-center justify-center gap-2 bg-mc-accent text-mc-bg rounded text-sm font-medium hover:bg-mc-accent/90 disabled:opacity-50"
+        className="w-full min-h-11 flex items-center justify-center gap-2 bg-mc-accent text-white rounded text-sm font-medium hover:bg-mc-accent/90 disabled:opacity-50"
       >
         <Save className="w-4 h-4" />
         {saving ? 'Saving...' : 'Save Team'}

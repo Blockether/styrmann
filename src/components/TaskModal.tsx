@@ -297,11 +297,11 @@ export function TaskModal({ task, onClose, workspaceId }: TaskModalProps) {
               <option value="">Unassigned</option>
               {agents.map((agent) => (
                 <option key={agent.id} value={agent.id}>
-                  {agent.avatar_emoji} {agent.name} - {agent.role}
+                  {agent.name} - {agent.role}
                 </option>
               ))}
               <option value="__add_new__" className="text-mc-accent">
-                ➕ Add new agent...
+                + Add new agent...
               </option>
             </select>
           </div>
@@ -410,7 +410,7 @@ export function TaskModal({ task, onClose, workspaceId }: TaskModalProps) {
               <button
                 onClick={handleSubmit}
                 disabled={isSubmitting}
-                className="min-h-11 flex items-center gap-2 px-4 py-2 bg-mc-accent text-mc-bg rounded text-sm font-medium hover:bg-mc-accent/90 disabled:opacity-50"
+                className="min-h-11 flex items-center gap-2 px-4 py-2 bg-mc-accent text-white rounded text-sm font-medium hover:bg-mc-accent/90 disabled:opacity-50"
               >
                 <Save className="w-4 h-4" />
                 {isSubmitting ? 'Saving...' : 'Save'}

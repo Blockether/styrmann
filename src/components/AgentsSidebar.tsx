@@ -1,11 +1,11 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Plus, ChevronRight, ChevronLeft, Zap, ZapOff, Loader2, Search } from 'lucide-react';
+import { Plus, ChevronRight, ChevronLeft, RefreshCw } from 'lucide-react';
 import { useMissionControl } from '@/lib/store';
 import type { Agent, AgentStatus, OpenClawSession } from '@/lib/types';
 import { AgentModal } from './AgentModal';
-import { DiscoverAgentsModal } from './DiscoverAgentsModal';
+import { AgentInitials } from './AgentInitials';
 
 type FilterTab = 'all' | 'working' | 'standby';
 
@@ -16,12 +16,11 @@ interface AgentsSidebarProps {
 }
 
 export function AgentsSidebar({ workspaceId, mobileMode = false, isPortrait = true }: AgentsSidebarProps) {
-  const { agents, selectedAgent, setSelectedAgent, agentOpenClawSessions, setAgentOpenClawSession } = useMissionControl();
+  const { agents, selectedAgent, setSelectedAgent, setAgents, agentOpenClawSessions, setAgentOpenClawSession } = useMissionControl();
   const [filter, setFilter] = useState<FilterTab>('all');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingAgent, setEditingAgent] = useState<Agent | null>(null);
-  const [showDiscoverModal, setShowDiscoverModal] = useState(false);
-  const [connectingAgentId, setConnectingAgentId] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
   const [activeSubAgents, setActiveSubAgents] = useState(0);
   const [isMinimized, setIsMinimized] = useState(false);
 
@@ -68,33 +67,24 @@ export function AgentsSidebar({ workspaceId, mobileMode = false, isPortrait = tr
     return () => clearInterval(interval);
   }, []);
 
-  const handleConnectToOpenClaw = async (agent: Agent, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setConnectingAgentId(agent.id);
-
+  const handleSyncGateway = async () => {
+    setSyncing(true);
     try {
-      const existingSession = agentOpenClawSessions[agent.id];
-
-      if (existingSession) {
-        const res = await fetch(`/api/agents/${agent.id}/openclaw`, { method: 'DELETE' });
-        if (res.ok) {
-          setAgentOpenClawSession(agent.id, null);
+      const res = await fetch('/api/agents/sync', { method: 'POST' });
+      if (res.ok) {
+        const allRes = await fetch(`/api/agents${workspaceId ? `?workspace_id=${workspaceId}` : ''}`);
+        if (allRes.ok) {
+          const allAgents = await allRes.json();
+          setAgents(allAgents);
         }
       } else {
-        const res = await fetch(`/api/agents/${agent.id}/openclaw`, { method: 'POST' });
-        if (res.ok) {
-          const data = await res.json();
-          setAgentOpenClawSession(agent.id, data.session as OpenClawSession);
-        } else {
-          const error = await res.json();
-          console.error('Failed to connect to OpenClaw:', error);
-          alert(`Failed to connect: ${error.error || 'Unknown error'}`);
-        }
+        const data = await res.json();
+        console.error('Sync failed:', data.error);
       }
     } catch (error) {
-      console.error('OpenClaw connection error:', error);
+      console.error('Sync error:', error);
     } finally {
-      setConnectingAgentId(null);
+      setSyncing(false);
     }
   };
 
@@ -155,7 +145,7 @@ export function AgentsSidebar({ workspaceId, mobileMode = false, isPortrait = tr
                   key={tab}
                   onClick={() => setFilter(tab)}
                   className={`min-h-11 text-xs rounded uppercase ${mobileMode && isPortrait ? 'px-1' : 'px-3'} ${
-                    filter === tab ? 'bg-mc-accent text-mc-bg font-medium' : 'text-mc-text-secondary hover:bg-mc-bg-tertiary'
+                    filter === tab ? 'bg-mc-accent text-white font-medium' : 'text-mc-text-secondary hover:bg-mc-bg-tertiary'
                   }`}
                 >
                   {tab}
@@ -169,6 +159,7 @@ export function AgentsSidebar({ workspaceId, mobileMode = false, isPortrait = tr
       <div className="flex-1 overflow-y-auto p-2 space-y-1">
         {filteredAgents.map((agent) => {
           const openclawSession = agentOpenClawSessions[agent.id];
+          const isSynced = agent.source === 'synced' || agent.source === 'gateway';
 
           if (effectiveMinimized) {
             return (
@@ -181,8 +172,8 @@ export function AgentsSidebar({ workspaceId, mobileMode = false, isPortrait = tr
                   className="relative group"
                   title={`${agent.name} - ${agent.role}`}
                 >
-                  <span className="text-2xl">{agent.avatar_emoji}</span>
-                  {openclawSession && <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-mc-bg-secondary" />}
+                  <AgentInitials name={agent.name} size="md" />
+                  {(openclawSession || isSynced) && <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-mc-bg-secondary" />}
                   {!!agent.is_master && <span className="absolute -top-1 -right-1 text-xs text-mc-accent-yellow">★</span>}
                   <span
                     className={`absolute -bottom-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full ${
@@ -197,7 +188,6 @@ export function AgentsSidebar({ workspaceId, mobileMode = false, isPortrait = tr
             );
           }
 
-          const isConnecting = connectingAgentId === agent.id;
           return (
             <div key={agent.id} className={`w-full rounded hover:bg-mc-bg-tertiary transition-colors ${selectedAgent?.id === agent.id ? 'bg-mc-bg-tertiary' : ''}`}>
               <button
@@ -207,9 +197,9 @@ export function AgentsSidebar({ workspaceId, mobileMode = false, isPortrait = tr
                 }}
                 className="w-full flex items-center gap-3 p-3 text-left min-h-11"
               >
-                <div className="text-2xl relative">
-                  {agent.avatar_emoji}
-                  {openclawSession && <span className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-mc-bg-secondary" />}
+                <div className="relative">
+                  <AgentInitials name={agent.name} size="md" />
+                  {(openclawSession || isSynced) && <span className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-mc-bg-secondary" />}
                 </div>
 
                 <div className="flex-1 min-w-0">
@@ -219,9 +209,9 @@ export function AgentsSidebar({ workspaceId, mobileMode = false, isPortrait = tr
                   </div>
                   <div className="text-xs text-mc-text-secondary truncate flex items-center gap-1">
                     {agent.role}
-                    {agent.source === 'gateway' && (
-                      <span className="text-[10px] px-1 py-0 bg-blue-500/20 text-blue-400 rounded" title="Imported from Gateway">
-                        GW
+                    {isSynced && (
+                      <span className="text-[10px] px-1 py-0 bg-mc-accent/20 text-mc-accent rounded" title="Synced from Gateway">
+                        SYNC
                       </span>
                     )}
                   </div>
@@ -229,37 +219,6 @@ export function AgentsSidebar({ workspaceId, mobileMode = false, isPortrait = tr
 
                 <span className={`text-xs px-2 py-0.5 rounded uppercase ${getStatusBadge(agent.status)}`}>{agent.status}</span>
               </button>
-
-              {!!agent.is_master && (
-                <div className="px-2 pb-2">
-                  <button
-                    onClick={(e) => handleConnectToOpenClaw(agent, e)}
-                    disabled={isConnecting}
-                    className={`w-full min-h-11 flex items-center justify-center gap-2 px-2 rounded text-xs transition-colors ${
-                      openclawSession
-                        ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
-                        : 'bg-mc-bg text-mc-text-secondary hover:bg-mc-bg-tertiary hover:text-mc-text'
-                    }`}
-                  >
-                    {isConnecting ? (
-                      <>
-                        <Loader2 className="w-3 h-3 animate-spin" />
-                        <span>Connecting...</span>
-                      </>
-                    ) : openclawSession ? (
-                      <>
-                        <Zap className="w-3 h-3" />
-                        <span>OpenClaw Connected</span>
-                      </>
-                    ) : (
-                      <>
-                        <ZapOff className="w-3 h-3" />
-                        <span>Connect to OpenClaw</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-              )}
             </div>
           );
         })}
@@ -275,18 +234,19 @@ export function AgentsSidebar({ workspaceId, mobileMode = false, isPortrait = tr
             Add Agent
           </button>
           <button
-            onClick={() => setShowDiscoverModal(true)}
-            className="w-full min-h-11 flex items-center justify-center gap-2 px-3 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 rounded text-sm text-blue-400 hover:text-blue-300 transition-colors"
+            onClick={handleSyncGateway}
+            disabled={syncing}
+            className="w-full min-h-11 flex items-center justify-center gap-2 px-3 bg-mc-accent/10 hover:bg-mc-accent/20 border border-mc-accent/20 rounded text-sm text-mc-accent hover:text-mc-accent/80 transition-colors disabled:opacity-50"
           >
-            <Search className="w-4 h-4" />
-            Import from Gateway
+            <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
+            {syncing ? 'Syncing...' : 'Sync with Gateway'}
           </button>
         </div>
       )}
 
       {showCreateModal && <AgentModal onClose={() => setShowCreateModal(false)} workspaceId={workspaceId} />}
       {editingAgent && <AgentModal agent={editingAgent} onClose={() => setEditingAgent(null)} workspaceId={workspaceId} />}
-      {showDiscoverModal && <DiscoverAgentsModal onClose={() => setShowDiscoverModal(false)} workspaceId={workspaceId} />}
+
     </aside>
   );
 }

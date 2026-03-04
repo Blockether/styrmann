@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { CheckCircle, Circle, Lock, AlertCircle, Loader2, X } from 'lucide-react';
+import { AgentInitials } from './AgentInitials';
 
 interface PlanningOption {
   id: string;
@@ -36,7 +37,6 @@ interface PlanningState {
   agents?: Array<{
     name: string;
     role: string;
-    avatar_emoji: string;
     soul_md: string;
     instructions: string;
   }>;
@@ -68,8 +68,6 @@ export function PlanningTab({ taskId, onSpecLocked }: PlanningTabProps) {
   const isPollingRef = useRef(false);
   const lastSubmissionRef = useRef<{ answer: string; otherText?: string } | null>(null);
   const currentQuestionRef = useRef<string | undefined>(undefined);
-  
-
 
   // Load planning state (initial load only)
   const loadState = useCallback(async () => {
@@ -288,8 +286,8 @@ export function PlanningTab({ taskId, onSpecLocked }: PlanningTabProps) {
       setError('Failed to submit answer');
       setIsSubmittingAnswer(false); // Clear submitting state on error
       // Clear selection on error so user can try again
-      setSelectedOption(null);
-      setOtherText('');
+        setSelectedOption(null);
+        setOtherText('');
     } finally {
       // Don't re-enable submit button here — wait until next question arrives
       // setSubmitting(false) is handled when polling gets the new question
@@ -414,7 +412,7 @@ export function PlanningTab({ taskId, onSpecLocked }: PlanningTabProps) {
           </div>
           {state.dispatchError && (
             <div className="text-right">
-              <span className="text-sm text-amber-400">⚠️ Dispatch Failed</span>
+              <span className="text-sm text-amber-400">Dispatch Failed</span>
             </div>
           )}
         </div>
@@ -489,7 +487,7 @@ export function PlanningTab({ taskId, onSpecLocked }: PlanningTabProps) {
             <div className="space-y-2">
               {state.agents.map((agent, i) => (
                 <div key={i} className="bg-mc-bg border border-mc-border rounded-lg p-3 flex items-center gap-3">
-                  <span className="text-2xl">{agent.avatar_emoji}</span>
+                  <AgentInitials name={agent.name} size="lg" />
                   <div>
                     <p className="font-medium">{agent.name}</p>
                     <p className="text-sm text-mc-text-secondary">{agent.role}</p>
@@ -525,7 +523,7 @@ export function PlanningTab({ taskId, onSpecLocked }: PlanningTabProps) {
         <button
           onClick={startPlanning}
           disabled={starting}
-          className="px-6 py-3 bg-mc-accent text-mc-bg rounded-lg font-medium hover:bg-mc-accent/90 disabled:opacity-50 flex items-center gap-2"
+          className="px-6 py-3 bg-mc-accent text-white rounded-lg font-medium hover:bg-mc-accent/90 disabled:opacity-50 flex items-center gap-2"
         >
           {starting ? (
             <>
@@ -533,7 +531,7 @@ export function PlanningTab({ taskId, onSpecLocked }: PlanningTabProps) {
               Starting...
             </>
           ) : (
-            <>📋 Start Planning</>
+            <>Start Planning</>
           )}
         </button>
       </div>
@@ -596,7 +594,7 @@ export function PlanningTab({ taskId, onSpecLocked }: PlanningTabProps) {
                       } disabled:opacity-50`}
                     >
                       <span className={`w-8 h-8 rounded flex items-center justify-center text-sm font-bold ${
-                        isSelected ? 'bg-mc-accent text-mc-bg' : 'bg-mc-bg-tertiary'
+                        isSelected ? 'bg-mc-accent text-white' : 'bg-mc-bg-tertiary'
                       }`}>
                         {option.id.toUpperCase()}
                       </span>
@@ -627,38 +625,40 @@ export function PlanningTab({ taskId, onSpecLocked }: PlanningTabProps) {
             </div>
 
             {error && (
-              <div
-                className={`mt-4 p-3 border rounded-lg ${
-                  error.includes('still processing')
-                    ? 'bg-orange-500/10 border-orange-500/40'
-                    : 'bg-red-500/10 border-red-500/30'
-                }`}
-              >
-                <div className="flex items-start gap-2">
-                  <AlertCircle
-                    className={`w-4 h-4 mt-0.5 flex-shrink-0 ${
-                      error.includes('still processing') ? 'text-orange-300' : 'text-red-400'
-                    }`}
-                  />
-                  <div className="flex-1">
-                    <p className={`text-sm ${error.includes('still processing') ? 'text-orange-200' : 'text-red-400'}`}>
-                      {error}
-                    </p>
+              <div className="mt-4">
+                {error.includes('still processing') ? (
+                  <div className="p-3 border border-orange-600/40 bg-orange-600/15 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4 text-orange-200" />
+                      <span className="text-orange-200 text-sm">{error}</span>
+                    </div>
                     {!isWaitingForResponse && lastSubmissionRef.current && (
                       <button
                         onClick={handleRetry}
                         disabled={submitting}
-                        className={`mt-2 text-xs underline disabled:opacity-50 ${
-                          error.includes('still processing')
-                            ? 'text-orange-300 hover:text-orange-200'
-                            : 'text-red-400 hover:text-red-300'
-                        }`}
+                        className="mt-2 text-xs underline text-orange-200 hover:text-orange-100 disabled:opacity-50"
                       >
                         {submitting ? 'Retrying...' : 'Retry'}
                       </button>
                     )}
                   </div>
-                </div>
+                ) : (
+                  <div className="p-3 border border-red-600/25 bg-red-600/12 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4 text-red-400" />
+                      <span className="text-red-400 text-sm">{error}</span>
+                    </div>
+                    {!isWaitingForResponse && lastSubmissionRef.current && (
+                      <button
+                        onClick={handleRetry}
+                        disabled={submitting}
+                        className="mt-2 text-xs underline text-red-400 hover:text-red-300 disabled:opacity-50"
+                      >
+                        {submitting ? 'Retrying...' : 'Retry'}
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
@@ -667,7 +667,7 @@ export function PlanningTab({ taskId, onSpecLocked }: PlanningTabProps) {
               <button
                 onClick={submitAnswer}
                 disabled={!selectedOption || submitting || (selectedOption === 'Other' && !otherText.trim())}
-                className="w-full px-6 py-3 bg-mc-accent text-mc-bg rounded-lg font-medium hover:bg-mc-accent/90 disabled:opacity-50 flex items-center justify-center gap-2"
+                className="w-full px-6 py-3 bg-mc-accent text-white rounded-lg font-medium hover:bg-mc-accent/90 disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {submitting ? (
                   <>

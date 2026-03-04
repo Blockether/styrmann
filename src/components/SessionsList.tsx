@@ -7,6 +7,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { Bot, CheckCircle, Circle, XCircle, Trash2, Check } from 'lucide-react';
+import { AgentInitials } from './AgentInitials';
 
 interface SessionWithAgent {
   id: string;
@@ -20,7 +21,6 @@ interface SessionWithAgent {
   created_at: string;
   updated_at: string;
   agent_name?: string;
-  agent_avatar_emoji?: string;
 }
 
 interface SessionsListProps {
@@ -133,7 +133,7 @@ export function SessionsList({ taskId }: SessionsListProps) {
   if (sessions.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-8 text-mc-text-secondary">
-        <div className="text-4xl mb-2">🤖</div>
+        <Bot className="w-10 h-10 text-mc-text-secondary mb-2" />
         <p>No sub-agent sessions yet</p>
       </div>
     );
@@ -148,8 +148,8 @@ export function SessionsList({ taskId }: SessionsListProps) {
         >
           {/* Agent Avatar */}
           <div className="flex-shrink-0">
-            {session.agent_avatar_emoji ? (
-              <span className="text-2xl">{session.agent_avatar_emoji}</span>
+            {session.agent_name ? (
+              <AgentInitials name={session.agent_name} size="md" />
             ) : (
               <Bot className="w-8 h-8 text-mc-accent" />
             )}

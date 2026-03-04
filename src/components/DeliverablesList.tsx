@@ -148,7 +148,7 @@ export function DeliverablesList({ taskId }: DeliverablesListProps) {
   if (deliverables.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-8 text-mc-text-secondary">
-        <div className="text-4xl mb-2">📦</div>
+        <div className="text-xl font-bold text-mc-text-secondary mb-2">No Deliverables</div>
         <p>No deliverables yet</p>
       </div>
     );

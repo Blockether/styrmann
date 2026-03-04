@@ -55,7 +55,7 @@ export function LiveFeed({ mobileMode = false, isPortrait = true }: LiveFeedProp
                 key={tab}
                 onClick={() => setFilter(tab)}
                 className={`min-h-11 text-xs rounded uppercase ${mobileMode && isPortrait ? 'px-1' : 'px-3'} ${
-                  filter === tab ? 'bg-mc-accent text-mc-bg font-medium' : 'text-mc-text-secondary hover:bg-mc-bg-tertiary'
+                  filter === tab ? 'bg-mc-accent text-white font-medium' : 'text-mc-text-secondary hover:bg-mc-bg-tertiary'
                 }`}
               >
                 {tab}
@@ -82,23 +82,23 @@ function EventItem({ event }: { event: Event }) {
   const getEventIcon = (type: string) => {
     switch (type) {
       case 'task_created':
-        return '📋';
+        return 'TC';
       case 'task_assigned':
-        return '👤';
+        return 'TA';
       case 'task_status_changed':
-        return '🔄';
+        return 'TS';
       case 'task_completed':
-        return '✅';
+        return 'OK';
       case 'message_sent':
-        return '💬';
+        return 'MS';
       case 'agent_joined':
-        return '🎉';
+        return 'AJ';
       case 'agent_status_changed':
-        return '🔔';
+        return 'AS';
       case 'system':
-        return '⚙️';
+        return 'SY';
       default:
-        return '📌';
+        return '--';
     }
   };
 

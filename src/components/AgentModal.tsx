@@ -12,8 +12,6 @@ interface AgentModalProps {
   onAgentCreated?: (agentId: string) => void;
 }
 
-const EMOJI_OPTIONS = ['🤖', '🦞', '💻', '🔍', '✍️', '🎨', '📊', '🧠', '⚡', '🚀', '🎯', '🔧'];
-
 export function AgentModal({ agent, onClose, workspaceId, onAgentCreated }: AgentModalProps) {
   const { addAgent, updateAgent, agents } = useMissionControl();
   const [activeTab, setActiveTab] = useState<'info' | 'soul' | 'user' | 'agents'>('info');
@@ -26,7 +24,6 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated }: Agen
     name: agent?.name || '',
     role: agent?.role || '',
     description: agent?.description || '',
-    avatar_emoji: agent?.avatar_emoji || '🤖',
     status: agent?.status || 'standby' as AgentStatus,
     is_master: agent?.is_master || false,
     soul_md: agent?.soul_md || '',
@@ -157,27 +154,6 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated }: Agen
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4">
           {activeTab === 'info' && (
             <div className="space-y-4">
-              {/* Avatar Selection */}
-              <div>
-                <label className="block text-sm font-medium mb-2">Avatar</label>
-                <div className="flex flex-wrap gap-2">
-                  {EMOJI_OPTIONS.map((emoji) => (
-                    <button
-                      key={emoji}
-                      type="button"
-                      onClick={() => setForm({ ...form, avatar_emoji: emoji })}
-                      className={`text-2xl p-2 rounded hover:bg-mc-bg-tertiary ${
-                        form.avatar_emoji === emoji
-                          ? 'bg-mc-accent/20 ring-2 ring-mc-accent'
-                          : ''
-                      }`}
-                    >
-                      {emoji}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
               {/* Name */}
               <div>
                 <label className="block text-sm font-medium mb-1">Name</label>
@@ -346,7 +322,7 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated }: Agen
             <button
               onClick={handleSubmit}
               disabled={isSubmitting}
-              className="min-h-11 flex items-center gap-2 px-4 py-2 bg-mc-accent text-mc-bg rounded text-sm font-medium hover:bg-mc-accent/90 disabled:opacity-50"
+              className="min-h-11 flex items-center gap-2 px-4 py-2 bg-mc-accent text-white rounded text-sm font-medium hover:bg-mc-accent/90 disabled:opacity-50"
             >
               <Save className="w-4 h-4" />
               {isSubmitting ? 'Saving...' : 'Save'}

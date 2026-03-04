@@ -191,7 +191,7 @@ export function AgentActivityDashboard({ workspace }: AgentActivityDashboardProp
     return (
       <div className="min-h-screen bg-mc-bg flex items-center justify-center">
         <div className="text-center">
-          <div className="text-4xl mb-3 animate-pulse">🦞</div>
+          <img src="/favicon.svg" alt="Blockether" className="w-10 h-10 mb-3 animate-pulse" />
           <p className="text-mc-text-secondary">Loading activity dashboard...</p>
         </div>
       </div>
@@ -244,7 +244,7 @@ export function AgentActivityDashboard({ workspace }: AgentActivityDashboardProp
                 <div key={agent.id} className="border border-mc-border rounded-lg p-3 bg-mc-bg min-h-11">
                   <div className="flex items-center justify-between gap-2">
                     <div className="min-w-0">
-                      <div className="font-medium text-sm truncate">{agent.avatar_emoji} {agent.name}</div>
+                      <div className="font-medium text-sm truncate">{agent.name}</div>
                       <div className="text-xs text-mc-text-secondary truncate">{currentTask?.title || 'No active task linked'}</div>
                     </div>
                     <div className="text-xs text-mc-text-secondary whitespace-nowrap flex items-center gap-1">
@@ -265,7 +265,7 @@ export function AgentActivityDashboard({ workspace }: AgentActivityDashboardProp
               <button
                 key={tab}
                 onClick={() => setFilter(tab)}
-                className={`min-h-11 px-4 rounded-full border text-sm capitalize ${filter === tab ? 'bg-mc-accent text-mc-bg border-mc-accent' : 'bg-mc-bg-secondary text-mc-text-secondary border-mc-border'}`}
+                className={`min-h-11 px-4 rounded-full border text-sm capitalize ${filter === tab ? 'bg-mc-accent text-white border-mc-accent' : 'bg-mc-bg-secondary text-mc-text-secondary border-mc-border'}`}
               >
                 {tab}
               </button>
@@ -281,7 +281,7 @@ export function AgentActivityDashboard({ workspace }: AgentActivityDashboardProp
                 <article key={agent.id} className="bg-mc-bg-secondary border border-mc-border rounded-xl p-4">
                   <div className="flex items-start justify-between gap-3 mb-3">
                     <div className="min-w-0">
-                      <div className="font-semibold truncate">{agent.avatar_emoji} {agent.name}</div>
+                      <div className="font-semibold truncate">{agent.name}</div>
                       <div className="text-xs text-mc-text-secondary truncate">{agent.role}</div>
                     </div>
                     <div className="text-right shrink-0">

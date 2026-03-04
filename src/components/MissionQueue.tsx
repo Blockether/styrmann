@@ -6,6 +6,7 @@ import { useMissionControl } from '@/lib/store';
 import { triggerAutoDispatch, shouldTriggerAutoDispatch } from '@/lib/auto-dispatch';
 import type { Task, TaskStatus } from '@/lib/types';
 import { TaskModal } from './TaskModal';
+import { AgentInitials } from './AgentInitials';
 import { formatDistanceToNow } from 'date-fns';
 
 interface MissionQueueProps {
@@ -15,7 +16,7 @@ interface MissionQueueProps {
 }
 
 const COLUMNS: { id: TaskStatus; label: string; color: string }[] = [
-  { id: 'planning', label: '📋 Planning', color: 'border-t-mc-accent-purple' },
+  { id: 'planning', label: 'Planning', color: 'border-t-mc-accent-purple' },
   { id: 'inbox', label: 'Inbox', color: 'border-t-mc-accent-pink' },
   { id: 'assigned', label: 'Assigned', color: 'border-t-mc-accent-yellow' },
   { id: 'in_progress', label: 'In Progress', color: 'border-t-mc-accent' },
@@ -111,7 +112,7 @@ export function MissionQueue({ workspaceId, mobileMode = false, isPortrait = tru
         </div>
         <button
           onClick={() => setShowCreateModal(true)}
-          className="flex items-center gap-2 px-4 min-h-11 bg-mc-accent-pink text-mc-bg rounded text-sm font-medium hover:bg-mc-accent-pink/90"
+          className="flex items-center gap-2 px-4 min-h-11 bg-mc-accent text-white rounded text-sm font-medium hover:bg-mc-accent/90"
         >
           <Plus className="w-4 h-4" />
           New Task
@@ -164,7 +165,7 @@ export function MissionQueue({ workspaceId, mobileMode = false, isPortrait = tru
                   onClick={() => setMobileStatus(column.id)}
                   className={`min-h-11 px-4 rounded-full border whitespace-nowrap ${isPortrait ? 'text-sm' : 'text-xs'} ${
                     selected
-                      ? 'bg-mc-accent text-mc-bg border-mc-accent font-medium'
+                      ? 'bg-mc-accent text-white border-mc-accent font-medium'
                       : 'bg-mc-bg-secondary border-mc-border text-mc-text-secondary'
                   }`}
                 >
@@ -266,7 +267,7 @@ function TaskCard({ task, onDragStart, onClick, onMoveStatus, isDragging, mobile
       onClick={onClick}
       className={`group bg-mc-bg-secondary border rounded-lg cursor-pointer transition-all hover:shadow-lg hover:shadow-black/20 ${
         isDragging ? 'opacity-50 scale-95' : ''
-      } ${isPlanning ? 'border-purple-500/40 hover:border-purple-500' : 'border-mc-border/50 hover:border-mc-accent/40'}`}
+      } $${isPlanning ? 'border-purple-600/40 hover:border-purple-600' : 'border-mc-border/50 hover:border-mc-accent/40'}`}
     >
       {!mobileMode && (
         <div className="flex items-center justify-center py-1.5 border-b border-mc-border/30 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -277,51 +278,51 @@ function TaskCard({ task, onDragStart, onClick, onMoveStatus, isDragging, mobile
       <div className={portraitMode ? 'p-4' : 'p-3'}>
         <h4 className={`font-medium leading-snug line-clamp-2 ${portraitMode ? 'text-sm mb-3' : 'text-xs mb-2'}`}>{task.title}</h4>
 
-        {isPlanning && (
-          <div className={`flex items-center gap-2 ${portraitMode ? 'mb-3 py-2 px-3' : 'mb-2 py-1.5 px-2.5'} bg-purple-500/10 rounded-md border border-purple-500/20`}>
-            <div className="w-2 h-2 bg-purple-500 rounded-full animate-pulse flex-shrink-0" />
-            <span className="text-xs text-purple-400 font-medium">Continue planning</span>
+        ${isPlanning && (
+          <div className={`flex items-center gap-2 ${portraitMode ? 'mb-3 py-2 px-3' : 'mb-2 py-1.5 px-2.5'} bg-purple-600/15 rounded-md border border-purple-600/25`}>
+            <div className="w-2 h-2 bg-purple-600 rounded-full animate-pulse flex-shrink-0" />
+            <span className="text-xs text-purple-700 font-medium">Continue planning</span>
           </div>
         )}
 
         {isAssigned && dispatchError && (
-          <div className={`flex items-start gap-2 ${portraitMode ? 'mb-3 py-2 px-3' : 'mb-2 py-1.5 px-2.5'} bg-red-500/10 rounded-md border border-red-500/30`}>
-            <div className="w-2 h-2 bg-red-400 rounded-full mt-1 flex-shrink-0" />
-            <span className="text-xs text-red-300">Assigned, but blocked: {dispatchError}</span>
+          <div className={`flex items-start gap-2 ${portraitMode ? 'mb-3 py-2 px-3' : 'mb-2 py-1.5 px-2.5'} bg-red-600/12 rounded-md border border-red-600/25`}>
+            <div className="w-2 h-2 bg-red-600 rounded-full mt-1 flex-shrink-0" />
+            <span className="text-xs text-red-700">Assigned, but blocked: {dispatchError}</span>
           </div>
         )}
 
         {isAssigned && !dispatchError && (
-          <div className={`flex items-center gap-2 ${portraitMode ? 'mb-3 py-2 px-3' : 'mb-2 py-1.5 px-2.5'} bg-yellow-500/10 rounded-md border border-yellow-500/30`}>
-            <div className="w-2 h-2 bg-yellow-400 rounded-full flex-shrink-0" />
-            <span className="text-xs text-yellow-200">Assigned and validating — auto-start will move this to In Progress.</span>
+          <div className={`flex items-center gap-2 ${portraitMode ? 'mb-3 py-2 px-3' : 'mb-2 py-1.5 px-2.5'} bg-yellow-600/15 rounded-md border border-yellow-600/25`}>
+            <div className="w-2 h-2 bg-yellow-500 rounded-full flex-shrink-0" />
+            <span className="text-xs text-yellow-800">Assigned and validating — auto-start will move this to In Progress.</span>
           </div>
         )}
 
         {task.status === 'inbox' && !task.assigned_agent_id && (
-          <div className={`flex items-center gap-2 ${portraitMode ? 'mb-3 py-2 px-3' : 'mb-2 py-1.5 px-2.5'} bg-amber-500/10 rounded-md border border-amber-500/30`}>
-            <div className="w-2 h-2 bg-amber-400 rounded-full flex-shrink-0" />
-            <span className="text-xs text-amber-200">Needs agent — assign to start</span>
+          <div className={`flex items-center gap-2 ${portraitMode ? 'mb-3 py-2 px-3' : 'mb-2 py-1.5 px-2.5'} bg-amber-600/15 rounded-md border border-amber-600/25`}>
+            <div className="w-2 h-2 bg-amber-600 rounded-full flex-shrink-0" />
+            <span className="text-xs text-amber-800">Needs agent — assign to start</span>
           </div>
         )}
 
         {['testing', 'verification'].includes(task.status) && dispatchError && (
-          <div className={`flex items-start gap-2 ${portraitMode ? 'mb-3 py-2 px-3' : 'mb-2 py-1.5 px-2.5'} bg-red-500/10 rounded-md border border-red-500/30`}>
-            <div className="w-2 h-2 bg-red-400 rounded-full mt-1 flex-shrink-0" />
-            <span className="text-xs text-red-300">{dispatchError}</span>
+          <div className={`flex items-start gap-2 ${portraitMode ? 'mb-3 py-2 px-3' : 'mb-2 py-1.5 px-2.5'} bg-red-600/12 rounded-md border border-red-600/25`}>
+            <div className="w-2 h-2 bg-red-600 rounded-full mt-1 flex-shrink-0" />
+            <span className="text-xs text-red-700">{dispatchError}</span>
           </div>
         )}
 
         {task.status === 'review' && !dispatchError && (
-          <div className={`flex items-center gap-2 ${portraitMode ? 'mb-3 py-2 px-3' : 'mb-2 py-1.5 px-2.5'} bg-cyan-500/10 rounded-md border border-cyan-500/30`}>
-            <div className="w-2 h-2 bg-cyan-400 rounded-full flex-shrink-0" />
-            <span className="text-xs text-cyan-200">In queue — waiting for verification</span>
+          <div className={`flex items-center gap-2 ${portraitMode ? 'mb-3 py-2 px-3' : 'mb-2 py-1.5 px-2.5'} bg-cyan-600/12 rounded-md border border-cyan-600/25`}>
+            <div className="w-2 h-2 bg-cyan-600 rounded-full flex-shrink-0" />
+            <span className="text-xs text-cyan-800">In queue — waiting for verification</span>
           </div>
         )}
 
         {task.assigned_agent && (
           <div className={`flex items-center gap-2 ${portraitMode ? 'mb-3 py-1.5 px-2' : 'mb-2 py-1 px-2'} bg-mc-bg-tertiary/50 rounded`}>
-            <span className="text-base">{(task.assigned_agent as unknown as { avatar_emoji: string }).avatar_emoji}</span>
+            <AgentInitials name={(task.assigned_agent as unknown as { name: string }).name} size="sm" />
             <span className="text-xs text-mc-text-secondary truncate">{(task.assigned_agent as unknown as { name: string }).name}</span>
           </div>
         )}

@@ -8,6 +8,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import type { TaskActivity } from '@/lib/types';
+import { AgentInitials } from './AgentInitials';
 
 interface ActivityLogProps {
   taskId: string;
@@ -75,17 +76,17 @@ export function ActivityLog({ taskId }: ActivityLogProps) {
   const getActivityIcon = (type: string) => {
     switch (type) {
       case 'spawned':
-        return '🚀';
+        return 'SP';
       case 'updated':
-        return '✏️';
+        return 'UP';
       case 'completed':
-        return '✅';
+        return 'OK';
       case 'file_created':
-        return '📄';
+        return 'FL';
       case 'status_changed':
-        return '🔄';
+        return 'ST';
       default:
-        return '📝';
+        return '--';
     }
   };
 
@@ -100,7 +101,7 @@ export function ActivityLog({ taskId }: ActivityLogProps) {
   if (activities.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-8 text-mc-text-secondary">
-        <div className="text-4xl mb-2">📝</div>
+        <div className="text-xl font-bold text-mc-text-secondary mb-2">No Activity</div>
         <p>No activity yet</p>
       </div>
     );
@@ -123,7 +124,7 @@ export function ActivityLog({ taskId }: ActivityLogProps) {
             {/* Agent info */}
             {activity.agent && (
               <div className="flex items-center gap-2 mb-1">
-                <span className="text-sm">{activity.agent.avatar_emoji}</span>
+                <AgentInitials name={activity.agent.name} size="sm" />
                 <span className="text-sm font-medium text-mc-text">
                   {activity.agent.name}
                 </span>
