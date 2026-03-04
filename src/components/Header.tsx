@@ -64,7 +64,12 @@ export function Header({ workspace, isPortrait = true }: HeaderProps) {
                 <LayoutGrid className="w-4 h-4" />
               </Link>
               <div className="flex items-center gap-2 px-2.5 py-1.5 bg-mc-bg-tertiary rounded min-w-0">
-                <Folder className="w-4 h-4 text-mc-accent shrink-0" />
+                {workspace.logo_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={workspace.logo_url} alt={workspace.name} className="w-4 h-4 rounded object-contain shrink-0" />
+                ) : (
+                  <Folder className="w-4 h-4 text-mc-accent shrink-0" />
+                )}
                 <span className="font-medium truncate text-sm">{workspace.name}</span>
               </div>
             </div>
@@ -114,7 +119,12 @@ export function Header({ workspace, isPortrait = true }: HeaderProps) {
                 </Link>
                 <span className="hidden sm:block text-mc-text-secondary">/</span>
                 <div className="flex items-center gap-2 px-2 md:px-3 py-1 bg-mc-bg-tertiary rounded min-w-0">
-                  <Folder className="w-4 h-4 text-mc-accent shrink-0" />
+                  {workspace.logo_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={workspace.logo_url} alt={workspace.name} className="w-4 h-4 rounded object-contain shrink-0" />
+                  ) : (
+                    <Folder className="w-4 h-4 text-mc-accent shrink-0" />
+                  )}
                   <span className="font-medium truncate text-sm md:text-base">{workspace.name}</span>
                 </div>
               </div>

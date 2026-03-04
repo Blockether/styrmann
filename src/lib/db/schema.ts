@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS workspaces (
   github_repo TEXT,
   owner_email TEXT,
   coordinator_email TEXT,
+  logo_url TEXT,
   created_at TEXT DEFAULT (datetime('now')),
   updated_at TEXT DEFAULT (datetime('now'))
 );

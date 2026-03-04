@@ -134,6 +134,7 @@ export interface Workspace {
   github_repo?: string;
   owner_email?: string;
   coordinator_email?: string;
+  logo_url?: string;
   created_at: string;
   updated_at: string;
 }
@@ -146,6 +147,7 @@ export interface WorkspaceStats {
   github_repo?: string;
   owner_email?: string;
   coordinator_email?: string;
+  logo_url?: string;
   taskCounts: {
     pending_dispatch: number;
     planning: number;

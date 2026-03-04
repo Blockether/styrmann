@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Plus, ArrowRight, Folder, Users, CheckSquare, Trash2, AlertTriangle, Activity, Github, Mail, Pencil } from 'lucide-react';
+import { Plus, ArrowRight, Folder, Users, CheckSquare, Trash2, AlertTriangle, Activity, Mail, Pencil } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import type { WorkspaceStats } from '@/lib/types';
@@ -178,7 +178,12 @@ function WorkspaceCard({ workspace, onDelete, onEdit }: { workspace: WorkspaceSt
       <div className="bg-mc-bg-secondary border border-mc-border rounded-xl p-4 sm:p-6 hover:border-mc-accent/50 transition-all hover:shadow-lg cursor-pointer group relative h-[240px]">
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center gap-3">
-            <Folder className="w-7 h-7 text-mc-accent" />
+            {workspace.logo_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={workspace.logo_url} alt={workspace.name} className="w-7 h-7 rounded object-contain" />
+            ) : (
+              <Folder className="w-7 h-7 text-mc-accent" />
+            )}
             <div>
               <h3 className="font-semibold text-lg group-hover:text-mc-accent transition-colors">
                 {workspace.name}
@@ -237,7 +242,18 @@ function WorkspaceCard({ workspace, onDelete, onEdit }: { workspace: WorkspaceSt
               }}
               className="inline-flex items-center gap-1.5 hover:text-mc-accent transition-colors"
             >
-              <Github className="w-4 h-4" />
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="w-4 h-4"
+                aria-hidden="true"
+              >
+                <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22" />
+              </svg>
               <span className="truncate max-w-[220px]">{workspace.github_repo}</span>
             </button>
           )}
@@ -304,6 +320,7 @@ function WorkspaceCard({ workspace, onDelete, onEdit }: { workspace: WorkspaceSt
 
 function EditWorkspaceModal({ workspace, onClose, onSaved }: { workspace: WorkspaceStats; onClose: () => void; onSaved: () => void }) {
   const [name, setName] = useState(workspace.name);
+  const [logoUrl, setLogoUrl] = useState(workspace.logo_url || '');
   const [githubRepo, setGithubRepo] = useState(workspace.github_repo || '');
   const [ownerEmail, setOwnerEmail] = useState(workspace.owner_email || '');
   const [coordinatorEmail, setCoordinatorEmail] = useState(workspace.coordinator_email || '');
@@ -323,6 +340,7 @@ function EditWorkspaceModal({ workspace, onClose, onSaved }: { workspace: Worksp
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: name.trim(),
+          logo_url: logoUrl.trim() || null,
           github_repo: githubRepo.trim() || null,
           owner_email: ownerEmail.trim() || null,
           coordinator_email: coordinatorEmail.trim() || null,
@@ -358,6 +376,17 @@ function EditWorkspaceModal({ workspace, onClose, onSaved }: { workspace: Worksp
               onChange={(e) => setName(e.target.value)}
               className="w-full bg-mc-bg border border-mc-border rounded-lg px-4 py-2 focus:outline-none focus:border-mc-accent"
               autoFocus
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-2">Logo URL</label>
+            <input
+              type="text"
+              value={logoUrl}
+              onChange={(e) => setLogoUrl(e.target.value)}
+              placeholder="/workspace-logos/mission-control.png"
+              className="w-full bg-mc-bg border border-mc-border rounded-lg px-4 py-2 focus:outline-none focus:border-mc-accent"
             />
           </div>
 
@@ -422,14 +451,12 @@ function EditWorkspaceModal({ workspace, onClose, onSaved }: { workspace: Worksp
 
 function CreateWorkspaceModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
   const [name, setName] = useState('');
-  const [icon, setIcon] = useState('BL');
+  const [logoUrl, setLogoUrl] = useState('');
   const [githubRepo, setGithubRepo] = useState('');
   const [ownerEmail, setOwnerEmail] = useState('');
   const [coordinatorEmail, setCoordinatorEmail] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const icons = ['BL', 'WK', 'HQ', 'RK', 'ID', 'TG', 'AN', 'TL', 'ST', 'HM'];
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -444,7 +471,7 @@ function CreateWorkspaceModal({ onClose, onCreated }: { onClose: () => void; onC
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: name.trim(),
-          icon,
+          logo_url: logoUrl.trim() || null,
           github_repo: githubRepo.trim() || null,
           owner_email: ownerEmail.trim() || null,
           coordinator_email: coordinatorEmail.trim() || null,
@@ -472,28 +499,6 @@ function CreateWorkspaceModal({ onClose, onCreated }: { onClose: () => void; onC
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          {/* Icon selector */}
-          <div>
-            <label className="block text-sm font-medium mb-2">Icon</label>
-            <div className="flex flex-wrap gap-2">
-              {icons.map((i) => (
-                <button
-                  key={i}
-                  type="button"
-                  onClick={() => setIcon(i)}
-                  className={`w-10 h-10 rounded-lg text-xl flex items-center justify-center transition-colors ${
-                    icon === i 
-                      ? 'bg-mc-accent/20 border-2 border-mc-accent' 
-                      : 'bg-mc-bg border border-mc-border hover:border-mc-accent/50'
-                  }`}
-                >
-                  {i}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Name input */}
           <div>
             <label className="block text-sm font-medium mb-2">Name</label>
             <input
@@ -503,6 +508,17 @@ function CreateWorkspaceModal({ onClose, onCreated }: { onClose: () => void; onC
               placeholder="e.g., Acme Corp"
               className="w-full bg-mc-bg border border-mc-border rounded-lg px-4 py-2 focus:outline-none focus:border-mc-accent"
               autoFocus
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-2">Logo URL</label>
+            <input
+              type="text"
+              value={logoUrl}
+              onChange={(e) => setLogoUrl(e.target.value)}
+              placeholder="/workspace-logos/blockether-spel.svg"
+              className="w-full bg-mc-bg border border-mc-border rounded-lg px-4 py-2 focus:outline-none focus:border-mc-accent"
             />
           </div>
 

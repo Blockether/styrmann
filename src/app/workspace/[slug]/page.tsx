@@ -311,7 +311,12 @@ function MobileSettingsPanel({ workspace, denseLandscape = false }: { workspace:
         <div className="bg-mc-bg-secondary border border-mc-border rounded-lg p-4">
           <div className="text-sm text-mc-text-secondary mb-2">Current workspace</div>
           <div className="flex items-center gap-2 text-base font-medium">
-            <Folder className="w-4 h-4 text-mc-accent" />
+            {workspace.logo_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={workspace.logo_url} alt={workspace.name} className="w-4 h-4 rounded object-contain" />
+            ) : (
+              <Folder className="w-4 h-4 text-mc-accent" />
+            )}
             <span>{workspace.name}</span>
           </div>
           <div className="text-xs text-mc-text-secondary mt-1">/{workspace.slug}</div>

@@ -13,7 +13,7 @@ import { bootstrapCoreAgentsRaw } from '@/lib/bootstrap-agents';
 interface Migration {
   id: string;
   name: string;
-  up: (db: Database.Database) => void;
+  up: (_db: Database.Database) => void;
 }
 
 // All migrations in order - NEVER remove or reorder existing migrations
@@ -21,7 +21,7 @@ const migrations: Migration[] = [
   {
     id: '001',
     name: 'initial_schema',
-    up: (db) => {
+    up: () => {
       // Core tables - these are created in schema.ts on fresh databases
       // This migration exists to mark the baseline for existing databases
       console.log('[Migration 001] Baseline schema marker');
@@ -673,6 +673,21 @@ const migrations: Migration[] = [
       }
 
       console.log('[Migration 016] Workspace metadata columns added');
+    }
+  },
+  {
+    id: '017',
+    name: 'add_workspace_logo_url',
+    up: (db) => {
+      console.log('[Migration 017] Adding workspace logo_url column...');
+
+      const cols = (db.prepare(`PRAGMA table_info(workspaces)`).all() as { name: string }[]).map(c => c.name);
+
+      if (!cols.includes('logo_url')) {
+        db.exec(`ALTER TABLE workspaces ADD COLUMN logo_url TEXT`);
+      }
+
+      console.log('[Migration 017] Workspace logo_url column added');
     }
   }
 ];

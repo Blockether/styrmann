@@ -4,7 +4,7 @@ import { getDb } from '@/lib/db';
 export const dynamic = 'force-dynamic';
 // GET /api/workspaces/[id] - Get a single workspace
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
@@ -37,7 +37,7 @@ export async function PATCH(
   
   try {
     const body = await request.json();
-    const { name, description, icon, github_repo, owner_email, coordinator_email } = body;
+    const { name, description, icon, github_repo, owner_email, coordinator_email, logo_url } = body;
     
     const db = getDb();
     
@@ -75,6 +75,10 @@ export async function PATCH(
       updates.push('coordinator_email = ?');
       values.push(coordinator_email);
     }
+    if (logo_url !== undefined) {
+      updates.push('logo_url = ?');
+      values.push(logo_url);
+    }
     
     if (updates.length === 0) {
       return NextResponse.json({ error: 'No fields to update' }, { status: 400 });
@@ -97,7 +101,7 @@ export async function PATCH(
 
 // DELETE /api/workspaces/[id] - Delete a workspace
 export async function DELETE(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
