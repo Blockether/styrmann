@@ -46,11 +46,12 @@ echo -e "${BOLD}Blockether Mission Control - Deploy${NC}"
 echo "================================================"
 
 # ── Step 1: Build ────────────────────────────────────────────
+step 1 "Clearing cache + building..."
+rm -rf "${PROJECT_DIR}/.next/cache/images" 2>/dev/null || true
+
 if [ "$SKIP_BUILD" = true ]; then
-  step 1 "Build ${YELLOW}(skipped)${NC}"
+  ok "Cache cleared (build skipped)"
 else
-  step 1 "Building Next.js..."
-  
   BUILD_OUTPUT=$(cd "$PROJECT_DIR" && npx next build 2>&1) || {
     fail "Build failed!"
     echo "$BUILD_OUTPUT" | tail -30
