@@ -46,6 +46,8 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId }: TaskM
     milestone_id: task?.milestone_id || '',
   });
 
+  const [acceptanceCriteria, setAcceptanceCriteria] = useState<string[]>([]);
+  const [newCriteriaInput, setNewCriteriaInput] = useState('');
   const [milestones, setMilestones] = useState<{ id: string; name: string }[]>([]);
 
   useEffect(() => {
@@ -138,6 +140,18 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId }: TaskM
         created_at: new Date().toISOString(),
       });
 
+      if (acceptanceCriteria.length > 0) {
+        await Promise.all(
+          acceptanceCriteria.map((description, index) =>
+            fetch(`/api/tasks/${savedTask.id}/acceptance-criteria`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ description, sort_order: index }),
+            }).catch((err) => console.error('Failed to create acceptance criteria:', err))
+          )
+        );
+      }
+
       if (usePlanningMode) {
         // Start planning session (fire-and-forget), then close modal.
         // User reopens the task from the board to see the planning tab.
@@ -171,6 +185,8 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId }: TaskM
           milestone_id: '',
         });
         setUsePlanningMode(false);
+        setAcceptanceCriteria([]);
+        setNewCriteriaInput('');
       } else {
         onClose();
       }
@@ -274,6 +290,62 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId }: TaskM
               placeholder="Add details..."
             />
           </div>
+
+          {/* Acceptance Criteria - only for new tasks */}
+          {!task && (
+            <div>
+              <label className="block text-sm font-medium mb-1">Acceptance Criteria</label>
+              {acceptanceCriteria.length > 0 && (
+                <div className="space-y-2 mb-2">
+                  {acceptanceCriteria.map((criteria, index) => (
+                    <div
+                      key={index}
+                      className="flex items-center gap-2 p-2 bg-mc-bg rounded border border-mc-border"
+                    >
+                      <div className="w-5 h-5 rounded flex items-center justify-center flex-shrink-0 bg-mc-bg-tertiary border border-mc-border" />
+                      <span className="text-sm flex-1">{criteria}</span>
+                      <button
+                        type="button"
+                        onClick={() => setAcceptanceCriteria(prev => prev.filter((_, i) => i !== index))}
+                        className="p-1 hover:bg-mc-bg-tertiary rounded text-mc-text-secondary hover:text-mc-accent-red"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={newCriteriaInput}
+                  onChange={(e) => setNewCriteriaInput(e.target.value)}
+                  placeholder="Add acceptance criteria..."
+                  className="flex-1 min-h-11 bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && newCriteriaInput.trim()) {
+                      e.preventDefault();
+                      setAcceptanceCriteria(prev => [...prev, newCriteriaInput.trim()]);
+                      setNewCriteriaInput('');
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (newCriteriaInput.trim()) {
+                      setAcceptanceCriteria(prev => [...prev, newCriteriaInput.trim()]);
+                      setNewCriteriaInput('');
+                    }
+                  }}
+                  disabled={!newCriteriaInput.trim()}
+                  className="min-h-11 px-3 bg-mc-accent text-white rounded text-sm hover:bg-mc-accent/90 disabled:opacity-50"
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Planning Mode Toggle - only for new tasks */}
           {!task && (
