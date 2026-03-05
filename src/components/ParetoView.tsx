@@ -82,7 +82,7 @@ export function ParetoView({ workspaceId }: ParetoViewProps) {
   }, [tasksWithPosition]);
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden">
+    <div data-component="src/components/ParetoView" className="flex-1 flex flex-col overflow-hidden">
       <div className="p-3 border-b border-mc-border bg-mc-bg-secondary flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-2">
           <ChevronRight className="w-4 h-4 text-mc-text-secondary" />

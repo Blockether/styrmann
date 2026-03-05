@@ -209,7 +209,7 @@ export function AgentActivityDashboard({ workspace, embedded = false }: AgentAct
 
   if (embedded) {
     return (
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div data-component="src/components/AgentActivityDashboard" className="flex-1 flex flex-col overflow-hidden">
         <div className="p-3 border-b border-mc-border bg-mc-bg-secondary flex items-center justify-between gap-2 flex-wrap">
           <div className="flex items-center gap-2">
             <ChevronRight className="w-4 h-4 text-mc-text-secondary" />
@@ -323,7 +323,7 @@ export function AgentActivityDashboard({ workspace, embedded = false }: AgentAct
   }
 
   return (
-    <div className="min-h-screen bg-mc-bg pb-[calc(1rem+env(safe-area-inset-bottom))]">
+    <div data-component="src/components/AgentActivityDashboard" className="min-h-screen bg-mc-bg pb-[calc(1rem+env(safe-area-inset-bottom))]">
       <header className="border-b border-mc-border bg-mc-bg-secondary px-4 sm:px-6 py-3">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">

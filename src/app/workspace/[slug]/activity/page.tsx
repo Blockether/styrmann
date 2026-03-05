@@ -11,5 +11,5 @@ export default function ActivityRedirect() {
     router.replace(`/workspace/${params.slug}?view=activity`);
   }, [params.slug, router]);
 
-  return null;
+  return <div data-component="src/app/workspace/[slug]/activity/page" />;
 }

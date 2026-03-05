@@ -11,5 +11,5 @@ export default function ParetoRedirect() {
     router.replace(`/workspace/${params.slug}?view=pareto`);
   }, [params.slug, router]);
 
-  return null;
+  return <div data-component="src/app/workspace/[slug]/pareto/page" />;
 }

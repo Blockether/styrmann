@@ -404,7 +404,7 @@ export function PlanningTab({ taskId, onSpecLocked }: PlanningTabProps) {
   // Planning complete - show spec and agents
   if (state?.isComplete && state?.spec) {
     return (
-      <div className="p-4 space-y-6">
+      <div data-component="src/components/PlanningTab" className="p-4 space-y-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-green-400">
             <Lock className="w-5 h-5" />
@@ -504,7 +504,7 @@ export function PlanningTab({ taskId, onSpecLocked }: PlanningTabProps) {
   // Not started - show start button
   if (!state?.isStarted) {
     return (
-      <div className="flex flex-col items-center justify-center p-8 space-y-4">
+      <div data-component="src/components/PlanningTab" className="flex flex-col items-center justify-center p-8 space-y-4">
         <div className="text-center">
           <h3 className="text-lg font-medium mb-2">Start Planning</h3>
           <p className="text-mc-text-secondary text-sm max-w-md">
@@ -540,7 +540,7 @@ export function PlanningTab({ taskId, onSpecLocked }: PlanningTabProps) {
 
   // Show current question
   return (
-    <div className="flex flex-col h-full">
+    <div data-component="src/components/PlanningTab" className="flex flex-col h-full">
       {/* Progress indicator with cancel button */}
       <div className="p-4 border-b border-mc-border flex items-center justify-between">
         <div className="flex items-center gap-2 text-sm text-mc-text-secondary">

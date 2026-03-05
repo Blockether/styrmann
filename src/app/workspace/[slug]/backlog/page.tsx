@@ -11,5 +11,5 @@ export default function BacklogRedirect() {
     router.replace(`/workspace/${params.slug}?view=backlog`);
   }, [params.slug, router]);
 
-  return null;
+  return <div data-component="src/app/workspace/[slug]/backlog/page" />;
 }

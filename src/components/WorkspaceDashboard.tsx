@@ -42,7 +42,7 @@ export function WorkspaceDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-mc-bg">
+    <div data-component="src/components/WorkspaceDashboard" className="min-h-screen bg-mc-bg">
       {/* Header */}
       <header className="border-b border-mc-border bg-mc-bg-secondary">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">

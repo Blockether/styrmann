@@ -103,6 +103,7 @@ export function AgentsSidebar({ workspaceId, mobileMode = false, isPortrait = tr
 
   return (
     <aside
+      data-component="src/components/AgentsSidebar"
       className={`bg-mc-bg-secondary ${mobileMode ? 'border border-mc-border rounded-lg h-full' : 'border-r border-mc-border'} flex flex-col transition-all duration-300 ease-in-out ${
         effectiveMinimized ? 'w-12' : mobileMode ? 'w-full' : 'w-[32rem]'
       }`}

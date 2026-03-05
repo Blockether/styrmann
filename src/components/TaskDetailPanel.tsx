@@ -488,6 +488,7 @@ export function TaskDetailPanel({ taskId, onClose }: TaskDetailPanelProps) {
 
   return (
     <div
+      data-component="src/components/TaskDetailPanel"
       className="fixed inset-0 z-50 flex justify-end"
       onClick={handleBackdropClick}
     >

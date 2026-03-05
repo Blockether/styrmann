@@ -76,7 +76,7 @@ export function SSEDebugPanel() {
   if (!isEnabled) return null;
 
   return (
-    <div className="fixed bottom-4 left-4 z-50">
+    <div data-component="src/components/SSEDebugPanel" className="fixed bottom-4 left-4 z-50">
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center gap-2 px-3 py-2 bg-mc-bg-secondary border border-mc-border rounded-lg shadow-lg text-sm"

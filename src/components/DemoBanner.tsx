@@ -15,7 +15,7 @@ export default function DemoBanner() {
   if (!isDemo) return null;
 
   return (
-    <div className="bg-gradient-to-r from-blue-600 via-purple-600 to-blue-600 text-white text-center py-2 px-4 text-sm font-medium z-50 relative">
+    <div data-component="src/components/DemoBanner" className="bg-gradient-to-r from-blue-600 via-purple-600 to-blue-600 text-white text-center py-2 px-4 text-sm font-medium z-50 relative">
       <span className="mr-2 font-bold">DEMO</span>
       <span>Live Demo — AI agents are working in real-time. This is a read-only simulation.</span>
       <a

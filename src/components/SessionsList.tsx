@@ -140,7 +140,7 @@ export function SessionsList({ taskId }: SessionsListProps) {
   }
 
   return (
-    <div className="space-y-3">
+    <div data-component="src/components/SessionsList" className="space-y-3">
       {sessions.map((session) => (
         <div
           key={session.id}

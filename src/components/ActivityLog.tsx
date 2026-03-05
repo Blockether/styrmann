@@ -108,7 +108,7 @@ export function ActivityLog({ taskId }: ActivityLogProps) {
   }
 
   return (
-    <div className="space-y-3">
+    <div data-component="src/components/ActivityLog" className="space-y-3">
       {activities.map((activity) => (
         <div
           key={activity.id}

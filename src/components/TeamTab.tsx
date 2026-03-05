@@ -160,7 +160,7 @@ export function TeamTab({ taskId, workspaceId }: TeamTabProps) {
   );
 
   return (
-    <div className="space-y-6">
+    <div data-component="src/components/TeamTab" className="space-y-6">
       {/* Workflow Template Selector */}
       <div>
         <label className="block text-sm font-medium mb-2">Workflow Template</label>

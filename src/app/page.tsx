@@ -3,5 +3,5 @@
 import { WorkspaceDashboard } from '@/components/WorkspaceDashboard';
 
 export default function HomePage() {
-  return <WorkspaceDashboard />;
+  return <div data-component="src/app/page"><WorkspaceDashboard /></div>;
 }

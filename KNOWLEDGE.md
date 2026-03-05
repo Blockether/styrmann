@@ -313,6 +313,7 @@ Agents without direct filesystem access use upload/download endpoints:
 4. **Sprints and milestones are independent**: A task can belong to a sprint, a milestone, both, or neither. They are not hierarchically related.
 5. **Agent sync from gateway config**: Agents defined in OpenClaw config files, auto-synced on startup. Prompts stored in files (not DB). Synced agents appear in all workspaces.
 6. **Migrations auto-run on DB connection**: Schema creation only for fresh databases. `legacy_alter_table = ON` during migrations to prevent FK rewriting bug.
+7. **Component traceability**: Every React component's root DOM element has `data-component="src/path/to/File"` (relative path, no extension). Paste rendered HTML and immediately identify which source file to edit.
 
 ---
 

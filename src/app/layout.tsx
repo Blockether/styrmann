@@ -32,7 +32,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${ibmPlexMono.variable} ${atkinsonHyperlegible.variable}`}>
+    <html data-component="src/app/layout" lang="en" className={`${ibmPlexMono.variable} ${atkinsonHyperlegible.variable}`}>
       <head>
         <link rel="preload" href="/logo.png" as="image" />
       </head>

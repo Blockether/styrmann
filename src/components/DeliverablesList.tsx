@@ -155,7 +155,7 @@ export function DeliverablesList({ taskId }: DeliverablesListProps) {
   }
 
   return (
-    <div className="space-y-3">
+    <div data-component="src/components/DeliverablesList" className="space-y-3">
       {deliverables.map((deliverable) => (
         <div
           key={deliverable.id}

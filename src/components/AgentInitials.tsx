@@ -21,6 +21,7 @@ function getInitials(name: string): string {
 export function AgentInitials({ name, size = 'md', className = '' }: AgentInitialsProps) {
   return (
     <span
+      data-component="src/components/AgentInitials"
       className={`inline-flex items-center justify-center rounded-full bg-mc-accent/15 text-mc-accent font-semibold select-none flex-shrink-0 ${sizeMap[size]} ${className}`}
       title={name}
     >

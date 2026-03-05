@@ -278,7 +278,7 @@ export default function WorkspacePage() {
   }
 
   return (
-    <div className="h-screen flex flex-col bg-mc-bg overflow-hidden">
+    <div data-component="src/app/workspace/[slug]/page" className="h-screen flex flex-col bg-mc-bg overflow-hidden">
       <Header workspace={workspace} isPortrait={isPortrait} activeView={view} onViewChange={handleViewChange} />
 
       <div className="hidden lg:flex flex-1 overflow-hidden">

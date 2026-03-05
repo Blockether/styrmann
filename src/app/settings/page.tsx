@@ -83,7 +83,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-mc-bg">
+    <div data-component="src/app/settings/page" className="min-h-screen bg-mc-bg">
       <div className="border-b border-mc-border bg-mc-bg-secondary">
         <div className="max-w-4xl mx-auto px-4 py-4">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
