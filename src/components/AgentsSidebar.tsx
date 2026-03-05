@@ -21,7 +21,7 @@ export function AgentsSidebar({ workspaceId, mobileMode = false, isPortrait = tr
   const [editingAgent, setEditingAgent] = useState<Agent | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [activeSubAgents, setActiveSubAgents] = useState(0);
-  const [isMinimized, setIsMinimized] = useState(false);
+  const [isMinimized, setIsMinimized] = useState(true);
 
   const effectiveMinimized = mobileMode ? false : isMinimized;
   const toggleMinimize = () => setIsMinimized(!isMinimized);

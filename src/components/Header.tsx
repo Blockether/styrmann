@@ -83,8 +83,8 @@ export function Header({ workspace, isPortrait = true, activeView = 'sprint', on
 
   return (
     <header
-      className={`bg-mc-bg-secondary border-b border-mc-border px-3 md:px-4 ${
-        portraitWorkspaceHeader ? 'py-2.5 space-y-2.5' : 'h-14 flex items-center justify-between gap-2'
+      className={`bg-mc-bg-secondary px-3 md:px-4 ${
+        portraitWorkspaceHeader ? 'py-2.5 space-y-2.5 border-b border-mc-border' : 'h-14 flex items-center justify-between gap-2'
       }`}
     >
       {portraitWorkspaceHeader ? (
