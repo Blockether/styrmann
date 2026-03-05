@@ -1,331 +1,357 @@
-# KNOWLEDGE.md -- Mission Control Consolidated Knowledge
+# KNOWLEDGE.md -- Mission Control
 
-This document consolidates all project knowledge previously scattered across
-multiple markdown files. For agent instructions and deployment, see `AGENTS.md`.
+Last updated: 2026-03-05
 
 ---
 
-## Architecture Overview
+## Architecture
 
-Mission Control is an AI Agent Orchestration Dashboard built with Next.js 14.
-It connects to OpenClaw Gateway via WebSocket to dispatch tasks to AI agents
-and track their progress in real-time.
+Next.js 14 App Router dashboard connected to OpenClaw Gateway via WebSocket.
+SQLite database (better-sqlite3). Real-time updates via SSE.
 
 ```
-Mission Control (Next.js, port 4000)
-        |
-        |-- WebSocket --> OpenClaw Gateway (port 18789)
-        |                       |
-        |                       +--> AI Providers (Anthropic, etc.)
-        |
-        +-- SQLite (better-sqlite3)
-        |
-        +-- SSE --> Browser clients (real-time updates)
+Browser <-- SSE -- Mission Control (Next.js, port 4000) -- WebSocket --> OpenClaw Gateway (port 18789)
+                          |                                                    |
+                      SQLite DB                                         AI Providers
 ```
+
+**Tech stack**: Next.js 14, TypeScript 5, SQLite (better-sqlite3), Zustand, Tailwind CSS, Zod, Lucide React, SSE.
+
+**Service**: systemd unit `mission-control`, Rocky Linux, port 4000, URL https://control.blockether.com.
+
+---
+
+## Dashboard Architecture
+
+Single-page dashboard per workspace. No route navigations between views.
+
+```
+/workspace/[slug]/page.tsx
+  Header (nav buttons, view switching via URL ?view= param)
+  Desktop: AgentsSidebar(collapsed) | {view content} | LiveFeed
+    view='sprint'   -> ActiveSprint (List/Board toggle)
+    view='backlog'  -> BacklogView (tasks with no sprint_id)
+    view='pareto'   -> ParetoView (effort/impact matrix)
+    view='activity' -> AgentActivityDashboard (embedded)
+  Mobile portrait: tab bar (Content/Agents/Feed)
+  Mobile landscape: 60/40 grid (content | agents or feed)
+```
+
+View state is React state + URL query param (`?view=backlog`). Default is `sprint`. Switching calls `window.history.replaceState()` -- no page reload.
+
+---
 
 ## Task Lifecycle
 
 ```
-PLANNING --> INBOX --> ASSIGNED --> IN_PROGRESS --> TESTING --> REVIEW --> DONE
+PLANNING -> INBOX -> ASSIGNED -> IN_PROGRESS -> TESTING -> REVIEW -> VERIFICATION -> DONE
 ```
 
-- **PLANNING**: AI asks clarifying questions before work begins.
-- **INBOX**: New tasks awaiting processing.
-- **ASSIGNED**: Task assigned to an agent, auto-dispatched via OpenClaw.
-- **IN_PROGRESS**: Agent actively working.
-- **TESTING**: Automated quality gate (browser tests, CSS validation, resource checks).
-- **REVIEW**: Passed automated tests, awaiting human approval (queue -- no agent dispatch).
-- **DONE**: Task completed and approved.
+| Status | Description |
+|--------|-------------|
+| `planning` | AI asks clarifying questions before work begins |
+| `inbox` | New task awaiting processing |
+| `assigned` | Assigned to agent, auto-dispatched via OpenClaw |
+| `in_progress` | Agent actively working |
+| `testing` | Automated quality gate (browser tests, CSS validation) |
+| `review` | Queue stage -- no agent dispatch, awaiting human review |
+| `verification` | Active QC by reviewer agent |
+| `done` | Completed and approved |
 
-**Fail-loopback**: If testing or verification fails, task returns to IN_PROGRESS
-and the builder agent is re-dispatched.
+Also: `pending_dispatch` (transient, pre-dispatch state).
 
-## Sprint and Milestone Hierarchy
+**Fail-loopback**: Testing or verification failure returns task to `in_progress` and re-dispatches the builder.
 
-```
-Sprint (SPRINT-N, auto-incremented)
-  +-- Milestone (with coordinator agent)
-        +-- Task
-        +-- Task
-```
+**Task fields**: title, description, status, priority (low/normal/high/urgent), task_type (bug/feature/chore/documentation/research), effort (1-5), impact (1-5), assigned_agent_id, sprint_id, milestone_id, parent_task_id, workflow_template_id, due_date, tags.
 
-Milestones are task groups within a sprint. Each milestone has a coordinator
-agent who gets notified when all child tasks complete.
+**Task sub-resources**: comments, blockers (with blocked_by_task_id), resources (links/docs/designs), acceptance criteria (with is_met flag), activities (audit log), deliverables (file/url/artifact), sub-agent sessions.
+
+---
+
+## Sprints
+
+Auto-named `SPRINT-N` per workspace (auto-incremented `sprint_number`). Users cannot customize sprint names.
+
+**Fields**: workspace_id, name, goal, sprint_number, start_date, end_date, status.
+
+**Statuses**: `planning` -> `active` -> `completed` | `cancelled`.
+
+**Constraints**:
+- Only one sprint can be `active` per workspace at a time.
+- When a sprint is completed, all non-done tasks are unassigned from the sprint.
+- Cannot delete a sprint that has tasks.
+
+**Kanban board** (ActiveSprint): Sprint-scoped. Only shows tasks where `sprint_id` matches the selected sprint. Two view modes: List (milestone-grouped) and Board (drag-and-drop columns for all 8 statuses).
+
+---
+
+## Milestones
+
+Workspace-level task groups. **Independent of sprints** -- a task can belong to a sprint, a milestone, both, or neither.
+
+**Fields**: workspace_id, name, description, due_date, status (open/closed), coordinator_agent_id.
+
+**Coordinator agent**: Optional. Informational only -- displayed in the UI alongside the milestone name and progress bar. No automated notifications or dispatch tied to the coordinator.
+
+**In ActiveSprint list view**: Tasks are grouped by milestone. Each group shows milestone name, coordinator initials, and a progress bar (done/total). Ungrouped tasks appear at the bottom.
+
+Cannot delete a milestone that has tasks.
+
+---
+
+## Backlog
+
+Backlog = tasks with `sprint_id IS NULL` and status != `done`. The BacklogView shows these tasks in a sortable table with filters for priority, type, and tags.
+
+---
+
+## Pareto View
+
+Effort/impact matrix. Tasks plotted by their effort (1-5) and impact (1-5) scores. High-impact/low-effort tasks surface to the top.
+
+---
+
+## Tags
+
+Workspace-scoped. Many-to-many with tasks via `task_tags` junction table. Each tag has a name (unique per workspace) and color. CRUD via `/api/tags`.
+
+---
 
 ## Workflow Engine
 
 Three workflow templates: Simple, Standard, Strict.
 
-The **Strict** template defines a full pipeline:
-- Builder -> Tester -> Queue (review) -> Verifier -> Done
-- Each stage transition dispatches to the appropriate role agent
-- If no agent is assigned for a role, a dispatch error banner appears on the card
-- Review is a queue stage (role=null) -- no agent dispatch
-- Verification is active QC by a verifier agent
+| Template | Pipeline | Default |
+|----------|----------|---------|
+| Simple | Builder -> Done | No |
+| Standard | Builder -> Tester -> Reviewer -> Done | No |
+| Strict | Builder -> Tester -> Review (queue) -> Reviewer (verification) -> Done | Yes |
 
-The workflow engine lives in `src/lib/workflow-engine.ts` and handles:
-- Stage transitions via `handleStageTransition()`
-- Role-to-agent lookup from `task_roles` table
-- Fail-loopback routing with detailed reasons
+The Strict template is the default. Review is a queue stage (role=null, no dispatch). Verification is active QC by the `reviewer` role.
+
+**Workflow engine** (`src/lib/workflow-engine.ts`):
+- `handleStageTransition()` -- Triggered on status changes to testing, review, or verification. Looks up role agent from `task_roles` table, assigns, dispatches.
+- If no agent for a role: sets `planning_dispatch_error` on the task (shown as red banner on task card).
+- Fail-loopback: `POST /api/tasks/{id}/fail` routes task back to `in_progress` and re-dispatches builder.
+
+New workspaces clone workflow templates from the `default` workspace.
+
+---
+
+## Agent System
+
+**Sync from OpenClaw Gateway**: Agents are defined in OpenClaw gateway config files. `ensureSynced()` runs lazily on first agent query. Reads config, upserts agents in DB with `source='synced'`. Agents removed from config are deleted from DB.
+
+**Global visibility**: Synced agents have `workspace_id='default'`. Agent queries return both workspace-local agents AND all synced agents (`WHERE workspace_id = ? OR source = 'synced'`).
+
+**Agent fields**: name, role, description, status (standby/working/offline), is_master, model, source (local/gateway/synced), gateway_agent_id, session_key_prefix, agent_dir, agent_workspace_path, soul_md, user_md, agents_md.
+
+**Prompts stored in files**: soul_md, user_md, agents_md are read from OpenClaw agent workspace directories on disk. Double binding -- files are the source of truth, DB reflects them.
+
+**Manual sync**: `POST /api/agents/sync` triggers `syncAgentsWithRpcCheck()` (attempts RPC to gateway, falls back to config-only).
+
+---
+
+## SSE (Real-Time)
+
+Server-Sent Events, not WebSocket. Endpoint: `GET /api/events/stream`.
+
+Events broadcast:
+- `task_created`, `task_updated`, `task_deleted`
+- `activity_logged`, `deliverable_added`
+- `agent_spawned`, `agent_completed`
+
+Client: `src/hooks/useSSE.ts` with auto-reconnect (5s retry) and 30s keep-alive pings.
+Server: `src/lib/events.ts` manages connected clients.
+
+Fallback: Task polling every 60s, event polling every 30s.
+
+---
 
 ## API Endpoints
 
-### Core CRUD
+### Tasks
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET | `/api/tasks` | List tasks (filter: workspace_id, status, sprint_id, milestone_id, backlog=true) |
+| POST | `/api/tasks` | Create task |
+| GET | `/api/tasks/{id}` | Get task with agent joins, subtasks, tags, comments, blockers, resources, acceptance criteria |
+| PATCH | `/api/tasks/{id}` | Update task (triggers workflow engine on status changes) |
+| DELETE | `/api/tasks/{id}` | Delete task |
+| POST | `/api/tasks/{id}/dispatch` | Dispatch to agent via OpenClaw |
+| POST | `/api/tasks/{id}/fail` | Report stage failure (triggers fail-loopback) |
+| GET/POST | `/api/tasks/{id}/activities` | Activity audit log |
+| GET/POST | `/api/tasks/{id}/deliverables` | File/URL/artifact outputs |
+| GET/POST | `/api/tasks/{id}/subagent` | Sub-agent session registration |
+| GET/PUT | `/api/tasks/{id}/roles` | Role-to-agent assignments |
 
-| Endpoint | Method | Purpose |
-|----------|--------|---------|
-| `/api/tasks` | GET | List all tasks (filterable by status, workspace) |
-| `/api/tasks` | POST | Create task |
-| `/api/tasks/{id}` | GET | Get task details |
-| `/api/tasks/{id}` | PATCH | Update task (triggers workflow engine on status changes) |
-| `/api/tasks/{id}/dispatch` | POST | Dispatch task to agent via OpenClaw |
-| `/api/tasks/{id}/fail` | POST | Report stage failure (triggers fail-loopback) |
-| `/api/agents` | GET/POST | Agent CRUD |
-| `/api/agents/{id}` | GET/PATCH/DELETE | Agent management |
-| `/api/sprints` | GET/POST | Sprint CRUD |
-| `/api/sprints/{id}` | GET/PATCH/DELETE | Sprint management |
-| `/api/milestones` | GET/POST | Milestone CRUD |
-| `/api/milestones/{id}` | GET/PATCH/DELETE | Milestone management |
-| `/api/workspaces` | GET/POST | Workspace CRUD |
-| `/api/workspaces/{id}` | GET/PATCH/DELETE | Workspace management |
-| `/api/tags` | GET/POST | Tag management |
+### Sprints and Milestones
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET/POST | `/api/sprints` | List/create sprints (workspace_id required) |
+| GET/PATCH/DELETE | `/api/sprints/{id}` | Sprint CRUD |
+| GET/POST | `/api/milestones` | List/create milestones (workspace_id required) |
+| GET/PATCH/DELETE | `/api/milestones/{id}` | Milestone CRUD |
 
-### Task Sub-Resources
+### Agents
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET | `/api/agents` | List agents (triggers ensureSynced) |
+| GET/PATCH/DELETE | `/api/agents/{id}` | Agent CRUD (PATCH writes back to OpenClaw config) |
+| POST | `/api/agents/sync` | Manual sync from gateway config |
 
-| Endpoint | Method | Purpose |
-|----------|--------|---------|
-| `/api/tasks/{id}/activities` | GET/POST | Activity log (audit trail) |
-| `/api/tasks/{id}/deliverables` | GET/POST | File/URL/artifact outputs |
-| `/api/tasks/{id}/subagent` | GET/POST | Sub-agent session registration |
-| `/api/tasks/{id}/roles` | GET/PUT | Role-to-agent assignments |
+### Workspaces
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET/POST | `/api/workspaces` | List (optional stats=true) / create workspace |
+| GET/PATCH/DELETE | `/api/workspaces/{id}` | Workspace CRUD (lookup by ID or slug) |
+| GET/POST | `/api/workspaces/{id}/knowledge` | Learner knowledge entries |
+| GET/POST | `/api/workspaces/{id}/workflows` | Workflow templates |
 
-### Real-Time and Gateway
+### Other
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET | `/api/events/stream` | SSE event stream |
+| GET | `/api/tags` | List tags for workspace |
+| POST | `/api/tags` | Create tag |
+| PATCH/DELETE | `/api/tags/{id}` | Update/delete tag |
+| GET/PATCH/DELETE | `/api/openclaw/sessions/{id}` | OpenClaw session management |
+| POST | `/api/files/upload` | Upload file from remote agent |
+| GET | `/api/files/download` | Download file |
+| POST | `/api/webhooks/agent-completion` | HMAC-verified agent completion webhook |
+| GET | `/api/demo` | Demo mode status flag |
 
-| Endpoint | Method | Purpose |
-|----------|--------|---------|
-| `/api/events/stream` | GET | SSE event stream |
-| `/api/openclaw/sessions` | GET | List OpenClaw sessions |
-| `/api/openclaw/sessions/{id}` | PATCH/DELETE | Update/delete session |
-| `/api/files/upload` | POST | Upload file from remote agent |
-| `/api/files/download` | GET | Download file |
-| `/api/files/reveal` | POST | Open file in file manager |
-| `/api/webhooks/completion` | POST | Agent completion webhook |
-
-### Workspace Extensions
-
-| Endpoint | Method | Purpose |
-|----------|--------|---------|
-| `/api/workspaces/{id}/knowledge` | GET/POST | Learner knowledge entries |
-| `/api/workspaces/{id}/workflows` | GET/POST | Workflow templates |
-
-## SSE (Server-Sent Events)
-
-Real-time updates use SSE, not WebSocket. The system broadcasts these events:
-
-- `task_created` -- New task added
-- `task_updated` -- Task modified (including status changes)
-- `activity_logged` -- New activity logged
-- `deliverable_added` -- New deliverable registered
-- `agent_spawned` -- Sub-agent started
-- `agent_completed` -- Sub-agent finished
-
-**Client**: `src/hooks/useSSE.ts` connects to `/api/events/stream`
-with auto-reconnect (5s retry) and 30s keep-alive pings.
-
-**Server**: `src/lib/events.ts` manages connected clients and broadcasts.
-
-## Agent Protocol
-
-### Dispatch Format
-
-When a task is dispatched, the agent receives:
-- Task ID, title, description, priority
-- Output directory path
-- API endpoints to call back
-- Role-specific instructions (builder/tester/verifier)
-
-### Completion Format
-
-```
-TASK_COMPLETE: [concise summary] | deliverables: [paths] | verification: [how verified]
-```
-
-### Progress Updates
-
-```
-PROGRESS_UPDATE: [what changed] | next: [next step] | eta: [time]
-```
-
-### Blocker Reports
-
-```
-BLOCKED: [what is blocked] | need: [specific input] | meanwhile: [fallback work]
-```
-
-## Orchestration Helper Library
-
-`src/lib/orchestration.ts` provides helper functions:
-
-- `onSubAgentSpawned()` -- Register sub-agent, log activity, broadcast event
-- `onSubAgentCompleted()` -- Mark session complete, log deliverables, broadcast
-- `logActivity()` -- Log task activity with type and message
-- `logDeliverable()` -- Register file/URL/artifact output
-- `registerSubAgentSession()` -- Register sub-agent in DB
-- `completeSubAgentSession()` -- Mark session complete with timestamp
-- `verifyTaskHasDeliverables()` -- Check before approval (review -> done requires deliverables)
-
-## Learner Knowledge Loop
-
-`src/lib/learner.ts` implements a knowledge loop:
-- Captures transition outcomes (pass/fail) as knowledge entries
-- Injects relevant lessons into future dispatches
-- Learner agent gets notified when tasks complete
+---
 
 ## Database Schema
 
+19 migrations (001-019), auto-run on DB connection in `src/lib/db/index.ts`. Schema creation (`schema.ts`) only runs for fresh databases.
+
 ### Core Tables
+- **workspaces** -- slug, name, description, icon, github_repo, owner_email, coordinator_email, logo_url
+- **agents** -- name, role, status, is_master, model, source, gateway_agent_id, session_key_prefix, agent_dir, agent_workspace_path, soul_md, user_md, agents_md
+- **tasks** -- title, description, status, priority, task_type, effort, impact, assigned_agent_id, sprint_id, milestone_id, parent_task_id, workflow_template_id, due_date, planning fields
+- **sprints** -- workspace_id, name, goal, sprint_number, start_date, end_date, status
+- **milestones** -- workspace_id, name, description, due_date, status, coordinator_agent_id
+- **tags** / **task_tags** -- workspace-scoped tags, many-to-many with tasks
 
-- `workspaces` -- Multi-workspace support with slug routing
-- `agents` -- Agent definitions (synced from gateway config)
-- `tasks` -- Task records with full lifecycle status
-- `sprints` -- Sprint containers (SPRINT-N naming)
-- `milestones` -- Task groups within sprints
-- `tags` -- Tag management
-- `task_tags` -- Task-tag associations
+### Task Sub-Resource Tables
+- **task_comments** -- author, content
+- **task_blockers** -- blocked_by_task_id, description, resolved flag
+- **task_resources** -- title, url, resource_type (link/document/design/api/reference)
+- **task_acceptance_criteria** -- description, is_met, sort_order
+- **task_activities** -- activity_type, message, agent_id, metadata (JSON)
+- **task_deliverables** -- deliverable_type (file/url/artifact), title, path, description
+- **task_roles** -- role, agent_id (unique per task+role)
 
-### Workflow Tables
+### Workflow and Knowledge Tables
+- **workflow_templates** -- stages (JSON array), fail_targets (JSON), is_default
+- **knowledge_entries** -- category, title, content, tags (JSON), confidence score
 
-- `workflow_templates` -- Pipeline definitions (Simple/Standard/Strict)
-- `workflow_stages` -- Stage definitions per template
-- `task_roles` -- Role-to-agent assignments per task
+### Session and Event Tables
+- **openclaw_sessions** -- agent_id, openclaw_session_id, channel, status, session_type (persistent/subagent), task_id, ended_at
+- **events** -- type, agent_id, task_id, message, metadata
+- **conversations** / **messages** / **conversation_participants** -- agent-to-agent messaging
+- **planning_questions** / **planning_specs** -- AI planning Q&A flow
+- **businesses** -- legacy table, kept for compatibility
 
-### Activity Tables
-
-- `task_activities` -- Audit log (activity_type, message, agent_id, metadata)
-- `task_deliverables` -- Output artifacts (file/url/artifact)
-- `openclaw_sessions` -- Gateway sessions (persistent + subagent types)
-
-### Other Tables
-
-- `planning_questions` -- AI planning Q&A
-- `planning_specs` -- AI-generated specifications
-- `conversations` -- Chat history
-- `events` -- System event log
-- `workspace_knowledge` -- Learner knowledge entries
-- `_migrations` -- Applied migration tracking
+---
 
 ## Authentication
 
 When `MC_API_TOKEN` is set in `.env.local`:
-- External API calls require `Authorization: Bearer <token>` header
-- Same-origin browser requests bypass auth (no header needed)
-- SSE streams accept token as query parameter
-- Implemented in `src/middleware.ts`
+- External API calls require `Authorization: Bearer <token>` header.
+- Same-origin browser requests bypass auth.
+- SSE streams accept token as query parameter.
+- Implemented in `src/middleware.ts`.
 
-## Configuration Helpers
+Webhook verification: `WEBHOOK_SECRET` env var, HMAC signature in `x-webhook-signature` header.
 
-`src/lib/config.ts` provides:
-- `getMissionControlUrl()` -- Auto-detects API URL
-- `getWorkspaceBasePath()` -- Workspace root directory
-- `getProjectsPath()` -- Projects directory
+---
 
-Environment variables override UI settings for server operations.
+## Agent Protocol
+
+**Dispatch**: Task dispatched to agent via OpenClaw `chat.send` RPC. Includes task ID, description, output directory, callback endpoints. Role-specific instructions (builder: "when done, update to testing"; tester: "pass -> review, fail -> POST /fail").
+
+**Completion format**: `TASK_COMPLETE: [summary] | deliverables: [paths] | verification: [how verified]`
+
+**Progress**: `PROGRESS_UPDATE: [what changed] | next: [next step] | eta: [time]`
+
+**Blockers**: `BLOCKED: [what] | need: [input] | meanwhile: [fallback work]`
+
+---
+
+## Orchestration Helpers
+
+`src/lib/orchestration.ts`:
+- `onSubAgentSpawned()` -- Register sub-agent, log activity, broadcast SSE
+- `onSubAgentCompleted()` -- Mark session complete, log deliverables, broadcast
+- `logActivity()` / `logDeliverable()` -- Audit trail
+- `verifyTaskHasDeliverables()` -- Required before review -> done transition
+
+`src/lib/learner.ts`:
+- Captures transition outcomes as knowledge entries
+- Injects relevant lessons into future dispatches
+
+---
 
 ## File Operations (Remote Agents)
 
-Remote agents without filesystem access use:
+Agents without direct filesystem access use upload/download endpoints:
 
-```
-POST /api/files/upload
-{
-  "relativePath": "project-name/filename.html",
-  "content": "file contents...",
-  "encoding": "utf-8"
-}
-```
+- `POST /api/files/upload` -- `{ relativePath, content, encoding }` -> saves to `$PROJECTS_PATH/{relativePath}`
+- `GET /api/files/download?relativePath=...` -- Returns file content (JSON or raw with `&raw=true`)
+- `POST /api/files/reveal` -- Opens file in system file manager
 
-Files are saved at `$PROJECTS_PATH/{relativePath}`.
-
-Download:
-```
-GET /api/files/download?relativePath=project-name/filename.html
-GET /api/files/download?relativePath=project-name/filename.html&raw=true
-```
-
-## Debugging
-
-Enable debug mode in browser console:
-```javascript
-mcDebug.enable()
-```
-
-Logs prefixed with:
-- `[SSE]` -- Server-sent events
-- `[STORE]` -- Zustand state changes
-- `[API]` -- API calls
-- `[FILE]` -- File operations
-
-## Activity Types
-
-| Type | Description |
-|------|-------------|
-| `spawned` | Sub-agent created |
-| `updated` | General progress update |
-| `completed` | Work finished |
-| `file_created` | File created/modified |
-| `status_changed` | Status transition |
-
-## Deliverable Types
-
-| Type | Description |
-|------|-------------|
-| `file` | Local file (path required, must exist) |
-| `url` | Web URL |
-| `artifact` | Other output |
+---
 
 ## Key Design Decisions
 
-1. **SSE over WebSocket**: Simpler, works with Next.js out of the box,
-   sufficient for unidirectional server-to-client updates.
+1. **SSE over WebSocket**: Simpler, works with Next.js App Router natively, sufficient for server-to-client updates.
+2. **SQLite over Postgres**: Single-file DB, zero config, WAL mode for concurrent reads. Sufficient for single-server deployment.
+3. **Single-page dashboard**: All views render in same page via state switching. No route navigations between views -- prevents layout jumps.
+4. **Sprints and milestones are independent**: A task can belong to a sprint, a milestone, both, or neither. They are not hierarchically related.
+5. **Agent sync from gateway config**: Agents defined in OpenClaw config files, auto-synced on startup. Prompts stored in files (not DB). Synced agents appear in all workspaces.
+6. **Migrations auto-run on DB connection**: Schema creation only for fresh databases. `legacy_alter_table = ON` during migrations to prevent FK rewriting bug.
 
-2. **SQLite over Postgres**: Single-file database, zero config, sufficient
-   for single-server deployment. WAL mode for concurrent reads.
+---
 
-3. **Single-page dashboard**: All views (Sprint, Backlog, Pareto, Activity)
-   render in the same page via state switching. No route navigations between
-   views -- prevents layout jumps and maintains scroll position.
+## Environment Variables
 
-4. **Agent sync from gateway config**: Agents are defined in OpenClaw
-   gateway configuration files and auto-synced on startup. Prompts stored
-   in files, not in the database. Agents appear in all workspaces.
+| Variable | Required | Default | Purpose |
+|----------|----------|---------|---------|
+| `OPENCLAW_GATEWAY_URL` | Yes | `ws://127.0.0.1:18789` | WebSocket URL to OpenClaw Gateway |
+| `OPENCLAW_GATEWAY_TOKEN` | Yes | -- | Auth token for OpenClaw |
+| `MC_API_TOKEN` | No | -- | API auth token (enables Bearer auth) |
+| `WEBHOOK_SECRET` | No | -- | HMAC secret for webhook verification |
+| `DATABASE_PATH` | No | `./mission-control.db` | SQLite database path |
+| `WORKSPACE_BASE_PATH` | No | `~/Documents/Shared` | Base workspace directory |
+| `PROJECTS_PATH` | No | `~/Documents/Shared/projects` | Project files directory |
+| `MISSION_CONTROL_URL` | No | auto-detected | API URL for agent callbacks |
+| `DEMO_MODE` | No | -- | Enables read-only demo mode |
 
-5. **Migrations auto-run**: All migrations execute on DB connection in
-   `src/lib/db/index.ts`. Schema creation only runs for fresh databases
-   to avoid re-running on existing ones.
+---
 
-## Nginx/Proxy SSE Configuration
+## npm Scripts
 
-If running behind a reverse proxy:
-
-```nginx
-location /api/events/stream {
-    proxy_pass http://localhost:4000;
-    proxy_http_version 1.1;
-    proxy_set_header Connection '';
-    proxy_buffering off;
-    proxy_cache off;
-    chunked_transfer_encoding off;
-}
+```
+npm run dev          # Start dev server on port 4000
+npm run build        # Production build (next build)
+npm run start        # Production server on port 4000
+npm run lint         # ESLint
+npm run db:seed      # Create DB + seed defaults
+npm run db:backup    # WAL checkpoint + copy to .backup
+npm run db:restore   # Restore from .backup
+npm run db:reset     # Delete DB + re-seed
 ```
 
-## Common Issues
+---
 
-- **SSE not connecting**: Check browser console for `[SSE] Connected`. If not,
-  verify `/api/events/stream` endpoint and check for proxy buffering.
-- **Agent counter stuck at 0**: Counter only shows sub-agents with
-  `session_type='subagent'` and `status='active'`.
-- **Migration FK bug (fixed)**: Migration 011 fixed dangling FK references
-  caused by SQLite rewriting FKs during `ALTER TABLE`. Runner now sets
-  `legacy_alter_table = ON`.
-- **Port 4000 in use**: `lsof -i :4000` then `kill -9 <PID>`.
-- **Agent callbacks failing behind proxy**: Set `NO_PROXY=localhost,127.0.0.1`.
+## Shell Scripts
+
+```
+scripts/deploy.sh [--skip-build] [--no-restart]   # Build + restart + health check
+scripts/lint.sh [--fix]                            # ESLint + tsc --noEmit
+scripts/validate.sh                                # DB + env + service health
+scripts/check.sh                                   # Full pre-deploy (lint + validate + build)
+```
