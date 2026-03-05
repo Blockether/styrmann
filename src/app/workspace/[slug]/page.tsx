@@ -4,10 +4,13 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
-import { ChevronLeft, ListTodo, Users, Activity } from 'lucide-react';
-import { Header } from '@/components/Header';
+import { ChevronLeft, ListTodo, Users, Activity, Inbox, BarChart3 } from 'lucide-react';
+import { Header, type DashboardView } from '@/components/Header';
 import { AgentsSidebar } from '@/components/AgentsSidebar';
 import { ActiveSprint } from '@/components/ActiveSprint';
+import { BacklogView } from '@/components/BacklogView';
+import { ParetoView } from '@/components/ParetoView';
+import { AgentActivityDashboard } from '@/components/AgentActivityDashboard';
 import { LiveFeed } from '@/components/LiveFeed';
 import { SSEDebugPanel } from '@/components/SSEDebugPanel';
 import { useMissionControl } from '@/lib/store';
@@ -15,7 +18,31 @@ import { useSSE } from '@/hooks/useSSE';
 import { debug } from '@/lib/debug';
 import type { Task, Workspace } from '@/lib/types';
 
-type MobileTab = 'sprint' | 'agents' | 'feed';
+type MobileTab = 'content' | 'agents' | 'feed';
+
+const VIEW_LABELS: Record<DashboardView, string> = {
+  sprint: 'Sprint',
+  backlog: 'Backlog',
+  pareto: 'Pareto',
+  activity: 'Activity',
+};
+
+const VIEW_ICONS: Record<DashboardView, React.ReactNode> = {
+  sprint: <ListTodo className="w-4 h-4" />,
+  backlog: <Inbox className="w-4 h-4" />,
+  pareto: <BarChart3 className="w-4 h-4" />,
+  activity: <Activity className="w-4 h-4" />,
+};
+
+function getInitialView(): DashboardView {
+  if (typeof window === 'undefined') return 'sprint';
+  const params = new URLSearchParams(window.location.search);
+  const urlView = params.get('view');
+  if (urlView && ['sprint', 'backlog', 'pareto', 'activity'].includes(urlView)) {
+    return urlView as DashboardView;
+  }
+  return 'sprint';
+}
 
 export default function WorkspacePage() {
   const params = useParams();
@@ -25,10 +52,29 @@ export default function WorkspacePage() {
 
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [notFound, setNotFound] = useState(false);
-  const [mobileTab, setMobileTab] = useState<MobileTab>('sprint');
+  const [view, setView] = useState<DashboardView>(getInitialView);
+  const [mobileTab, setMobileTab] = useState<MobileTab>('content');
   const [isPortrait, setIsPortrait] = useState(true);
 
   useSSE();
+
+  useEffect(() => {
+    const urlView = new URLSearchParams(window.location.search).get('view');
+    if (urlView && ['sprint', 'backlog', 'pareto', 'activity'].includes(urlView)) {
+      setView(urlView as DashboardView);
+    }
+  }, []);
+
+  const handleViewChange = (newView: DashboardView) => {
+    setView(newView);
+    const url = new URL(window.location.href);
+    if (newView === 'sprint') {
+      url.searchParams.delete('view');
+    } else {
+      url.searchParams.set('view', newView);
+    }
+    window.history.replaceState({}, '', url.toString());
+  };
 
   useEffect(() => {
     const media = window.matchMedia('(orientation: portrait)');
@@ -67,11 +113,7 @@ export default function WorkspacePage() {
     loadWorkspace();
   }, [slug, setIsLoading]);
 
-  useEffect(() => {
-    if (!isPortrait && mobileTab === 'sprint') {
-      setMobileTab('agents');
-    }
-  }, [isPortrait, mobileTab]);
+
 
   useEffect(() => {
     if (!workspace) return;
@@ -176,6 +218,38 @@ export default function WorkspacePage() {
     };
   }, [workspace, setAgents, setTasks, setEvents, setIsOnline, setIsLoading]);
 
+  const renderView = () => {
+    if (!workspace) return null;
+    switch (view) {
+      case 'sprint':
+        return <ActiveSprint workspaceId={workspace.id} />;
+      case 'backlog':
+        return <BacklogView workspaceId={workspace.id} />;
+      case 'pareto':
+        return <ParetoView workspaceId={workspace.id} />;
+      case 'activity':
+        return <AgentActivityDashboard workspace={workspace} embedded />;
+      default:
+        return <ActiveSprint workspaceId={workspace.id} />;
+    }
+  };
+
+  const renderMobileView = (mobileMode: boolean, portrait: boolean) => {
+    if (!workspace) return null;
+    switch (view) {
+      case 'sprint':
+        return <ActiveSprint workspaceId={workspace.id} mobileMode={mobileMode} isPortrait={portrait} />;
+      case 'backlog':
+        return <BacklogView workspaceId={workspace.id} />;
+      case 'pareto':
+        return <ParetoView workspaceId={workspace.id} />;
+      case 'activity':
+        return <AgentActivityDashboard workspace={workspace} embedded />;
+      default:
+        return <ActiveSprint workspaceId={workspace.id} mobileMode={mobileMode} isPortrait={portrait} />;
+    }
+  };
+
   if (notFound) {
     return (
       <div className="min-h-screen bg-mc-bg flex items-center justify-center">
@@ -205,11 +279,11 @@ export default function WorkspacePage() {
 
   return (
     <div className="h-screen flex flex-col bg-mc-bg overflow-hidden">
-      <Header workspace={workspace} isPortrait={isPortrait} />
+      <Header workspace={workspace} isPortrait={isPortrait} activeView={view} onViewChange={handleViewChange} />
 
       <div className="hidden lg:flex flex-1 overflow-hidden">
         <AgentsSidebar workspaceId={workspace.id} />
-        <ActiveSprint workspaceId={workspace.id} />
+        {renderView()}
         <LiveFeed />
       </div>
 
@@ -218,13 +292,13 @@ export default function WorkspacePage() {
           <div className="h-full flex flex-col">
             <div className="flex items-center gap-1 px-3 py-2 border-b border-mc-border bg-mc-bg-secondary shrink-0">
               <button
-                onClick={() => setMobileTab('sprint')}
+                onClick={() => setMobileTab('content')}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                  mobileTab === 'sprint' ? 'bg-mc-accent text-white' : 'text-mc-text-secondary hover:text-mc-text'
+                  mobileTab === 'content' ? 'bg-mc-accent text-white' : 'text-mc-text-secondary hover:text-mc-text'
                 }`}
               >
-                <ListTodo className="w-4 h-4" />
-                Sprint
+                {VIEW_ICONS[view]}
+                {VIEW_LABELS[view]}
               </button>
               <button
                 onClick={() => setMobileTab('agents')}
@@ -246,7 +320,7 @@ export default function WorkspacePage() {
               </button>
             </div>
             <div className="flex-1 min-h-0 overflow-hidden">
-              {mobileTab === 'sprint' && <ActiveSprint workspaceId={workspace.id} mobileMode isPortrait />}
+              {mobileTab === 'content' && renderMobileView(true, true)}
               {mobileTab === 'agents' && (
                 <div className="h-full p-3 overflow-y-auto">
                   <AgentsSidebar workspaceId={workspace.id} mobileMode isPortrait />
@@ -261,7 +335,7 @@ export default function WorkspacePage() {
           </div>
         ) : (
           <div className="h-full p-3 grid grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] gap-3">
-            <ActiveSprint workspaceId={workspace.id} mobileMode isPortrait={false} />
+            {renderMobileView(true, false)}
             <div className="min-w-0 h-full flex flex-col gap-3">
               <div className="grid grid-cols-2 gap-2">
                 <button

@@ -1,29 +1,15 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
-import { AgentActivityDashboard } from '@/components/AgentActivityDashboard';
-import type { Workspace } from '@/lib/types';
+import { useParams, useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 
-export default function WorkspaceActivityPage() {
+export default function ActivityRedirect() {
   const params = useParams();
-  const slug = params.slug as string;
-  const [workspace, setWorkspace] = useState<Workspace | null>(null);
+  const router = useRouter();
 
   useEffect(() => {
-    async function loadWorkspace() {
-      try {
-        const res = await fetch(`/api/workspaces/${slug}`);
-        if (res.ok) {
-          setWorkspace(await res.json());
-        }
-      } catch (error) {
-        console.error('Failed to load workspace for activity page:', error);
-      }
-    }
+    router.replace(`/workspace/${params.slug}?view=activity`);
+  }, [params.slug, router]);
 
-    loadWorkspace();
-  }, [slug]);
-
-  return <AgentActivityDashboard workspace={workspace} />;
+  return null;
 }

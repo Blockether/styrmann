@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
 import {
@@ -18,56 +18,33 @@ import { useMissionControl } from '@/lib/store';
 import { format } from 'date-fns';
 import type { Workspace } from '@/lib/types';
 
+export type DashboardView = 'sprint' | 'backlog' | 'pareto' | 'activity';
+
 interface HeaderProps {
   workspace?: Workspace;
   isPortrait?: boolean;
+  activeView?: DashboardView;
+  onViewChange?: (view: DashboardView) => void;
 }
 
 interface NavItem {
   label: string;
-  href: string;
+  view: DashboardView;
   icon: React.ReactNode;
-  matchPattern: (pathname: string, slug: string) => boolean;
 }
 
-function getNavItems(slug: string): NavItem[] {
-  return [
-    {
-      label: 'Active Sprint',
-      href: `/workspace/${slug}`,
-      icon: <ListTodo className="w-4 h-4" />,
-      matchPattern: (pathname, s) => pathname === `/workspace/${s}` || pathname === `/workspace/${s}/`,
-    },
-    {
-      label: 'Backlog',
-      href: `/workspace/${slug}/backlog`,
-      icon: <Inbox className="w-4 h-4" />,
-      matchPattern: (pathname, s) => pathname.startsWith(`/workspace/${s}/backlog`),
-    },
-    {
-      label: 'Pareto',
-      href: `/workspace/${slug}/pareto`,
-      icon: <BarChart3 className="w-4 h-4" />,
-      matchPattern: (pathname, s) => pathname.startsWith(`/workspace/${s}/pareto`),
-    },
-    {
-      label: 'Activity',
-      href: `/workspace/${slug}/activity`,
-      icon: <Activity className="w-4 h-4" />,
-      matchPattern: (pathname, s) => pathname.startsWith(`/workspace/${s}/activity`),
-    },
-  ];
-}
+const NAV_ITEMS: NavItem[] = [
+  { label: 'Active Sprint', view: 'sprint', icon: <ListTodo className="w-4 h-4" /> },
+  { label: 'Backlog', view: 'backlog', icon: <Inbox className="w-4 h-4" /> },
+  { label: 'Pareto', view: 'pareto', icon: <BarChart3 className="w-4 h-4" /> },
+  { label: 'Activity', view: 'activity', icon: <Activity className="w-4 h-4" /> },
+];
 
-export function Header({ workspace, isPortrait = true }: HeaderProps) {
+export function Header({ workspace, isPortrait = true, activeView = 'sprint', onViewChange }: HeaderProps) {
   const router = useRouter();
-  const pathname = usePathname();
   const { agents, tasks, isOnline } = useMissionControl();
   const [currentTime, setCurrentTime] = useState(new Date());
   const [activeSubAgents, setActiveSubAgents] = useState(0);
-
-  const navItems = workspace ? getNavItems(workspace.slug) : [];
-  const activeNavItem = navItems.find((item) => item.matchPattern(pathname, workspace?.slug || ''));
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -97,6 +74,12 @@ export function Header({ workspace, isPortrait = true }: HeaderProps) {
   const tasksInQueue = tasks.filter((t) => t.status !== 'done' && t.status !== 'review').length;
 
   const portraitWorkspaceHeader = !!workspace && isPortrait;
+
+  const handleNavClick = (view: DashboardView) => {
+    if (onViewChange) {
+      onViewChange(view);
+    }
+  };
 
   return (
     <header
@@ -153,12 +136,12 @@ export function Header({ workspace, isPortrait = true }: HeaderProps) {
           </div>
 
           <nav className="flex items-center gap-1 overflow-x-auto -mx-3 px-3 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-            {navItems.map((item) => {
-              const isActive = activeNavItem?.href === item.href;
+            {NAV_ITEMS.map((item) => {
+              const isActive = activeView === item.view;
               return (
-                <Link
-                  key={item.href}
-                  href={item.href}
+                <button
+                  key={item.view}
+                  onClick={() => handleNavClick(item.view)}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm whitespace-nowrap transition-colors shrink-0 ${
                     isActive
                       ? 'bg-mc-accent text-white font-medium'
@@ -167,7 +150,7 @@ export function Header({ workspace, isPortrait = true }: HeaderProps) {
                 >
                   {item.icon}
                   <span>{item.label}</span>
-                </Link>
+                </button>
               );
             })}
           </nav>
@@ -205,14 +188,14 @@ export function Header({ workspace, isPortrait = true }: HeaderProps) {
             )}
           </div>
 
-          {workspace && navItems.length > 0 && (
+          {workspace && (
             <nav className="hidden md:flex items-center gap-1">
-              {navItems.map((item) => {
-                const isActive = activeNavItem?.href === item.href;
+              {NAV_ITEMS.map((item) => {
+                const isActive = activeView === item.view;
                 return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
+                  <button
+                    key={item.view}
+                    onClick={() => handleNavClick(item.view)}
                     className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-colors ${
                       isActive
                         ? 'bg-mc-accent text-white font-medium'
@@ -221,7 +204,7 @@ export function Header({ workspace, isPortrait = true }: HeaderProps) {
                   >
                     {item.icon}
                     <span className="hidden lg:inline">{item.label}</span>
-                  </Link>
+                  </button>
                 );
               })}
             </nav>
