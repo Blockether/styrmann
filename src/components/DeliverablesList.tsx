@@ -159,7 +159,8 @@ export function DeliverablesList({ taskId }: DeliverablesListProps) {
       {deliverables.map((deliverable) => (
         <div
           key={deliverable.id}
-          className="flex gap-3 p-3 bg-mc-bg rounded-lg border border-mc-border hover:border-mc-accent transition-colors"
+          onClick={() => handleOpen(deliverable)}
+          className="flex gap-3 p-3 bg-mc-bg rounded-lg border border-mc-border hover:border-mc-accent transition-colors cursor-pointer"
         >
           {/* Icon */}
           <div className="flex-shrink-0 text-mc-accent">
@@ -175,6 +176,7 @@ export function DeliverablesList({ taskId }: DeliverablesListProps) {
                   href={deliverable.path}
                   target="_blank"
                   rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
                   className="font-medium text-mc-accent hover:text-mc-accent/80 hover:underline flex items-center gap-1.5"
                 >
                   {deliverable.title}
@@ -187,7 +189,7 @@ export function DeliverablesList({ taskId }: DeliverablesListProps) {
                 {/* Preview button for previewable files */}
                 {deliverable.deliverable_type === 'file' && isPreviewable(deliverable.path) && (
                   <button
-                    onClick={() => handlePreview(deliverable)}
+                    onClick={(e) => { e.stopPropagation(); handlePreview(deliverable); }}
                     className="flex-shrink-0 p-1.5 hover:bg-mc-bg-tertiary rounded text-mc-accent-cyan"
                     title="Preview in browser"
                   >
@@ -197,7 +199,7 @@ export function DeliverablesList({ taskId }: DeliverablesListProps) {
                 {/* Download button for files */}
                 {deliverable.deliverable_type === 'file' && deliverable.path && (
                   <button
-                    onClick={() => handleDownload(deliverable)}
+                    onClick={(e) => { e.stopPropagation(); handleDownload(deliverable); }}
                     className="flex-shrink-0 p-1.5 hover:bg-mc-bg-tertiary rounded text-mc-text-secondary hover:text-mc-accent"
                     title="Download file"
                   >
@@ -207,7 +209,7 @@ export function DeliverablesList({ taskId }: DeliverablesListProps) {
                 {/* Open/Reveal button */}
                 {deliverable.path && (
                   <button
-                    onClick={() => handleOpen(deliverable)}
+                    onClick={(e) => { e.stopPropagation(); handleOpen(deliverable); }}
                     className="flex-shrink-0 p-1.5 hover:bg-mc-bg-tertiary rounded text-mc-accent"
                     title={deliverable.deliverable_type === 'url' ? 'Open URL' : 'Open file'}
                   >
