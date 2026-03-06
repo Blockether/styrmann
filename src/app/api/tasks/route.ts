@@ -19,7 +19,6 @@ export async function GET(request: NextRequest) {
     const sprintId = searchParams.get('sprint_id');
     const milestoneId = searchParams.get('milestone_id');
     const taskType = searchParams.get('task_type');
-    const parentTaskId = searchParams.get('parent_task_id');
     const backlog = searchParams.get('backlog');
 
     let sql = `
@@ -27,14 +26,12 @@ export async function GET(request: NextRequest) {
         t.*,
         aa.name as assigned_agent_name,
         ca.name as created_by_agent_name,
-        s.name as sprint_name,
         m.name as milestone_name
       FROM tasks t
       LEFT JOIN agents aa ON t.assigned_agent_id = aa.id
       LEFT JOIN agents ca ON t.created_by_agent_id = ca.id
-      LEFT JOIN sprints s ON t.sprint_id = s.id
       LEFT JOIN milestones m ON t.milestone_id = m.id
-      WHERE t.parent_task_id IS NULL
+      WHERE 1=1
     `;
     const params: unknown[] = [];
 
@@ -61,7 +58,7 @@ export async function GET(request: NextRequest) {
       params.push(assignedAgentId);
     }
     if (sprintId) {
-      sql += ' AND t.sprint_id = ?';
+      sql += ' AND t.milestone_id IN (SELECT id FROM milestones WHERE sprint_id = ?)';
       params.push(sprintId);
     }
     if (milestoneId) {
@@ -72,19 +69,14 @@ export async function GET(request: NextRequest) {
       sql += ' AND t.task_type = ?';
       params.push(taskType);
     }
-    if (parentTaskId) {
-      sql = sql.replace('WHERE t.parent_task_id IS NULL', 'WHERE 1=1');
-      sql += ' AND t.parent_task_id = ?';
-      params.push(parentTaskId);
-    }
     if (backlog === 'true') {
-      sql += ' AND t.sprint_id IS NULL AND t.status != ?';
+      sql += ' AND t.milestone_id IS NULL AND t.status != ?';
       params.push('done');
     }
 
     sql += ' ORDER BY t.created_at DESC';
 
-    const tasks = queryAll<Task & { assigned_agent_name?: string; created_by_agent_name?: string; sprint_name?: string; milestone_name?: string }>(sql, params);
+    const tasks = queryAll<Task & { assigned_agent_name?: string; created_by_agent_name?: string; milestone_name?: string }>(sql, params);
 
     const transformedTasks = tasks.map((task) => ({
       ...task,
@@ -93,9 +85,6 @@ export async function GET(request: NextRequest) {
             id: task.assigned_agent_id,
             name: task.assigned_agent_name,
           }
-        : undefined,
-      sprint: task.sprint_id
-        ? { id: task.sprint_id, name: task.sprint_name }
         : undefined,
       milestone: task.milestone_id
         ? { id: task.milestone_id, name: task.milestone_name }
@@ -140,8 +129,8 @@ export async function POST(request: NextRequest) {
     const workflowTemplateId = defaultTemplate?.id || null;
 
     run(
-      `INSERT INTO tasks (id, title, description, status, priority, task_type, effort, impact, assigned_agent_id, created_by_agent_id, workspace_id, sprint_id, milestone_id, parent_task_id, business_id, due_date, workflow_template_id, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO tasks (id, title, description, status, priority, task_type, effort, impact, assigned_agent_id, created_by_agent_id, workspace_id, milestone_id, business_id, due_date, workflow_template_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
         validatedData.title,
@@ -154,9 +143,7 @@ export async function POST(request: NextRequest) {
         validatedData.assigned_agent_id || null,
         validatedData.created_by_agent_id || null,
         workspaceId,
-        validatedData.sprint_id || null,
         validatedData.milestone_id || null,
-        validatedData.parent_task_id || null,
         validatedData.business_id || 'default',
         validatedData.due_date || null,
         workflowTemplateId,

@@ -68,17 +68,17 @@ export async function PATCH(
     const now = new Date().toISOString();
 
     // Workflow enforcement for agent-initiated approvals
-    // If an agent is trying to move review→done, they must be a master agent
+    // If an agent is trying to move review→done, they must be the orchestrator
     // User-initiated moves (no agent ID) are allowed
     if (validatedData.status === 'done' && existing.status === 'review' && validatedData.updated_by_agent_id) {
       const updatingAgent = queryOne<Agent>(
-        'SELECT is_master FROM agents WHERE id = ?',
+        'SELECT role FROM agents WHERE id = ?',
         [validatedData.updated_by_agent_id]
       );
 
-      if (!updatingAgent || !updatingAgent.is_master) {
+      if (!updatingAgent || updatingAgent.role !== 'orchestrator') {
         return NextResponse.json(
-          { error: 'Forbidden: only the master agent can approve tasks' },
+          { error: 'Forbidden: only the orchestrator can approve tasks' },
           { status: 403 }
         );
       }
@@ -108,17 +108,9 @@ export async function PATCH(
       updates.push('impact = ?');
       values.push(validatedData.impact);
     }
-    if (validatedData.sprint_id !== undefined) {
-      updates.push('sprint_id = ?');
-      values.push(validatedData.sprint_id);
-    }
     if (validatedData.milestone_id !== undefined) {
       updates.push('milestone_id = ?');
       values.push(validatedData.milestone_id);
-    }
-    if (validatedData.parent_task_id !== undefined) {
-      updates.push('parent_task_id = ?');
-      values.push(validatedData.parent_task_id);
     }
     if (validatedData.due_date !== undefined) {
       updates.push('due_date = ?');
