@@ -36,7 +36,6 @@ export interface Agent {
   role: string;
   description?: string;
   status: AgentStatus;
-  is_master: boolean;
   workspace_id: string;
   soul_md?: string;
   user_md?: string;
@@ -61,9 +60,25 @@ export interface Milestone {
   due_date?: string;
   status: MilestoneStatus;
   coordinator_agent_id?: string;
+  sprint_id?: string;
+  priority?: TaskPriority;
+  story_points?: number;
   created_at: string;
   updated_at: string;
   coordinator?: Agent;
+  sprint?: Sprint;
+  dependencies?: MilestoneDependency[];
+}
+
+export interface MilestoneDependency {
+  id: string;
+  milestone_id: string;
+  depends_on_milestone_id?: string;
+  depends_on_task_id?: string;
+  dependency_type: 'finish_to_start' | 'blocks';
+  created_at: string;
+  depends_on_milestone?: Milestone;
+  depends_on_task?: Task;
 }
 
 export interface Sprint {
@@ -135,9 +150,7 @@ export interface Task {
   assigned_agent_id: string | null;
   created_by_agent_id: string | null;
   workspace_id: string;
-  sprint_id?: string;
   milestone_id?: string;
-  parent_task_id?: string;
   business_id: string;
   due_date?: string;
   workflow_template_id?: string;
@@ -149,9 +162,7 @@ export interface Task {
   updated_at: string;
   assigned_agent?: Agent;
   created_by_agent?: Agent;
-  sprint?: Sprint;
   milestone?: Milestone;
-  subtasks?: Task[];
   tags?: Tag[];
   comments?: TaskComment[];
   blockers?: TaskBlocker[];
@@ -380,7 +391,6 @@ export interface CreateAgentRequest {
   name: string;
   role: string;
   description?: string;
-  is_master?: boolean;
   soul_md?: string;
   user_md?: string;
   agents_md?: string;
@@ -401,9 +411,7 @@ export interface CreateTaskRequest {
   assigned_agent_id?: string;
   created_by_agent_id?: string;
   workspace_id?: string;
-  sprint_id?: string;
   milestone_id?: string;
-  parent_task_id?: string;
   business_id?: string;
   due_date?: string;
   tags?: string[];
