@@ -15,7 +15,7 @@ interface RoleAssignment {
   agent_id: string;
   agent_name?: string;
 }
-function formatAgentLabel(name: string, role: string, max = 120): string {
+function formatAgentLabel(name: string, role: string, max = 60): string {
   const full = `${name} — ${role}`;
   return full.length > max ? full.slice(0, max - 1) + '…' : full;
 }

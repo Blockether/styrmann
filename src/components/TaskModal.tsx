@@ -455,7 +455,7 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId, githubI
                 <option value="">Unassigned</option>
                 {agents.map((agent) => (
                   <option key={agent.id} value={agent.id}>
-                    {agent.name} - {agent.role}
+                    {agent.name}{agent.role ? ` — ${agent.role.slice(0, 40)}${agent.role.length > 40 ? '…' : ''}` : ''}
                   </option>
                 ))}
                 <option value="__add_new__" className="text-mc-accent">

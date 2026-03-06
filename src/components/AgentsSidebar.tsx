@@ -476,7 +476,7 @@ export function AgentsSidebar({
                     setEditingAgent(agent);
                   }}
                   className="relative group"
-                  title={`${agent.name} - ${agent.role}`}
+                  title={`${agent.name}${agent.role ? ' — ' + (agent.role.length > 40 ? agent.role.slice(0, 40) + '…' : agent.role) : ''}`}
                 >
                   <AgentInitials name={agent.name} size="md" />
                   {(openclawSession || isSynced) && <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-mc-bg-secondary" />}
