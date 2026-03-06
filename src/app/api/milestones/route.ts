@@ -13,6 +13,7 @@ export const dynamic = 'force-dynamic';
 export async function GET(request: NextRequest) {
   const workspaceId = request.nextUrl.searchParams.get('workspace_id');
   const status = request.nextUrl.searchParams.get('status');
+  const sprintId = request.nextUrl.searchParams.get('sprint_id');
 
   if (!workspaceId) {
     return NextResponse.json({ error: 'workspace_id is required' }, { status: 400 });
@@ -25,7 +26,9 @@ export async function GET(request: NextRequest) {
   try {
     const db = getDb();
 
-    let sql = `SELECT m.*, a.name as coordinator_agent_name, a.role as coordinator_agent_role
+    let sql = `SELECT m.*,
+      (SELECT COALESCE(SUM(effort), 0) FROM tasks WHERE milestone_id = m.id) as story_points,
+      a.name as coordinator_agent_name, a.role as coordinator_agent_role
       FROM milestones m
       LEFT JOIN agents a ON m.coordinator_agent_id = a.id
       WHERE m.workspace_id = ?`;
@@ -34,6 +37,11 @@ export async function GET(request: NextRequest) {
     if (status) {
       sql += ' AND m.status = ?';
       values.push(status);
+    }
+
+    if (sprintId) {
+      sql += ' AND m.sprint_id = ?';
+      values.push(sprintId);
     }
 
     sql += ' ORDER BY m.created_at DESC';
@@ -81,10 +89,11 @@ export async function POST(request: NextRequest) {
 
     const coordinatorAgentId = data.coordinator_agent_id ?? null;
     const sprintId = data.sprint_id ?? null;
+    const priority = data.priority ?? null;
 
     db.prepare(`
-      INSERT INTO milestones (id, workspace_id, sprint_id, name, description, due_date, coordinator_agent_id, status, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO milestones (id, workspace_id, sprint_id, name, description, due_date, coordinator_agent_id, priority, status, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id,
       data.workspace_id,
@@ -93,6 +102,7 @@ export async function POST(request: NextRequest) {
       data.description || null,
       data.due_date || null,
       coordinatorAgentId,
+      priority,
       'open',
       now,
       now

@@ -19,7 +19,9 @@ export async function GET(
   try {
     const db = getDb();
     const milestone = db.prepare(
-      `SELECT m.*, a.name as coordinator_agent_name, a.role as coordinator_agent_role
+      `SELECT m.*,
+       (SELECT COALESCE(SUM(effort), 0) FROM tasks WHERE milestone_id = m.id) as story_points,
+       a.name as coordinator_agent_name, a.role as coordinator_agent_role
        FROM milestones m
        LEFT JOIN agents a ON m.coordinator_agent_id = a.id
        WHERE m.id = ?`
@@ -95,6 +97,14 @@ export async function PATCH(
     if (data.coordinator_agent_id !== undefined) {
       updates.push('coordinator_agent_id = ?');
       values.push(data.coordinator_agent_id);
+    }
+    if (data.sprint_id !== undefined) {
+      updates.push('sprint_id = ?');
+      values.push(data.sprint_id);
+    }
+    if (data.priority !== undefined) {
+      updates.push('priority = ?');
+      values.push(data.priority);
     }
 
     if (updates.length === 0) {
