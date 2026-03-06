@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { Plus, ChevronDown, CheckCircle2, Loader2, Flag, Users, Calendar, ChevronRight, ArrowRightLeft, LayoutList, Columns3, GripVertical } from 'lucide-react';
+import { Plus, ChevronDown, CheckCircle2, Loader2, Flag, Users, Calendar, ChevronRight, ArrowRightLeft, LayoutList, Columns3, GripVertical, Target, AlertCircle, Crown } from 'lucide-react';
 import { useMissionControl } from '@/lib/store';
 import { triggerAutoDispatch, shouldTriggerAutoDispatch } from '@/lib/auto-dispatch';
 import type { Task, TaskStatus, Sprint, Milestone, Agent } from '@/lib/types';
@@ -40,32 +40,47 @@ const BOARD_COLUMN_CONFIG: { status: TaskStatus; borderColor: string }[] = [
 
 const DONE_STATUSES: TaskStatus[] = ['done'];
 
+const PRIORITY_ORDER: Record<string, number> = {
+  urgent: 0,
+  high: 1,
+  normal: 2,
+  low: 3,
+};
+
+const PRIORITY_COLORS: Record<string, string> = {
+  urgent: 'bg-red-500',
+  high: 'bg-orange-500',
+  normal: 'bg-blue-500',
+  low: 'bg-gray-400',
+};
+
 export function ActiveSprint({ workspaceId, mobileMode = false, isPortrait = true }: ActiveSprintProps) {
   const { tasks: storeTasks, updateTaskStatus, addEvent } = useMissionControl();
   const [sprints, setSprints] = useState<Sprint[]>([]);
   const [milestones, setMilestones] = useState<Milestone[]>([]);
-    const [agents, setAgents] = useState<Agent[]>([]);
-    const [selectedSprintId, setSelectedSprintId] = useState<string | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [showSprintDropdown, setShowSprintDropdown] = useState(false);
-    const [showCreateModal, setShowCreateModal] = useState(false);
-    const [editingTask, setEditingTask] = useState<Task | null>(null);
-    const [endingSprint, setEndingSprint] = useState(false);
-    const [creatingSprint, setCreatingSprint] = useState(false);
-    const [statusMoveTask, setStatusMoveTask] = useState<Task | null>(null);
+  const [agents, setAgents] = useState<Agent[]>([]);
+  const [selectedSprintId, setSelectedSprintId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [showSprintDropdown, setShowSprintDropdown] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [endingSprint, setEndingSprint] = useState(false);
+  const [creatingSprint, setCreatingSprint] = useState(false);
+  const [statusMoveTask, setStatusMoveTask] = useState<Task | null>(null);
   const [viewMode, setViewMode] = useState<'list' | 'board'>('list');
   const [selectedBoardStatus, setSelectedBoardStatus] = useState<TaskStatus>('planning');
   const [draggedTask, setDraggedTask] = useState<Task | null>(null);
+  const [expandedMilestones, setExpandedMilestones] = useState<Set<string>>(new Set());
 
+  // Initial data load (sprints + agents only)
   useEffect(() => {
     if (!workspaceId) return;
 
     async function loadData() {
       try {
         setLoading(true);
-        const [sprintsRes, milestonesRes, agentsRes] = await Promise.all([
+        const [sprintsRes, agentsRes] = await Promise.all([
           fetch(`/api/sprints?workspace_id=${workspaceId}`),
-          fetch(`/api/milestones?workspace_id=${workspaceId}`),
           fetch(`/api/agents?workspace_id=${workspaceId}`),
         ]);
 
@@ -78,7 +93,6 @@ export function ActiveSprint({ workspaceId, mobileMode = false, isPortrait = tru
           setSelectedSprintId(activeSprint?.id || planningSprint?.id || null);
         }
 
-        if (milestonesRes.ok) setMilestones(await milestonesRes.json());
         if (agentsRes.ok) setAgents(await agentsRes.json());
       } catch (error) {
         console.error('Failed to load sprint data:', error);
@@ -90,415 +104,754 @@ export function ActiveSprint({ workspaceId, mobileMode = false, isPortrait = tru
     loadData();
   }, [workspaceId]);
 
-    const sprintTasks = useMemo(() => {
-      if (!selectedSprintId) return [];
-      return storeTasks.filter((t) => t.sprint_id === selectedSprintId);
-    }, [storeTasks, selectedSprintId]);
+  // Fetch milestones when sprint selection changes
+  useEffect(() => {
+    if (!workspaceId) return;
 
-    const tasksByMilestone = useMemo(() => {
-      const groups: Record<string, Task[]> = { ungrouped: [] };
-
-      sprintTasks.forEach((task) => {
-        if (task.milestone_id) {
-          if (!groups[task.milestone_id]) {
-            groups[task.milestone_id] = [];
-          }
-          groups[task.milestone_id].push(task);
-        } else {
-          groups['ungrouped'].push(task);
+    async function loadMilestones() {
+      try {
+        const url = selectedSprintId
+          ? `/api/milestones?workspace_id=${workspaceId}&sprint_id=${selectedSprintId}`
+          : `/api/milestones?workspace_id=${workspaceId}`;
+        const res = await fetch(url);
+        if (res.ok) {
+          const data = await res.json();
+          setMilestones(data);
+          // Expand all milestones by default
+          setExpandedMilestones(new Set(data.map((m: Milestone) => m.id)));
         }
+      } catch (error) {
+        console.error('Failed to load milestones:', error);
+      }
+    }
+
+    loadMilestones();
+  }, [workspaceId, selectedSprintId]);
+
+  const sprintTasks = useMemo(() => {
+    if (!selectedSprintId) return [];
+    const sprintMilestoneIds = new Set(milestones.map((m) => m.id));
+    return storeTasks.filter((t) =>{
+      if (t.milestone_id) return sprintMilestoneIds.has(t.milestone_id);
+      // Ungrouped tasks: no milestone, belong to workspace
+      return t.workspace_id === workspaceId;
+    });
+  }, [storeTasks, selectedSprintId, milestones, workspaceId]);
+
+  const tasksByMilestone = useMemo(() => {
+    const groups: Record<string, Task[]> = { ungrouped: [] };
+
+    sprintTasks.forEach((task) => {
+      if (task.milestone_id) {
+        if (!groups[task.milestone_id]) {
+          groups[task.milestone_id] = [];
+        }
+        groups[task.milestone_id].push(task);
+      } else {
+        groups['ungrouped'].push(task);
+      }
+    });
+
+    return groups;
+  }, [sprintTasks]);
+
+  // Milestones sorted by priority, filtered to those with tasks
+  const milestoneOrder = useMemo(() => {
+    return milestones
+      .filter((m) => tasksByMilestone[m.id]?.length > 0)
+      .sort((a, b) => {
+        const orderA = PRIORITY_ORDER[a.priority || 'normal'] ?? 2;
+        const orderB = PRIORITY_ORDER[b.priority || 'normal'] ?? 2;
+        return orderA - orderB;
+      })
+      .map((m) => m.id);
+  }, [milestones, tasksByMilestone]);
+
+  const hasUngrouped = tasksByMilestone['ungrouped'].length > 0;
+
+  const selectedSprint = sprints.find((s) => s.id === selectedSprintId);
+  const activeSprint = sprints.find((s) => s.status === 'active');
+
+  const updateTaskStatusWithPersist = async (task: Task, targetStatus: TaskStatus) => {
+    if (task.status === targetStatus) return;
+
+    updateTaskStatus(task.id, targetStatus);
+
+    try {
+      const res = await fetch(`/api/tasks/${task.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: targetStatus }),
       });
 
-      return groups;
-    }, [sprintTasks]);
-
-    const selectedSprint = sprints.find((s) => s.id === selectedSprintId);
-    const activeSprint = sprints.find((s) => s.status === 'active');
-
-    const updateTaskStatusWithPersist = async (task: Task, targetStatus: TaskStatus) => {
-      if (task.status === targetStatus) return;
-
-      updateTaskStatus(task.id, targetStatus);
-
-      try {
-        const res = await fetch(`/api/tasks/${task.id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status: targetStatus }),
+      if (res.ok) {
+        addEvent({
+          id: task.id + '-' + Date.now(),
+          type: targetStatus === 'done' ? 'task_completed' : 'task_status_changed',
+          task_id: task.id,
+          message: `Task "${task.title}" moved to ${targetStatus}`,
+          created_at: new Date().toISOString(),
         });
 
-        if (res.ok) {
-          addEvent({
-            id: task.id + '-' + Date.now(),
-            type: targetStatus === 'done' ? 'task_completed' : 'task_status_changed',
-            task_id: task.id,
-            message: `Task "${task.title}" moved to ${targetStatus}`,
-            created_at: new Date().toISOString(),
+        if (shouldTriggerAutoDispatch(task.status, targetStatus, task.assigned_agent_id)) {
+          const result = await triggerAutoDispatch({
+            taskId: task.id,
+            taskTitle: task.title,
+            agentId: task.assigned_agent_id,
+            agentName: task.assigned_agent?.name || 'Unknown Agent',
+            workspaceId: task.workspace_id,
           });
 
-          if (shouldTriggerAutoDispatch(task.status, targetStatus, task.assigned_agent_id)) {
-            const result = await triggerAutoDispatch({
-              taskId: task.id,
-              taskTitle: task.title,
-              agentId: task.assigned_agent_id,
-              agentName: task.assigned_agent?.name || 'Unknown Agent',
-              workspaceId: task.workspace_id,
-            });
-
-            if (!result.success) {
-              console.error('Auto-dispatch failed:', result.error);
-            }
+          if (!result.success) {
+            console.error('Auto-dispatch failed:', result.error);
           }
         }
-      } catch (error) {
-        console.error('Failed to update task status:', error);
-        updateTaskStatus(task.id, task.status);
       }
-    };
+    } catch (error) {
+      console.error('Failed to update task status:', error);
+      updateTaskStatus(task.id, task.status);
+    }
+  };
 
-    const handleEndSprint = async () => {
-      if (!selectedSprintId) return;
-      setEndingSprint(true);
-      try {
-        const res = await fetch(`/api/sprints/${selectedSprintId}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status: 'completed' }),
-        });
+  const handleEndSprint = async () => {
+    if (!selectedSprintId) return;
+    setEndingSprint(true);
+    try {
+      const res = await fetch(`/api/sprints/${selectedSprintId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'completed' }),
+      });
 
-        if (res.ok) {
-          setSprints((prev) =>
-            prev.map((s) => (s.id === selectedSprintId ? { ...s, status: 'completed' } : s))
-          );
-          const remaining = sprints.filter((s) => s.status === 'planning' || s.status === 'active');
-          setSelectedSprintId(remaining[0]?.id || null);
-        }
-      } catch (error) {
-        console.error('Failed to end sprint:', error);
-      } finally {
-        setEndingSprint(false);
+      if (res.ok) {
+        setSprints((prev) =>
+          prev.map((s) => (s.id === selectedSprintId ? { ...s, status: 'completed' } : s))
+        );
+        const remaining = sprints.filter((s) => s.status === 'planning' || s.status === 'active');
+        setSelectedSprintId(remaining[0]?.id || null);
       }
-    };
+    } catch (error) {
+      console.error('Failed to end sprint:', error);
+    } finally {
+      setEndingSprint(false);
+    }
+  };
 
-    const handleCreateNextSprint = async () => {
-      if (!workspaceId) return;
-      setCreatingSprint(true);
-      try {
-        const now = new Date();
-        const twoWeeksLater = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
-        const res = await fetch('/api/sprints', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            workspace_id: workspaceId,
-            start_date: now.toISOString().split('T')[0],
-            end_date: twoWeeksLater.toISOString().split('T')[0],
-          }),
-        });
+  const handleCreateNextSprint = async () => {
+    if (!workspaceId) return;
+    setCreatingSprint(true);
+    try {
+      const now = new Date();
+      const twoWeeksLater = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
+      const res = await fetch('/api/sprints', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          workspace_id: workspaceId,
+          start_date: now.toISOString().split('T')[0],
+          end_date: twoWeeksLater.toISOString().split('T')[0],
+        }),
+      });
 
-        if (res.ok) {
-          const newSprint = await res.json();
-          setSprints((prev) => [...prev, newSprint]);
-          setSelectedSprintId(newSprint.id);
-        }
-      } catch (error) {
-        console.error('Failed to create sprint:', error);
-      } finally {
-        setCreatingSprint(false);
+      if (res.ok) {
+        const newSprint = await res.json();
+        setSprints((prev) => [...prev, newSprint]);
+        setSelectedSprintId(newSprint.id);
       }
-    };
-
-    const getMilestoneProgress = (milestoneId: string) => {
-      const tasks = tasksByMilestone[milestoneId] || [];
-      const done = tasks.filter((t) => DONE_STATUSES.includes(t.status)).length;
-      return { done, total: tasks.length };
-    };
-
-    const getMilestoneCoordinator = (milestoneId: string) => {
-      const milestone = milestones.find((m) => m.id === milestoneId);
-      if (!milestone?.coordinator_agent_id) return null;
-      return agents.find((a) => a.id === milestone.coordinator_agent_id) || null;
-    };
-
-    if (loading) {
-      return (
-        <div className="flex-1 flex items-center justify-center">
-          <Loader2 className="w-6 h-6 animate-spin text-mc-text-secondary" />
-        </div>
-      );
+    } catch (error) {
+      console.error('Failed to create sprint:', error);
+    } finally {
+      setCreatingSprint(false);
     }
+  };
 
-    if (sprints.length === 0) {
-      return (
-        <div className="flex-1 flex flex-col items-center justify-center p-6">
-          <Calendar className="w-12 h-12 text-mc-border mb-4" />
-          <h3 className="text-lg font-semibold mb-2">No Sprints Yet</h3>
-          <p className="text-sm text-mc-text-secondary text-center mb-4">
-            Create your first sprint to start organizing tasks.
-          </p>
-          <button
-            onClick={handleCreateNextSprint}
-            disabled={creatingSprint}
-            className="flex items-center gap-2 px-4 min-h-11 bg-mc-accent text-white rounded text-sm font-medium hover:bg-mc-accent/90 disabled:opacity-50"
-          >
-            {creatingSprint ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-            Create First Sprint
-          </button>
-        </div>
-      );
-    }
+  const getMilestoneProgress = (milestoneId: string) => {
+    const tasks = tasksByMilestone[milestoneId] || [];
+    const done = tasks.filter((t) => DONE_STATUSES.includes(t.status)).length;
+    return { done, total: tasks.length };
+  };
 
-    if (!selectedSprintId || !selectedSprint) {
-      return (
-        <div className="flex-1 flex flex-col items-center justify-center p-6">
-          <Flag className="w-12 h-12 text-mc-border mb-4" />
-          <h3 className="text-lg font-semibold mb-2">No Active Sprint</h3>
-          <p className="text-sm text-mc-text-secondary text-center mb-4">
-            Select a sprint from the dropdown or create a new one.
-          </p>
-          <button
-            onClick={handleCreateNextSprint}
-            disabled={creatingSprint}
-            className="flex items-center gap-2 px-4 min-h-11 bg-mc-accent text-white rounded text-sm font-medium hover:bg-mc-accent/90 disabled:opacity-50"
-          >
-            {creatingSprint ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-            Create Sprint
-          </button>
-        </div>
-      );
-    }
+  const getMilestoneCoordinator = (milestoneId: string) => {
+    const milestone = milestones.find((m) => m.id === milestoneId);
+    if (!milestone?.coordinator_agent_id) return null;
+    return agents.find((a) => a.id === milestone.coordinator_agent_id) || null;
+  };
 
-    const milestoneOrder = milestones
-      .filter((m) => tasksByMilestone[m.id]?.length > 0)
-      .map((m) => m.id);
-    const hasUngrouped = tasksByMilestone['ungrouped'].length > 0;
+  const toggleMilestone = (milestoneId: string) => {
+    setExpandedMilestones((prev) => {
+      const next = new Set(prev);
+      if (next.has(milestoneId)) {
+        next.delete(milestoneId);
+      } else {
+        next.add(milestoneId);
+      }
+      return next;
+    });
+  };
 
+  if (loading) {
     return (
-      <div data-component="src/components/ActiveSprint" className="flex-1 flex flex-col overflow-hidden">
-        <div className={`p-3 border-b border-mc-border bg-mc-bg-secondary flex items-center justify-between gap-2 ${mobileMode && isPortrait ? 'flex-wrap' : ''}`}>
-          <div className="flex items-center gap-2">
-            <ChevronRight className="w-4 h-4 text-mc-text-secondary" />
-            
-            <div className="relative">
-              <button
-                onClick={() => setShowSprintDropdown(!showSprintDropdown)}
-                className="flex items-center gap-2 px-3 min-h-11 rounded-lg border border-mc-border bg-mc-bg-secondary text-sm font-medium hover:bg-mc-bg-tertiary"
-              >
-                <span className={selectedSprint.status === 'active' ? 'text-mc-accent-green' : 'text-mc-text-secondary'}>
-                  {selectedSprint.name}
-                </span>
-                {selectedSprint.status === 'active' && (
-                  <span className="text-xs px-1.5 py-0.5 rounded bg-mc-accent-green/20 text-mc-accent-green">Active</span>
-                )}
-                <ChevronDown className="w-4 h-4 text-mc-text-secondary" />
-              </button>
+      <div className="flex-1 flex items-center justify-center">
+        <Loader2 className="w-6 h-6 animate-spin text-mc-text-secondary" />
+      </div>
+    );
+  }
 
-              {showSprintDropdown && (
-                <div className="absolute left-0 top-full mt-1 w-56 bg-mc-bg-secondary border border-mc-border rounded-lg shadow-lg z-20 py-1">
-                  {[...sprints.filter((s) => s.status === 'active' || s.status === 'planning'), ...sprints.filter((s) => s.status === 'completed')].map((sprint) => (
-                    <button
-                      key={sprint.id}
-                      onClick={() => {
-                        setSelectedSprintId(sprint.id);
-                        setShowSprintDropdown(false);
-                      }}
-                      className={`w-full px-3 py-2 text-left text-sm hover:bg-mc-bg-tertiary flex items-center justify-between ${
-                        selectedSprintId === sprint.id ? 'bg-mc-bg-tertiary' : ''
-                      }`}
-                    >
-                      <span>{sprint.name}</span>
-                      <span className={`text-xs px-1.5 py-0.5 rounded ${
-                        sprint.status === 'active' ? 'bg-mc-accent-green/20 text-mc-accent-green' :
-                        sprint.status === 'planning' ? 'bg-mc-accent-yellow/20 text-mc-accent-yellow' :
-                        'bg-mc-bg-tertiary text-mc-text-secondary'
-                      }`}>
-                        {sprint.status}
-                      </span>
-                    </button>
-                  ))}
-                  <div className="border-t border-mc-border mt-1 pt-1">
-                    <button
-                      onClick={() => {
-                        handleCreateNextSprint();
-                        setShowSprintDropdown(false);
-                      }}
-                      disabled={creatingSprint}
-                      className="w-full px-3 py-2 text-left text-sm text-mc-accent hover:bg-mc-bg-tertiary flex items-center gap-2"
-                    >
-                      {creatingSprint ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-                      Create Next Sprint
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
+  if (sprints.length === 0) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center p-6">
+        <Calendar className="w-12 h-12 text-mc-border mb-4" />
+        <h3 className="text-lg font-semibold mb-2">No Sprints Yet</h3>
+        <p className="text-sm text-mc-text-secondary text-center mb-4">
+          Create your first sprint to start organizing tasks.
+        </p>
+        <button
+          onClick={handleCreateNextSprint}
+          disabled={creatingSprint}
+          className="flex items-center gap-2 px-4 min-h-11 bg-mc-accent text-white rounded text-sm font-medium hover:bg-mc-accent/90 disabled:opacity-50"
+        >
+          {creatingSprint ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+          Create First Sprint
+        </button>
+      </div>
+    );
+  }
 
-          <div className="flex items-center gap-2">
-            <div className="flex items-center bg-mc-bg-tertiary rounded-lg p-0.5">
-              <button
-                onClick={() => setViewMode('list')}
-                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-medium transition-colors min-h-9 ${
-                  viewMode === 'list' ? 'bg-mc-accent text-white' : 'text-mc-text-secondary hover:text-mc-text'
-                }`}
-              >
-                <LayoutList className="w-4 h-4" />
-                <span className="hidden sm:inline">List</span>
-              </button>
-              <button
-                onClick={() => setViewMode('board')}
-                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-medium transition-colors min-h-9 ${
-                  viewMode === 'board' ? 'bg-mc-accent text-white' : 'text-mc-text-secondary hover:text-mc-text'
-                }`}
-              >
-                <Columns3 className="w-4 h-4" />
-                <span className="hidden sm:inline">Board</span>
-              </button>
-            </div>
-            {selectedSprint.status === 'active' && (
-              <button
-                onClick={handleEndSprint}
-                disabled={endingSprint}
-                className="flex items-center gap-2 px-3 min-h-11 border border-mc-border rounded text-sm text-mc-text-secondary hover:bg-mc-bg-tertiary disabled:opacity-50"
-              >
-                {endingSprint ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-                <span className="hidden sm:inline">End Sprint</span>
-              </button>
-            )}
+  if (!selectedSprintId || !selectedSprint) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center p-6">
+        <Flag className="w-12 h-12 text-mc-border mb-4" />
+        <h3 className="text-lg font-semibold mb-2">No Active Sprint</h3>
+        <p className="text-sm text-mc-text-secondary text-center mb-4">
+          Select a sprint from the dropdown or create a new one.
+        </p>
+        <button
+          onClick={handleCreateNextSprint}
+          disabled={creatingSprint}
+          className="flex items-center gap-2 px-4 min-h-11 bg-mc-accent text-white rounded text-sm font-medium hover:bg-mc-accent/90 disabled:opacity-50"
+        >
+          {creatingSprint ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+          Create Sprint
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div data-component="src/components/ActiveSprint" className="flex-1 flex flex-col overflow-hidden">
+      <div className={`p-3 border-b border-mc-border bg-mc-bg-secondary flex items-center justify-between gap-2 ${mobileMode && isPortrait ? 'flex-wrap' : ''}`}>
+        <div className="flex items-center gap-2">
+          <ChevronRight className="w-4 h-4 text-mc-text-secondary" />
+          
+          <div className="relative">
             <button
-              onClick={() => setShowCreateModal(true)}
-              className="flex items-center gap-2 px-4 min-h-11 bg-mc-accent text-white rounded text-sm font-medium hover:bg-mc-accent/90"
+              onClick={() => setShowSprintDropdown(!showSprintDropdown)}
+              className="flex items-center gap-2 px-3 min-h-11 rounded-lg border border-mc-border bg-mc-bg-secondary text-sm font-medium hover:bg-mc-bg-tertiary"
             >
-              <Plus className="w-4 h-4" />
-              New Task
+              <span className={selectedSprint.status === 'active' ? 'text-mc-accent-green' : 'text-mc-text-secondary'}>
+                {selectedSprint.name}
+              </span>
+              {selectedSprint.status === 'active' && (
+                <span className="text-xs px-1.5 py-0.5 rounded bg-mc-accent-green/20 text-mc-accent-green">Active</span>
+              )}
+              <ChevronDown className="w-4 h-4 text-mc-text-secondary" />
+            </button>
+
+            {showSprintDropdown && (
+              <div className="absolute left-0 top-full mt-1 w-56 bg-mc-bg-secondary border border-mc-border rounded-lg shadow-lg z-20 py-1">
+                {[...sprints.filter((s) => s.status === 'active' || s.status === 'planning'), ...sprints.filter((s) => s.status === 'completed')].map((sprint) => (
+                  <button
+                    key={sprint.id}
+                    onClick={() => {
+                      setSelectedSprintId(sprint.id);
+                      setShowSprintDropdown(false);
+                    }}
+                    className={`w-full px-3 py-2 text-left text-sm hover:bg-mc-bg-tertiary flex items-center justify-between ${
+                      selectedSprintId === sprint.id ? 'bg-mc-bg-tertiary' : ''
+                    }`}
+                  >
+                    <span>{sprint.name}</span>
+                    <span className={`text-xs px-1.5 py-0.5 rounded ${
+                      sprint.status === 'active' ? 'bg-mc-accent-green/20 text-mc-accent-green' :
+                      sprint.status === 'planning' ? 'bg-mc-accent-yellow/20 text-mc-accent-yellow' :
+                      'bg-mc-bg-tertiary text-mc-text-secondary'
+                    }`}>
+                      {sprint.status}
+                    </span>
+                  </button>
+                ))}
+                <div className="border-t border-mc-border mt-1 pt-1">
+                  <button
+                    onClick={() => {
+                      handleCreateNextSprint();
+                      setShowSprintDropdown(false);
+                    }}
+                    disabled={creatingSprint}
+                    className="w-full px-3 py-2 text-left text-sm text-mc-accent hover:bg-mc-bg-tertiary flex items-center gap-2"
+                  >
+                    {creatingSprint ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                    Create Next Sprint
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <div className="flex items-center bg-mc-bg-tertiary rounded-lg p-0.5">
+            <button
+              onClick={() => setViewMode('list')}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-medium transition-colors min-h-9 ${
+                viewMode === 'list' ? 'bg-mc-accent text-white' : 'text-mc-text-secondary hover:text-mc-text'
+              }`}
+            >
+              <LayoutList className="w-4 h-4" />
+              <span className="hidden sm:inline">List</span>
+            </button>
+            <button
+              onClick={() => setViewMode('board')}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-medium transition-colors min-h-9 ${
+                viewMode === 'board' ? 'bg-mc-accent text-white' : 'text-mc-text-secondary hover:text-mc-text'
+              }`}
+            >
+              <Columns3 className="w-4 h-4" />
+              <span className="hidden sm:inline">Board</span>
             </button>
           </div>
+          {selectedSprint.status === 'active' && (
+            <button
+              onClick={handleEndSprint}
+              disabled={endingSprint}
+              className="flex items-center gap-2 px-3 min-h-11 border border-mc-border rounded text-sm text-mc-text-secondary hover:bg-mc-bg-tertiary disabled:opacity-50"
+            >
+              {endingSprint ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+              <span className="hidden sm:inline">End Sprint</span>
+            </button>
+          )}
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="flex items-center gap-2 px-4 min-h-11 bg-mc-accent text-white rounded text-sm font-medium hover:bg-mc-accent/90"
+          >
+            <Plus className="w-4 h-4" />
+            New Task
+          </button>
         </div>
+      </div>
 
-        <div className={`flex-1 overflow-y-auto ${viewMode === 'board' ? 'overflow-hidden' : ''} ${isPortrait && viewMode === 'list' ? 'p-3 pb-[calc(1rem+env(safe-area-inset-bottom))]' : viewMode === 'list' ? 'p-3' : ''}`}>
-          {sprintTasks.length === 0 ? (
-            <div className="text-center py-12">
-              <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-mc-bg-tertiary flex items-center justify-center">
-                <Flag className="w-6 h-6 text-mc-text-secondary" />
-              </div>
-              <h3 className="text-base font-medium mb-1">No Tasks in This Sprint</h3>
-              <p className="text-sm text-mc-text-secondary">Use the New Task button above to add tasks.</p>
+      <div className={`flex-1 overflow-y-auto ${viewMode === 'board' ? 'overflow-hidden' : ''} ${isPortrait && viewMode === 'list' ? 'p-3 pb-[calc(1rem+env(safe-area-inset-bottom))]' : viewMode === 'list' ? 'p-3' : ''}`}>
+        {sprintTasks.length === 0 ? (
+          <div className="text-center py-12">
+            <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-mc-bg-tertiary flex items-center justify-center">
+              <Flag className="w-6 h-6 text-mc-text-secondary" />
             </div>
-          ) : viewMode === 'list' ? (
-            <div className={`space-y-6 ${isPortrait ? '' : 'space-y-4'}`}>
-              {milestoneOrder.map((milestoneId) => {
-                const milestone = milestones.find((m) => m.id === milestoneId);
-                const tasks = tasksByMilestone[milestoneId] || [];
-                const { done, total } = getMilestoneProgress(milestoneId);
-                const coordinator = getMilestoneCoordinator(milestoneId);
-                const progress = total > 0 ? (done / total) * 100 : 0;
+            <h3 className="text-base font-medium mb-1">No Tasks in This Sprint</h3>
+            <p className="text-sm text-mc-text-secondary">Use the New Task button above to add tasks.</p>
+          </div>
+        ) : viewMode === 'list' ? (
+          <div className={`space-y-6 ${isPortrait ? '' : 'space-y-4'}`}>
+            {milestoneOrder.map((milestoneId) => {
+              const milestone = milestones.find((m) => m.id === milestoneId);
+              const tasks = tasksByMilestone[milestoneId] || [];
+              const { done, total } = getMilestoneProgress(milestoneId);
+              const coordinator = getMilestoneCoordinator(milestoneId);
+              const progress = total > 0 ? (done / total) * 100 : 0;
+              const isExpanded = expandedMilestones.has(milestoneId);
 
-                return (
-                  <MilestoneGroup
-                    key={milestoneId}
-                    milestone={milestone ?? null}
-                    coordinator={coordinator ?? null}
-                    tasks={tasks}
-                    done={done}
-                    total={total}
-                    progress={progress}
-                    isPortrait={isPortrait}
-                    onTaskClick={setEditingTask}
-                    onMoveStatus={setStatusMoveTask}
-                    mobileMode={mobileMode}
-                  />
-                );
-              })}
-
-              {hasUngrouped && (
+              return (
                 <MilestoneGroup
-                  milestone={null}
-                  coordinator={null}
-                  tasks={tasksByMilestone['ungrouped']}
-                  done={tasksByMilestone['ungrouped'].filter((t) => DONE_STATUSES.includes(t.status)).length}
-                  total={tasksByMilestone['ungrouped'].length}
-                  progress={tasksByMilestone['ungrouped'].length > 0 ? (tasksByMilestone['ungrouped'].filter((t) => DONE_STATUSES.includes(t.status)).length / tasksByMilestone['ungrouped'].length) * 100 : 0}
+                  key={milestoneId}
+                  milestone={milestone ?? null}
+                  coordinator={coordinator ?? null}
+                  tasks={tasks}
+                  done={done}
+                  total={total}
+                  progress={progress}
                   isPortrait={isPortrait}
+                  isExpanded={isExpanded}
+                  onToggle={() => toggleMilestone(milestoneId)}
                   onTaskClick={setEditingTask}
                   onMoveStatus={setStatusMoveTask}
                   mobileMode={mobileMode}
                 />
+              );
+            })}
+
+            {hasUngrouped && (
+              <MilestoneGroup
+                milestone={null}
+                coordinator={null}
+                tasks={tasksByMilestone['ungrouped']}
+                done={tasksByMilestone['ungrouped'].filter((t) => DONE_STATUSES.includes(t.status)).length}
+                total={tasksByMilestone['ungrouped'].length}
+                progress={tasksByMilestone['ungrouped'].length > 0 ? (tasksByMilestone['ungrouped'].filter((t) => DONE_STATUSES.includes(t.status)).length / tasksByMilestone['ungrouped'].length) * 100 : 0}
+                isPortrait={isPortrait}
+                isExpanded={expandedMilestones.has('ungrouped')}
+                onToggle={() => toggleMilestone('ungrouped')}
+                onTaskClick={setEditingTask}
+                onMoveStatus={setStatusMoveTask}
+                mobileMode={mobileMode}
+              />
+            )}
+          </div>
+        ) : mobileMode ? (
+          <div className="flex flex-col h-full">
+            <div className="flex gap-2 p-3 overflow-x-auto border-b border-mc-border flex-shrink-0">
+              {BOARD_COLUMN_CONFIG.map(({ status, borderColor }) => {
+                const count = sprintTasks.filter((t) => t.status === status).length;
+                const config = STATUS_CONFIG[status];
+                const isSelected = selectedBoardStatus === status;
+                return (
+                  <button
+                    key={status}
+                    onClick={() => setSelectedBoardStatus(status)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap min-h-8 transition-colors ${
+                      isSelected
+                        ? 'bg-mc-accent text-white'
+                        : 'bg-mc-bg-secondary border border-mc-border text-mc-text-secondary hover:text-mc-text'
+                    }`}
+                  >
+                    <span className={`w-2 h-2 rounded-full ${config.color}`} />
+                    {config.label}
+                    <span className={`text-xs ${isSelected ? 'text-white/70' : 'text-mc-text-secondary'}`}>({count})</span>
+                  </button>
+                );
+              })}
+            </div>
+            <div className="flex-1 overflow-y-auto p-3 space-y-2">
+              {sprintTasks
+                .filter((t) => t.status === selectedBoardStatus)
+                .map((task) => (
+                  <div
+                    key={task.id}
+                    onClick={() => setEditingTask(task)}
+                    className="bg-mc-bg-secondary border border-mc-border/50 rounded-lg p-3 cursor-pointer hover:border-mc-accent/40 transition-colors"
+                  >
+                    <div className="flex items-start gap-2 mb-2">
+                      <span className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${STATUS_CONFIG[task.status].color}`} />
+                      <h4 className="font-medium text-sm line-clamp-2 flex-1">{task.title}</h4>
+                    </div>
+                    <div className="flex items-center gap-3 text-xs text-mc-text-secondary mb-3">
+                      {task.assigned_agent && (
+                        <div className="flex items-center gap-1.5">
+                          <AgentInitials name={(task.assigned_agent as unknown as { name: string }).name} size="xs" />
+                          <span className="truncate">{(task.assigned_agent as unknown as { name: string }).name}</span>
+                        </div>
+                      )}
+                      <span className="capitalize">{task.priority}</span>
+                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setStatusMoveTask(task);
+                      }}
+                      className="w-full min-h-11 rounded-md border border-mc-border bg-mc-bg flex items-center justify-center gap-2 text-mc-text-secondary text-sm hover:bg-mc-bg-tertiary transition-colors"
+                    >
+                      <ArrowRightLeft className="w-4 h-4" />
+                      Move Status
+                    </button>
+                  </div>
+                ))}
+              {sprintTasks.filter((t) => t.status === selectedBoardStatus).length === 0 && (
+                <div className="text-center py-8 text-mc-text-secondary text-sm">
+                  No tasks in {STATUS_CONFIG[selectedBoardStatus].label}
+                </div>
               )}
             </div>
-          ) : mobileMode ? (
-            <div className="flex flex-col h-full">
-              <div className="flex gap-2 p-3 overflow-x-auto border-b border-mc-border flex-shrink-0">
-                {BOARD_COLUMN_CONFIG.map(({ status, borderColor }) => {
-                  const count = sprintTasks.filter((t) => t.status === status).length;
-                  const config = STATUS_CONFIG[status];
-                  const isSelected = selectedBoardStatus === status;
-                  return (
-                    <button
-                      key={status}
-                      onClick={() => setSelectedBoardStatus(status)}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap min-h-8 transition-colors ${
-                        isSelected
-                          ? 'bg-mc-accent text-white'
-                          : 'bg-mc-bg-secondary border border-mc-border text-mc-text-secondary hover:text-mc-text'
-                      }`}
-                    >
-                      <span className={`w-2 h-2 rounded-full ${config.color}`} />
-                      {config.label}
-                      <span className={`text-xs ${isSelected ? 'text-white/70' : 'text-mc-text-secondary'}`}>({count})</span>
-                    </button>
-                  );
-                })}
-              </div>
-              <div className="flex-1 overflow-y-auto p-3 space-y-2">
-                {sprintTasks
-                  .filter((t) => t.status === selectedBoardStatus)
-                  .map((task) => (
-                    <div
-                      key={task.id}
-                      onClick={() => setEditingTask(task)}
-                      className="bg-mc-bg-secondary border border-mc-border/50 rounded-lg p-3 cursor-pointer hover:border-mc-accent/40 transition-colors"
-                    >
-                      <div className="flex items-start gap-2 mb-2">
-                        <span className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${STATUS_CONFIG[task.status].color}`} />
-                        <h4 className="font-medium text-sm line-clamp-2 flex-1">{task.title}</h4>
-                      </div>
-                      <div className="flex items-center gap-3 text-xs text-mc-text-secondary mb-3">
-                        {task.assigned_agent && (
-                          <div className="flex items-center gap-1.5">
-                            <AgentInitials name={(task.assigned_agent as unknown as { name: string }).name} size="xs" />
-                            <span className="truncate">{(task.assigned_agent as unknown as { name: string }).name}</span>
-                          </div>
-                        )}
-                        <span className="capitalize">{task.priority}</span>
-                      </div>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setStatusMoveTask(task);
-                        }}
-                        className="w-full min-h-11 rounded-md border border-mc-border bg-mc-bg flex items-center justify-center gap-2 text-mc-text-secondary text-sm hover:bg-mc-bg-tertiary transition-colors"
-                      >
-                        <ArrowRightLeft className="w-4 h-4" />
-                        Move Status
-                      </button>
-                    </div>
-                  ))}
-                {sprintTasks.filter((t) => t.status === selectedBoardStatus).length === 0 && (
-                  <div className="text-center py-8 text-mc-text-secondary text-sm">
-                    No tasks in {STATUS_CONFIG[selectedBoardStatus].label}
-                  </div>
-                )}
-              </div>
+          </div>
+        ) : (
+          <MilestoneBoard
+            milestoneOrder={milestoneOrder}
+            milestones={milestones}
+            tasksByMilestone={tasksByMilestone}
+            hasUngrouped={hasUngrouped}
+            agents={agents}
+            onTaskClick={setEditingTask}
+            draggedTask={draggedTask}
+            setDraggedTask={setDraggedTask}
+            updateTaskStatusWithPersist={updateTaskStatusWithPersist}
+          />
+        )}
+      </div>
+
+      {showCreateModal && (
+        <TaskModal
+          onClose={() => setShowCreateModal(false)}
+          workspaceId={workspaceId}
+          defaultSprintId={selectedSprintId || undefined}
+        />
+      )}
+      {editingTask && (
+        <TaskModal
+          task={editingTask}
+          onClose={() => setEditingTask(null)}
+          workspaceId={workspaceId}
+        />
+      )}
+
+      {mobileMode && statusMoveTask && (
+        <div className="fixed inset-0 z-50 bg-black/60 p-4 flex items-end sm:items-center sm:justify-center" onClick={() => setStatusMoveTask(null)}>
+          <div
+            className="w-full sm:max-w-md bg-mc-bg-secondary border border-mc-border rounded-t-xl sm:rounded-xl p-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="text-sm text-mc-text-secondary mb-2">Move task</div>
+            <div className="font-medium mb-4 line-clamp-2">{statusMoveTask.title}</div>
+            <div className="space-y-2 max-h-[50vh] overflow-y-auto">
+              {Object.entries(STATUS_CONFIG).map(([status, config]) => (
+                <button
+                  key={status}
+                  onClick={async () => {
+                    await updateTaskStatusWithPersist(statusMoveTask, status as TaskStatus);
+                    setStatusMoveTask(null);
+                  }}
+                  disabled={statusMoveTask.status === status}
+                  className="w-full min-h-11 px-4 rounded-lg border border-mc-border bg-mc-bg text-left text-sm disabled:opacity-40 flex items-center gap-2"
+                >
+                  <span className={`w-2 h-2 rounded-full ${config.color}`} />
+                  {config.label}
+                </button>
+              ))}
             </div>
-          ) : (
-            <div className="flex-1 flex gap-3 p-3 overflow-x-auto">
+          </div>
+        </div>
+      )}
+
+      {showSprintDropdown && (
+        <div className="fixed inset-0 z-10" onClick={() => setShowSprintDropdown(false)} />
+      )}
+    </div>
+  );
+}
+
+// Milestone Group Component for List View
+interface MilestoneGroupProps {
+  milestone: Milestone | null;
+  coordinator: Agent | null;
+  tasks: Task[];
+  done: number;
+  total: number;
+  progress: number;
+  isPortrait: boolean;
+  isExpanded: boolean;
+  onToggle: () => void;
+  onTaskClick: (task: Task) => void;
+  onMoveStatus: (task: Task) => void;
+  mobileMode: boolean;
+}
+
+function MilestoneGroup({
+  milestone,
+  coordinator,
+  tasks,
+  done,
+  total,
+  progress,
+  isPortrait,
+  isExpanded,
+  onToggle,
+  onTaskClick,
+  onMoveStatus,
+  mobileMode,
+}: MilestoneGroupProps) {
+  const sortedTasks = [...tasks].sort((a, b) => {
+    const aDone = DONE_STATUSES.includes(a.status);
+    const bDone = DONE_STATUSES.includes(b.status);
+    if (aDone && !bDone) return 1;
+    if (!aDone && bDone) return -1;
+    return 0;
+  });
+
+  const priorityColor = milestone?.priority ? PRIORITY_COLORS[milestone.priority] : null;
+  const storyPoints = milestone?.story_points;
+  const hasDependencies = milestone?.dependencies && milestone.dependencies.length > 0;
+
+  return (
+    <section className="bg-mc-bg-secondary border border-mc-border rounded-xl overflow-hidden">
+      <button
+        onClick={onToggle}
+        className={`w-full px-4 py-3 border-b border-mc-border bg-mc-bg-tertiary/50 text-left ${isPortrait ? '' : 'px-3 py-2.5'}`}
+      >
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 min-w-0">
+            {isExpanded ? (
+              <ChevronDown className="w-4 h-4 flex-shrink-0 text-mc-text-secondary" />
+            ) : (
+              <ChevronRight className="w-4 h-4 flex-shrink-0 text-mc-text-secondary" />
+            )}
+            <Target className={`w-4 h-4 flex-shrink-0 ${milestone ? 'text-mc-accent' : 'text-mc-text-secondary'}`} />
+            <h3 className="font-mono font-medium truncate">{milestone?.name || 'Ungrouped Tasks'}</h3>
+            {priorityColor && (
+              <span className={`text-white text-xs px-1.5 py-0.5 rounded ${priorityColor}`}>
+                {milestone?.priority}
+              </span>
+            )}
+            {storyPoints !== undefined && storyPoints > 0 && (
+              <span className="text-xs text-mc-text-secondary">
+                {storyPoints} pts
+              </span>
+            )}
+            {coordinator && (
+              <div className="flex items-center gap-1.5 text-mc-text-secondary">
+                <Crown className="w-3.5 h-3.5" />
+                <AgentInitials name={coordinator.name} size="xs" />
+              </div>
+            )}
+            {hasDependencies && (
+              <div className="flex items-center gap-1 text-mc-text-secondary">
+                <AlertCircle className="w-3.5 h-3.5" />
+                <span className="text-xs">Depends on: {milestone?.dependencies?.length} milestone(s)</span>
+              </div>
+            )}
+          </div>
+          <div className="flex items-center gap-3 flex-shrink-0">
+            <span className={`text-sm font-medium ${done === total && total > 0 ? 'text-mc-accent-green' : 'text-mc-text-secondary'}`}>
+              {done}/{total}
+            </span>
+            <div className="w-24 h-2 bg-mc-bg-tertiary rounded-full overflow-hidden">
+              <div
+                className={`h-full transition-all ${done === total && total > 0 ? 'bg-mc-accent-green' : 'bg-mc-accent'}`}
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+          </div>
+        </div>
+      </button>
+
+      {isExpanded && (
+        <div className="divide-y divide-mc-border">
+          {sortedTasks.map((task) => (
+            <TaskRow
+              key={task.id}
+              task={task}
+              isPortrait={isPortrait}
+              onClick={() => onTaskClick(task)}
+              onMoveStatus={() => onMoveStatus(task)}
+              mobileMode={mobileMode}
+            />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+// Milestone Board Component with Swimlanes
+interface MilestoneBoardProps {
+  milestoneOrder: string[];
+  milestones: Milestone[];
+  tasksByMilestone: Record<string, Task[]>;
+  hasUngrouped: boolean;
+  agents: Agent[];
+  onTaskClick: (task: Task) => void;
+  draggedTask: Task | null;
+  setDraggedTask: (task: Task | null) => void;
+  updateTaskStatusWithPersist: (task: Task, status: TaskStatus) => Promise<void>;
+}
+
+function MilestoneBoard({
+  milestoneOrder,
+  milestones,
+  tasksByMilestone,
+  hasUngrouped,
+  agents,
+  onTaskClick,
+  draggedTask,
+  setDraggedTask,
+  updateTaskStatusWithPersist,
+}: MilestoneBoardProps) {
+  // Build swimlane data: milestones + ungrouped
+  const swimlanes: { id: string; milestone: Milestone | null; tasks: Task[] }[] = useMemo(() => {
+    const lanes = milestoneOrder.map((milestoneId) => ({
+      id: milestoneId,
+      milestone: milestones.find((m) => m.id === milestoneId) || null,
+      tasks: tasksByMilestone[milestoneId] || [],
+    }));
+
+    if (hasUngrouped) {
+      lanes.push({
+        id: 'ungrouped',
+        milestone: null,
+        tasks: tasksByMilestone['ungrouped'],
+      });
+    }
+
+    return lanes;
+  }, [milestoneOrder, milestones, tasksByMilestone, hasUngrouped]);
+
+  return (
+    <div className="flex-1 overflow-auto">
+      <div className="min-w-max">
+        {/* Header row with column names */}
+        <div className="flex border-b border-mc-border bg-mc-bg-secondary sticky top-0 z-10">
+          <div className="w-48 flex-shrink-0 px-3 py-2 border-r border-mc-border">
+            <span className="text-xs font-medium uppercase text-mc-text-secondary tracking-wide">Milestone</span>
+          </div>
+          {BOARD_COLUMN_CONFIG.map(({ status, borderColor }) => {
+            const config = STATUS_CONFIG[status];
+            const count = swimlanes.reduce((sum, lane) => sum + lane.tasks.filter((t) => t.status === status).length, 0);
+            return (
+              <div
+                key={status}
+                className={`w-48 flex-shrink-0 px-3 py-2 border-r border-mc-border border-t-2 ${borderColor}`}
+              >
+                <span className="text-xs font-medium uppercase text-mc-text-secondary tracking-wide">{config.label}</span>
+                <span className="ml-2 text-xs px-1.5 py-0.5 rounded bg-mc-bg-tertiary text-mc-text-secondary font-medium">{count}</span>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Swimlane rows */}
+        {swimlanes.map((lane) => {
+          const priorityColor = lane.milestone?.priority ? PRIORITY_COLORS[lane.milestone.priority] : null;
+          const storyPoints = lane.milestone?.story_points;
+          const coordinator = lane.milestone?.coordinator_agent_id
+            ? agents.find((a) => a.id === lane.milestone.coordinator_agent_id)
+            : null;
+          const hasDependencies = lane.milestone?.dependencies && lane.milestone.dependencies.length > 0;
+
+          return (
+            <div key={lane.id} className="flex border-b border-mc-border">
+              {/* Swimlane header */}
+              <div className="w-48 flex-shrink-0 px-3 py-2 border-r border-mc-border bg-mc-bg-secondary">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <Target className={`w-3.5 h-3.5 flex-shrink-0 ${lane.milestone ? 'text-mc-accent' : 'text-mc-text-secondary'}`} />
+                  <span className="font-mono text-sm font-medium truncate">{lane.milestone?.name || 'Ungrouped'}</span>
+                </div>
+                <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                  {priorityColor && (
+                    <span className={`text-white text-xs px-1.5 py-0.5 rounded ${priorityColor}`}>
+                      {lane.milestone?.priority}
+                    </span>
+                  )}
+                  {storyPoints !== undefined && storyPoints > 0 && (
+                    <span className="text-xs text-mc-text-secondary">{storyPoints} pts</span>
+                  )}
+                  {coordinator && (
+                    <div className="flex items-center gap-1">
+                      <Crown className="w-3 h-3 text-mc-text-secondary" />
+                      <AgentInitials name={coordinator.name} size="xs" />
+                    </div>
+                  )}
+                  {hasDependencies && (
+                    <div className="flex items-center gap-1 text-mc-text-secondary">
+                      <AlertCircle className="w-3 h-3" />
+                      <span className="text-xs">{lane.milestone?.dependencies?.length}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Status columns within swimlane */}
               {BOARD_COLUMN_CONFIG.map(({ status, borderColor }) => {
-                const columnTasks = sprintTasks.filter((t) => t.status === status);
-                const config = STATUS_CONFIG[status];
+                const columnTasks = lane.tasks.filter((t) => t.status === status);
                 return (
                   <div
                     key={status}
-                    className={`min-w-[200px] flex-1 max-w-[280px] flex flex-col bg-mc-bg rounded-lg border border-mc-border/50 border-t-2 ${borderColor}`}
+                    className={`w-48 flex-shrink-0 p-1.5 min-h-[80px] bg-mc-bg border-r border-mc-border ${
+                      draggedTask ? '' : ''
+                    }`}
                     onDragOver={(e) => {
                       e.preventDefault();
                       e.currentTarget.classList.add('bg-mc-bg-tertiary/30');
@@ -515,11 +868,7 @@ export function ActiveSprint({ workspaceId, mobileMode = false, isPortrait = tru
                       setDraggedTask(null);
                     }}
                   >
-                    <div className="px-3 py-2 border-b border-mc-border/50 flex items-center justify-between flex-shrink-0">
-                      <span className="text-xs font-medium uppercase text-mc-text-secondary tracking-wide">{config.label}</span>
-                      <span className="text-xs px-1.5 py-0.5 rounded bg-mc-bg-tertiary text-mc-text-secondary font-medium">{columnTasks.length}</span>
-                    </div>
-                    <div className="flex-1 overflow-y-auto p-2 space-y-2">
+                    <div className="space-y-1.5">
                       {columnTasks.map((task) => (
                         <div
                           key={task.id}
@@ -528,25 +877,18 @@ export function ActiveSprint({ workspaceId, mobileMode = false, isPortrait = tru
                             setDraggedTask(task);
                             e.dataTransfer.effectAllowed = 'move';
                           }}
-                          onClick={() => setEditingTask(task)}
-                          className="group bg-mc-bg-secondary border border-mc-border/50 rounded-lg p-3 cursor-pointer hover:border-mc-accent/40 hover:shadow-lg transition-all relative"
+                          onClick={() => onTaskClick(task)}
+                          className="group bg-mc-bg-secondary border border-mc-border/50 rounded p-2 cursor-pointer hover:border-mc-accent/40 hover:shadow transition-all relative"
                         >
-                          <div className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing">
-                            <GripVertical className="w-4 h-4 text-mc-text-secondary" />
+                          <div className="absolute top-1 left-1 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing">
+                            <GripVertical className="w-3 h-3 text-mc-text-secondary" />
                           </div>
-                          <h4 className="font-medium text-sm line-clamp-2 mb-2 pl-4">{task.title}</h4>
-                          <div className="flex items-center gap-2 mb-2">
-                            <span className={`w-2 h-2 rounded-full ${task.priority === 'urgent' ? 'bg-red-500' : task.priority === 'high' ? 'bg-orange-500' : task.priority === 'normal' ? 'bg-yellow-500' : 'bg-gray-400'}`} />
-                            <span className="text-xs text-mc-text-secondary capitalize">{task.priority}</span>
-                          </div>
-                          {task.assigned_agent && (
-                            <div className="flex items-center gap-1.5 mb-2">
+                          <h4 className="font-medium text-xs line-clamp-2 mb-1 pl-3">{task.title}</h4>
+                          <div className="flex items-center gap-1.5">
+                            <span className={`w-1.5 h-1.5 rounded-full ${task.priority === 'urgent' ? 'bg-red-500' : task.priority === 'high' ? 'bg-orange-500' : task.priority === 'normal' ? 'bg-yellow-500' : 'bg-gray-400'}`} />
+                            {task.assigned_agent && (
                               <AgentInitials name={(task.assigned_agent as unknown as { name: string }).name} size="xs" />
-                              <span className="text-xs text-mc-text-secondary truncate">{(task.assigned_agent as unknown as { name: string }).name}</span>
-                            </div>
-                          )}
-                          <div className="text-xs text-mc-text-secondary">
-                            {formatDistanceToNow(new Date(task.created_at), { addSuffix: true })}
+                            )}
                           </div>
                         </div>
                       ))}
@@ -555,136 +897,14 @@ export function ActiveSprint({ workspaceId, mobileMode = false, isPortrait = tru
                 );
               })}
             </div>
-          )}
-        </div>
-
-        {showCreateModal && (
-          <TaskModal
-            onClose={() => setShowCreateModal(false)}
-            workspaceId={workspaceId}
-            defaultSprintId={selectedSprintId || undefined}
-          />
-        )}
-        {editingTask && (
-          <TaskModal
-            task={editingTask}
-            onClose={() => setEditingTask(null)}
-            workspaceId={workspaceId}
-          />
-        )}
-
-        {mobileMode && statusMoveTask && (
-          <div className="fixed inset-0 z-50 bg-black/60 p-4 flex items-end sm:items-center sm:justify-center" onClick={() => setStatusMoveTask(null)}>
-            <div
-              className="w-full sm:max-w-md bg-mc-bg-secondary border border-mc-border rounded-t-xl sm:rounded-xl p-4"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="text-sm text-mc-text-secondary mb-2">Move task</div>
-              <div className="font-medium mb-4 line-clamp-2">{statusMoveTask.title}</div>
-              <div className="space-y-2 max-h-[50vh] overflow-y-auto">
-                {Object.entries(STATUS_CONFIG).map(([status, config]) => (
-                  <button
-                    key={status}
-                    onClick={async () => {
-                      await updateTaskStatusWithPersist(statusMoveTask, status as TaskStatus);
-                      setStatusMoveTask(null);
-                    }}
-                    disabled={statusMoveTask.status === status}
-                    className="w-full min-h-11 px-4 rounded-lg border border-mc-border bg-mc-bg text-left text-sm disabled:opacity-40 flex items-center gap-2"
-                  >
-                    <span className={`w-2 h-2 rounded-full ${config.color}`} />
-                    {config.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {showSprintDropdown && (
-          <div className="fixed inset-0 z-10" onClick={() => setShowSprintDropdown(false)} />
-        )}
+          );
+        })}
       </div>
-    );
-  }
-
-interface MilestoneGroupProps {
-  milestone: Milestone | null;
-  coordinator: Agent | null;
-  tasks: Task[];
-  done: number;
-  total: number;
-  progress: number;
-  isPortrait: boolean;
-  onTaskClick: (task: Task) => void;
-  onMoveStatus: (task: Task) => void;
-  mobileMode: boolean;
-}
-
-function MilestoneGroup({
-  milestone,
-  coordinator,
-  tasks,
-  done,
-  total,
-  progress,
-  isPortrait,
-  onTaskClick,
-  onMoveStatus,
-  mobileMode,
-}: MilestoneGroupProps) {
-  const sortedTasks = [...tasks].sort((a, b) => {
-    const aDone = DONE_STATUSES.includes(a.status);
-    const bDone = DONE_STATUSES.includes(b.status);
-    if (aDone && !bDone) return 1;
-    if (!aDone && bDone) return -1;
-    return 0;
-  });
-
-  return (
-    <section className="bg-mc-bg-secondary border border-mc-border rounded-xl overflow-hidden">
-      <div className={`px-4 py-3 border-b border-mc-border bg-mc-bg-tertiary/50 ${isPortrait ? '' : 'px-3 py-2.5'}`}>
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2 min-w-0">
-            <Flag className={`w-4 h-4 flex-shrink-0 ${milestone ? 'text-mc-accent' : 'text-mc-text-secondary'}`} />
-            <h3 className="font-medium truncate">{milestone?.name || 'Ungrouped'}</h3>
-            {coordinator && (
-              <div className="flex items-center gap-1.5 text-mc-text-secondary">
-                <Users className="w-3.5 h-3.5" />
-                <AgentInitials name={coordinator.name} size="xs" />
-              </div>
-            )}
-          </div>
-          <div className="flex items-center gap-3 flex-shrink-0">
-            <span className={`text-sm font-medium ${done === total && total > 0 ? 'text-mc-accent-green' : 'text-mc-text-secondary'}`}>
-              {done}/{total}
-            </span>
-            <div className="w-24 h-2 bg-mc-border rounded-full overflow-hidden">
-              <div
-                className={`h-full transition-all ${done === total && total > 0 ? 'bg-mc-accent-green' : 'bg-mc-accent'}`}
-                style={{ width: `${progress}%` }}
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="divide-y divide-mc-border">
-        {sortedTasks.map((task) => (
-          <TaskRow
-            key={task.id}
-            task={task}
-            isPortrait={isPortrait}
-            onClick={() => onTaskClick(task)}
-            onMoveStatus={() => onMoveStatus(task)}
-            mobileMode={mobileMode}
-          />
-        ))}
-      </div>
-    </section>
+    </div>
   );
 }
 
+// Task Row Component
 interface TaskRowProps {
   task: Task;
   isPortrait: boolean;
