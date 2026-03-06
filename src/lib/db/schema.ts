@@ -366,4 +366,25 @@ CREATE INDEX IF NOT EXISTS idx_task_comments_task ON task_comments(task_id, crea
 CREATE INDEX IF NOT EXISTS idx_task_blockers_task ON task_blockers(task_id);
 CREATE INDEX IF NOT EXISTS idx_task_resources_task ON task_resources(task_id);
 CREATE INDEX IF NOT EXISTS idx_task_acceptance_criteria_task ON task_acceptance_criteria(task_id, sort_order);
+-- Daemon tables
+CREATE TABLE IF NOT EXISTS agent_heartbeats (
+  id TEXT PRIMARY KEY,
+  agent_id TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+  status TEXT NOT NULL,
+  metadata TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE TABLE IF NOT EXISTS scheduled_job_runs (
+  id TEXT PRIMARY KEY,
+  job_id TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'running',
+  started_at TEXT NOT NULL DEFAULT (datetime('now')),
+  finished_at TEXT,
+  result TEXT,
+  error TEXT,
+  task_id TEXT REFERENCES tasks(id) ON DELETE SET NULL
+);
+CREATE INDEX IF NOT EXISTS idx_agent_heartbeats_agent ON agent_heartbeats(agent_id);
+CREATE INDEX IF NOT EXISTS idx_agent_heartbeats_created ON agent_heartbeats(created_at);
+CREATE INDEX IF NOT EXISTS idx_scheduled_job_runs_job ON scheduled_job_runs(job_id);
 `;

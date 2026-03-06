@@ -260,6 +260,7 @@ Fallback: Task polling every 60s, event polling every 30s.
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
 | GET | `/api/events/stream` | SSE event stream |
+| POST | `/api/events/broadcast` | Daemon SSE relay (broadcasts event to all connected clients) |
 | GET | `/api/tags` | List tags for workspace |
 | POST | `/api/tags` | Create tag |
 | PATCH/DELETE | `/api/tags/{id}` | Update/delete tag |
@@ -449,3 +450,52 @@ scripts/lint.sh [--fix]                            # ESLint + tsc --noEmit
 scripts/validate.sh                                # DB + env + service health
 scripts/check.sh                                   # Full pre-deploy (lint + validate + build)
 ```
+
+## Daemon (Agent Automation)
+
+### Rationale
+
+The Next.js server handles HTTP request/response cycles but has no built-in mechanism for background loops — polling for assigned tasks, monitoring agent health, or running scheduled jobs. A separate daemon process (`tsx src/daemon/index.ts`) fills this gap. It communicates with Mission Control exclusively via HTTP API (never imports Next.js internals or accesses the DB directly), making it safe to run, restart, or kill independently.
+
+### Architecture
+
+The daemon is a standalone Node.js process with five modules:
+
+| Module | Interval | Purpose |
+|--------|----------|---------|
+| **heartbeat** | 30s | Polls `/api/agents`, detects stale working agents (>60 min without activity), sets them to standby |
+| **dispatcher** | 10s | Polls `/api/tasks?status=assigned`, auto-dispatches each via `POST /api/tasks/{id}/dispatch` |
+| **scheduler** | 10s | Runs registered `ScheduledJob` entries on interval. Job registry starts empty — no hardcoded jobs |
+| **health** | 60s | Pings MC to verify API is reachable, logs connection changes |
+| **router** | SSE stream | Subscribes to `/api/events/stream`, routes events (e.g., logs task assignments for dispatcher awareness) |
+
+Communication flow: `Daemon → HTTP API → Next.js → SQLite / OpenClaw Gateway → SSE broadcast → UI`
+
+For SSE relay (daemon pushing events to browser clients): `Daemon → POST /api/events/broadcast → in-memory SSE broadcaster → connected browsers`
+
+### Running
+
+```bash
+# Production
+npm run daemon
+
+# Development (auto-restart on changes)
+npm run daemon:dev
+```
+
+Env vars: `MC_URL` (default `http://localhost:4000`), `MC_API_TOKEN` (required — same token used by `mc` CLI).
+
+### Database Tables
+
+| Table | Purpose |
+|-------|---------|
+| `agent_heartbeats` | Records agent status snapshots over time (agent_id, status, metadata, created_at) |
+| `scheduled_job_runs` | Records job execution history (job_id, status, started_at, finished_at, result, error, optional task_id) |
+
+### Shared Dispatch (`src/lib/dispatch.ts`)
+
+The dispatch logic (task message building, OpenClaw session management, workflow stage awareness, knowledge injection) was extracted from the API route into a shared module `dispatchTaskToAgent(taskId)`. Both the API route (`POST /api/tasks/{id}/dispatch`) and the daemon's dispatcher call the same function. Returns a `DispatchResult` with success/error status and updated task/agent payloads.
+
+### Broadcast Endpoint
+
+`POST /api/events/broadcast` — accepts `{type, payload}` and broadcasts to all connected SSE clients. Protected by the existing middleware auth (`MC_API_TOKEN`). Used by the daemon to push real-time updates from a separate process that can't access the in-memory SSE client set directly.

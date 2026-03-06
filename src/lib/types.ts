@@ -481,6 +481,7 @@ export interface AgentWithOpenClaw extends Agent {
 // Real-time SSE event types
 export type SSEEventType =
   | 'task_updated'
+  | 'agent_updated'
   | 'task_created'
   | 'task_deleted'
   | 'activity_logged'
@@ -491,7 +492,7 @@ export type SSEEventType =
 
 export interface SSEEvent {
   type: SSEEventType;
-  payload: Task | TaskActivity | TaskDeliverable | {
+  payload: Task | Agent | TaskActivity | TaskDeliverable | {
     taskId: string;
     sessionId: string;
     agentName?: string;

@@ -1069,6 +1069,38 @@ const migrations: Migration[] = [
 
       console.warn('[Migration 021] Done');
     }
+  },
+  {
+    id: '022',
+    name: 'add_daemon_tables',
+    up: (db) => {
+      console.log('[Migration 022] Adding daemon tables (agent_heartbeats, scheduled_job_runs)...');
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS agent_heartbeats (
+          id TEXT PRIMARY KEY,
+          agent_id TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+          status TEXT NOT NULL,
+          metadata TEXT,
+          created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+      `);
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_agent_heartbeats_agent ON agent_heartbeats(agent_id)`);
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_agent_heartbeats_created ON agent_heartbeats(created_at)`);
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS scheduled_job_runs (
+          id TEXT PRIMARY KEY,
+          job_id TEXT NOT NULL,
+          status TEXT NOT NULL DEFAULT 'running',
+          started_at TEXT NOT NULL DEFAULT (datetime('now')),
+          finished_at TEXT,
+          result TEXT,
+          error TEXT,
+          task_id TEXT REFERENCES tasks(id) ON DELETE SET NULL
+        )
+      `);
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_scheduled_job_runs_job ON scheduled_job_runs(job_id)`);
+      console.log('[Migration 022] Daemon tables created');
+    }
   }
 ];
 
