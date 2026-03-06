@@ -531,6 +531,12 @@ export interface ValidationCheck {
   status: 'pass' | 'fail' | 'warn';
   message: string;
   details?: string;
+  /** Whether this check failure can be auto-repaired by dispatching to an agent */
+  repairable?: boolean;
+  /** Prompt to send to the repair agent describing what to fix */
+  repair_prompt?: string;
+  /** Category grouping for display (e.g. 'system', 'openclaw') */
+  category?: 'system' | 'openclaw';
 }
 
 export interface ValidationResult {

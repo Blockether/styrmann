@@ -13,6 +13,7 @@ import {
   AlertTriangle,
   Server,
   HardDrive,
+  Wrench,
 } from 'lucide-react';
 import type {
   SystemInfo,
@@ -36,6 +37,8 @@ export function SystemPanel() {
   const [loading, setLoading] = useState(true);
   const [validating, setValidating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [repairingChecks, setRepairingChecks] = useState<Set<string>>(new Set());
+  const [repairResults, setRepairResults] = useState<Record<string, { success: boolean; agent_name?: string; error?: string }>>({});
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -74,6 +77,30 @@ export function SystemPanel() {
       console.error('Validation failed:', err);
     } finally {
       setValidating(false);
+    }
+  };
+
+  const triggerRepair = async (checkItem: ValidationCheck) => {
+    setRepairingChecks(prev => new Set(prev).add(checkItem.name));
+    try {
+      const res = await fetch('/api/system/repair', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          check_name: checkItem.name,
+          repair_prompt: checkItem.repair_prompt,
+        }),
+      });
+      const data = await res.json();
+      setRepairResults(prev => ({ ...prev, [checkItem.name]: data }));
+    } catch {
+      setRepairResults(prev => ({ ...prev, [checkItem.name]: { success: false, error: 'Request failed' } }));
+    } finally {
+      setRepairingChecks(prev => {
+        const s = new Set(prev);
+        s.delete(checkItem.name);
+        return s;
+      });
     }
   };
 
@@ -184,9 +211,9 @@ export function SystemPanel() {
                   <div className="border-t border-mc-border pt-4">
                     <div className="text-sm text-mc-text-secondary mb-2">System Memory</div>
                     <div className="text-sm mb-2">
-                      <span className="font-mono">{Math.round(systemInfo.system_memory.total_mb - systemInfo.system_memory.free_mb)} MB</span>
+                      <span className="font-mono">{(systemInfo.system_memory.total_mb - systemInfo.system_memory.free_mb).toFixed(1)} MB</span>
                       {' / '}
-                      <span className="font-mono">{Math.round(systemInfo.system_memory.total_mb)} MB</span>
+                      <span className="font-mono">{systemInfo.system_memory.total_mb.toFixed(1)} MB</span>
                       {' ('}
                       <span className="font-mono">{systemInfo.system_memory.used_percent.toFixed(1)}%</span>
                       {')'}
@@ -427,24 +454,78 @@ export function SystemPanel() {
                     </p>
                   </div>
 
-                  <div className="border-t border-mc-border pt-4 space-y-2">
-                    {validationResult.checks.map((check: ValidationCheck, idx: number) => (
-                      <div
-                        key={idx}
-                        className="flex items-start gap-2 p-2 bg-mc-bg-secondary rounded border border-mc-border"
-                      >
-                        {getStatusIcon(check.status)}
-                        <div className="flex-1 min-w-0">
-                          <div className="font-medium text-sm">{check.name}</div>
-                          <div className="text-xs text-mc-text-secondary">{check.message}</div>
-                          {check.details && (
-                            <div className="text-xs text-mc-text-secondary mt-1 font-mono bg-mc-bg-tertiary p-1 rounded">
-                              {check.details}
+                  <div className="border-t border-mc-border pt-4 space-y-4">
+                    {(() => {
+                      const systemChecks = validationResult.checks.filter(c => c.category !== 'openclaw');
+                      const openclawChecks = validationResult.checks.filter(c => c.category === 'openclaw');
+
+                      const renderCheckItem = (check: ValidationCheck) => {
+                        const isRepairing = repairingChecks.has(check.name);
+                        const repairResult = repairResults[check.name];
+                        const canRepair = check.repairable && check.status !== 'pass';
+
+                        return (
+                          <div
+                            key={check.name}
+                            className="flex items-start gap-2 p-2 bg-mc-bg-secondary rounded border border-mc-border"
+                          >
+                            {getStatusIcon(check.status)}
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium text-sm">{check.name}</div>
+                              <div className="text-xs text-mc-text-secondary">{check.message}</div>
+                              {check.details && (
+                                <div className="text-xs text-mc-text-secondary mt-1 font-mono bg-mc-bg-tertiary p-1 rounded">
+                                  {check.details}
+                                </div>
+                              )}
+                              {repairResult && (
+                                <div className={`text-xs mt-1 ${repairResult.success ? 'text-green-600' : 'text-red-600'}`}>
+                                  {repairResult.success
+                                    ? `Dispatched to ${repairResult.agent_name ?? 'agent'}`
+                                    : repairResult.error ?? 'Repair failed'
+                                  }
+                                </div>
+                              )}
+                            </div>
+                            {canRepair && (
+                              <button
+                                onClick={() => triggerRepair(check)}
+                                disabled={isRepairing}
+                                className="flex items-center justify-center gap-1 px-2 min-h-11 border border-mc-border rounded text-xs hover:bg-mc-bg-tertiary disabled:opacity-50 transition-colors"
+                                title="Repair"
+                              >
+                                {isRepairing ? (
+                                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                                ) : (
+                                  <Wrench className="w-3.5 h-3.5" />
+                                )}
+                              </button>
+                            )}
+                          </div>
+                        );
+                      };
+
+                      return (
+                        <>
+                          {systemChecks.length > 0 && (
+                            <div>
+                              <h4 className="text-xs font-medium text-mc-text-secondary uppercase tracking-wide mb-2">System Checks</h4>
+                              <div className="space-y-2">
+                                {systemChecks.map(renderCheckItem)}
+                              </div>
                             </div>
                           )}
-                        </div>
-                      </div>
-                    ))}
+                          {openclawChecks.length > 0 && (
+                            <div>
+                              <h4 className="text-xs font-medium text-mc-text-secondary uppercase tracking-wide mb-2">OpenClaw Doctor</h4>
+                              <div className="space-y-2">
+                                {openclawChecks.map(renderCheckItem)}
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()}
                   </div>
                 </>
               )}
