@@ -350,10 +350,12 @@ export function ActiveSprint({ workspaceId, mobileMode = false, isPortrait = tru
       <div className={`p-3 border-b border-mc-border bg-mc-bg-secondary flex items-center justify-between gap-2 ${mobileMode && isPortrait ? 'flex-wrap' : ''}`}>
         <div className="flex items-center gap-2">
           <ChevronRight className="w-4 h-4 text-mc-text-secondary" />
+          <h2 className="sr-only">{activeSprint?.name || 'Sprint'}</h2>
           
           <div className="relative">
             <button
               onClick={() => setShowSprintDropdown(!showSprintDropdown)}
+              aria-label="Select sprint"
               className="flex items-center gap-2 px-3 min-h-11 rounded-lg border border-mc-border bg-mc-bg-secondary text-sm font-medium hover:bg-mc-bg-tertiary"
             >
               <span className={selectedSprint.status === 'active' ? 'text-mc-accent-green' : 'text-mc-text-secondary'}>
@@ -407,9 +409,12 @@ export function ActiveSprint({ workspaceId, mobileMode = false, isPortrait = tru
         </div>
 
         <div className="flex items-center gap-2">
-          <div className="flex items-center bg-mc-bg-tertiary rounded-lg p-0.5">
+          <div className="flex items-center bg-mc-bg-tertiary rounded-lg p-0.5" role="tablist" aria-label="View mode">
             <button
               onClick={() => setViewMode('list')}
+              aria-label="List view"
+              role="tab"
+              aria-selected={viewMode === 'list'}
               className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-medium transition-colors min-h-9 ${
                 viewMode === 'list' ? 'bg-mc-accent text-white' : 'text-mc-text-secondary hover:text-mc-text'
               }`}
@@ -419,6 +424,9 @@ export function ActiveSprint({ workspaceId, mobileMode = false, isPortrait = tru
             </button>
             <button
               onClick={() => setViewMode('board')}
+              aria-label="Board view"
+              role="tab"
+              aria-selected={viewMode === 'board'}
               className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-medium transition-colors min-h-9 ${
                 viewMode === 'board' ? 'bg-mc-accent text-white' : 'text-mc-text-secondary hover:text-mc-text'
               }`}
@@ -439,6 +447,7 @@ export function ActiveSprint({ workspaceId, mobileMode = false, isPortrait = tru
           )}
           <button
             onClick={() => setShowCreateModal(true)}
+            aria-label="Create new task"
             className="flex items-center gap-2 px-4 min-h-11 bg-mc-accent text-white rounded text-sm font-medium hover:bg-mc-accent/90"
           >
             <Plus className="w-4 h-4" />
@@ -678,6 +687,7 @@ function MilestoneGroup({
     <section className="bg-mc-bg-secondary border border-mc-border rounded-xl overflow-hidden">
       <button
         onClick={onToggle}
+        aria-label={`Toggle ${milestone?.name || 'Ungrouped Tasks'} group`}
         className={`w-full px-4 py-3 border-b border-mc-border bg-mc-bg-tertiary/50 text-left ${isPortrait ? '' : 'px-3 py-2.5'}`}
       >
         <div className="flex items-center justify-between gap-3">

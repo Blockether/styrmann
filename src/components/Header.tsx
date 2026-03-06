@@ -141,10 +141,11 @@ export function Header({ workspace, isPortrait = true, onMenuToggle, sidebarOpen
                 {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
               </button>
               <div ref={switcherRef} className="relative min-w-0">
-                <button
-                  onClick={() => setShowWorkspaceSwitcher(!showWorkspaceSwitcher)}
-                  className="flex items-center gap-2 px-2.5 py-1.5 bg-mc-bg-tertiary rounded min-w-0 overflow-hidden hover:bg-mc-bg transition-colors"
-                >
+              <button
+                onClick={() => setShowWorkspaceSwitcher(!showWorkspaceSwitcher)}
+                aria-label="Switch workspace"
+                className="flex items-center gap-2 px-2.5 py-1.5 bg-mc-bg-tertiary rounded min-w-0 overflow-hidden hover:bg-mc-bg transition-colors"
+              >
                   {workspace.logo_url ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={workspace.logo_url} alt={workspace.name} className="w-4 h-4 rounded object-contain shrink-0" />
@@ -194,13 +195,14 @@ export function Header({ workspace, isPortrait = true, onMenuToggle, sidebarOpen
 
             <div className="hidden sm:flex items-center gap-2">
               <Image src="/logo.png" alt="Blockether" width={24} height={24} className="rounded" />
-              <span className="font-semibold text-mc-text uppercase tracking-wider text-sm">Blockether</span>
+              <h1 className="font-semibold text-mc-text uppercase tracking-wider text-sm">Mission Control</h1>
             </div>
 
             {workspace ? (
               <div ref={switcherRef} className="relative flex items-center gap-2 min-w-0">
                 <button
                   onClick={() => setShowWorkspaceSwitcher(!showWorkspaceSwitcher)}
+                  aria-label="Switch workspace"
                   className="flex items-center gap-2 px-2 md:px-3 py-1 bg-mc-bg-tertiary rounded min-w-0 hover:bg-mc-bg transition-colors"
                 >
                   {workspace.logo_url ? (
@@ -226,11 +228,11 @@ export function Header({ workspace, isPortrait = true, onMenuToggle, sidebarOpen
             <div className="hidden lg:flex items-center gap-8">
               <div className="text-center">
                 <div className="text-2xl font-bold text-mc-accent-cyan">{activeAgents}</div>
-                <div className="text-xs text-mc-text-secondary uppercase">Agents Active</div>
+                <div className="text-sm text-mc-text-secondary uppercase">Agents Active</div>
               </div>
               <div className="text-center">
                 <div className="text-2xl font-bold text-mc-accent-purple">{tasksInQueue}</div>
-                <div className="text-xs text-mc-text-secondary uppercase">Tasks in Queue</div>
+                <div className="text-sm text-mc-text-secondary uppercase">Tasks in Queue</div>
               </div>
             </div>
           )}

@@ -237,6 +237,9 @@ export default function WorkspacePage() {
 
   return (
     <div data-component="src/app/workspace/[slug]/page" className="h-screen flex flex-col bg-mc-bg overflow-hidden">
+      <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-[100] focus:px-4 focus:py-2 focus:bg-mc-accent focus:text-white focus:rounded focus:text-sm focus:font-medium">
+        Skip to content
+      </a>
       <Header 
         workspace={workspace} 
         isPortrait={isPortrait} 
@@ -250,7 +253,7 @@ export default function WorkspacePage() {
           activeView={view} 
           onViewChange={handleViewChange} 
         />
-        <div className="flex-1 min-w-0 overflow-hidden flex flex-col">{renderView()}</div>
+        <main id="main-content" className="flex-1 min-w-0 overflow-hidden flex flex-col">{renderView()}</main>
       </div>
 
       <div className="lg:hidden flex-1 overflow-hidden pb-[env(safe-area-inset-bottom)]">
@@ -261,7 +264,7 @@ export default function WorkspacePage() {
           open={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
         />
-        <div className="h-full overflow-hidden flex flex-col">{renderView()}</div>
+        <main id="main-content" className="h-full overflow-hidden flex flex-col">{renderView()}</main>
       </div>
 
       <SSEDebugPanel />

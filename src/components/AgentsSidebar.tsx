@@ -166,7 +166,7 @@ export function AgentsSidebar({
 
           <div className="p-3 border-b border-mc-border">
             <span className="text-xs font-medium uppercase tracking-wider text-mc-text-secondary mb-2 block">Views</span>
-            <div className="space-y-1">
+            <nav aria-label="Workspace views" className="space-y-1">
               {NAV_ITEMS.map((item) => {
                 const isActive = activeView === item.view;
                 return (
@@ -182,7 +182,7 @@ export function AgentsSidebar({
                   </button>
                 );
               })}
-            </div>
+            </nav>
           </div>
 
           {/* Sprint History - mobile */}
@@ -236,11 +236,13 @@ export function AgentsSidebar({
                 </div>
               </div>
             )}
-            <div className="flex gap-1">
+            <div className="flex gap-1" role="tablist" aria-label="Filter agents">
               {(['all', 'working', 'standby'] as FilterTab[]).map((tab) => (
                 <button
                   key={tab}
                   onClick={() => setFilter(tab)}
+                  role="tab"
+                  aria-selected={filter === tab}
                   className={`flex-1 min-h-9 text-xs rounded uppercase ${
                     filter === tab ? 'bg-mc-accent text-white font-medium' : 'text-mc-text-secondary hover:bg-mc-bg-tertiary'
                   }`}
@@ -267,7 +269,7 @@ export function AgentsSidebar({
                   >
                     <div className="relative">
                       <AgentInitials name={agent.name} size="md" />
-                      {(openclawSession || isSynced) && <span className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-mc-bg-secondary" />}
+                      {(openclawSession || isSynced) && <span role="img" aria-label="Online" className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-mc-bg-secondary" />}
                     </div>
 
                     <div className="flex-1 min-w-0">
@@ -275,7 +277,7 @@ export function AgentsSidebar({
                         <span className="font-medium text-sm truncate">{agent.name}</span>
                         {agent.role === 'orchestrator' && <Crown className="w-3 h-3 text-amber-500" />}
                       </div>
-                      <div className="text-xs text-mc-text-secondary truncate flex items-center gap-1">
+                      <div className="text-xs text-mc-text-secondary truncate flex items-center gap-1" title={agent.role || agent.description || ''}>
                         {agent.role === 'orchestrator' ? 'Product Owner' : agent.role}
                         {isSynced && (
                           <span className="text-[10px] px-1 py-0 bg-mc-accent/20 text-mc-accent rounded" title="Synced from Gateway">
@@ -331,7 +333,7 @@ export function AgentsSidebar({
         </div>
 
         {!isMinimized && (
-          <div className="mt-2 space-y-1">
+          <nav aria-label="Workspace views" className="mt-2 space-y-1">
             {NAV_ITEMS.map((item) => {
               const isActive = activeView === item.view;
               return (
@@ -345,9 +347,9 @@ export function AgentsSidebar({
                   {item.icon}
                   <span>{item.label}</span>
                 </button>
-              );
-            })}
-          </div>
+                );
+              })}
+          </nav>
         )}
 
         {isMinimized && (
@@ -445,11 +447,13 @@ export function AgentsSidebar({
               </div>
             )}
 
-            <div className="mt-3 flex gap-1">
+            <div className="mt-3 flex gap-1" role="tablist" aria-label="Filter agents">
               {(['all', 'working', 'standby'] as FilterTab[]).map((tab) => (
                 <button
                   key={tab}
                   onClick={() => setFilter(tab)}
+                  role="tab"
+                  aria-selected={filter === tab}
                   className={`flex-1 min-h-9 text-xs rounded uppercase ${
                     filter === tab ? 'bg-mc-accent text-white font-medium' : 'text-mc-text-secondary hover:bg-mc-bg-tertiary'
                   }`}
@@ -479,9 +483,11 @@ export function AgentsSidebar({
                   title={`${agent.name}${agent.role ? ' — ' + (agent.role.length > 40 ? agent.role.slice(0, 40) + '…' : agent.role) : ''}`}
                 >
                   <AgentInitials name={agent.name} size="md" />
-                  {(openclawSession || isSynced) && <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-mc-bg-secondary" />}
+                  {(openclawSession || isSynced) && <span role="img" aria-label="Online" className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-mc-bg-secondary" />}
                   {agent.role === 'orchestrator' && <span className="absolute -top-1 -right-1 text-amber-500"><Crown className="w-3 h-3" /></span>}
                   <span
+                    role="img"
+                    aria-label={agent.status === 'working' ? 'Online' : 'Standby'}
                     className={`absolute -bottom-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full ${
                       agent.status === 'working' ? 'bg-mc-accent-green' : agent.status === 'standby' ? 'bg-mc-text-secondary' : 'bg-gray-500'
                     }`}
@@ -505,7 +511,7 @@ export function AgentsSidebar({
               >
                 <div className="relative">
                   <AgentInitials name={agent.name} size="md" />
-                  {(openclawSession || isSynced) && <span className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-mc-bg-secondary" />}
+                  {(openclawSession || isSynced) && <span role="img" aria-label="Online" className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-mc-bg-secondary" />}
                 </div>
 
                 <div className="flex-1 min-w-0">
@@ -513,7 +519,7 @@ export function AgentsSidebar({
                     <span className="font-medium text-sm truncate">{agent.name}</span>
                     {agent.role === 'orchestrator' && <Crown className="w-3 h-3 text-amber-500" />}
                   </div>
-                  <div className="text-xs text-mc-text-secondary truncate flex items-center gap-1">
+                  <div className="text-xs text-mc-text-secondary truncate flex items-center gap-1" title={agent.role || agent.description || ''}>
                     {agent.role === 'orchestrator' ? 'Product Owner' : agent.role}
                     {isSynced && (
                       <span className="text-[10px] px-1 py-0 bg-mc-accent/20 text-mc-accent rounded" title="Synced from Gateway">
