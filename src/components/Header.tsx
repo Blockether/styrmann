@@ -93,7 +93,7 @@ export function Header({ workspace, isPortrait = true, onMenuToggle, sidebarOpen
   const portraitWorkspaceHeader = !!workspace && isPortrait;
 
   const workspaceSwitcherDropdown = showWorkspaceSwitcher && (
-    <div className="absolute top-full left-0 mt-1 w-64 bg-mc-bg-secondary border border-mc-border rounded-lg shadow-lg z-50 py-1 max-h-64 overflow-y-auto">
+    <div className="absolute top-full left-0 mt-1 w-52 sm:w-64 bg-mc-bg-secondary border border-mc-border rounded-lg shadow-lg z-50 py-1 max-h-64 overflow-y-auto">
       <Link
         href="/"
         onClick={() => setShowWorkspaceSwitcher(false)}
@@ -135,7 +135,7 @@ export function Header({ workspace, isPortrait = true, onMenuToggle, sidebarOpen
       {portraitWorkspaceHeader ? (
         <>
           <div className="flex items-center justify-between gap-2 min-w-0">
-            <div className="flex items-center gap-2 min-w-0 overflow-hidden">
+            <div className="flex items-center gap-2 min-w-0 flex-1">
               <button
                 onClick={onMenuToggle}
                 className="lg:hidden min-h-11 min-w-11 p-2 hover:bg-mc-bg-tertiary rounded text-mc-text-secondary shrink-0"
