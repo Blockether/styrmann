@@ -37,6 +37,8 @@ Actions:
   issue_list        List cached GitHub issues
   issue_sync        Trigger GitHub issues sync
 
+  workspace_list    List all workspaces
+
   status            Show workspace overview (agents + active tasks)
 """
 
@@ -412,6 +414,14 @@ def action_issue_sync(p: dict):
     ok(result)
 
 
+def action_workspace_list(p: dict):
+    """
+    List all workspaces.
+    No parameters required.
+    """
+    result = api_get("/api/workspaces")
+    ok(result)
+
 def action_status(p: dict):
     """
     Show workspace overview: agents + active tasks.
@@ -476,6 +486,7 @@ ACTIONS = {
     "issue_list": action_issue_list,
     "issue_sync": action_issue_sync,
     "status": action_status,
+    "workspace_list": action_workspace_list,
 }
 
 
