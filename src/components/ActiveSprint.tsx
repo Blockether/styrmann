@@ -807,7 +807,7 @@ function MilestoneBoard({
           const priorityColor = lane.milestone?.priority ? PRIORITY_COLORS[lane.milestone.priority] : null;
           const storyPoints = lane.milestone?.story_points;
           const coordinator = lane.milestone?.coordinator_agent_id
-            ? agents.find((a) => a.id === lane.milestone.coordinator_agent_id)
+            ? agents.find((a) => a.id === lane.milestone?.coordinator_agent_id)
             : null;
           const hasDependencies = lane.milestone?.dependencies && lane.milestone.dependencies.length > 0;
 
