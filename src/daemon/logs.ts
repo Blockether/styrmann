@@ -96,18 +96,22 @@ export function startLogPoller(config: DaemonConfig, stats: DaemonStats): () => 
       // 3. For each session, fetch history and store new entries
       for (const session of sessions) {
         try {
-          const sessionId = session.openclaw_session_id || session.id;
-          const historyRes = await mcFetch(`/api/openclaw/sessions/${sessionId}/history`);
+          // Construct the full session key for chat.history RPC
+          const sessionSuffix = session.openclaw_session_id || session.id;
+          const agent = session.agent_id
+            ? agents.find(a => a.id === session.agent_id)
+            : undefined;
+          const gatewayAgentId = agent?.gateway_agent_id;
+          const sessionKey = gatewayAgentId
+            ? `agent:${gatewayAgentId}:${sessionSuffix}`
+            : sessionSuffix;
+          const historyRes = await mcFetch(`/api/openclaw/sessions/${encodeURIComponent(sessionKey)}/history`);
           if (!historyRes.ok) continue;
 
           const body = await historyRes.json();
           const messages: HistoryMessage[] = Array.isArray(body) ? body : (body.history || []);
           if (messages.length === 0) continue;
 
-          // Find the agent for this session
-          const agent = session.agent_id
-            ? agents.find(a => a.id === session.agent_id)
-            : undefined;
           const workspaceId = agent?.workspace_id || 'default';
 
           // Build log entries, skipping already-known hashes
@@ -126,7 +130,7 @@ export function startLogPoller(config: DaemonConfig, stats: DaemonStats): () => 
             const msg = messages[i];
             if (!msg.content || !msg.role) continue;
 
-            const hash = contentHash(sessionId, msg.role, msg.content, i);
+            const hash = contentHash(sessionKey, msg.role, msg.content, i);
             if (knownHashes.has(hash)) continue;
 
             const entryId = createHash('sha256')
@@ -137,7 +141,7 @@ export function startLogPoller(config: DaemonConfig, stats: DaemonStats): () => 
             newEntries.push({
               id: entryId,
               agent_id: agent?.id || session.agent_id || null,
-              openclaw_session_id: sessionId,
+              openclaw_session_id: sessionSuffix,
               role: msg.role,
               content: msg.content,
               content_hash: hash,
@@ -170,7 +174,7 @@ export function startLogPoller(config: DaemonConfig, stats: DaemonStats): () => 
                 type: 'agent_log_added',
                 payload: {
                   count: stored,
-                  session_id: sessionId,
+                  session_id: sessionKey,
                   agent_id: agent?.id || session.agent_id || null,
                   agent_name: agent?.name,
                   workspace_id: workspaceId,
@@ -184,7 +188,7 @@ export function startLogPoller(config: DaemonConfig, stats: DaemonStats): () => 
                 knownHashes.add(entry.content_hash);
               }
             } else {
-              log.warn(`Failed to store logs for session ${sessionId}: ${storeRes.status}`);
+              log.warn(`Failed to store logs for session ${sessionKey}: ${storeRes.status}`);
             }
           }
         } catch (err) {
