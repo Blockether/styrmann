@@ -146,7 +146,7 @@ export function Header({ workspace, isPortrait = true, onMenuToggle, sidebarOpen
               <div ref={switcherRef} className="relative min-w-0">
                 <button
                   onClick={() => setShowWorkspaceSwitcher(!showWorkspaceSwitcher)}
-                  className="flex items-center gap-2 px-2.5 py-1.5 bg-mc-bg-tertiary rounded min-w-0 hover:bg-mc-bg transition-colors"
+                  className="flex items-center gap-2 px-2.5 py-1.5 bg-mc-bg-tertiary rounded min-w-0 overflow-hidden hover:bg-mc-bg transition-colors"
                 >
                   {workspace.logo_url ? (
                     // eslint-disable-next-line @next/next/no-img-element
