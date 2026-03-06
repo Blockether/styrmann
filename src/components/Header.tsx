@@ -26,9 +26,8 @@ interface HeaderProps {
 }
 
 export function Header({ workspace, isPortrait = true, onMenuToggle, sidebarOpen }: HeaderProps) {
-  const { agents, tasks, isOnline } = useMissionControl();
+  const { isOnline } = useMissionControl();
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [activeSubAgents, setActiveSubAgents] = useState(0);
   const [showWorkspaceSwitcher, setShowWorkspaceSwitcher] = useState(false);
   const [allWorkspaces, setAllWorkspaces] = useState<Workspace[]>([]);
   const switcherRef = useRef<HTMLDivElement>(null);
@@ -36,24 +35,6 @@ export function Header({ workspace, isPortrait = true, onMenuToggle, sidebarOpen
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
-  }, []);
-
-  useEffect(() => {
-    const loadSubAgentCount = async () => {
-      try {
-        const res = await fetch('/api/openclaw/sessions?session_type=subagent&status=active');
-        if (res.ok) {
-          const sessions = await res.json();
-          setActiveSubAgents(sessions.length);
-        }
-      } catch (error) {
-        console.error('Failed to load sub-agent count:', error);
-      }
-    };
-
-    loadSubAgentCount();
-    const interval = setInterval(loadSubAgentCount, 30000);
-    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
@@ -83,9 +64,6 @@ export function Header({ workspace, isPortrait = true, onMenuToggle, sidebarOpen
     }
   }, [showWorkspaceSwitcher]);
 
-  const workingAgents = agents.filter((a) => a.status === 'working').length;
-  const activeAgents = workingAgents + activeSubAgents;
-  const tasksInQueue = tasks.filter((t) => t.status !== 'done' && t.status !== 'review').length;
 
   const portraitWorkspaceHeader = !!workspace && isPortrait;
 
@@ -169,18 +147,6 @@ export function Header({ workspace, isPortrait = true, onMenuToggle, sidebarOpen
             </div>
           </div>
 
-          <div className="flex items-center gap-2 min-w-0">
-            <div className="flex-1 grid grid-cols-2 gap-2">
-              <div className="min-h-11 rounded border border-mc-border bg-mc-bg-tertiary px-2 flex items-center justify-center gap-1.5 text-xs">
-                <span className="text-mc-accent-cyan font-semibold">{activeAgents}</span>
-                <span className="text-mc-text-secondary">active</span>
-              </div>
-              <div className="min-h-11 rounded border border-mc-border bg-mc-bg-tertiary px-2 flex items-center justify-center gap-1.5 text-xs">
-                <span className="text-mc-accent-purple font-semibold">{tasksInQueue}</span>
-                <span className="text-mc-text-secondary">queued</span>
-              </div>
-            </div>
-          </div>
         </>
       ) : (
         <>
@@ -224,18 +190,6 @@ export function Header({ workspace, isPortrait = true, onMenuToggle, sidebarOpen
             )}
           </div>
 
-          {workspace && (
-            <div className="hidden lg:flex items-center gap-8">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-mc-accent-cyan">{activeAgents}</div>
-                <div className="text-sm text-mc-text-secondary uppercase">Agents Active</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-mc-accent-purple">{tasksInQueue}</div>
-                <div className="text-sm text-mc-text-secondary uppercase">Tasks in Queue</div>
-              </div>
-            </div>
-          )}
 
           <div className="flex items-center gap-2 md:gap-4">
             <span className="hidden md:block text-mc-text-secondary text-sm font-mono">{format(currentTime, 'HH:mm:ss')}</span>

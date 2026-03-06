@@ -33,7 +33,7 @@ export function AgentsSidebar({
   open = false,
   onClose 
 }: AgentsSidebarProps) {
-  const { agents, selectedAgent, setSelectedAgent, setAgents, agentOpenClawSessions, setAgentOpenClawSession, setSelectedSprintId } = useMissionControl();
+  const { agents, tasks, selectedAgent, setSelectedAgent, setAgents, agentOpenClawSessions, setAgentOpenClawSession, setSelectedSprintId } = useMissionControl();
   const [filter, setFilter] = useState<FilterTab>('all');
   const [editingAgent, setEditingAgent] = useState<Agent | null>(null);
   const [syncing, setSyncing] = useState(false);
@@ -294,7 +294,17 @@ export function AgentsSidebar({
             })}
           </div>
 
-          <div className="p-3 border-t border-mc-border">
+          <div className="p-3 border-t border-mc-border space-y-2">
+            <div className="flex gap-2">
+              <div className="flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 rounded bg-mc-bg-tertiary text-xs">
+                <span className="font-semibold text-mc-accent-cyan">{agents.filter(a => a.status === 'working').length}</span>
+                <span className="text-mc-text-secondary">active</span>
+              </div>
+              <div className="flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 rounded bg-mc-bg-tertiary text-xs">
+                <span className="font-semibold text-mc-accent-purple">{tasks.filter(t => t.status !== 'done' && t.status !== 'review').length}</span>
+                <span className="text-mc-text-secondary">queued</span>
+              </div>
+            </div>
             <button
               onClick={handleSyncGateway}
               disabled={syncing}
@@ -538,6 +548,16 @@ export function AgentsSidebar({
 
       {!isMinimized && (
         <div className="p-3 border-t border-mc-border space-y-2">
+          <div className="flex gap-2">
+            <div className="flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 rounded bg-mc-bg-tertiary text-xs">
+              <span className="font-semibold text-mc-accent-cyan">{agents.filter(a => a.status === 'working').length}</span>
+              <span className="text-mc-text-secondary">active</span>
+            </div>
+            <div className="flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 rounded bg-mc-bg-tertiary text-xs">
+              <span className="font-semibold text-mc-accent-purple">{tasks.filter(t => t.status !== 'done' && t.status !== 'review').length}</span>
+              <span className="text-mc-text-secondary">queued</span>
+            </div>
+          </div>
           <button
             onClick={handleSyncGateway}
             disabled={syncing}
