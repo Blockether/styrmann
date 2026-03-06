@@ -322,15 +322,17 @@ export function TeamTab({ taskId, workspaceId }: TeamTabProps) {
         </div>
       )}
 
-      {/* Save Button */}
-      <button
-        onClick={handleSave}
-        disabled={saving}
-        className="w-full min-h-11 flex items-center justify-center gap-2 bg-mc-accent text-white rounded text-sm font-medium hover:bg-mc-accent/90 disabled:opacity-50"
-      >
-        <Save className="w-4 h-4" />
-        {saving ? 'Saving...' : 'Save Team'}
-      </button>
+      {/* Footer */}
+      <div className="flex items-center justify-end pt-4 border-t border-mc-border">
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="min-h-11 flex items-center gap-2 px-4 py-2 bg-mc-accent text-white rounded text-sm font-medium hover:bg-mc-accent/90 disabled:opacity-50"
+        >
+          <Save className="w-4 h-4" />
+          {saving ? 'Saving...' : 'Save Team'}
+        </button>
+      </div>
     </div>
   );
 }
