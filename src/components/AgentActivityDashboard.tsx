@@ -131,7 +131,7 @@ export function AgentActivityDashboard({ workspace, embedded = false }: AgentAct
   }, [workspaceId]);
 
   const activeTasks = useMemo(
-    () => tasks.filter((task) => task.status !== 'done' && task.status !== 'review'),
+    () => tasks.filter((task) => task.status !== 'done'),
     [tasks]
   );
 
@@ -162,7 +162,7 @@ export function AgentActivityDashboard({ workspace, embedded = false }: AgentAct
       .filter((agent) => agent.status === 'working')
       .map((agent) => {
         const currentTask = tasks.find(
-          (task) => task.assigned_agent_id === agent.id && (task.status === 'in_progress' || task.status === 'assigned' || task.status === 'testing')
+          (task) => task.assigned_agent_id === agent.id && task.status !== 'done'
         );
         return { agent, currentTask };
       });
