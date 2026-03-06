@@ -40,9 +40,7 @@ export const CreateTaskSchema = z.object({
   created_by_agent_id: z.string().uuid().optional().nullable(),
   business_id: z.string().optional(),
   workspace_id: z.string().optional(),
-  sprint_id: z.string().optional().nullable(),
   milestone_id: z.string().optional().nullable(),
-  parent_task_id: z.string().optional().nullable(),
   due_date: z.string().optional().nullable(),
   tags: z.array(z.string()).optional(),
 });
@@ -57,9 +55,7 @@ export const UpdateTaskSchema = z.object({
   impact: z.number().int().min(1).max(5).optional().nullable(),
   assigned_agent_id: z.string().uuid().optional().nullable(),
   workflow_template_id: z.string().optional().nullable(),
-  sprint_id: z.string().optional().nullable(),
   milestone_id: z.string().optional().nullable(),
-  parent_task_id: z.string().optional().nullable(),
   due_date: z.string().optional().nullable(),
   updated_by_agent_id: z.string().uuid().optional(),
   tags: z.array(z.string()).optional(),
@@ -88,6 +84,7 @@ export const CreateMilestoneSchema = z.object({
   description: z.string().max(2000).optional(),
   due_date: z.string().optional().nullable(),
   coordinator_agent_id: z.string().uuid().optional().nullable(),
+  priority: z.enum(['low', 'normal', 'high', 'urgent']).optional(),
 });
 
 export const UpdateMilestoneSchema = z.object({
@@ -96,6 +93,8 @@ export const UpdateMilestoneSchema = z.object({
   due_date: z.string().optional().nullable(),
   coordinator_agent_id: z.string().uuid().optional().nullable(),
   status: z.enum(['open', 'closed']).optional(),
+  sprint_id: z.string().optional().nullable(),
+  priority: z.enum(['low', 'normal', 'high', 'urgent']).optional(),
 });
 
 // Activity validation schema
@@ -113,6 +112,15 @@ export const CreateDeliverableSchema = z.object({
   path: z.string().optional(),
   description: z.string().optional(),
 });
+
+export const CreateMilestoneDependencySchema = z.object({
+  depends_on_milestone_id: z.string().uuid().optional(),
+  depends_on_task_id: z.string().uuid().optional(),
+  dependency_type: z.enum(['finish_to_start', 'blocks']).optional().default('finish_to_start'),
+}).refine(
+  data => data.depends_on_milestone_id != null || data.depends_on_task_id != null,
+  { message: 'At least one of depends_on_milestone_id or depends_on_task_id is required' }
+);
 
 // Type exports for use in routes
 export type CreateTaskInput = z.infer<typeof CreateTaskSchema>;
