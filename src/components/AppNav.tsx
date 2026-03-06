@@ -3,13 +3,12 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { LayoutGrid, Activity, Cpu, Settings } from 'lucide-react';
+import { LayoutGrid, Activity, Cpu } from 'lucide-react';
 
 const NAV_ITEMS = [
   { href: '/', label: 'Workspaces', icon: LayoutGrid },
   { href: '/system', label: 'System', icon: Activity },
   { href: '/openclaw', label: 'OpenClaw', icon: Cpu },
-  { href: '/settings', label: 'Settings', icon: Settings },
 ] as const;
 
 export function AppNav() {
