@@ -141,7 +141,6 @@ export function BacklogView({ workspaceId }: BacklogViewProps) {
     <div data-component="src/components/BacklogView" className="flex-1 flex flex-col overflow-hidden">
       <div className="p-3 border-b border-mc-border bg-mc-bg-secondary flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-2">
-          <ChevronRight className="w-4 h-4 text-mc-text-secondary" />
           <span className="font-medium">Backlog</span>
           <span className="text-sm text-mc-text-secondary">{filteredTasks.length} tasks</span>
         </div>

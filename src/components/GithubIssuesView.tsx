@@ -116,7 +116,6 @@ export function GithubIssuesView({ workspaceId, workspace, onCreateTask }: Githu
       >
         <div className="p-3 border-b border-mc-border bg-mc-bg-secondary flex items-center justify-between gap-2 flex-wrap">
           <div className="flex items-center gap-2">
-            <ChevronRight className="w-4 h-4 text-mc-text-secondary" />
             <span className="font-mono font-medium">GitHub Issues</span>
           </div>
         </div>
@@ -141,7 +140,6 @@ export function GithubIssuesView({ workspaceId, workspace, onCreateTask }: Githu
       {/* Toolbar */}
       <div className="p-3 border-b border-mc-border bg-mc-bg-secondary flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-2">
-          <ChevronRight className="w-4 h-4 text-mc-text-secondary" />
           <span className="font-mono font-medium">GitHub Issues</span>
           {lastSyncedAt && (
             <span className="text-xs text-mc-text-secondary hidden sm:inline">

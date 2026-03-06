@@ -349,7 +349,6 @@ export function ActiveSprint({ workspaceId, mobileMode = false, isPortrait = tru
     <div data-component="src/components/ActiveSprint" className="flex-1 flex flex-col overflow-hidden">
       <div className={`p-3 border-b border-mc-border bg-mc-bg-secondary flex items-center justify-between gap-2 ${mobileMode && isPortrait ? 'flex-wrap' : ''}`}>
         <div className="flex items-center gap-2">
-          <ChevronRight className="w-4 h-4 text-mc-text-secondary" />
           <h2 className="sr-only">{activeSprint?.name || 'Sprint'}</h2>
           
           <div className="relative">

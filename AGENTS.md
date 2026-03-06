@@ -16,7 +16,7 @@
 7. **Icons**: Lucide React only. No other icon libraries.
 8. **Fonts**: IBM Plex Mono (headings), Atkinson Hyperlegible (body).
 9. **Styling**: Light theme, Blockether cream/gold palette (`mc-*` CSS classes). Tailwind only.
-10. **Toolbars**: `ChevronRight` leading icon + context title on left, controls on right. Pattern: `p-3 border-b border-mc-border bg-mc-bg-secondary flex items-center justify-between gap-2 flex-wrap`.
+10. **Toolbars**: Context title on left, controls on right. Pattern: `p-3 border-b border-mc-border bg-mc-bg-secondary flex items-center justify-between gap-2 flex-wrap`.
 11. **Mobile**: `flex-wrap`, text labels hidden via `hidden sm:inline`, icons-only on small screens.
 12. **Component traceability**: Every React component's root DOM element MUST have `data-component="src/path/to/File"` (relative path, no extension). This allows pasting rendered HTML and immediately knowing which source file to edit.
 
