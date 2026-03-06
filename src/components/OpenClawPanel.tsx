@@ -10,6 +10,8 @@ import {
   Star,
   AlertCircle,
   Power,
+  Save,
+  CheckCircle2,
 } from 'lucide-react';
 import type { Agent, AgentStatus } from '@/lib/types';
 
@@ -44,6 +46,9 @@ export function OpenClawPanel() {
   const [error, setError] = useState<string | null>(null);
   const [restarting, setRestarting] = useState(false);
   const [restartResult, setRestartResult] = useState<{ success: boolean; error?: string } | null>(null);
+  const [selectedModel, setSelectedModel] = useState<string>('');
+  const [savingModel, setSavingModel] = useState(false);
+  const [modelSaveStatus, setModelSaveStatus] = useState<'idle' | 'saved' | 'error'>('idle');
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -63,6 +68,7 @@ export function OpenClawPanel() {
       if (modelsRes.ok) {
         const modelsData = await modelsRes.json();
         setModels(modelsData);
+        if (modelsData.defaultModel) setSelectedModel(modelsData.defaultModel);
       }
 
       if (agentsRes.ok) {
@@ -83,19 +89,7 @@ export function OpenClawPanel() {
   }, [fetchData]);
 
   const maskToken = (url: string) => {
-    // Mask tokens in URLs like ws://host:port?token=xxx
     return url.replace(/token=[^&]+/gi, 'token=***');
-  };
-
-  const getStatusDot = (status: AgentStatus) => {
-    switch (status) {
-      case 'working':
-        return <span className="inline-block w-2 h-2 rounded-full bg-green-500" title="Working" />;
-      case 'standby':
-        return <span className="inline-block w-2 h-2 rounded-full bg-blue-500" title="Standby" />;
-      case 'offline':
-        return <span className="inline-block w-2 h-2 rounded-full bg-gray-400" title="Offline" />;
-    }
   };
 
   const agentCounts = {
@@ -221,7 +215,7 @@ export function OpenClawPanel() {
             </div>
           </div>
 
-          {/* Bottom Row: Agent Occupation + Available Models */}
+          {/* Bottom Row: Agent Occupation + Models */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Card 2: Agent Occupation */}
             <div className="rounded-lg border border-mc-border bg-mc-bg overflow-hidden">
@@ -232,18 +226,18 @@ export function OpenClawPanel() {
               <div className="p-4">
                 {agents.length > 0 ? (
                   <div className="space-y-4">
-                    {/* Counts */}
+                    {/* Summary counts */}
                     <div className="flex gap-4 text-sm">
                       <div className="flex items-center gap-2">
-                        <span className="inline-block w-3 h-3 rounded bg-green-500" />
+                        <span className="inline-block w-4 h-4 rounded-full bg-green-500" />
                         <span>{agentCounts.working} Working</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="inline-block w-3 h-3 rounded bg-blue-500" />
+                        <span className="inline-block w-4 h-4 rounded-full bg-blue-500" />
                         <span>{agentCounts.standby} Standby</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="inline-block w-3 h-3 rounded bg-gray-400" />
+                        <span className="inline-block w-4 h-4 rounded-full bg-gray-400" />
                         <span>{agentCounts.offline} Offline</span>
                       </div>
                     </div>
@@ -251,44 +245,89 @@ export function OpenClawPanel() {
                     {/* Occupation Bar */}
                     <div className="w-full h-3 rounded-full overflow-hidden bg-mc-bg-tertiary flex">
                       {occupationBarWidths.working > 0 && (
-                        <div
-                          className="h-full bg-green-500"
-                          style={{ width: `${occupationBarWidths.working}%` }}
-                        />
+                        <div className="h-full bg-green-500" style={{ width: `${occupationBarWidths.working}%` }} />
                       )}
                       {occupationBarWidths.standby > 0 && (
-                        <div
-                          className="h-full bg-blue-500"
-                          style={{ width: `${occupationBarWidths.standby}%` }}
-                        />
+                        <div className="h-full bg-blue-500" style={{ width: `${occupationBarWidths.standby}%` }} />
                       )}
                       {occupationBarWidths.offline > 0 && (
-                        <div
-                          className="h-full bg-gray-400"
-                          style={{ width: `${occupationBarWidths.offline}%` }}
-                        />
+                        <div className="h-full bg-gray-400" style={{ width: `${occupationBarWidths.offline}%` }} />
                       )}
                     </div>
 
                     {/* Agent List */}
-                    <div className="border-t border-mc-border pt-4 space-y-2 max-h-64 overflow-y-auto">
-                      {agents.map((agent) => (
-                        <div
-                          key={agent.id}
-                          className="flex items-center justify-between p-2 bg-mc-bg-secondary rounded border border-mc-border"
-                        >
-                          <div className="flex items-center gap-2">
-                            {getStatusDot(agent.status)}
-                            <span className="font-medium text-sm">{agent.name}</span>
-                            <span className="text-xs text-mc-text-secondary">{agent.role}</span>
+                    <div className="border-t border-mc-border pt-4 space-y-1 max-h-80 overflow-y-auto">
+                      {agents.map((agent) => {
+                        const isWorking = agent.status === 'working';
+                        const isOffline = agent.status === 'offline';
+                        const descriptionPreview = agent.description ? agent.description.slice(0, 60) : '';
+
+                        return (
+                          <div
+                            key={agent.id}
+                            className={`
+                              relative p-3 rounded-md transition-colors
+                              ${isWorking ? 'bg-green-50/50 border-l-2 border-l-green-500' : ''}
+                              ${agent.status === 'standby' ? 'bg-mc-bg-secondary' : ''}
+                              ${isOffline ? 'bg-mc-bg-tertiary/50 opacity-60' : ''}
+                            `}
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex items-start gap-2.5 min-w-0 flex-1">
+                                <div className="pt-1 flex-shrink-0">
+                                  {isWorking && (
+                                    <span className="inline-block w-2.5 h-2.5 rounded-full bg-green-500 ring-2 ring-green-500/30 ring-offset-1" title="Working" />
+                                  )}
+                                  {agent.status === 'standby' && (
+                                    <span className="inline-block w-2.5 h-2.5 rounded-full bg-blue-500" title="Standby" />
+                                  )}
+                                  {isOffline && (
+                                    <span className="inline-block w-2.5 h-2.5 rounded-full bg-gray-400" title="Offline" />
+                                  )}
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="font-medium text-sm text-mc-text truncate">{agent.name}</span>
+                                    <span className={`
+                                      px-1.5 py-0.5 rounded text-[10px] font-mono uppercase tracking-wide
+                                      ${isWorking ? 'bg-green-100 text-green-700' : ''}
+                                      ${agent.status === 'standby' ? 'bg-blue-100 text-blue-700' : ''}
+                                      ${isOffline ? 'bg-gray-200 text-gray-600' : ''}
+                                    `}>
+                                      {agent.role}
+                                    </span>
+                                  </div>
+                                  {descriptionPreview && (
+                                    <p className="text-xs text-mc-text-secondary mt-0.5 truncate">
+                                      {descriptionPreview}{agent.description && agent.description.length > 60 ? '...' : ''}
+                                    </p>
+                                  )}
+                                  {isWorking && agent.current_task_title && (
+                                    <p className="text-xs text-green-600 mt-1 italic truncate">
+                                      {agent.current_task_title}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                                {agent.model && (
+                                  <span className="text-[10px] font-mono px-1.5 py-0.5 bg-mc-bg-tertiary rounded text-mc-text-secondary truncate max-w-[120px]">
+                                    {agent.model}
+                                  </span>
+                                )}
+                                {agent.active_task_count !== undefined && agent.active_task_count > 0 && (
+                                  <span className={`
+                                    text-[10px] font-mono px-1.5 py-0.5 rounded
+                                    ${isWorking ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}
+                                  `}>
+                                    {agent.active_task_count} task{agent.active_task_count !== 1 ? 's' : ''}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
                           </div>
-                          {agent.model && (
-                            <span className="text-xs font-mono text-mc-text-secondary">
-                              {agent.model}
-                            </span>
-                          )}
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 ) : (
@@ -300,11 +339,11 @@ export function OpenClawPanel() {
               </div>
             </div>
 
-            {/* Card 3: Available Models */}
+            {/* Card 3: Models + Default Model Selector */}
             <div className="rounded-lg border border-mc-border bg-mc-bg overflow-hidden">
               <div className="p-3 border-b border-mc-border bg-mc-bg-secondary flex items-center gap-2">
                 <Cpu className="w-4 h-4 text-mc-text-secondary" />
-                <h3 className="text-sm font-medium">Available Models</h3>
+                <h3 className="text-sm font-medium">Models</h3>
               </div>
               <div className="p-4">
                 {models ? (
@@ -312,18 +351,64 @@ export function OpenClawPanel() {
                     {models.error && (
                       <div className="flex items-start gap-2 p-3 bg-yellow-50 border border-yellow-200 rounded text-yellow-700 text-sm">
                         <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                        <div>
-                          <div className="font-medium">Warning</div>
-                          <div>{models.error}</div>
-                        </div>
+                        <span>{models.error}</span>
                       </div>
                     )}
 
-                    <div className="text-sm text-mc-text-secondary">
-                      Source: <span className="font-mono">{models.source}</span>
+                    {/* Default model selector */}
+                    <div>
+                      <label className="block text-sm text-mc-text-secondary mb-2">Default Model</label>
+                      <div className="flex gap-2">
+                        <select
+                          value={selectedModel}
+                          onChange={(e) => { setSelectedModel(e.target.value); setModelSaveStatus('idle'); }}
+                          disabled={savingModel || models.availableModels.length === 0}
+                          className="flex-1 p-2 border border-mc-border rounded bg-mc-bg font-mono text-sm focus:outline-none focus:ring-2 focus:ring-mc-accent/50"
+                        >
+                          {models.availableModels.map((m) => (
+                            <option key={m} value={m}>{m}</option>
+                          ))}
+                        </select>
+                        <button
+                          onClick={async () => {
+                            if (!selectedModel) return;
+                            setSavingModel(true);
+                            setModelSaveStatus('idle');
+                            try {
+                              const res = await fetch('/api/openclaw/models', {
+                                method: 'PATCH',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ defaultModel: selectedModel }),
+                              });
+                              const data = await res.json();
+                              if (data.success) {
+                                setModels({ ...models, defaultModel: data.defaultModel });
+                                setModelSaveStatus('saved');
+                                setTimeout(() => setModelSaveStatus('idle'), 2000);
+                              } else {
+                                setModelSaveStatus('error');
+                              }
+                            } catch {
+                              setModelSaveStatus('error');
+                            } finally {
+                              setSavingModel(false);
+                            }
+                          }}
+                          disabled={savingModel || !selectedModel || selectedModel === models.defaultModel}
+                          className="flex items-center gap-2 px-3 min-h-[38px] bg-mc-accent text-white rounded text-sm font-medium hover:bg-mc-accent/90 disabled:opacity-50 transition-colors"
+                        >
+                          {modelSaveStatus === 'saved' ? (
+                            <><CheckCircle2 className="w-4 h-4" /><span className="hidden sm:inline">Saved</span></>
+                          ) : (
+                            <><Save className="w-4 h-4" /><span className="hidden sm:inline">{savingModel ? 'Saving...' : 'Save'}</span></>
+                          )}
+                        </button>
+                      </div>
+                      <p className="text-xs text-mc-text-secondary mt-2">Source: {models.source}</p>
                     </div>
 
-                    <div className="space-y-2 max-h-72 overflow-y-auto">
+                    {/* Model list */}
+                    <div className="border-t border-mc-border pt-4 space-y-2 max-h-64 overflow-y-auto">
                       {models.availableModels.map((model) => (
                         <div
                           key={model}

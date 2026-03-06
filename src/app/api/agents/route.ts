@@ -24,14 +24,34 @@ export async function GET(request: NextRequest) {
         SELECT * FROM agents ORDER BY CASE WHEN role = 'orchestrator' THEN 0 ELSE 1 END, name ASC
       `);
     }
-    for (const agent of agents) {
-      if (agent.source === 'synced') {
-        const mdFiles = readAgentMdFromDisk(agent.agent_workspace_path);
-        agent.soul_md = mdFiles.soul_md ?? undefined;
-        agent.user_md = mdFiles.user_md ?? undefined;
-        agent.agents_md = mdFiles.agents_md ?? undefined;
-        const systemMd = readAgentDescriptionFromDisk(agent.agent_dir);
-        if (systemMd) agent.description = systemMd;
+for (const agent of agents) {
+if (agent.source === 'synced') {
+const mdFiles = readAgentMdFromDisk(agent.agent_workspace_path);
+agent.soul_md = mdFiles.soul_md ?? undefined;
+agent.user_md = mdFiles.user_md ?? undefined;
+agent.agents_md = mdFiles.agents_md ?? undefined;
+const systemMd = readAgentDescriptionFromDisk(agent.agent_dir);
+if (systemMd) agent.description = systemMd;
+      }
+      // Count active tasks for this agent
+      const taskCount = queryOne<{ count: number
+    }>(
+        `SELECT COUNT(*) as count FROM tasks 
+         WHERE assigned_agent_id = ? 
+         AND status IN ('in_progress', 'assigned', 'testing', 'review', 'verification')`,
+        [agent.id]
+      );
+      agent.active_task_count = taskCount?.count ?? 0;
+      
+      // Get current task title if agent is working
+      const currentTask = queryOne<{ title: string }>(
+        `SELECT title FROM tasks 
+         WHERE assigned_agent_id = ? AND status = 'in_progress' 
+         LIMIT 1`,
+        [agent.id]
+      );
+      if (currentTask) {
+        agent.current_task_title = currentTask.title;
       }
     }
     return NextResponse.json(agents);

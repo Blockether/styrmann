@@ -180,7 +180,7 @@ New workspaces clone workflow templates from the `default` workspace.
 
 **Global visibility**: Synced agents have `workspace_id='default'`. Agent queries return both workspace-local agents AND all synced agents (`WHERE workspace_id = ? OR source = 'synced'`).
 
-**Agent fields**: name, role, description, status (standby/working/offline), model, source (local/gateway/synced), gateway_agent_id, session_key_prefix, agent_dir, agent_workspace_path, soul_md, user_md, agents_md.
+**Agent fields**: name, role, description, status (standby/working/offline), model, source (local/gateway/synced), gateway_agent_id, session_key_prefix, agent_dir, agent_workspace_path, soul_md, user_md, agents_md. **API enrichment**: `GET /api/agents` returns `active_task_count` (number of active tasks) and `current_task_title` (title of in-progress task, if any) for each agent.
 
 **Prompts stored in files**: soul_md, user_md, agents_md are read from OpenClaw agent workspace directories on disk. Double binding -- files are the source of truth, DB reflects them.
 
@@ -244,7 +244,7 @@ Fallback: Task polling every 60s, event polling every 30s.
 ### Agents
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
-| GET | `/api/agents` | List agents (triggers ensureSynced) |
+| GET | `/api/agents` | List agents (triggers ensureSynced); enriches each agent with `active_task_count` and `current_task_title` from tasks table |
 | GET/PATCH/DELETE | `/api/agents/{id}` | Agent CRUD (PATCH writes back to OpenClaw config; cannot demote orchestrator) |
 | POST | `/api/agents/sync` | Manual sync from gateway config |
 
@@ -536,7 +536,7 @@ The homepage has three tabs: **Workspaces** (existing), **System** (new), and **
 
 **OpenClaw tab** shows 3 cards:
 - **Gateway Status** — Connection status (connected/disconnected), masked gateway URL (tokens replaced with `***`), active session count.
-- **Agent Occupation** — Working/standby/offline counts with stacked bar visualization, agent list with name, role, status dot, model.
+- **Agent Occupation** — Working/standby/offline counts with stacked bar visualization, redesigned agent list with status-based visual treatment (green left-border for working, neutral for standby, muted for offline), role badges, model info, task counts, and current task titles. Per-agent cards show description previews and current task context for working agents.
 - **Available Models** — Model list from gateway with default model badge, source indicator (remote/local/fallback).
 
 Both System and OpenClaw tabs auto-refresh every 30 seconds. Validation only runs on button click.

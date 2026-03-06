@@ -48,6 +48,10 @@ export interface Agent {
   agent_dir?: string;
   /** Absolute path to the OpenClaw agent workspace directory (contains SOUL.md, USER.md, AGENTS.md) */
   agent_workspace_path?: string;
+  /** Number of active tasks (assigned, in_progress, testing, review, verification) */
+  active_task_count?: number;
+  /** Title of the current in-progress task, if any */
+  current_task_title?: string;
   created_at: string;
   updated_at: string;
 }
