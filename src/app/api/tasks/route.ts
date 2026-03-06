@@ -102,7 +102,6 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body: CreateTaskRequest = await request.json();
-    console.log('[POST /api/tasks] Received body:', JSON.stringify(body));
 
     // Validate input with Zod
     const validation = CreateTaskSchema.safeParse(body);
