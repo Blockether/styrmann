@@ -43,29 +43,6 @@ export function WorkspaceDashboard() {
 
   return (
     <div data-component="src/components/WorkspaceDashboard" className="min-h-screen bg-mc-bg">
-      {/* Toolbar */}
-      <div className="border-b border-mc-border bg-mc-bg-secondary">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <Link
-                href={workspaces.length > 0 ? `/workspace/${workspaces[0].slug}/activity` : '/workspace/default/activity'}
-                className="min-h-11 px-4 rounded-lg border border-mc-border bg-mc-bg text-mc-text-secondary hover:text-mc-text hover:bg-mc-bg-tertiary flex items-center gap-2 text-sm"
-              >
-                <Activity className="w-4 h-4" />
-                Activity Dashboard
-              </Link>
-              <button
-                onClick={() => setShowCreateModal(true)}
-                className="min-h-11 flex items-center gap-2 px-4 bg-mc-accent text-white rounded-lg font-medium hover:bg-mc-accent/90"
-              >
-                <Plus className="w-4 h-4" />
-                New Workspace
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
