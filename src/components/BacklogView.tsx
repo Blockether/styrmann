@@ -14,6 +14,7 @@ import {
   ArrowUpDown,
   Loader2,
   ChevronRight,
+  Target,
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { useMissionControl } from '@/lib/store';
@@ -37,37 +38,34 @@ interface BacklogViewProps {
 
 export function BacklogView({ workspaceId }: BacklogViewProps) {
   const { tasks } = useMissionControl();
-  const [sprints, setSprints] = useState<Sprint[]>([]);
+  // Sprints state removed - backlog shows tasks without milestones
   const [milestones, setMilestones] = useState<Milestone[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const [filterSprint, setFilterSprint] = useState<string>('all');
   const [filterType, setFilterType] = useState<TaskType | 'all'>('all');
   const [filterPriority, setFilterPriority] = useState<TaskPriority | 'all'>('all');
-  const [filterMilestone, setFilterMilestone] = useState<string>('all');
   const [sortBy, setSortBy] = useState<'priority' | 'created' | 'title'>('created');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [showFilters, setShowFilters] = useState(false);
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [assigningMilestone, setAssigningMilestone] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadData() {
       try {
         setLoading(true);
-        const [sprintsRes, milestonesRes, agentsRes] = await Promise.all([
-          fetch(`/api/sprints?workspace_id=${workspaceId}`),
+        const [milestonesRes, agentsRes] = await Promise.all([
           fetch(`/api/milestones?workspace_id=${workspaceId}`),
           fetch(`/api/agents?workspace_id=${workspaceId}`),
         ]);
 
-        if (sprintsRes.ok) setSprints(await sprintsRes.json());
         if (milestonesRes.ok) setMilestones(await milestonesRes.json());
         if (agentsRes.ok) setAgents(await agentsRes.json());
       } catch (error) {
-        console.error('Failed to load backlog data:', error);
+        // Silent error handling
       } finally {
         setLoading(false);
       }
@@ -77,13 +75,7 @@ export function BacklogView({ workspaceId }: BacklogViewProps) {
   }, [workspaceId]);
 
   const filteredTasks = useMemo(() => {
-    let result = [...tasks];
-
-    if (filterSprint === 'none') {
-      result = result.filter((t) => !t.sprint_id);
-    } else if (filterSprint !== 'all') {
-      result = result.filter((t) => t.sprint_id === filterSprint);
-    }
+    let result = tasks.filter((t) => !t.milestone_id);
 
     if (filterType !== 'all') {
       result = result.filter((t) => t.task_type === filterType);
@@ -91,12 +83,6 @@ export function BacklogView({ workspaceId }: BacklogViewProps) {
 
     if (filterPriority !== 'all') {
       result = result.filter((t) => t.priority === filterPriority);
-    }
-
-    if (filterMilestone === 'none') {
-      result = result.filter((t) => !t.milestone_id);
-    } else if (filterMilestone !== 'all') {
-      result = result.filter((t) => t.milestone_id === filterMilestone);
     }
 
     result.sort((a, b) => {
@@ -112,13 +98,9 @@ export function BacklogView({ workspaceId }: BacklogViewProps) {
     });
 
     return result;
-  }, [tasks, filterSprint, filterType, filterPriority, filterMilestone, sortBy, sortDir]);
+  }, [tasks, filterType, filterPriority, sortBy, sortDir]);
 
-  const getSprintName = (sprintId: string | undefined): string => {
-    if (!sprintId) return 'No Sprint';
-    const sprint = sprints.find((s) => s.id === sprintId);
-    return sprint?.name || 'Unknown Sprint';
-  };
+
 
   const getMilestoneName = (milestoneId: string | undefined): string => {
     if (!milestoneId) return 'No Milestone';
@@ -129,6 +111,21 @@ export function BacklogView({ workspaceId }: BacklogViewProps) {
   const getAgent = (agentId: string | null | undefined): Agent | undefined => {
     if (!agentId) return undefined;
     return agents.find((a) => a.id === agentId);
+  };
+
+  const handleAssignMilestone = async (taskId: string, milestoneId: string) => {
+    try {
+      const res = await fetch(`/api/tasks/${taskId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ milestone_id: milestoneId }),
+      });
+      if (res.ok) {
+        setAssigningMilestone(null);
+      }
+    } catch (error) {
+      // Silent error handling
+    }
   };
 
   const toggleSort = (field: 'priority' | 'created' | 'title') => {
@@ -157,7 +154,7 @@ export function BacklogView({ workspaceId }: BacklogViewProps) {
           >
             <Filter className="w-4 h-4" />
             <span className="hidden sm:inline">Filters</span>
-            {(filterSprint !== 'all' || filterType !== 'all' || filterPriority !== 'all' || filterMilestone !== 'all') && (
+            {(filterType !== 'all' || filterPriority !== 'all') && (
               <span className="w-2 h-2 rounded-full bg-mc-accent-green" />
             )}
           </button>
@@ -202,24 +199,7 @@ export function BacklogView({ workspaceId }: BacklogViewProps) {
 
       <div className="flex-1 overflow-y-auto">
         {showFilters && (
-          <div className="p-3 border-b border-mc-border bg-mc-bg-secondary grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-              <div>
-                <label className="block text-xs text-mc-text-secondary mb-1.5">Sprint</label>
-                <select
-                  value={filterSprint}
-                  onChange={(e) => setFilterSprint(e.target.value)}
-                  className="w-full min-h-11 px-3 rounded-lg border border-mc-border bg-mc-bg text-sm focus:outline-none focus:ring-2 focus:ring-mc-accent/50"
-                >
-                  <option value="all">All Sprints</option>
-                  <option value="none">No Sprint (Backlog)</option>
-                  {sprints.map((sprint) => (
-                    <option key={sprint.id} value={sprint.id}>
-                      {sprint.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
+          <div className="p-3 border-b border-mc-border bg-mc-bg-secondary grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               <div>
                 <label className="block text-xs text-mc-text-secondary mb-1.5">Type</label>
                 <select
@@ -248,23 +228,6 @@ export function BacklogView({ workspaceId }: BacklogViewProps) {
                   <option value="high">High</option>
                   <option value="normal">Normal</option>
                   <option value="low">Low</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs text-mc-text-secondary mb-1.5">Milestone</label>
-                <select
-                  value={filterMilestone}
-                  onChange={(e) => setFilterMilestone(e.target.value)}
-                  className="w-full min-h-11 px-3 rounded-lg border border-mc-border bg-mc-bg text-sm focus:outline-none focus:ring-2 focus:ring-mc-accent/50"
-                >
-                  <option value="all">All Milestones</option>
-                  <option value="none">No Milestone</option>
-                  {milestones.map((milestone) => (
-                    <option key={milestone.id} value={milestone.id}>
-                      {milestone.name}
-                    </option>
-                  ))}
                 </select>
               </div>
             </div>
@@ -306,9 +269,6 @@ export function BacklogView({ workspaceId }: BacklogViewProps) {
                     Priority
                   </th>
                   <th className="text-left px-4 py-3 text-xs font-medium text-mc-text-secondary uppercase tracking-wider">
-                    Sprint
-                  </th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-mc-text-secondary uppercase tracking-wider">
                     Milestone
                   </th>
                   <th className="text-left px-4 py-3 text-xs font-medium text-mc-text-secondary uppercase tracking-wider">
@@ -316,6 +276,9 @@ export function BacklogView({ workspaceId }: BacklogViewProps) {
                   </th>
                   <th className="text-left px-4 py-3 text-xs font-medium text-mc-text-secondary uppercase tracking-wider">
                     Created
+                  </th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-mc-text-secondary uppercase tracking-wider">
+                    Actions
                   </th>
                 </tr>
               </thead>
@@ -360,11 +323,6 @@ export function BacklogView({ workspaceId }: BacklogViewProps) {
                       </td>
                       <td className="px-4 py-3">
                         <span className="text-xs text-mc-text-secondary truncate max-w-[120px] block">
-                          {getSprintName(task.sprint_id)}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="text-xs text-mc-text-secondary truncate max-w-[120px] block">
                           {getMilestoneName(task.milestone_id)}
                         </span>
                       </td>
@@ -382,6 +340,38 @@ export function BacklogView({ workspaceId }: BacklogViewProps) {
                         <span className="text-xs text-mc-text-secondary">
                           {format(parseISO(task.created_at), 'MMM d, yyyy')}
                         </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        {assigningMilestone === task.id ? (
+                          <div className="flex items-center gap-1.5 min-w-[200px]">
+                            <select
+                              autoFocus
+                              onChange={(e) => handleAssignMilestone(task.id, e.target.value)}
+                              className="flex-1 px-2 py-1 text-xs rounded border border-mc-border bg-mc-bg focus:outline-none focus:ring-2 focus:ring-mc-accent/50"
+                            >
+                              <option value="">Select milestone...</option>
+                              {milestones.map((m) => (
+                                <option key={m.id} value={m.id}>
+                                  {m.name}
+                                </option>
+                              ))}
+                            </select>
+                            <button
+                              onClick={() => setAssigningMilestone(null)}
+                              className="px-2 py-1 text-xs text-mc-text-secondary hover:text-mc-text"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => setAssigningMilestone(task.id)}
+                            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium text-mc-text-secondary hover:bg-mc-bg-tertiary transition-colors"
+                          >
+                            <Target className="w-3.5 h-3.5" />
+                            <span className="hidden sm:inline">Assign</span>
+                          </button>
+                        )}
                       </td>
                     </tr>
                   );
