@@ -486,7 +486,8 @@ export type SSEEventType =
   | 'activity_logged'
   | 'deliverable_added'
   | 'agent_spawned'
-  | 'agent_completed';
+  | 'agent_completed'
+  | 'github_issues_synced';
 
 export interface SSEEvent {
   type: SSEEventType;
@@ -498,5 +499,7 @@ export interface SSEEvent {
     deleted?: boolean;
   } | {
     id: string;  // For task_deleted events
+  } | {
+    workspace_id: string;  // For github_issues_synced events
   };
 }
