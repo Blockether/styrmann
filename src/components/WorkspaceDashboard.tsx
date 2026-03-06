@@ -43,14 +43,10 @@ export function WorkspaceDashboard() {
 
   return (
     <div data-component="src/components/WorkspaceDashboard" className="min-h-screen bg-mc-bg">
-      {/* Header */}
-      <header className="border-b border-mc-border bg-mc-bg-secondary">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
+      {/* Toolbar */}
+      <div className="border-b border-mc-border bg-mc-bg-secondary">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <Image src="/logo.png" alt="Blockether" width={28} height={28} className="rounded" />
-              <h1 className="text-xl font-bold">Blockether</h1>
-            </div>
             <div className="flex items-center gap-2">
               <Link
                 href={workspaces.length > 0 ? `/workspace/${workspaces[0].slug}/activity` : '/workspace/default/activity'}
@@ -69,7 +65,7 @@ export function WorkspaceDashboard() {
             </div>
           </div>
         </div>
-      </header>
+      </div>
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
