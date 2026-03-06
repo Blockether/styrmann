@@ -250,7 +250,7 @@ export default function WorkspacePage() {
           activeView={view} 
           onViewChange={handleViewChange} 
         />
-        <div className="flex-1 min-w-0 overflow-hidden">{renderView()}</div>
+        <div className="flex-1 min-w-0 overflow-hidden flex flex-col">{renderView()}</div>
       </div>
 
       <div className="lg:hidden flex-1 overflow-hidden pb-[env(safe-area-inset-bottom)]">
@@ -261,7 +261,7 @@ export default function WorkspacePage() {
           open={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
         />
-        <div className="h-full overflow-hidden">{renderView()}</div>
+        <div className="h-full overflow-hidden flex flex-col">{renderView()}</div>
       </div>
 
       <SSEDebugPanel />
