@@ -17,11 +17,11 @@ export async function GET(request: NextRequest) {
     if (workspaceId) {
       agents = queryAll<Agent>(`
         SELECT * FROM agents WHERE workspace_id = ? OR source = 'synced'
-        ORDER BY is_master DESC, name ASC
+        ORDER BY role ASC, name ASC
       `, [workspaceId]);
     } else {
       agents = queryAll<Agent>(`
-        SELECT * FROM agents ORDER BY is_master DESC, name ASC
+        SELECT * FROM agents ORDER BY role ASC, name ASC
       `);
     }
     for (const agent of agents) {
@@ -54,18 +54,32 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Name and role are required' }, { status: 400 });
     }
 
+    // Enforce single orchestrator per workspace
+    if (body.role === 'orchestrator') {
+      const workspaceId = (body as { workspace_id?: string }).workspace_id || 'default';
+      const existingOrchestrator = queryOne<{ id: string }>(
+        'SELECT id FROM agents WHERE workspace_id = ? AND role = ?',
+        [workspaceId, 'orchestrator']
+      );
+      if (existingOrchestrator) {
+        return NextResponse.json(
+          { error: 'An Orchestrator already exists for this workspace' },
+          { status: 409 }
+        );
+      }
+    }
+
     const id = uuidv4();
     const now = new Date().toISOString();
 
     run(
-      `INSERT INTO agents (id, name, role, description, is_master, workspace_id, soul_md, user_md, agents_md, model, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO agents (id, name, role, description, workspace_id, soul_md, user_md, agents_md, model, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
         body.name,
         body.role,
         body.description || null,
-        body.is_master ? 1 : 0,
         (body as { workspace_id?: string }).workspace_id || 'default',
         body.soul_md || null,
         body.user_md || null,

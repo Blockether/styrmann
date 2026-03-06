@@ -48,6 +48,28 @@ export async function PATCH(
       return NextResponse.json({ error: 'Agent not found' }, { status: 404 });
     }
 
+    // Block orchestrator demotion
+    if (body.role !== undefined && existing.role === 'orchestrator' && body.role !== 'orchestrator') {
+      return NextResponse.json(
+        { error: 'Cannot demote Orchestrator. Delete and recreate the agent to change its role.' },
+        { status: 400 }
+      );
+    }
+
+    // Block duplicate orchestrator promotion
+    if (body.role === 'orchestrator' && existing.role !== 'orchestrator') {
+      const existingOrchestrator = queryOne<{ id: string }>(
+        'SELECT id FROM agents WHERE workspace_id = ? AND role = ?',
+        [existing.workspace_id, 'orchestrator']
+      );
+      if (existingOrchestrator) {
+        return NextResponse.json(
+          { error: 'An Orchestrator already exists for this workspace' },
+          { status: 409 }
+        );
+      }
+    }
+
     const updates: string[] = [];
     const values: unknown[] = [];
 
@@ -74,10 +96,6 @@ export async function PATCH(
          VALUES (?, ?, ?, ?, ?)`,
         [uuidv4(), 'agent_status_changed', id, `${existing.name} is now ${body.status}`, now]
       );
-    }
-    if (body.is_master !== undefined) {
-      updates.push('is_master = ?');
-      values.push(body.is_master ? 1 : 0);
     }
     const isSynced = existing.source === 'synced';
     if (body.soul_md !== undefined && !isSynced) {

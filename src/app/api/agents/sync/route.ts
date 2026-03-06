@@ -10,7 +10,7 @@ export async function POST() {
     const results = await syncAgentsWithRpcCheck();
 
     const syncedAgents = queryAll<Agent>(
-      `SELECT * FROM agents WHERE source = 'synced' ORDER BY is_master DESC, name ASC`
+      `SELECT * FROM agents WHERE source = 'synced' ORDER BY name ASC`
     );
 
     return NextResponse.json({
