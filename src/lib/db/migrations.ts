@@ -1030,6 +1030,45 @@ const migrations: Migration[] = [
 
       console.warn('[Migration 020] Hierarchy + agent schema restructure complete');
     }
+  },
+  {
+    id: '021',
+    name: 'github_issues_and_task_link',
+    up: (db) => {
+      console.warn('[Migration 021] Adding github_issues table and tasks.github_issue_id...');
+
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS github_issues (
+          id TEXT PRIMARY KEY,
+          workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+          github_id INTEGER NOT NULL,
+          issue_number INTEGER NOT NULL,
+          title TEXT NOT NULL,
+          body TEXT,
+          state TEXT NOT NULL DEFAULT 'open',
+          state_reason TEXT,
+          labels TEXT NOT NULL DEFAULT '[]',
+          assignees TEXT NOT NULL DEFAULT '[]',
+          github_url TEXT NOT NULL,
+          author TEXT,
+          created_at_github TEXT,
+          updated_at_github TEXT,
+          synced_at TEXT NOT NULL,
+          UNIQUE(workspace_id, issue_number)
+        )
+      `);
+
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_github_issues_workspace ON github_issues(workspace_id)`);
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_github_issues_state ON github_issues(workspace_id, state)`);
+
+      const taskCols = (db.prepare('PRAGMA table_info(tasks)').all() as { name: string }[]).map(c => c.name);
+      if (!taskCols.includes('github_issue_id')) {
+        db.exec(`ALTER TABLE tasks ADD COLUMN github_issue_id TEXT REFERENCES github_issues(id) ON DELETE SET NULL`);
+        console.warn('[Migration 021] Added github_issue_id to tasks');
+      }
+
+      console.warn('[Migration 021] Done');
+    }
   }
 ];
 

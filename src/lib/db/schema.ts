@@ -61,6 +61,26 @@ CREATE TABLE IF NOT EXISTS milestones (
   updated_at TEXT DEFAULT (datetime('now'))
 );
 
+-- GitHub issues table (workspace-scoped cache)
+CREATE TABLE IF NOT EXISTS github_issues (
+  id TEXT PRIMARY KEY,
+  workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  github_id INTEGER NOT NULL,
+  issue_number INTEGER NOT NULL,
+  title TEXT NOT NULL,
+  body TEXT,
+  state TEXT NOT NULL DEFAULT 'open',
+  state_reason TEXT,
+  labels TEXT NOT NULL DEFAULT '[]',
+  assignees TEXT NOT NULL DEFAULT '[]',
+  github_url TEXT NOT NULL,
+  author TEXT,
+  created_at_github TEXT,
+  updated_at_github TEXT,
+  synced_at TEXT NOT NULL,
+  UNIQUE(workspace_id, issue_number)
+);
+
 -- Milestone dependencies table
 CREATE TABLE IF NOT EXISTS milestone_dependencies (
   id TEXT PRIMARY KEY,
@@ -100,6 +120,7 @@ CREATE TABLE IF NOT EXISTS tasks (
   created_by_agent_id TEXT REFERENCES agents(id),
   workspace_id TEXT DEFAULT 'default' REFERENCES workspaces(id),
   milestone_id TEXT REFERENCES milestones(id) ON DELETE SET NULL,
+  github_issue_id TEXT REFERENCES github_issues(id) ON DELETE SET NULL,
   business_id TEXT DEFAULT 'default',
   due_date TEXT,
   workflow_template_id TEXT REFERENCES workflow_templates(id),
@@ -338,6 +359,8 @@ CREATE INDEX IF NOT EXISTS idx_milestone_deps_depends ON milestone_dependencies(
 CREATE INDEX IF NOT EXISTS idx_tasks_type ON tasks(task_type);
 CREATE INDEX IF NOT EXISTS idx_sprints_workspace ON sprints(workspace_id);
 CREATE INDEX IF NOT EXISTS idx_milestones_workspace ON milestones(workspace_id);
+CREATE INDEX IF NOT EXISTS idx_github_issues_workspace ON github_issues(workspace_id);
+CREATE INDEX IF NOT EXISTS idx_github_issues_state ON github_issues(workspace_id, state);
 CREATE INDEX IF NOT EXISTS idx_tags_workspace ON tags(workspace_id);
 CREATE INDEX IF NOT EXISTS idx_task_comments_task ON task_comments(task_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_task_blockers_task ON task_blockers(task_id);

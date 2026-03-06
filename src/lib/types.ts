@@ -138,6 +138,25 @@ export interface TaskAcceptanceCriteria {
   created_at: string;
 }
 
+export interface GitHubIssue {
+  id: string;
+  workspace_id: string;
+  github_id: number;
+  issue_number: number;
+  title: string;
+  body?: string | null;
+  state: 'open' | 'closed';
+  state_reason?: string | null;
+  labels: string;
+  assignees: string;
+  github_url: string;
+  author?: string | null;
+  created_at_github?: string | null;
+  updated_at_github?: string | null;
+  synced_at: string;
+  task_id?: string | null;
+}
+
 export interface Task {
   id: string;
   title: string;
@@ -151,6 +170,7 @@ export interface Task {
   created_by_agent_id: string | null;
   workspace_id: string;
   milestone_id?: string;
+  github_issue_id?: string | null;
   business_id: string;
   due_date?: string;
   workflow_template_id?: string;
