@@ -1,11 +1,11 @@
-// Database seed script - creates initial data including the master orchestrator agent
+// Database seed script - creates initial data including the orchestrator agent
 
 import { v4 as uuidv4 } from 'uuid';
 import { getDb, closeDb } from './index';
 
 const ORCHESTRATOR_SOUL_MD = `# Mission Control Orchestrator
 
-You are the master orchestrator of Mission Control. You lead a team of AI agents working together to complete tasks.
+You are the orchestrator of Mission Control. You lead a team of AI agents working together to complete tasks.
 
 ## Core Identity
 
@@ -100,18 +100,17 @@ async function seed() {
     `INSERT OR IGNORE INTO businesses (id, name, description, created_at) VALUES (?, ?, ?, ?)`
   ).run(businessId, 'Mission Control HQ', 'Default workspace for all operations', now);
 
-  // Create master orchestrator agent
+  // Create orchestrator agent
   const orchestratorId = uuidv4();
   db.prepare(
-    `INSERT INTO agents (id, name, role, description, status, is_master, soul_md, user_md, agents_md, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO agents (id, name, role, description, status, soul_md, user_md, agents_md, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     orchestratorId,
     'Orchestrator',
-    'Team Lead & Orchestrator',
-    'The master orchestrator who coordinates all agents and manages the mission queue',
+    'orchestrator',
+    'Project Orchestrator / Product Owner',
     'standby',
-    1,
     ORCHESTRATOR_SOUL_MD,
     ORCHESTRATOR_USER_MD,
     ORCHESTRATOR_AGENTS_MD,
@@ -133,9 +132,9 @@ async function seed() {
     const agentId = uuidv4();
     agentIds.push(agentId);
     db.prepare(
-      `INSERT INTO agents (id, name, role, description, status, is_master, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-    ).run(agentId, agent.name, agent.role, agent.desc, 'standby', 0, now, now);
+      `INSERT INTO agents (id, name, role, description, status, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
+    ).run(agentId, agent.name, agent.role, agent.desc, 'standby', now, now);
   }
 
   // Create a team conversation
@@ -200,7 +199,7 @@ async function seed() {
   );
 
   console.log('[Seed] Database seeded successfully!');
-  console.log(`   - Created Orchestrator (master agent): ${orchestratorId}`);
+  console.log(`   - Created Orchestrator: ${orchestratorId}`);
   console.log(`   - Created ${agents.length} additional agents`);
   console.log(`   - Created ${tasks.length} sample tasks`);
   console.log(`   - Created team conversation`);

@@ -1,8 +1,8 @@
 /**
  * Bootstrap Core Agents
  *
- * Creates the 4 core agents (Builder, Tester, Reviewer, Learner)
- * for a workspace if it has zero agents. Also clones workflow
+ * Ensures core agents (Orchestrator, Builder, Tester, Reviewer, Learner)
+ * exist for a workspace. Also clones workflow
  * templates from the default workspace to new workspaces.
  */
 
@@ -32,6 +32,9 @@ Manages overall system, sets priorities, defines tasks. Follow specifications pr
 
 const SHARED_AGENTS_MD = `# Team Roster
 
+## Orchestrator Agent
+Project Orchestrator / Product Owner. Owns prioritization, planning, and team coordination. Not a workflow worker.
+
 ## Builder Agent
 Creates deliverables from specs. Writes code, creates files, builds projects. When work comes back from failed QA, fixes all reported issues.
 
@@ -45,6 +48,7 @@ Final quality gate. Reviews code quality, best practices, correctness, completen
 Observes all transitions. Captures patterns and lessons learned. Feeds knowledge back to improve future work.
 
 ## How We Work Together
+Orchestrator plans and coordinates the pipeline.
 Builder → Tester (front-end QA) → Review Queue → Reviewer (code QC) → Done
 If Testing fails: back to Builder with front-end issues.
 If Verification fails: back to Builder with code issues.
@@ -55,13 +59,34 @@ Only one task in Verification at a time.`;
 interface AgentDef {
   name: string;
   role: string;
+  description: string;
   soulMd: string;
 }
 
 const CORE_AGENTS: AgentDef[] = [
   {
+    name: 'Orchestrator Agent',
+    role: 'orchestrator',
+    description: 'Project Orchestrator / Product Owner',
+    soulMd: `# Orchestrator Agent
+
+Project orchestrator and product owner. Coordinates priorities, clarifies scope, and keeps workflow healthy.
+
+## Core Responsibilities
+- Break goals into clear, testable tasks
+- Route work to the right specialists
+- Keep priorities aligned with product outcomes
+- Unblock team members and resolve sequencing conflicts
+
+## Workflow Boundaries
+- You are a manager role, not a workflow worker stage
+- Do not take implementation/testing/review slots
+- Focus on orchestration, planning, and decision quality`,
+  },
+  {
     name: 'Builder Agent',
     role: 'builder',
+    description: 'Builder Agent — core team member',
     soulMd: `# Builder Agent
 
 Expert builder. Follows specs exactly. Creates output in the designated project directory.
@@ -85,6 +110,7 @@ When tasks come back from failed QA (testing or verification), read the failure 
   {
     name: 'Tester Agent',
     role: 'tester',
+    description: 'Tester Agent — core team member',
     soulMd: `# Tester Agent — Front-End QA
 
 Front-end QA specialist. Tests the app/project from the user's perspective.
@@ -110,6 +136,7 @@ Front-end QA specialist. Tests the app/project from the user's perspective.
   {
     name: 'Reviewer Agent',
     role: 'reviewer',
+    description: 'Reviewer Agent — core team member',
     soulMd: `# Reviewer Agent — Code Quality Gatekeeper
 
 Reviews code structure, best practices, patterns, completeness, correctness, and security.
@@ -137,6 +164,7 @@ Be specific. "Code quality could be better" is useless. "src/utils.ts:42 — mis
   {
     name: 'Learner Agent',
     role: 'learner',
+    description: 'Learner Agent — core team member',
     soulMd: `# Learner Agent
 
 Observes all task transitions — both passes and failures. Captures lessons learned and writes them to the knowledge base.
@@ -187,31 +215,31 @@ export function bootstrapCoreAgentsRaw(
   workspaceId: string,
   missionControlUrl: string,
 ): void {
-  // Only bootstrap if workspace has zero agents
-  const count = db.prepare(
-    'SELECT COUNT(*) as cnt FROM agents WHERE workspace_id = ?'
-  ).get(workspaceId) as { cnt: number };
-
-  if (count.cnt > 0) {
-    console.log(`[Bootstrap] Workspace ${workspaceId} already has ${count.cnt} agent(s) — skipping`);
-    return;
-  }
-
   const userMd = sharedUserMd(missionControlUrl);
   const now = new Date().toISOString();
 
   const insert = db.prepare(`
-    INSERT INTO agents (id, name, role, description, status, is_master, workspace_id, soul_md, user_md, agents_md, source, created_at, updated_at)
-    VALUES (?, ?, ?, ?, 'standby', 0, ?, ?, ?, ?, 'local', ?, ?)
+    INSERT INTO agents (id, name, role, description, status, workspace_id, soul_md, user_md, agents_md, source, created_at, updated_at)
+    VALUES (?, ?, ?, ?, 'standby', ?, ?, ?, ?, 'local', ?, ?)
   `);
 
+  const findByRole = db.prepare(
+    'SELECT id FROM agents WHERE workspace_id = ? AND role = ? LIMIT 1'
+  );
+
   for (const agent of CORE_AGENTS) {
+    const existing = findByRole.get(workspaceId, agent.role) as { id: string } | undefined;
+    if (existing) {
+      console.log(`[Bootstrap] ${agent.role} already exists for workspace ${workspaceId} — skipping`);
+      continue;
+    }
+
     const id = crypto.randomUUID();
     insert.run(
       id,
       agent.name,
       agent.role,
-      `${agent.name} — core team member`,
+      agent.description,
       workspaceId,
       agent.soulMd,
       userMd,

@@ -283,6 +283,7 @@ export function populateTaskRolesFromAgents(taskId: string, workspaceId: string)
   // For each stage that requires a role, try to find a matching agent
   const roleMap: Record<string, string> = {};
   for (const stage of workflow.stages) {
+    if (stage.role === 'orchestrator') continue;
     if (!stage.role || roleMap[stage.role]) continue;
 
     // Try exact match on role name, then fuzzy match
