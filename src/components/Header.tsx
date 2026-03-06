@@ -135,7 +135,7 @@ export function Header({ workspace, isPortrait = true, onMenuToggle, sidebarOpen
       {portraitWorkspaceHeader ? (
         <>
           <div className="flex items-center justify-between gap-2 min-w-0">
-            <div className="flex items-center gap-2 min-w-0">
+            <div className="flex items-center gap-2 min-w-0 overflow-hidden">
               <button
                 onClick={onMenuToggle}
                 className="lg:hidden min-h-11 min-w-11 p-2 hover:bg-mc-bg-tertiary rounded text-mc-text-secondary shrink-0"
@@ -161,7 +161,7 @@ export function Header({ workspace, isPortrait = true, onMenuToggle, sidebarOpen
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 shrink-0">
               <div
                 className={`flex items-center gap-2 px-3 min-h-11 rounded border text-xs font-medium ${
                   isOnline
