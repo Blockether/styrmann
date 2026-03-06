@@ -15,6 +15,11 @@ interface RoleAssignment {
   agent_id: string;
   agent_name?: string;
 }
+function formatAgentLabel(name: string, role: string, max = 120): string {
+  const full = `${name} — ${role}`;
+  return full.length > max ? full.slice(0, max - 1) + '…' : full;
+}
+
 
 export function TeamTab({ taskId, workspaceId }: TeamTabProps) {
   const { agents } = useMissionControl();
@@ -239,7 +244,7 @@ export function TeamTab({ taskId, workspaceId }: TeamTabProps) {
                   <option value="">Unassigned</option>
                   {agents.map(agent => (
                     <option key={agent.id} value={agent.id}>
-                      {agent.name} — {agent.role}
+                      {formatAgentLabel(agent.name, agent.role)}
                     </option>
                   ))}
                 </select>
@@ -267,7 +272,7 @@ export function TeamTab({ taskId, workspaceId }: TeamTabProps) {
                 <option value="">Unassigned</option>
                 {agents.map(agent => (
                   <option key={agent.id} value={agent.id}>
-                    {agent.name} — {agent.role}
+                    {formatAgentLabel(agent.name, agent.role)}
                   </option>
                 ))}
               </select>
@@ -287,7 +292,7 @@ export function TeamTab({ taskId, workspaceId }: TeamTabProps) {
                 <option value="">Unassigned (optional)</option>
                 {agents.map(agent => (
                   <option key={agent.id} value={agent.id}>
-                    {agent.name} — {agent.role}
+                    {formatAgentLabel(agent.name, agent.role)}
                   </option>
                 ))}
               </select>
