@@ -1101,6 +1101,32 @@ const migrations: Migration[] = [
       db.exec(`CREATE INDEX IF NOT EXISTS idx_scheduled_job_runs_job ON scheduled_job_runs(job_id)`);
       console.log('[Migration 022] Daemon tables created');
     }
+  },
+  {
+    id: '023',
+    name: 'add_agent_logs_table',
+    up: (db) => {
+      console.log('[Migration 023] Adding agent_logs table...');
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS agent_logs (
+          id TEXT PRIMARY KEY,
+          agent_id TEXT REFERENCES agents(id) ON DELETE CASCADE,
+          openclaw_session_id TEXT NOT NULL,
+          role TEXT NOT NULL CHECK (role IN ('user', 'assistant', 'system')),
+          content TEXT NOT NULL,
+          content_hash TEXT NOT NULL,
+          workspace_id TEXT DEFAULT 'default' REFERENCES workspaces(id),
+          created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+      `);
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_agent_logs_agent ON agent_logs(agent_id)`);
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_agent_logs_session ON agent_logs(openclaw_session_id)`);
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_agent_logs_created ON agent_logs(created_at DESC)`);
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_agent_logs_role ON agent_logs(role)`);
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_agent_logs_workspace ON agent_logs(workspace_id)`);
+      db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_agent_logs_content_hash ON agent_logs(content_hash)`);
+      console.log('[Migration 023] agent_logs table created');
+    }
   }
 ];
 

@@ -20,6 +20,7 @@ PROJECT_DIR="/root/repos/blockether/mission-control"
 DB_PATH="${PROJECT_DIR}/mission-control.db"
 ENV_FILE="${PROJECT_DIR}/.env.local"
 SERVICE_NAME="mission-control"
+DAEMON_SERVICE="mission-control-daemon"
 URL="https://control.blockether.com"
 
 step() { echo -e "\n${CYAN}${BOLD}[$1/$TOTAL]${NC} $2"; }
@@ -27,7 +28,7 @@ ok()   { echo -e "    ${GREEN}OK${NC} $1"; }
 warn() { echo -e "    ${YELLOW}WARN${NC} $1"; }
 fail() { echo -e "    ${RED}FAIL${NC} $1"; }
 
-TOTAL=4
+TOTAL=5
 ERRORS=0
 WARNINGS=0
 
@@ -83,8 +84,8 @@ else
   ERRORS=$((ERRORS + 1))
 fi
 
-# -- Step 3: Service status -------------------------------------------------
-step 3 "Checking service..."
+# -- Step 3: Web service status --------------------------------------------
+step 3 "Checking web service..."
 
 if systemctl is-active --quiet "$SERVICE_NAME" 2>/dev/null; then
   UPTIME=$(systemctl show "$SERVICE_NAME" --property=ActiveEnterTimestamp --no-pager 2>/dev/null | cut -d= -f2)
@@ -105,8 +106,30 @@ else
   ERRORS=$((ERRORS + 1))
 fi
 
-# -- Step 4: HTTP health check ---------------------------------------------
-step 4 "Checking HTTP endpoint..."
+# -- Step 4: Daemon service ------------------------------------------------
+step 4 "Checking daemon..."
+
+if systemctl is-active --quiet "$DAEMON_SERVICE" 2>/dev/null; then
+  UPTIME=$(systemctl show "$DAEMON_SERVICE" --property=ActiveEnterTimestamp --no-pager 2>/dev/null | cut -d= -f2)
+  ok "Daemon is running (since $UPTIME)"
+
+  PID=$(systemctl show "$DAEMON_SERVICE" --property=MainPID --no-pager 2>/dev/null | cut -d= -f2)
+  if [ -n "$PID" ] && [ "$PID" != "0" ]; then
+    MEM=$(ps -o rss= -p "$PID" 2>/dev/null | awk '{printf "%.0f MB", $1/1024}')
+    ok "Daemon PID $PID, memory: $MEM"
+  fi
+else
+  fail "Daemon $DAEMON_SERVICE is not running"
+  echo ""
+  echo "    Recent daemon logs:"
+  journalctl -u "$DAEMON_SERVICE" --no-pager -n 5 2>/dev/null | while IFS= read -r line; do
+    echo "      $line"
+  done
+  ERRORS=$((ERRORS + 1))
+fi
+
+# -- Step 5: HTTP health check ---------------------------------------------
+step 5 "Checking HTTP endpoint..."
 
 HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$URL" 2>/dev/null || echo "000")
 if [ "$HTTP_CODE" = "200" ]; then

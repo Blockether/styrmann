@@ -387,4 +387,21 @@ CREATE TABLE IF NOT EXISTS scheduled_job_runs (
 CREATE INDEX IF NOT EXISTS idx_agent_heartbeats_agent ON agent_heartbeats(agent_id);
 CREATE INDEX IF NOT EXISTS idx_agent_heartbeats_created ON agent_heartbeats(created_at);
 CREATE INDEX IF NOT EXISTS idx_scheduled_job_runs_job ON scheduled_job_runs(job_id);
+-- Agent logs (OpenClaw session transcripts)
+CREATE TABLE IF NOT EXISTS agent_logs (
+  id TEXT PRIMARY KEY,
+  agent_id TEXT REFERENCES agents(id) ON DELETE CASCADE,
+  openclaw_session_id TEXT NOT NULL,
+  role TEXT NOT NULL CHECK (role IN ('user', 'assistant', 'system')),
+  content TEXT NOT NULL,
+  content_hash TEXT NOT NULL,
+  workspace_id TEXT DEFAULT 'default' REFERENCES workspaces(id),
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_agent_logs_agent ON agent_logs(agent_id);
+CREATE INDEX IF NOT EXISTS idx_agent_logs_session ON agent_logs(openclaw_session_id);
+CREATE INDEX IF NOT EXISTS idx_agent_logs_created ON agent_logs(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_agent_logs_role ON agent_logs(role);
+CREATE INDEX IF NOT EXISTS idx_agent_logs_workspace ON agent_logs(workspace_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_agent_logs_content_hash ON agent_logs(content_hash);
 `;

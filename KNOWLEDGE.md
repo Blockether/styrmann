@@ -459,7 +459,7 @@ The Next.js server handles HTTP request/response cycles but has no built-in mech
 
 ### Architecture
 
-The daemon is a standalone Node.js process with five modules:
+The daemon is a standalone Node.js process with six modules:
 
 | Module | Interval | Purpose |
 |--------|----------|---------|
@@ -468,7 +468,7 @@ The daemon is a standalone Node.js process with five modules:
 | **scheduler** | 10s | Runs registered `ScheduledJob` entries on interval. Job registry starts empty — no hardcoded jobs |
 | **health** | 60s | Pings MC to verify API is reachable, logs connection changes |
 | **router** | SSE stream | Subscribes to `/api/events/stream`, routes events (e.g., logs task assignments for dispatcher awareness) |
-
+| **logs** | 30s | Polls OpenClaw session histories via `/api/openclaw/sessions/{id}/history`, stores new entries in `agent_logs` table via `/api/logs/ingest`, broadcasts `agent_log_added` SSE events, auto-cleans entries older than 30 days |
 Communication flow: `Daemon → HTTP API → Next.js → SQLite / OpenClaw Gateway → SSE broadcast → UI`
 
 For SSE relay (daemon pushing events to browser clients): `Daemon → POST /api/events/broadcast → in-memory SSE broadcaster → connected browsers`
@@ -491,7 +491,7 @@ Env vars: `MC_URL` (default `http://localhost:4000`), `MC_API_TOKEN` (required �
 |-------|---------|
 | `agent_heartbeats` | Records agent status snapshots over time (agent_id, status, metadata, created_at) |
 | `scheduled_job_runs` | Records job execution history (job_id, status, started_at, finished_at, result, error, optional task_id) |
-
+| `agent_logs` | OpenClaw session transcripts — role (user/assistant/system), content, content_hash (dedup), linked to agent and workspace |
 ### Shared Dispatch (`src/lib/dispatch.ts`)
 
 The dispatch logic (task message building, OpenClaw session management, workflow stage awareness, knowledge injection) was extracted from the API route into a shared module `dispatchTaskToAgent(taskId)`. Both the API route (`POST /api/tasks/{id}/dispatch`) and the daemon's dispatcher call the same function. Returns a `DispatchResult` with success/error status and updated task/agent payloads.
@@ -499,3 +499,23 @@ The dispatch logic (task message building, OpenClaw session management, workflow
 ### Broadcast Endpoint
 
 `POST /api/events/broadcast` — accepts `{type, payload}` and broadcasts to all connected SSE clients. Protected by the existing middleware auth (`MC_API_TOKEN`). Used by the daemon to push real-time updates from a separate process that can't access the in-memory SSE client set directly.
+
+### Agent Logs (OpenClaw Transcripts)
+
+Real-time agent session logs from OpenClaw Gateway, polled and stored by the daemon.
+
+**Database:** `agent_logs` table with columns: `id`, `agent_id`, `openclaw_session_id`, `role` (user/assistant/system), `content`, `content_hash` (SHA-256 for dedup), `workspace_id`, `created_at`. Unique index on `content_hash` prevents duplicates.
+
+**API Endpoints:**
+- `GET /api/logs` — Query with rich filtering: `agent_id`, `session_id`, `role`, `workspace_id`, `search` (LIKE), `from`/`to` (date range), `limit`/`offset` (pagination), `order` (asc/desc). Returns `{logs, total, limit, offset, hasMore}`.
+- `POST /api/logs/ingest` — Bulk insert from daemon. Uses `INSERT OR IGNORE` for dedup by content_hash.
+- `GET /api/logs/sessions` — Distinct sessions with log counts (for filter dropdown).
+- `DELETE /api/logs?days=30` — Cleanup stale entries older than N days.
+
+**Daemon module (`src/daemon/logs.ts`):** Polls every 30s. For each active OpenClaw session, fetches history, computes content_hash per message, stores new entries via `/api/logs/ingest`, broadcasts `agent_log_added` SSE event. Runs cleanup every ~50 minutes (100 ticks). Maintains an in-memory `knownHashes` Set to avoid redundant API calls.
+
+**UI:** `AgentLogsView` component accessible via "Agent Logs" tab in sidebar. Features: agent dropdown, role filter tabs, session filter, text search, date range inputs, paginated list with "Load more", auto-refresh on new data.
+
+**SSE Event:** `agent_log_added` — payload contains `{count, session_id, agent_id, agent_name, workspace_id}`.
+
+**Retention:** Logs older than 30 days are automatically purged by the daemon. Manual cleanup available via `DELETE /api/logs?days=N`.

@@ -13,6 +13,7 @@ import { ParetoView } from '@/components/ParetoView';
 import { AgentActivityDashboard } from '@/components/AgentActivityDashboard';
 import { SSEDebugPanel } from '@/components/SSEDebugPanel';
 import { GithubIssuesView } from '@/components/GithubIssuesView';
+import { AgentLogsView } from '@/components/AgentLogsView';
 import { TaskModal } from '@/components/TaskModal';
 import { useMissionControl } from '@/lib/store';
 import { useSSE } from '@/hooks/useSSE';
@@ -23,7 +24,7 @@ function getInitialView(): DashboardView {
   if (typeof window === 'undefined') return 'sprint';
   const params = new URLSearchParams(window.location.search);
   const urlView = params.get('view');
-  if (urlView && ['sprint', 'backlog', 'pareto', 'activity', 'issues'].includes(urlView)) {
+  if (urlView && ['sprint', 'backlog', 'pareto', 'activity', 'issues', 'logs'].includes(urlView)) {
     return urlView as DashboardView;
   }
   return 'sprint';
@@ -46,8 +47,7 @@ export default function WorkspacePage() {
 
   useEffect(() => {
     const urlView = new URLSearchParams(window.location.search).get('view');
-    if (urlView && ['sprint', 'backlog', 'pareto', 'activity', 'issues'].includes(urlView)) {
-      setView(urlView as DashboardView);
+    if (urlView && ['sprint', 'backlog', 'pareto', 'activity', 'issues', 'logs'].includes(urlView)) {
     }
   }, []);
 
@@ -203,6 +203,8 @@ export default function WorkspacePage() {
         return <AgentActivityDashboard workspace={workspace} embedded />;
       case 'issues':
         return <GithubIssuesView workspaceId={workspace.id} workspace={workspace} onCreateTask={(issue) => setGithubIssueForTask(issue)} />;
+      case 'logs':
+        return <AgentLogsView workspaceId={workspace.id} />;
       default:
         return <ActiveSprint workspaceId={workspace.id} />;
     }

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { ChevronRight, ChevronLeft, ChevronDown, RefreshCw, ListTodo, Inbox, BarChart3, Activity, X, Crown, CircleDot, Clock } from 'lucide-react';
+import { ChevronRight, ChevronLeft, ChevronDown, RefreshCw, ListTodo, Inbox, BarChart3, Activity, X, Crown, CircleDot, Clock, ScrollText } from 'lucide-react';
 import { useMissionControl } from '@/lib/store';
 import type { Agent, AgentStatus, OpenClawSession, Sprint } from '@/lib/types';
 import { AgentModal } from './AgentModal';
@@ -24,8 +24,8 @@ const NAV_ITEMS = [
   { label: 'Pareto', view: 'pareto' as DashboardView, icon: <BarChart3 className="w-4 h-4" /> },
   { label: 'Activity', view: 'activity' as DashboardView, icon: <Activity className="w-4 h-4" /> },
   { label: 'Issues', view: 'issues' as DashboardView, icon: <CircleDot className="w-4 h-4" /> },
+  { label: 'Agent Logs', view: 'logs' as DashboardView, icon: <ScrollText className="w-4 h-4" /> },
 ];
-
 export function AgentsSidebar({ 
   workspaceId, 
   activeView = 'sprint', 

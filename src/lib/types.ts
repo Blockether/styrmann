@@ -473,6 +473,22 @@ export interface OpenClawHistoryMessage {
   timestamp?: string;
 }
 
+export type AgentLogRole = 'user' | 'assistant' | 'system';
+
+export interface AgentLog {
+  id: string;
+  agent_id: string | null;
+  openclaw_session_id: string;
+  role: AgentLogRole;
+  content: string;
+  content_hash: string;
+  workspace_id: string;
+  created_at: string;
+  // Joined fields
+  agent_name?: string;
+  agent_role?: string;
+}
+
 // Agent with OpenClaw session info (extended for UI use)
 export interface AgentWithOpenClaw extends Agent {
   openclawSession?: OpenClawSession | null;
@@ -488,7 +504,8 @@ export type SSEEventType =
   | 'deliverable_added'
   | 'agent_spawned'
   | 'agent_completed'
-  | 'github_issues_synced';
+  | 'github_issues_synced'
+  | 'agent_log_added';
 
 export interface SSEEvent {
   type: SSEEventType;

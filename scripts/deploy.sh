@@ -12,7 +12,8 @@ NC='\033[0m'
 BOLD='\033[1m'
 
 PROJECT_DIR="/root/repos/blockether/mission-control"
-SERVICE_NAME="mission-control"
+WEB_SERVICE="mission-control"
+DAEMON_SERVICE="mission-control-daemon"
 LOG_FILE="${PROJECT_DIR}/.next/deploy.log"
 URL="https://control.blockether.com"
 
@@ -27,7 +28,7 @@ for arg in "$@"; do
       echo "Usage: ./scripts/deploy.sh [--skip-build] [--no-restart]"
       echo ""
       echo "  --skip-build   Skip the build step (just restart)"
-      echo "  --no-restart   Build only, don't restart the service"
+      echo "  --no-restart   Build only, don't restart the services"
       exit 0
       ;;
   esac
@@ -38,7 +39,7 @@ ok()   { echo -e "    ${GREEN}OK${NC} $1"; }
 warn() { echo -e "    ${YELLOW}WARN${NC} $1"; }
 fail() { echo -e "    ${RED}FAIL${NC} $1"; }
 
-TOTAL=4
+TOTAL=5
 ERRORS=0
 WARNINGS=0
 
@@ -83,49 +84,87 @@ else
   fi
 fi
 
-# ── Step 2: Restart ──────────────────────────────────────────
+# ── Step 2: Restart web service ─────────────────────────────
 if [ "$NO_RESTART" = true ]; then
-  step 2 "Restart ${YELLOW}(skipped)${NC}"
+  step 2 "Restart web ${YELLOW}(skipped)${NC}"
 else
-  step 2 "Restarting $SERVICE_NAME..."
+  step 2 "Restarting $WEB_SERVICE..."
   
-  systemctl kill -s SIGKILL "$SERVICE_NAME" 2>/dev/null || true
-  systemctl start "$SERVICE_NAME"
-  ok "Service restarted"
+  systemctl kill -s SIGKILL "$WEB_SERVICE" 2>/dev/null || true
+  systemctl start "$WEB_SERVICE"
+  ok "Web service restarted"
 fi
 
-# ── Step 3: Health check ─────────────────────────────────────
+# ── Step 3: Restart daemon service ──────────────────────────
 if [ "$NO_RESTART" = true ]; then
-  step 3 "Health check ${YELLOW}(skipped)${NC}"
+  step 3 "Restart daemon ${YELLOW}(skipped)${NC}"
 else
-  step 3 "Waiting for service..."
-  
-  HEALTHY=false
+  step 3 "Restarting $DAEMON_SERVICE..."
+
+  # Enable on first deploy
+  if ! systemctl is-enabled "$DAEMON_SERVICE" &>/dev/null; then
+    systemctl daemon-reload
+    systemctl enable "$DAEMON_SERVICE" 2>/dev/null || true
+  fi
+
+  systemctl restart "$DAEMON_SERVICE" 2>/dev/null || {
+    systemctl daemon-reload
+    systemctl start "$DAEMON_SERVICE"
+  }
+  ok "Daemon service restarted"
+fi
+
+# ── Step 4: Health checks ───────────────────────────────────
+if [ "$NO_RESTART" = true ]; then
+  step 4 "Health checks ${YELLOW}(skipped)${NC}"
+else
+  step 4 "Health checks..."
+
+  # 4a. Web service health (HTTP)
+  WEB_HEALTHY=false
   for i in $(seq 1 12); do
     sleep 5
     HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$URL" 2>/dev/null || echo "000")
     if [ "$HTTP_CODE" = "200" ]; then
-      HEALTHY=true
+      WEB_HEALTHY=true
       break
     fi
-    echo -e "      attempt $i/12 - HTTP $HTTP_CODE"
+    echo -e "      web: attempt $i/12 - HTTP $HTTP_CODE"
   done
 
-  if [ "$HEALTHY" = true ]; then
-    ok "$URL responding 200"
+  if [ "$WEB_HEALTHY" = true ]; then
+    ok "Web: $URL responding 200"
   else
-    fail "$URL not responding after 60s"
-    systemctl status "$SERVICE_NAME" --no-pager | tail -10
+    fail "Web: $URL not responding after 60s"
+    systemctl status "$WEB_SERVICE" --no-pager | tail -5
+    ERRORS=$((ERRORS + 1))
+  fi
+
+  # 4b. Daemon health (systemd active check + process alive)
+  sleep 2
+  DAEMON_STATUS=$(systemctl is-active "$DAEMON_SERVICE" 2>/dev/null || echo "inactive")
+  if [ "$DAEMON_STATUS" = "active" ]; then
+    DAEMON_PID=$(systemctl show -p MainPID --value "$DAEMON_SERVICE" 2>/dev/null || echo "0")
+    ok "Daemon: active (PID $DAEMON_PID)"
+  else
+    fail "Daemon: $DAEMON_STATUS"
+    systemctl status "$DAEMON_SERVICE" --no-pager | tail -10
     ERRORS=$((ERRORS + 1))
   fi
 fi
 
-# ── Step 4: Summary ──────────────────────────────────────────
-step 4 "Summary"
+# ── Step 5: Summary ────────────────────────────────────────
+step 5 "Summary"
 echo ""
 COMMIT=$(cd "$PROJECT_DIR" && git log -1 --format='%h %s' 2>/dev/null || echo "unknown")
 echo -e "    Commit:   ${BOLD}$COMMIT${NC}"
 echo -e "    Log:      $LOG_FILE"
+
+# Show service status
+WEB_ST=$(systemctl is-active "$WEB_SERVICE" 2>/dev/null || echo "unknown")
+DAEMON_ST=$(systemctl is-active "$DAEMON_SERVICE" 2>/dev/null || echo "unknown")
+echo -e "    Web:      ${WEB_ST}"
+echo -e "    Daemon:   ${DAEMON_ST}"
 
 if [ "$ERRORS" -gt 0 ]; then
   echo -e "    Result:   ${RED}${BOLD}$ERRORS error(s), $WARNINGS warning(s)${NC}"
