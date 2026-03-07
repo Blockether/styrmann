@@ -161,7 +161,7 @@ export function AgentsSidebar({
   const renderOpenClawLink = (minimized: boolean) => (
     <div className="mt-auto p-2 border-t border-mc-border">
       <Link
-        href="/openclaw"
+        href="/operations#openclaw"
         className={`flex items-center ${minimized ? 'justify-center py-2' : 'gap-3 px-3 py-2.5'} rounded text-sm hover:bg-mc-bg-tertiary transition-colors group`}
         title={minimized ? `${agentSummary.total} agents, ${agentSummary.working} working` : undefined}
       >
@@ -173,7 +173,7 @@ export function AgentsSidebar({
         </div>
         {!minimized && (
           <div className="flex-1 min-w-0 flex items-center justify-between">
-            <span className="text-mc-text-secondary group-hover:text-mc-text transition-colors">OpenClaw</span>
+            <span className="text-mc-text-secondary group-hover:text-mc-text transition-colors">Operations</span>
             <div className="flex items-center gap-2 text-xs">
               <span className="flex items-center gap-1">
                 <Bot className="w-3 h-3" />

@@ -12,7 +12,6 @@ import {
   ChevronDown,
   Check,
   Activity,
-  Cpu,
 } from 'lucide-react';
 import { useMissionControl } from '@/lib/store';
 import { format } from 'date-fns';
@@ -80,20 +79,12 @@ export function Header({ workspace, isPortrait = true, onMenuToggle, sidebarOpen
         All Workspaces
       </Link>
       <Link
-        href="/system"
+        href="/operations"
         onClick={() => setShowWorkspaceSwitcher(false)}
         className="flex items-center gap-2 px-3 py-2 text-sm text-mc-text-secondary hover:bg-mc-bg-tertiary transition-colors"
       >
         <Activity className="w-4 h-4" />
-        System
-      </Link>
-      <Link
-        href="/openclaw"
-        onClick={() => setShowWorkspaceSwitcher(false)}
-        className="flex items-center gap-2 px-3 py-2 text-sm text-mc-text-secondary hover:bg-mc-bg-tertiary transition-colors"
-      >
-        <Cpu className="w-4 h-4" />
-        OpenClaw
+        Operations
       </Link>
       <div className="border-t border-mc-border my-1" />
       {allWorkspaces.map((ws) => (

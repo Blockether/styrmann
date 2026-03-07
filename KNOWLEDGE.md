@@ -518,28 +518,29 @@ Real-time agent session logs from OpenClaw Gateway, polled and stored by the dae
 
 **Daemon module (`src/daemon/logs.ts`):** Polls every 30s. For each active OpenClaw session, fetches history, computes content_hash per message, stores new entries via `/api/logs/ingest`, broadcasts `agent_log_added` SSE event. Runs cleanup every ~50 minutes (100 ticks). Maintains an in-memory `knownHashes` Set to avoid redundant API calls.
 
-**UI:** `AgentLogsView` component embedded in the OpenClaw page. Features: agent dropdown, role filter tabs, session filter, text search, date range inputs, paginated list with "Load more", auto-refresh on new data. The component accepts an optional `workspaceId` prop — when omitted (OpenClaw page), shows all logs globally.
+**UI:** `AgentLogsView` component embedded in the unified Operations dashboard under the OpenClaw control-plane section. Features: agent dropdown, role filter tabs, session filter, text search, date range inputs, paginated list with "Load more", auto-refresh on new data. The component accepts an optional `workspaceId` prop — when omitted on the Operations page, shows all logs globally.
 
 **SSE Event:** `agent_log_added` — payload contains `{count, session_id, agent_id, agent_name, workspace_id}`.
 
 **Retention:** Logs older than 60 days are automatically purged by the daemon. Manual cleanup available via `DELETE /api/logs?days=N`.
 
-### System Dashboard
+### Operations Dashboard
 
-The homepage has three tabs: **Workspaces** (existing), **System** (new), and **OpenClaw** (new).
+The homepage has two top-level destinations: **Workspaces** and **Operations**. `/operations` is the canonical operational dashboard route. Legacy `/system` and `/openclaw` routes redirect to `/operations` for compatibility.
 
-**System tab** shows 4 cards:
+**Operations dashboard** is split into two sections. The **System Runtime** section shows 4 cards:
 - **Process Info** — Node.js version, platform, hostname, web process memory (RSS, heap), system memory usage bar, web/daemon service status dots.
 - **Daemon Status** — Uptime, PID, memory, module table (name, interval, last tick), counters (dispatched, heartbeats, stale recovered, events routed, logs stored/cleaned). Shows stale warning if last report is >2min old.
 - **Scheduled Jobs** — List of registered cron jobs from the daemon scheduler (id, name, cron, enabled, last run).
 - **Config Validation** — "Run Validation" button that POSTs to `/api/system/validate` and displays pass/fail/warn results for each check (env file, env vars, database, web service, daemon service, HTTP endpoint).
 
-**OpenClaw tab** shows 3 cards:
+The **OpenClaw Control Plane** section shows 4 cards:
 - **Gateway Status** — Connection status (connected/disconnected), masked gateway URL (tokens replaced with `***`), active session count.
 - **Agent Occupation** — Working/standby/offline counts with stacked bar visualization, redesigned agent list with status-based visual treatment (green left-border for working, neutral for standby, muted for offline), role badges, model info, task counts, and current task titles. Per-agent cards show description previews and current task context for working agents.
 - **Available Models** — Model list from gateway with default model badge, source indicator (remote/local/fallback).
+- **Security Audit and Live Logs** — On-demand audit / auto-fix actions plus the live global OpenClaw session transcript viewer.
 
-Both System and OpenClaw tabs auto-refresh every 30 seconds. Validation only runs on button click.
+Both sections auto-refresh every 30 seconds. Validation only runs on button click.
 
 ### Daemon Stats Reporter
 

@@ -69,7 +69,11 @@ interface AuditResult {
   ran_at?: string;
 }
 
-export function OpenClawPanel() {
+interface OpenClawPanelProps {
+  embedded?: boolean;
+}
+
+export function OpenClawPanel({ embedded = false }: OpenClawPanelProps) {
   const [status, setStatus] = useState<OpenClawStatus | null>(null);
   const [models, setModels] = useState<OpenClawModels | null>(null);
   const [agents, setAgents] = useState<Agent[]>([]);
@@ -141,11 +145,19 @@ export function OpenClawPanel() {
     offline: agentCounts.total > 0 ? (agentCounts.offline / agentCounts.total) * 100 : 0,
   };
 
+  const toolbarInnerClass = embedded
+    ? 'px-4 sm:px-6 py-3 flex items-center justify-end gap-2 flex-wrap'
+    : 'max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-end gap-2 flex-wrap';
+
+  const contentClass = embedded
+    ? 'px-4 sm:px-6 py-6'
+    : 'max-w-7xl mx-auto px-4 sm:px-6 py-6';
+
   return (
-    <div data-component="src/components/OpenClawPanel" className="min-h-screen">
+    <div data-component="src/components/OpenClawPanel" className={embedded ? undefined : 'min-h-screen'}>
       {/* Toolbar */}
       <div className="border-b border-mc-border bg-mc-bg-secondary">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-end gap-2 flex-wrap">
+        <div className={toolbarInnerClass}>
           <div className="flex items-center gap-2">
             <button
               onClick={async () => {
@@ -181,7 +193,7 @@ export function OpenClawPanel() {
       </div>
 
       {/* Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+      <div className={contentClass}>
         {restartResult && (
           <div className={`mb-4 p-4 rounded-lg text-sm ${restartResult.success ? 'bg-green-50 border border-green-200 text-green-700' : 'bg-red-50 border border-red-200 text-red-700'}`}>
             {restartResult.success ? 'Gateway restarted successfully. Reconnecting...' : `Restart failed: ${restartResult.error}`}
@@ -361,7 +373,7 @@ export function OpenClawPanel() {
                                     </div>
                                     <div className="flex items-center gap-1.5 flex-shrink-0">
                                       <a
-                                        href="/openclaw"
+                                        href="/operations#openclaw"
                                         onClick={(e) => e.stopPropagation()}
                                         className="flex items-center gap-1 px-2 py-1 rounded text-xs border border-mc-border hover:bg-mc-bg-tertiary transition-colors text-mc-text-secondary hover:text-mc-text"
                                         title="View logs"

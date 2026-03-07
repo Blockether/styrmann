@@ -30,7 +30,11 @@ interface DaemonStatsResponse {
   stale_seconds: number;
 }
 
-export function SystemPanel() {
+interface SystemPanelProps {
+  embedded?: boolean;
+}
+
+export function SystemPanel({ embedded = false }: SystemPanelProps) {
   const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null);
   const [daemonStats, setDaemonStats] = useState<DaemonStatsResponse | null>(null);
   const [validationResult, setValidationResult] = useState<ValidationResult | null>(null);
@@ -139,11 +143,19 @@ export function SystemPanel() {
     return `${mins}m`;
   };
 
+  const toolbarInnerClass = embedded
+    ? 'px-4 sm:px-6 py-3 flex items-center justify-end gap-2 flex-wrap'
+    : 'max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-end gap-2 flex-wrap';
+
+  const contentClass = embedded
+    ? 'px-4 sm:px-6 py-6'
+    : 'max-w-7xl mx-auto px-4 sm:px-6 py-6';
+
   return (
-    <div data-component="src/components/SystemPanel" className="min-h-screen">
+    <div data-component="src/components/SystemPanel" className={embedded ? undefined : 'min-h-screen'}>
       {/* Toolbar */}
       <div className="border-b border-mc-border bg-mc-bg-secondary">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-end gap-2 flex-wrap">
+        <div className={toolbarInnerClass}>
           <button
             onClick={fetchData}
             disabled={loading}
@@ -156,7 +168,7 @@ export function SystemPanel() {
       </div>
 
       {/* Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+      <div className={contentClass}>
         {error && (
           <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
             {error}
