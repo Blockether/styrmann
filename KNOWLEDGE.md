@@ -265,6 +265,7 @@ Fallback: Task polling every 60s, event polling every 30s.
 | POST | `/api/tags` | Create tag |
 | PATCH/DELETE | `/api/tags/{id}` | Update/delete tag |
 | GET/PATCH/DELETE | `/api/openclaw/sessions/{id}` | OpenClaw session management |
+| GET | `/api/openclaw/gateway-logs` | OpenClaw gateway runtime logs (RPC-first; journalctl fallback) |
 | POST | `/api/files/upload` | Upload file from remote agent |
 | GET | `/api/files/download` | Download file |
 | POST | `/api/webhooks/agent-completion` | HMAC-verified agent completion webhook |

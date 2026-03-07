@@ -19,12 +19,13 @@
 10. **Toolbars**: Context title on left, controls on right. Pattern: `p-3 border-b border-mc-border bg-mc-bg-secondary flex items-center justify-between gap-2 flex-wrap`.
 11. **Mobile**: `flex-wrap`, text labels hidden via `hidden sm:inline`, icons-only on small screens.
 12. **Component traceability**: Every React component's root DOM element MUST have `data-component="src/path/to/File"` (relative path, no extension). This allows pasting rendered HTML and immediately knowing which source file to edit.
+13. **OpenClaw integration policy**: For OpenClaw data/operations, use Gateway RPC first whenever capability exists. Use host-level fallbacks (CLI/journalctl/filesystem) only when RPC method is unavailable or fails, and label fallback source explicitly in UI/API output.
 
 ## Modal & Dialog Guidelines
 
-13. **Modal footers**: All save/action buttons in modal tabs MUST use the same footer pattern — a `border-t` top-bordered bar with right-aligned compact buttons. Never use full-width block buttons inside scrollable content.
-14. **Modal scroll**: Tab-based modals MUST reset scroll position to top when switching tabs.
-15. **Dropdowns**: When a dropdown selection has a description, show it as helper text below the dropdown (`text-xs text-mc-text-secondary`) — never cram long descriptions into `<option>` elements.
+14. **Modal footers**: All save/action buttons in modal tabs MUST use the same footer pattern — a `border-t` top-bordered bar with right-aligned compact buttons. Never use full-width block buttons inside scrollable content.
+15. **Modal scroll**: Tab-based modals MUST reset scroll position to top when switching tabs.
+16. **Dropdowns**: When a dropdown selection has a description, show it as helper text below the dropdown (`text-xs text-mc-text-secondary`) — never cram long descriptions into `<option>` elements.
 
 ## Verification Rules (Pre-Commit)
 

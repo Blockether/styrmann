@@ -25,6 +25,7 @@ interface GatewayLogsResponse {
 
 export function GatewayLogsView() {
   const [logs, setLogs] = useState<GatewayLogEntry[]>([]);
+  const [source, setSource] = useState('unknown');
   const [total, setTotal] = useState(0);
   const [unit, setUnit] = useState('openclaw-gateway');
   const [loading, setLoading] = useState(true);
@@ -66,6 +67,7 @@ export function GatewayLogsView() {
       if (res.ok) {
         const data: GatewayLogsResponse = await res.json();
         setLogs(Array.isArray(data.entries) ? data.entries : []);
+        setSource(data.source || 'unknown');
         setTotal(typeof data.total === 'number' ? data.total : 0);
         setUnit(data.unit || 'openclaw-gateway');
       } else {
@@ -123,7 +125,7 @@ export function GatewayLogsView() {
         <div>
           <p className="text-sm font-medium text-mc-text">OpenClaw Gateway Runtime Logs</p>
           <p className="text-xs text-mc-text-secondary">
-            Source unit: <span className="font-mono">{unit}</span> · Timezone: <span className="font-mono">{OPENCLAW_TIMEZONE}</span>
+            Source: <span className="font-mono">{source}</span> · Unit: <span className="font-mono">{unit}</span> · Timezone: <span className="font-mono">{OPENCLAW_TIMEZONE}</span>
           </p>
         </div>
         <div className="flex items-center gap-2">

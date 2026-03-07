@@ -162,35 +162,41 @@ export function AgentsSidebar({
     <div className="mt-auto p-2 border-t border-mc-border">
       <Link
         href="/operations#openclaw"
-        className={`group relative overflow-hidden rounded-lg border border-mc-border bg-mc-bg hover:bg-mc-bg-tertiary/70 transition-colors ${minimized ? 'flex justify-center py-2.5' : 'flex items-center gap-3 px-3 py-2.5'}`}
+        className={`group transition-colors ${
+          minimized
+            ? 'flex items-center justify-center rounded-md border border-mc-border bg-mc-bg-secondary hover:bg-mc-bg-tertiary p-1.5'
+            : 'flex items-center gap-2.5 rounded-md border border-mc-border bg-mc-bg hover:bg-mc-bg-tertiary px-2.5 py-2'
+        }`}
         title={minimized ? `${agentSummary.total} agents, ${agentSummary.working} working` : undefined}
       >
-        <div className={`relative flex-shrink-0 rounded-md border border-mc-border bg-mc-bg-secondary ${minimized ? 'p-1.5' : 'p-1.5'}`}>
+        <div className="relative flex-shrink-0 w-8 h-8 rounded-md border border-mc-border bg-mc-bg-secondary flex items-center justify-center">
           <Cpu className="w-4 h-4 text-mc-text-secondary group-hover:text-mc-accent transition-colors" />
           {agentSummary.working > 0 && (
-            <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-mc-accent ring-2 ring-mc-bg" />
+            <span
+              className={`absolute w-2 h-2 rounded-full bg-mc-accent ${
+                minimized ? 'top-0.5 right-0.5' : '-top-0.5 -right-0.5 ring-2 ring-mc-bg'
+              }`}
+            />
           )}
         </div>
         {!minimized && (
-          <div className="flex-1 min-w-0 flex items-center justify-between gap-3">
-            <div className="min-w-0">
+          <div className="flex-1 min-w-0 flex items-center justify-between gap-2">
+            <div className="min-w-0 pr-1">
               <p className="text-sm font-medium text-mc-text leading-none">Operations</p>
-              <p className="mt-1 text-[11px] text-mc-text-secondary truncate">
+              <p className="mt-1 text-[11px] text-mc-text-secondary leading-none">
                 {agentSummary.total} total agents
               </p>
             </div>
-            <div className="flex items-center gap-1.5 text-xs">
-              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-mc-border bg-mc-bg-secondary text-mc-text-secondary">
-                <Bot className="w-3 h-3" />
-                <span className="font-medium">{agentSummary.total}</span>
-              </span>
-              {agentSummary.working > 0 && (
-                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-mc-accent/30 bg-mc-accent/10 text-mc-accent font-medium">
-                  <span className="w-1.5 h-1.5 rounded-full bg-mc-accent" />
-                  {agentSummary.working} active
-                </span>
-              )}
-            </div>
+            <span
+              className={`inline-flex items-center gap-1 px-2 py-1 rounded-md border text-[11px] font-medium whitespace-nowrap ${
+                agentSummary.working > 0
+                  ? 'border-mc-accent/30 bg-mc-accent/10 text-mc-accent'
+                  : 'border-mc-border bg-mc-bg-secondary text-mc-text-secondary'
+              }`}
+            >
+              <Bot className="w-3 h-3" />
+              {agentSummary.working > 0 ? `${agentSummary.working} active` : 'idle'}
+            </span>
           </div>
         )}
       </Link>
