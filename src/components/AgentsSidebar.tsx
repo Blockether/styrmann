@@ -162,26 +162,32 @@ export function AgentsSidebar({
     <div className="mt-auto p-2 border-t border-mc-border">
       <Link
         href="/operations#openclaw"
-        className={`flex items-center ${minimized ? 'justify-center py-2' : 'gap-3 px-3 py-2.5'} rounded text-sm hover:bg-mc-bg-tertiary transition-colors group`}
+        className={`group relative overflow-hidden rounded-lg border border-mc-border bg-mc-bg hover:bg-mc-bg-tertiary/70 transition-colors ${minimized ? 'flex justify-center py-2.5' : 'flex items-center gap-3 px-3 py-2.5'}`}
         title={minimized ? `${agentSummary.total} agents, ${agentSummary.working} working` : undefined}
       >
-        <div className="relative flex-shrink-0">
+        <div className={`relative flex-shrink-0 rounded-md border border-mc-border bg-mc-bg-secondary ${minimized ? 'p-1.5' : 'p-1.5'}`}>
           <Cpu className="w-4 h-4 text-mc-text-secondary group-hover:text-mc-accent transition-colors" />
           {agentSummary.working > 0 && (
-            <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-green-500 ring-1 ring-green-500/30" />
+            <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-mc-accent ring-2 ring-mc-bg" />
           )}
         </div>
         {!minimized && (
-          <div className="flex-1 min-w-0 flex items-center justify-between">
-            <span className="text-mc-text-secondary group-hover:text-mc-text transition-colors">Operations</span>
-            <div className="flex items-center gap-2 text-xs">
-              <span className="flex items-center gap-1">
+          <div className="flex-1 min-w-0 flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-mc-text leading-none">Operations</p>
+              <p className="mt-1 text-[11px] text-mc-text-secondary truncate">
+                {agentSummary.total} total agents
+              </p>
+            </div>
+            <div className="flex items-center gap-1.5 text-xs">
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-mc-border bg-mc-bg-secondary text-mc-text-secondary">
                 <Bot className="w-3 h-3" />
-                <span className="text-mc-text-secondary">{agentSummary.total}</span>
+                <span className="font-medium">{agentSummary.total}</span>
               </span>
               {agentSummary.working > 0 && (
-                <span className="px-1.5 py-0.5 rounded bg-green-100 text-green-700 font-mono">
-                  {agentSummary.working} working
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-mc-accent/30 bg-mc-accent/10 text-mc-accent font-medium">
+                  <span className="w-1.5 h-1.5 rounded-full bg-mc-accent" />
+                  {agentSummary.working} active
                 </span>
               )}
             </div>
