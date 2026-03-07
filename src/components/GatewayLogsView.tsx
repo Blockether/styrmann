@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { AlertTriangle, Calendar, ChevronDown, ChevronUp, Filter, RefreshCw, Search, Server } from 'lucide-react';
+import { OPENCLAW_TIMEZONE, formatOpenClawDateTime } from '@/lib/openclaw-time';
 
 type LogLevelFilter = 'all' | 'error' | 'warn' | 'info' | 'debug';
 
@@ -113,9 +114,7 @@ export function GatewayLogsView() {
   };
 
   const absoluteTime = (value: string) => {
-    const parsed = new Date(value);
-    if (Number.isNaN(parsed.getTime())) return value;
-    return parsed.toLocaleString();
+    return formatOpenClawDateTime(value);
   };
 
   return (
@@ -123,7 +122,9 @@ export function GatewayLogsView() {
       <div className="p-3 border-b border-mc-border bg-mc-bg-secondary flex items-center justify-between gap-2 flex-wrap">
         <div>
           <p className="text-sm font-medium text-mc-text">OpenClaw Gateway Runtime Logs</p>
-          <p className="text-xs text-mc-text-secondary">Source unit: <span className="font-mono">{unit}</span></p>
+          <p className="text-xs text-mc-text-secondary">
+            Source unit: <span className="font-mono">{unit}</span> · Timezone: <span className="font-mono">{OPENCLAW_TIMEZONE}</span>
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <button
