@@ -116,41 +116,43 @@ export function OpenClawPanel() {
   return (
     <div data-component="src/components/OpenClawPanel" className="min-h-screen">
       {/* Toolbar */}
-      <div className="p-3 border-b border-mc-border bg-mc-bg-secondary flex items-center justify-between gap-2 flex-wrap">
-        <div className="flex items-center gap-2">
-          <Cpu className="w-4 h-4 text-mc-accent" />
-          <span className="font-mono font-medium">OpenClaw Gateway</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={async () => {
-              setRestarting(true);
-              setRestartResult(null);
-              try {
-                const res = await fetch('/api/system/restart-gateway', { method: 'POST' });
-                const data = await res.json();
-                setRestartResult(data);
-                if (data.success) setTimeout(() => { setRestartResult(null); fetchData(); }, 3000);
-              } catch {
-                setRestartResult({ success: false, error: 'Request failed' });
-              } finally {
-                setRestarting(false);
-              }
-            }}
-            disabled={restarting}
-            className="flex items-center gap-2 px-3 min-h-11 border border-red-300 text-red-600 rounded text-sm hover:bg-red-50 disabled:opacity-50 transition-colors"
-          >
-            <Power className={`w-4 h-4 ${restarting ? 'animate-spin' : ''}`} />
-            <span className="hidden sm:inline">{restarting ? 'Restarting...' : 'Restart Gateway'}</span>
-          </button>
-          <button
-            onClick={fetchData}
-            disabled={loading}
-            className="flex items-center gap-2 px-3 min-h-11 border border-mc-border rounded text-sm hover:bg-mc-bg-tertiary disabled:opacity-50 transition-colors"
-          >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-            <span className="hidden sm:inline">{loading ? 'Refreshing...' : 'Refresh'}</span>
-          </button>
+      <div className="border-b border-mc-border bg-mc-bg-secondary">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex items-center gap-2">
+            <Cpu className="w-4 h-4 text-mc-accent" />
+            <span className="font-mono font-medium">OpenClaw Gateway</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={async () => {
+                setRestarting(true);
+                setRestartResult(null);
+                try {
+                  const res = await fetch('/api/system/restart-gateway', { method: 'POST' });
+                  const data = await res.json();
+                  setRestartResult(data);
+                  if (data.success) setTimeout(() => { setRestartResult(null); fetchData(); }, 3000);
+                } catch {
+                  setRestartResult({ success: false, error: 'Request failed' });
+                } finally {
+                  setRestarting(false);
+                }
+              }}
+              disabled={restarting}
+              className="flex items-center gap-2 px-3 min-h-11 border border-red-300 text-red-600 rounded text-sm hover:bg-red-50 disabled:opacity-50 transition-colors"
+            >
+              <Power className={`w-4 h-4 ${restarting ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">{restarting ? 'Restarting...' : 'Restart Gateway'}</span>
+            </button>
+            <button
+              onClick={fetchData}
+              disabled={loading}
+              className="flex items-center gap-2 px-3 min-h-11 border border-mc-border rounded text-sm hover:bg-mc-bg-tertiary disabled:opacity-50 transition-colors"
+            >
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">{loading ? 'Refreshing...' : 'Refresh'}</span>
+            </button>
+          </div>
         </div>
       </div>
 
