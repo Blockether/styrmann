@@ -17,6 +17,10 @@ import {
   ScrollText,
   Package,
   Settings,
+  Shield,
+  ShieldCheck,
+  ShieldAlert,
+  Wrench,
 } from 'lucide-react';
 import { AgentModal } from './AgentModal';
 import { AgentLogsView } from './AgentLogsView';
@@ -45,6 +49,26 @@ interface OpenClawModels {
   error?: string;
 }
 
+interface AuditFinding {
+  checkId: string;
+  severity: 'critical' | 'warn' | 'info';
+  title: string;
+  detail: string;
+  remediation?: string;
+}
+
+interface AuditResult {
+  success: boolean;
+  mode?: string;
+  result?: {
+    summary: { critical: number; warn: number; info: number };
+    findings: AuditFinding[];
+  };
+  raw?: string;
+  error?: string;
+  ran_at?: string;
+}
+
 export function OpenClawPanel() {
   const [status, setStatus] = useState<OpenClawStatus | null>(null);
   const [models, setModels] = useState<OpenClawModels | null>(null);
@@ -58,6 +82,9 @@ export function OpenClawPanel() {
   const [expandedAgents, setExpandedAgents] = useState<Set<string>>(new Set());
   const [modelSaveStatus, setModelSaveStatus] = useState<'idle' | 'saved' | 'error'>('idle');
   const [editingAgent, setEditingAgent] = useState<Agent | null>(null);
+  const [auditResult, setAuditResult] = useState<AuditResult | null>(null);
+  const [auditing, setAuditing] = useState<'idle' | 'deep' | 'fix'>('idle');
+  const [expandedFindings, setExpandedFindings] = useState<Set<string>>(new Set());
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -477,6 +504,165 @@ export function OpenClawPanel() {
             </div>
 
           </div>
+          {/* Card: Security Audit */}
+          <div className="rounded-lg border border-mc-border bg-mc-bg overflow-hidden">
+            <div className="p-3 border-b border-mc-border bg-mc-bg-secondary flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Shield className="w-4 h-4 text-mc-text-secondary" />
+                <h3 className="text-sm font-medium">Security Audit</h3>
+                {auditResult?.result?.summary && (
+                  <div className="flex gap-2 text-xs">
+                    {auditResult.result.summary.critical > 0 && (
+                      <span className="px-1.5 py-0.5 rounded bg-red-100 text-red-700 font-medium">{auditResult.result.summary.critical} critical</span>
+                    )}
+                    {auditResult.result.summary.warn > 0 && (
+                      <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 font-medium">{auditResult.result.summary.warn} warn</span>
+                    )}
+                    {auditResult.result.summary.info > 0 && (
+                      <span className="px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-medium">{auditResult.result.summary.info} info</span>
+                    )}
+                  </div>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={async () => {
+                    setAuditing('deep');
+                    setAuditResult(null);
+                    setExpandedFindings(new Set());
+                    try {
+                      const res = await fetch('/api/openclaw/security-audit', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ deep: true }),
+                      });
+                      const data = await res.json();
+                      setAuditResult(data);
+                    } catch {
+                      setAuditResult({ success: false, error: 'Request failed' });
+                    } finally {
+                      setAuditing('idle');
+                    }
+                  }}
+                  disabled={auditing !== 'idle'}
+                  className="flex items-center gap-2 px-3 min-h-[36px] border border-mc-border rounded text-sm hover:bg-mc-bg-tertiary disabled:opacity-50 transition-colors"
+                >
+                  <ShieldCheck className={`w-4 h-4 ${auditing === 'deep' ? 'animate-spin' : ''}`} />
+                  <span className="hidden sm:inline">{auditing === 'deep' ? 'Scanning...' : 'Deep Audit'}</span>
+                </button>
+                <button
+                  onClick={async () => {
+                    setAuditing('fix');
+                    setAuditResult(null);
+                    setExpandedFindings(new Set());
+                    try {
+                      const res = await fetch('/api/openclaw/security-audit', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ fix: true }),
+                      });
+                      const data = await res.json();
+                      setAuditResult(data);
+                    } catch {
+                      setAuditResult({ success: false, error: 'Request failed' });
+                    } finally {
+                      setAuditing('idle');
+                    }
+                  }}
+                  disabled={auditing !== 'idle'}
+                  className="flex items-center gap-2 px-3 min-h-[36px] border border-amber-300 text-amber-700 rounded text-sm hover:bg-amber-50 disabled:opacity-50 transition-colors"
+                >
+                  <Wrench className={`w-4 h-4 ${auditing === 'fix' ? 'animate-spin' : ''}`} />
+                  <span className="hidden sm:inline">{auditing === 'fix' ? 'Fixing...' : 'Auto-Fix'}</span>
+                </button>
+              </div>
+            </div>
+            <div className="p-4">
+              {auditing !== 'idle' && !auditResult && (
+                <div className="flex items-center justify-center py-8 gap-2 text-mc-text-secondary">
+                  <RefreshCw className="w-5 h-5 animate-spin" />
+                  <span>{auditing === 'fix' ? 'Applying safe fixes...' : 'Running deep security audit...'}</span>
+                </div>
+              )}
+              {auditResult && !auditResult.success && (
+                <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">
+                  <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                  <span>{auditResult.error || 'Audit failed'}</span>
+                </div>
+              )}
+              {auditResult?.success && auditResult.result && (
+                <div className="space-y-3">
+                  {auditResult.result.findings.length === 0 ? (
+                    <div className="flex items-center gap-2 py-4 justify-center text-green-600">
+                      <ShieldCheck className="w-5 h-5" />
+                      <span className="font-medium">All clear — no findings</span>
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-mc-border">
+                      {auditResult.result.findings.map((finding) => {
+                        const isExpanded = expandedFindings.has(finding.checkId);
+                        const severityStyles: Record<string, string> = {
+                          critical: 'bg-red-100 text-red-800',
+                          warn: 'bg-amber-100 text-amber-800',
+                          info: 'bg-blue-100 text-blue-800',
+                        };
+                        const SeverityIcon = finding.severity === 'critical' ? ShieldAlert
+                          : finding.severity === 'warn' ? AlertCircle : Shield;
+
+                        return (
+                          <div key={finding.checkId}>
+                            <button
+                              onClick={() => {
+                                setExpandedFindings(prev => {
+                                  const next = new Set(prev);
+                                  if (next.has(finding.checkId)) next.delete(finding.checkId);
+                                  else next.add(finding.checkId);
+                                  return next;
+                                });
+                              }}
+                              className="w-full px-3 py-3 flex items-center gap-3 text-left hover:bg-mc-bg-tertiary/30 transition-colors"
+                            >
+                              <SeverityIcon className="w-4 h-4 flex-shrink-0" />
+                              <span className="flex-1 text-sm font-medium">{finding.title}</span>
+                              <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${severityStyles[finding.severity] || ''}`}>
+                                {finding.severity}
+                              </span>
+                              {isExpanded ? <ChevronDown className="w-4 h-4 text-mc-text-secondary flex-shrink-0" /> : <ChevronRight className="w-4 h-4 text-mc-text-secondary flex-shrink-0" />}
+                            </button>
+                            {isExpanded && (
+                              <div className="px-3 pb-3 space-y-2">
+                                <pre className="text-xs bg-mc-bg-tertiary p-3 rounded overflow-x-auto whitespace-pre-wrap font-mono text-mc-text-secondary">{finding.detail}</pre>
+                                {finding.remediation && (
+                                  <div className="text-xs p-3 bg-green-50 border border-green-200 rounded text-green-800">
+                                    <span className="font-medium">Remediation: </span>{finding.remediation}
+                                  </div>
+                                )}
+                                <code className="text-[10px] text-mc-text-secondary">{finding.checkId}</code>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {auditResult.ran_at && (
+                    <p className="text-xs text-mc-text-secondary text-right">
+                      {auditResult.mode === 'fix' ? 'Fixed' : 'Scanned'} at {new Date(auditResult.ran_at).toLocaleTimeString()}
+                    </p>
+                  )}
+                </div>
+              )}
+              {auditResult?.success && auditResult.raw && (
+                <pre className="text-xs bg-mc-bg-tertiary p-3 rounded overflow-x-auto whitespace-pre-wrap font-mono">{auditResult.raw}</pre>
+              )}
+              {!auditResult && auditing === 'idle' && (
+                <div className="flex items-center justify-center py-6 text-mc-text-secondary text-sm">
+                  Run a deep audit or auto-fix to check your OpenClaw security posture
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* Card: Live Agent Logs */}
           <div className="rounded-lg border border-mc-border bg-mc-bg overflow-hidden">
             <div className="h-[600px] flex flex-col">
