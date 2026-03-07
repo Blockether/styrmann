@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { queryAll, queryOne, run } from '@/lib/db';
 import { readAgentMdFromDisk, readAgentDescriptionFromDisk } from '@/lib/openclaw/config';
 import { ensureSynced } from '@/lib/openclaw/sync';
-import type { Agent, CreateAgentRequest } from '@/lib/types';
+import type { Agent, AgentStatus, CreateAgentRequest } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
 // GET /api/agents - List all agents
@@ -33,25 +33,42 @@ agent.agents_md = mdFiles.agents_md ?? undefined;
 const systemMd = readAgentDescriptionFromDisk(agent.agent_dir);
 if (systemMd) agent.description = systemMd;
       }
-      // Count active tasks for this agent
-      const taskCount = queryOne<{ count: number
-    }>(
-        `SELECT COUNT(*) as count FROM tasks 
-         WHERE assigned_agent_id = ? 
-         AND status IN ('in_progress', 'assigned', 'testing', 'review', 'verification')`,
+      // Get active tasks for this agent (with workspace name + deliverable count)
+      const activeTasks = queryAll<{
+        id: string;
+        title: string;
+        status: string;
+        workspace_id: string;
+        workspace_name: string;
+        workspace_slug: string;
+        deliverable_count: number;
+      }>(
+        `SELECT t.id, t.title, t.status, t.workspace_id,
+                w.name as workspace_name, w.slug as workspace_slug,
+                (SELECT COUNT(*) FROM task_deliverables td WHERE td.task_id = t.id) as deliverable_count
+         FROM tasks t
+         LEFT JOIN workspaces w ON w.id = t.workspace_id
+         WHERE t.assigned_agent_id = ?
+         AND t.status IN ('in_progress', 'assigned', 'testing', 'review', 'verification')
+         ORDER BY CASE WHEN t.status = 'in_progress' THEN 0 ELSE 1 END, t.updated_at DESC`,
         [agent.id]
       );
-      agent.active_task_count = taskCount?.count ?? 0;
-      
-      // Get current task title if agent is working
-      const currentTask = queryOne<{ title: string }>(
-        `SELECT title FROM tasks 
-         WHERE assigned_agent_id = ? AND status = 'in_progress' 
-         LIMIT 1`,
-        [agent.id]
-      );
-      if (currentTask) {
-        agent.current_task_title = currentTask.title;
+      agent.active_task_count = activeTasks.length;
+      agent.active_tasks = activeTasks;
+      const hasInProgress = activeTasks.some(t => t.status === 'in_progress');
+      if (hasInProgress) {
+        agent.current_task_title = activeTasks.find(t => t.status === 'in_progress')!.title;
+        // Reconcile: if agent has in_progress tasks, status must be 'working'
+        if (agent.status !== 'working') {
+          agent.status = 'working' as AgentStatus;
+          run('UPDATE agents SET status = ?, updated_at = ? WHERE id = ?',
+            ['working', new Date().toISOString(), agent.id]);
+        }
+      } else if (activeTasks.length > 0 && agent.status === 'standby') {
+        // Has assigned/testing/review tasks but not in_progress — still working
+        agent.status = 'working' as AgentStatus;
+        run('UPDATE agents SET status = ?, updated_at = ? WHERE id = ?',
+          ['working', new Date().toISOString(), agent.id]);
       }
     }
     return NextResponse.json(agents);

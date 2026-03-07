@@ -7,6 +7,7 @@ interface LogEntry {
   id: string;
   agent_id: string | null;
   openclaw_session_id: string;
+  task_id?: string | null;
   role: string;
   content: string;
   content_hash: string;
@@ -32,9 +33,16 @@ export async function POST(request: NextRequest) {
 
     const validRoles = ['user', 'assistant', 'system'];
 
+    // Prepare task_id lookup from openclaw_sessions
+    const lookupTaskId = db.prepare(`
+      SELECT task_id FROM openclaw_sessions
+      WHERE openclaw_session_id = ? AND task_id IS NOT NULL
+      LIMIT 1
+    `);
+
     const insert = db.prepare(`
-      INSERT OR IGNORE INTO agent_logs (id, agent_id, openclaw_session_id, role, content, content_hash, workspace_id, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT OR IGNORE INTO agent_logs (id, agent_id, openclaw_session_id, task_id, role, content, content_hash, workspace_id, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     let stored = 0;
@@ -44,10 +52,18 @@ export async function POST(request: NextRequest) {
         if (!entry.content || !entry.role || !validRoles.includes(entry.role)) continue;
         if (!entry.content_hash || !entry.openclaw_session_id) continue;
 
+        // Resolve task_id: use provided value, or look up from openclaw_sessions
+        let taskId = entry.task_id || null;
+        if (!taskId) {
+          const session = lookupTaskId.get(entry.openclaw_session_id) as { task_id: string } | undefined;
+          if (session) taskId = session.task_id;
+        }
+
         const result = insert.run(
           entry.id,
           entry.agent_id || null,
           entry.openclaw_session_id,
+          taskId,
           entry.role,
           entry.content,
           entry.content_hash,

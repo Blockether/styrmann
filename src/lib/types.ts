@@ -52,8 +52,20 @@ export interface Agent {
   active_task_count?: number;
   /** Title of the current in-progress task, if any */
   current_task_title?: string;
+  /** Active tasks assigned to this agent */
+  active_tasks?: AgentTask[];
   created_at: string;
   updated_at: string;
+}
+
+export interface AgentTask {
+  id: string;
+  title: string;
+  status: string;
+  workspace_id: string;
+  workspace_name: string;
+  workspace_slug: string;
+  deliverable_count: number;
 }
 
 export interface Milestone {

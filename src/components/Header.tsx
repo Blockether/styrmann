@@ -11,12 +11,14 @@ import {
   X,
   ChevronDown,
   Check,
+  Activity,
+  Cpu,
 } from 'lucide-react';
 import { useMissionControl } from '@/lib/store';
 import { format } from 'date-fns';
 import type { Workspace } from '@/lib/types';
 
-export type DashboardView = 'sprint' | 'backlog' | 'pareto' | 'activity' | 'issues' | 'logs';
+export type DashboardView = 'sprint' | 'backlog' | 'pareto' | 'activity' | 'issues';
 
 interface HeaderProps {
   workspace?: Workspace;
@@ -76,6 +78,22 @@ export function Header({ workspace, isPortrait = true, onMenuToggle, sidebarOpen
       >
         <LayoutGrid className="w-4 h-4" />
         All Workspaces
+      </Link>
+      <Link
+        href="/system"
+        onClick={() => setShowWorkspaceSwitcher(false)}
+        className="flex items-center gap-2 px-3 py-2 text-sm text-mc-text-secondary hover:bg-mc-bg-tertiary transition-colors"
+      >
+        <Activity className="w-4 h-4" />
+        System
+      </Link>
+      <Link
+        href="/openclaw"
+        onClick={() => setShowWorkspaceSwitcher(false)}
+        className="flex items-center gap-2 px-3 py-2 text-sm text-mc-text-secondary hover:bg-mc-bg-tertiary transition-colors"
+      >
+        <Cpu className="w-4 h-4" />
+        OpenClaw
       </Link>
       <div className="border-t border-mc-border my-1" />
       {allWorkspaces.map((ws) => (

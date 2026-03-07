@@ -392,6 +392,7 @@ CREATE TABLE IF NOT EXISTS agent_logs (
   id TEXT PRIMARY KEY,
   agent_id TEXT REFERENCES agents(id) ON DELETE CASCADE,
   openclaw_session_id TEXT NOT NULL,
+  task_id TEXT REFERENCES tasks(id) ON DELETE SET NULL,
   role TEXT NOT NULL CHECK (role IN ('user', 'assistant', 'system')),
   content TEXT NOT NULL,
   content_hash TEXT NOT NULL,
@@ -403,5 +404,6 @@ CREATE INDEX IF NOT EXISTS idx_agent_logs_session ON agent_logs(openclaw_session
 CREATE INDEX IF NOT EXISTS idx_agent_logs_created ON agent_logs(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_agent_logs_role ON agent_logs(role);
 CREATE INDEX IF NOT EXISTS idx_agent_logs_workspace ON agent_logs(workspace_id);
+CREATE INDEX IF NOT EXISTS idx_agent_logs_task ON agent_logs(task_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_agent_logs_content_hash ON agent_logs(content_hash);
 `;

@@ -136,10 +136,10 @@ export function AgentLogsView({ workspaceId }: AgentLogsViewProps) {
 
   // Fetch logs
   const fetchLogs = useCallback(
-    async (offset = 0, append = false) => {
+    async (offset = 0, append = false, silent = false) => {
       try {
-        if (!append) setLoading(true);
-        else setLoadingMore(true);
+        if (!append && !silent) setLoading(true);
+        else if (append) setLoadingMore(true);
         setError(null);
 
         const params = new URLSearchParams({
@@ -167,14 +167,16 @@ export function AgentLogsView({ workspaceId }: AgentLogsViewProps) {
           }
           setTotal(data.total);
           setHasMore(data.hasMore);
-        } else {
+        } else if (!silent) {
           const errData = await res.json().catch(() => ({ error: 'Failed to fetch logs' }));
           setError(errData.error || 'Failed to fetch logs');
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to fetch logs');
+        if (!silent) {
+          setError(err instanceof Error ? err.message : 'Failed to fetch logs');
+        }
       } finally {
-        setLoading(false);
+        if (!silent) setLoading(false);
         setLoadingMore(false);
       }
     },
@@ -186,12 +188,11 @@ export function AgentLogsView({ workspaceId }: AgentLogsViewProps) {
     fetchLogs(0, false);
   }, [fetchLogs]);
 
-  // Polling for new logs (simulating SSE `agent_log_added`)
+  // Silent polling for new logs
   useEffect(() => {
     const pollInterval = setInterval(() => {
-      // Only poll if not currently loading and no active filters (or minimal filtering)
       if (!loading && !loadingMore) {
-        fetchLogs(0, false);
+        fetchLogs(0, false, true);
       }
     }, 10000);
 

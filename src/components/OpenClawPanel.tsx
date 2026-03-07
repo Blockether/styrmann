@@ -12,8 +12,14 @@ import {
   Power,
   Save,
   CheckCircle2,
+  ChevronDown,
+  ChevronRight,
+  ScrollText,
+  Package,
+  Settings,
 } from 'lucide-react';
-import type { Agent, AgentStatus } from '@/lib/types';
+import { AgentModal } from './AgentModal';
+import type { Agent, AgentTask } from '@/lib/types';
 
 interface OpenClawSession {
   id: string;
@@ -48,7 +54,9 @@ export function OpenClawPanel() {
   const [restartResult, setRestartResult] = useState<{ success: boolean; error?: string } | null>(null);
   const [selectedModel, setSelectedModel] = useState<string>('');
   const [savingModel, setSavingModel] = useState(false);
+  const [expandedAgents, setExpandedAgents] = useState<Set<string>>(new Set());
   const [modelSaveStatus, setModelSaveStatus] = useState<'idle' | 'saved' | 'error'>('idle');
+  const [editingAgent, setEditingAgent] = useState<Agent | null>(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -219,116 +227,142 @@ export function OpenClawPanel() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Card 2: Agent Occupation */}
             <div className="rounded-lg border border-mc-border bg-mc-bg overflow-hidden">
-              <div className="p-3 border-b border-mc-border bg-mc-bg-secondary flex items-center gap-2">
-                <Bot className="w-4 h-4 text-mc-text-secondary" />
-                <h3 className="text-sm font-medium">Agent Occupation</h3>
+              <div className="p-3 border-b border-mc-border bg-mc-bg-secondary flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <Bot className="w-4 h-4 text-mc-text-secondary" />
+                  <h3 className="text-sm font-medium">Agent Occupation</h3>
+                </div>
+                <div className="flex gap-3 text-xs text-mc-text-secondary">
+                  <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-green-500" />{agentCounts.working} working</span>
+                  <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-blue-500" />{agentCounts.standby} standby</span>
+                  {agentCounts.offline > 0 && <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-gray-400" />{agentCounts.offline} offline</span>}
+                </div>
               </div>
-              <div className="p-4">
+              <div>
                 {agents.length > 0 ? (
-                  <div className="space-y-4">
-                    {/* Summary counts */}
-                    <div className="flex gap-4 text-sm">
-                      <div className="flex items-center gap-2">
-                        <span className="inline-block w-4 h-4 rounded-full bg-green-500" />
-                        <span>{agentCounts.working} Working</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="inline-block w-4 h-4 rounded-full bg-blue-500" />
-                        <span>{agentCounts.standby} Standby</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="inline-block w-4 h-4 rounded-full bg-gray-400" />
-                        <span>{agentCounts.offline} Offline</span>
-                      </div>
-                    </div>
+                  <div className="divide-y divide-mc-border">
+                    {agents.map((agent) => {
+                      const isWorking = agent.status === 'working';
+                      const isOffline = agent.status === 'offline';
+                      const taskCount = agent.active_task_count ?? 0;
+                      const isExpanded = expandedAgents.has(agent.id);
+                      const tasks = agent.active_tasks ?? [];
 
-                    {/* Occupation Bar */}
-                    <div className="w-full h-3 rounded-full overflow-hidden bg-mc-bg-tertiary flex">
-                      {occupationBarWidths.working > 0 && (
-                        <div className="h-full bg-green-500" style={{ width: `${occupationBarWidths.working}%` }} />
-                      )}
-                      {occupationBarWidths.standby > 0 && (
-                        <div className="h-full bg-blue-500" style={{ width: `${occupationBarWidths.standby}%` }} />
-                      )}
-                      {occupationBarWidths.offline > 0 && (
-                        <div className="h-full bg-gray-400" style={{ width: `${occupationBarWidths.offline}%` }} />
-                      )}
-                    </div>
-
-                    {/* Agent List */}
-                    <div className="border-t border-mc-border pt-4 space-y-1 max-h-80 overflow-y-auto">
-                      {agents.map((agent) => {
-                        const isWorking = agent.status === 'working';
-                        const isOffline = agent.status === 'offline';
-                        const descriptionPreview = agent.description ? agent.description.slice(0, 60) : '';
-
-                        return (
-                          <div
-                            key={agent.id}
-                            className={`
-                              relative p-3 rounded-md transition-colors
-                              ${isWorking ? 'bg-green-50/50 border-l-2 border-l-green-500' : ''}
-                              ${agent.status === 'standby' ? 'bg-mc-bg-secondary' : ''}
-                              ${isOffline ? 'bg-mc-bg-tertiary/50 opacity-60' : ''}
-                            `}
+                      return (
+                        <div key={agent.id} className={isOffline ? 'opacity-50' : ''}>
+                          {/* Agent row — always visible */}
+                          <button
+                            onClick={() => {
+                              setExpandedAgents(prev => {
+                                const next = new Set(prev);
+                                if (next.has(agent.id)) next.delete(agent.id);
+                                else next.add(agent.id);
+                                return next;
+                              });
+                            }}
+                            className="w-full px-4 py-3 flex items-center gap-3 text-left hover:bg-mc-bg-tertiary/30 transition-colors"
                           >
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="flex items-start gap-2.5 min-w-0 flex-1">
-                                <div className="pt-1 flex-shrink-0">
-                                  {isWorking && (
-                                    <span className="inline-block w-2.5 h-2.5 rounded-full bg-green-500 ring-2 ring-green-500/30 ring-offset-1" title="Working" />
-                                  )}
-                                  {agent.status === 'standby' && (
-                                    <span className="inline-block w-2.5 h-2.5 rounded-full bg-blue-500" title="Standby" />
-                                  )}
-                                  {isOffline && (
-                                    <span className="inline-block w-2.5 h-2.5 rounded-full bg-gray-400" title="Offline" />
-                                  )}
-                                </div>
-                                <div className="min-w-0 flex-1">
-                                  <div className="flex items-center gap-2 flex-wrap">
-                                    <span className="font-medium text-sm text-mc-text truncate">{agent.name}</span>
-                                    <span className={`
-                                      px-1.5 py-0.5 rounded text-[10px] font-mono uppercase tracking-wide
-                                      ${isWorking ? 'bg-green-100 text-green-700' : ''}
-                                      ${agent.status === 'standby' ? 'bg-blue-100 text-blue-700' : ''}
-                                      ${isOffline ? 'bg-gray-200 text-gray-600' : ''}
-                                    `}>
-                                      {agent.role}
-                                    </span>
+                            {/* Status dot */}
+                            <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${
+                              isWorking ? 'bg-green-500 ring-2 ring-green-500/30 ring-offset-1' :
+                              agent.status === 'standby' ? 'bg-blue-500' : 'bg-gray-400'
+                            }`} />
+
+                            {/* Name */}
+                            <span className="font-medium text-sm truncate flex-1 min-w-0">{agent.name}</span>
+
+                            {/* Task count badge */}
+                            {taskCount > 0 && (
+                              <span className={`text-xs font-mono px-2 py-0.5 rounded-full ${
+                                isWorking ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
+                              }`}>
+                                {taskCount} task{taskCount !== 1 ? 's' : ''}
+                              </span>
+                            )}
+                            {taskCount === 0 && (
+                              <span className="text-xs text-mc-text-secondary">No tasks</span>
+                            )}
+
+                            {/* Edit button */}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditingAgent(agent);
+                              }}
+                              className="p-1 rounded hover:bg-mc-bg-tertiary text-mc-text-secondary hover:text-mc-text transition-colors flex-shrink-0"
+                              title={`Edit ${agent.name}`}
+                            >
+                              <Settings className="w-3.5 h-3.5" />
+                            </button>
+
+                            {/* Expand chevron */}
+                            {taskCount > 0 ? (
+                              isExpanded ? <ChevronDown className="w-4 h-4 text-mc-text-secondary flex-shrink-0" /> : <ChevronRight className="w-4 h-4 text-mc-text-secondary flex-shrink-0" />
+                            ) : (
+                              <span className="w-4" />
+                            )}
+                          </button>
+
+                          {/* Expanded task list */}
+                          {isExpanded && tasks.length > 0 && (
+                            <div className="border-t border-mc-border/50 bg-mc-bg-tertiary/20">
+                              {tasks.map((task) => {
+                                const statusColors: Record<string, string> = {
+                                  in_progress: 'bg-mc-accent text-white',
+                                  assigned: 'bg-mc-accent-yellow text-white',
+                                  testing: 'bg-mc-accent-cyan text-white',
+                                  review: 'bg-mc-accent-purple text-white',
+                                  verification: 'bg-orange-500 text-white',
+                                };
+                                const statusLabels: Record<string, string> = {
+                                  in_progress: 'In Progress',
+                                  assigned: 'Assigned',
+                                  testing: 'Testing',
+                                  review: 'Review',
+                                  verification: 'Verification',
+                                };
+
+                                return (
+                                  <div key={task.id} className="px-4 py-2.5 pl-10 flex items-center gap-3 border-b border-mc-border/30 last:border-b-0">
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-center gap-2 mb-0.5">
+                                        <span className="text-sm font-medium truncate">{task.title}</span>
+                                        <span className={`text-[10px] px-1.5 py-0.5 rounded flex-shrink-0 ${statusColors[task.status] || 'bg-gray-200 text-gray-600'}`}>
+                                          {statusLabels[task.status] || task.status}
+                                        </span>
+                                      </div>
+                                      <span className="text-xs text-mc-text-secondary">{task.workspace_name || task.workspace_slug}</span>
+                                    </div>
+                                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                                      <a
+                                        href={`/workspace/${task.workspace_slug}?view=logs&agent=${agent.id}`}
+                                        onClick={(e) => e.stopPropagation()}
+                                        className="flex items-center gap-1 px-2 py-1 rounded text-xs border border-mc-border hover:bg-mc-bg-tertiary transition-colors text-mc-text-secondary hover:text-mc-text"
+                                        title="View logs"
+                                      >
+                                        <ScrollText className="w-3.5 h-3.5" />
+                                        <span className="hidden sm:inline">Logs</span>
+                                      </a>
+                                      {task.deliverable_count > 0 && (
+                                        <a
+                                          href={`/workspace/${task.workspace_slug}?task=${task.id}&tab=deliverables`}
+                                          onClick={(e) => e.stopPropagation()}
+                                          className="flex items-center gap-1 px-2 py-1 rounded text-xs border border-mc-border hover:bg-mc-bg-tertiary transition-colors text-mc-text-secondary hover:text-mc-text"
+                                          title="View deliverables"
+                                        >
+                                          <Package className="w-3.5 h-3.5" />
+                                          <span className="hidden sm:inline">{task.deliverable_count}</span>
+                                        </a>
+                                      )}
+                                    </div>
                                   </div>
-                                  {descriptionPreview && (
-                                    <p className="text-xs text-mc-text-secondary mt-0.5 truncate">
-                                      {descriptionPreview}{agent.description && agent.description.length > 60 ? '...' : ''}
-                                    </p>
-                                  )}
-                                  {isWorking && agent.current_task_title && (
-                                    <p className="text-xs text-green-600 mt-1 italic truncate">
-                                      {agent.current_task_title}
-                                    </p>
-                                  )}
-                                </div>
-                              </div>
-                              <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                                {agent.model && (
-                                  <span className="text-[10px] font-mono px-1.5 py-0.5 bg-mc-bg-tertiary rounded text-mc-text-secondary truncate max-w-[120px]">
-                                    {agent.model}
-                                  </span>
-                                )}
-                                {agent.active_task_count !== undefined && agent.active_task_count > 0 && (
-                                  <span className={`
-                                    text-[10px] font-mono px-1.5 py-0.5 rounded
-                                    ${isWorking ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}
-                                  `}>
-                                    {agent.active_task_count} task{agent.active_task_count !== 1 ? 's' : ''}
-                                  </span>
-                                )}
-                              </div>
+                                );
+                              })}
                             </div>
-                          </div>
-                        );
-                      })}
-                    </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 ) : (
                   <div className="flex items-center justify-center py-8 text-mc-text-secondary">
@@ -445,6 +479,13 @@ export function OpenClawPanel() {
           </div>
         </div>
       </div>
+
+      {editingAgent && (
+        <AgentModal
+          agent={editingAgent}
+          onClose={() => { setEditingAgent(null); fetchData(); }}
+        />
+      )}
     </div>
   );
 }

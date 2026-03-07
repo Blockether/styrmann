@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { X, Save, Trash2 } from 'lucide-react';
 import { useMissionControl } from '@/lib/store';
 import type { Agent, AgentStatus } from '@/lib/types';
@@ -15,6 +15,13 @@ interface AgentModalProps {
 export function AgentModal({ agent, onClose, workspaceId, onAgentCreated }: AgentModalProps) {
   const { addAgent, updateAgent, agents } = useMissionControl();
   const [activeTab, setActiveTab] = useState<'info' | 'soul' | 'user' | 'agents'>('info');
+  const contentRef = useRef<HTMLFormElement>(null);
+
+  useEffect(() => {
+    if (contentRef.current) {
+      contentRef.current.scrollTop = 0;
+    }
+  }, [activeTab]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [availableModels, setAvailableModels] = useState<string[]>([]);
   const [defaultModel, setDefaultModel] = useState<string>('');
@@ -118,10 +125,10 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated }: Agen
   ] as const;
 
   return (
-    <div data-component="src/components/AgentModal" className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-3 sm:p-4">
-      <div className="bg-mc-bg-secondary border border-mc-border rounded-t-xl sm:rounded-lg w-full max-w-2xl max-h-[92vh] sm:max-h-[90vh] flex flex-col pb-[env(safe-area-inset-bottom)] sm:pb-0">
+    <div data-component="src/components/AgentModal" className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-0 sm:p-4">
+      <div className="bg-mc-bg-secondary border border-mc-border rounded-none md:rounded-lg w-full md:w-4/5 xl:w-3/5 h-[95vh] flex flex-col overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-mc-border">
+        <div className="flex items-center justify-between p-4 border-b border-mc-border flex-shrink-0">
           <h2 className="text-lg font-semibold">
             {agent ? `Edit ${agent.name}` : 'Create New Agent'}
           </h2>
@@ -134,7 +141,7 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated }: Agen
         </div>
 
         {/* Tabs */}
-        <div className="flex border-b border-mc-border overflow-x-auto">
+        <div className="flex border-b border-mc-border overflow-x-auto flex-shrink-0">
           {tabs.map((tab) => (
             <button
               key={tab.id}
@@ -151,7 +158,7 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated }: Agen
         </div>
 
         {/* Content */}
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4">
+        <form onSubmit={handleSubmit} ref={contentRef} className="flex-1 overflow-y-auto p-4">
           {activeTab === 'info' && (
             <div className="space-y-4">
               {/* Name */}
@@ -286,7 +293,7 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated }: Agen
         </form>
 
         {/* Footer */}
-        <div className="flex items-center justify-between p-4 border-t border-mc-border">
+        <div className="flex items-center justify-between p-4 border-t border-mc-border flex-shrink-0">
           <div>
             {agent && (
               <button

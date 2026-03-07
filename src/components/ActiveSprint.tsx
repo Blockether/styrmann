@@ -946,7 +946,7 @@ function TaskRow({ task, isPortrait, onClick, onMoveStatus, mobileMode }: TaskRo
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
-            <h4 className={`font-medium leading-snug truncate ${isDone ? 'text-mc-text-secondary line-through' : ''} ${isPortrait ? 'text-sm' : 'text-sm'}`}>
+            <h4 className={`flex-1 min-w-0 font-medium leading-snug truncate ${isDone ? 'text-mc-text-secondary line-through' : ''} text-sm`}>
               {task.title}
             </h4>
             <span className={`text-xs px-1.5 py-0.5 rounded flex-shrink-0 ${statusConfig.color} text-white`}>
