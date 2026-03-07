@@ -45,7 +45,7 @@ echo "================================================"
 # -- Step 1: ESLint --------------------------------------------------------
 step 1 "Running ESLint..."
 
-LINT_OUTPUT=$(cd "$PROJECT_DIR" && npx next lint $FIX_FLAG 2>&1) || {
+LINT_OUTPUT=$(cd "$PROJECT_DIR" && npx eslint . $FIX_FLAG 2>&1) || {
   LINT_EXIT=$?
   if [ "$LINT_EXIT" -ne 0 ]; then
     fail "ESLint found errors"

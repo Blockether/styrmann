@@ -1,12 +1,12 @@
 # KNOWLEDGE.md -- Mission Control
 
-Last updated: 2026-03-06
+Last updated: 2026-03-07
 
 ---
 
 ## Architecture
 
-Next.js 14 App Router dashboard connected to OpenClaw Gateway via WebSocket.
+Next.js 16 App Router dashboard connected to OpenClaw Gateway via WebSocket.
 SQLite database (better-sqlite3). Real-time updates via SSE.
 
 ```
@@ -15,7 +15,7 @@ Browser <-- SSE -- Mission Control (Next.js, port 4000) -- WebSocket --> OpenCla
                       SQLite DB                                         AI Providers
 ```
 
-**Tech stack**: Next.js 14, TypeScript 5, SQLite (better-sqlite3), Zustand, Tailwind CSS, Zod, Lucide React, SSE.
+**Tech stack**: Next.js 16, React 19, TypeScript 5.9, SQLite (better-sqlite3), Zustand, Tailwind CSS 4, Zod, Lucide React, SSE. ESLint 9 (flat config).
 
 **Service**: systemd unit `mission-control`, Rocky Linux, port 4000, URL https://control.blockether.com.
 
@@ -357,7 +357,7 @@ When `MC_API_TOKEN` is set in `.env.local`:
 - External API calls require `Authorization: Bearer <token>` header.
 - Same-origin browser requests bypass auth.
 - SSE streams accept token as query parameter.
-- Implemented in `src/middleware.ts`.
+- Implemented in `src/proxy.ts` (Next.js 16 proxy, formerly middleware).
 
 Webhook verification: `WEBHOOK_SECRET` env var, HMAC signature in `x-webhook-signature` header.
 

@@ -64,7 +64,7 @@ export function AgentsSidebar({
   }, []);
 
   useEffect(() => {
-    loadAgentSummary();
+    loadAgentSummary(); // eslint-disable-line react-hooks/set-state-in-effect -- standard data fetch on mount
     const interval = setInterval(loadAgentSummary, 30000);
     return () => clearInterval(interval);
   }, [loadAgentSummary]);

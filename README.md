@@ -27,12 +27,12 @@ Create tasks. Plan with AI. Dispatch to agents. Watch them work.
 ## Architecture
 
 ```
-Browser <-- SSE -- Mission Control (Next.js 14, port 4000) -- WebSocket --> OpenClaw Gateway (port 18789)
+Browser <-- SSE -- Mission Control (Next.js 16, port 4000) -- WebSocket --> OpenClaw Gateway (port 18789)
                           |                                                        |
                       SQLite DB                                             AI Providers
 ```
 
-Next.js 14 App Router, TypeScript, SQLite (better-sqlite3), Zustand, Tailwind CSS, Zod validation.
+Next.js 16 App Router, React 19, TypeScript 5.9, SQLite (better-sqlite3), Zustand, Tailwind CSS 4, Zod validation.
 
 ---
 

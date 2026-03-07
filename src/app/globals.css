@@ -1,6 +1,25 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+@theme {
+  /* Blockether Light Theme — Gold #FFD700, Cream #fdf4e5, Charcoal #333 */
+  --color-mc-bg: #fdf4e5;
+  --color-mc-bg-secondary: #ffffff;
+  --color-mc-bg-tertiary: #f5ead6;
+  --color-mc-border: #e0d4be;
+  --color-mc-text: #333333;
+  --color-mc-text-secondary: #6e6453;
+  --color-mc-accent: #8a700a;
+  --color-mc-accent-green: #1a7a2e;
+  --color-mc-accent-yellow: #7a5c00;
+  --color-mc-accent-red: #c83232;
+  --color-mc-accent-purple: #7c3aed;
+  --color-mc-accent-pink: #8a700a;
+  --color-mc-accent-cyan: #0d7d72;
+  --color-mc-gold: #FFD700;
+
+  --font-serif: 'Atkinson Hyperlegible', Georgia, serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+}
 
 :root {
   --mc-bg: #fdf4e5;

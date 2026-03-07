@@ -24,7 +24,10 @@ function formatLogData(data: unknown): string {
 export function SSEDebugPanel() {
   const [logs, setLogs] = useState<SSELogEntry[]>([]);
   const [isOpen, setIsOpen] = useState(false);
-  const [isEnabled, setIsEnabled] = useState(false);
+  const [isEnabled, setIsEnabled] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return localStorage.getItem('MC_DEBUG') === 'true';
+  });
 
   const addLog = useCallback((type: string, data: unknown) => {
     setLogs(prev => [{
@@ -35,11 +38,7 @@ export function SSEDebugPanel() {
   }, []);
 
   useEffect(() => {
-    // Check if debug mode is enabled
-    const debugEnabled = localStorage.getItem('MC_DEBUG') === 'true';
-    setIsEnabled(debugEnabled);
-
-    if (!debugEnabled) return;
+    if (!isEnabled) return;
 
     // Intercept console.log for SSE events
     const originalLog = console.log;
@@ -60,7 +59,7 @@ export function SSEDebugPanel() {
     return () => {
       console.log = originalLog;
     };
-  }, [addLog]);
+  }, [addLog, isEnabled]);
 
   // Re-check debug mode on storage changes
   useEffect(() => {
