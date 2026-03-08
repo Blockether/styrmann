@@ -170,7 +170,7 @@ The Strict template is the default. The `review` stage is labeled "Human Verifie
 - Fail-loopback: `POST /api/tasks/{id}/fail` routes task back to `in_progress` and re-dispatches builder.
 - **Orchestrator guard**: `populateTaskRolesFromAgents()` skips agents with `role = 'orchestrator'`. Orchestrators are not auto-assigned to workflow stages.
 
-New workspaces clone workflow templates from the `default` workspace.
+**Template definitions are hardcoded** in `src/lib/workflow-templates.ts`. New workspaces get templates provisioned from these code constants via `provisionWorkflowTemplates()`. The legacy `cloneWorkflowTemplates()` in `bootstrap-agents.ts` delegates to the same function for backward compatibility.
 
 ---
 
@@ -279,10 +279,10 @@ Fallback: Task polling every 60s, event polling every 30s.
 
 ## Database Schema
 
-20 migrations (001-020), auto-run on DB connection in `src/lib/db/index.ts`. Schema creation (`schema.ts`) only runs for fresh databases.
+27 migrations (001-027), auto-run on DB connection in `src/lib/db/index.ts`. Schema creation (`schema.ts`) only runs for fresh databases. After migrations, `discoverRepoWorkspaces()` scans `/root/repos/{org}/{repo}` for git repos and creates/syncs workspaces.
 
 ### Core Tables
-- **workspaces** -- slug, name, description, icon, github_repo, owner_email, coordinator_email, logo_url
+- **workspaces** -- slug (`{org}-{repo}` format), name, description, icon, github_repo, owner_email, coordinator_email, logo_url, organization
 - **agents** -- name, role, status, model, source, gateway_agent_id, session_key_prefix, agent_dir, agent_workspace_path, soul_md, user_md, agents_md. No `is_master` column.
 - **tasks** -- title, description, status, priority, task_type, effort, impact, assigned_agent_id, milestone_id, workflow_template_id, due_date, github_issue_id (nullable FK to github_issues), planning fields. No `sprint_id`. No `parent_task_id`.
 - **sprints** -- workspace_id, name, goal, sprint_number, start_date, end_date, status
@@ -414,6 +414,8 @@ Agents without direct filesystem access use upload/download endpoints:
 10. **Story points computed, not stored**: `story_points` on a milestone is computed at read time via `SUM(task.effort)`. It is never persisted in the database.
 11. **Milestone dependencies are informational in v1**: The `milestone_dependencies` table exists and is queryable, but no blocking behavior is enforced. Dependencies are for planning visibility only.
 
+12. **Repo-driven workspaces**: Workspaces auto-discover from git repos at `/root/repos/{org}/{repo}`. On DB init, `discoverRepoWorkspaces()` scans for org directories containing git repos and creates/syncs a workspace per repo. Slug format: `{org}-{repo}` (e.g., `blockether-mission-control`). The `default` workspace (id='default') maps to `blockether/mission-control`. All workspaces are peers. Workspaces are grouped by organization in the UI.
+13. **Workflow templates in code, not DB-cloned**: Template definitions (Simple, Standard, Strict) live in `src/lib/workflow-templates.ts` as TypeScript constants. New workspaces get templates provisioned from code, not cloned from another workspace's DB rows.
 ---
 
 ## Environment Variables
@@ -426,7 +428,7 @@ Agents without direct filesystem access use upload/download endpoints:
 | `WEBHOOK_SECRET` | No | -- | HMAC secret for webhook verification |
 | `DATABASE_PATH` | No | `./mission-control.db` | SQLite database path |
 | `WORKSPACE_BASE_PATH` | No | `~/Documents/Shared` | Base workspace directory |
-| `PROJECTS_PATH` | No | `~/Documents/Shared/projects` | Project files directory |
+| `PROJECTS_PATH` | No | `/root/repos` | Repos base directory — scanned for `{org}/{repo}` git repos, auto-discovered as workspaces |
 | `MISSION_CONTROL_URL` | No | auto-detected | API URL for agent callbacks |
 | `DEMO_MODE` | No | -- | Enables read-only demo mode |
 

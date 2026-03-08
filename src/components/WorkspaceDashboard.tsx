@@ -68,27 +68,50 @@ export function WorkspaceDashboard() {
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {workspaces.map((workspace) => (
-              <WorkspaceCard 
-                key={workspace.id} 
-                workspace={workspace} 
-                onDelete={(id) => setWorkspaces(workspaces.filter(w => w.id !== id))}
-                onEdit={(ws) => setEditingWorkspace(ws)}
-              />
-            ))}
-            
-            {/* Add workspace card */}
+          <>
+            {(() => {
+              const grouped = workspaces.reduce<Record<string, WorkspaceStats[]>>((acc, ws) => {
+                const org = ws.organization || 'Other';
+                if (!acc[org]) acc[org] = [];
+                acc[org].push(ws);
+                return acc;
+              }, {});
+
+              const orgOrder = Object.keys(grouped).sort((a, b) => {
+                if (a === 'Other') return 1;
+                if (b === 'Other') return -1;
+                return a.localeCompare(b);
+              });
+
+              return orgOrder.map((org) => (
+                <div key={org} className="mb-10">
+                  <h3 className="text-sm font-semibold uppercase tracking-wider text-mc-text-secondary border-l-2 border-mc-accent pl-3 mb-4">
+                    {org}
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {grouped[org].map((workspace) => (
+                      <WorkspaceCard
+                        key={workspace.id}
+                        workspace={workspace}
+                        onDelete={(id) => setWorkspaces(workspaces.filter(w => w.id !== id))}
+                        onEdit={(ws) => setEditingWorkspace(ws)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ));
+            })()}
+
             <button
               onClick={() => setShowCreateModal(true)}
-              className="border-2 border-dashed border-mc-border rounded-xl p-6 hover:border-mc-accent/50 transition-colors flex flex-col items-center justify-center gap-3 min-h-[200px] min-w-0"
+              className="border-2 border-dashed border-mc-border rounded-xl p-6 hover:border-mc-accent/50 transition-colors flex flex-col items-center justify-center gap-3 min-h-[120px] w-full max-w-sm mx-auto mt-6"
             >
-              <div className="w-12 h-12 rounded-full bg-mc-bg-tertiary flex items-center justify-center">
-                <Plus className="w-6 h-6 text-mc-text-secondary" />
+              <div className="w-10 h-10 rounded-full bg-mc-bg-tertiary flex items-center justify-center">
+                <Plus className="w-5 h-5 text-mc-text-secondary" />
               </div>
               <span className="text-mc-text-secondary font-medium">Add Workspace</span>
             </button>
-          </div>
+          </>
         )}
       </main>
 
@@ -156,6 +179,11 @@ function WorkspaceCard({ workspace, onDelete, onEdit }: { workspace: WorkspaceSt
               <img src={workspace.logo_url} alt={workspace.name} className="w-7 h-7 rounded object-contain flex-shrink-0" />
             ) : (
               <Folder className="w-7 h-7 text-mc-accent flex-shrink-0" />
+            )}
+            {workspace.organization && (
+              <span className="text-[10px] font-medium uppercase tracking-wider text-mc-accent/70 bg-mc-accent/10 px-1.5 py-0.5 rounded flex-shrink-0">
+                {workspace.organization}
+              </span>
             )}
             <h3 className="font-semibold text-lg group-hover:text-mc-accent transition-colors truncate">
               {workspace.name}

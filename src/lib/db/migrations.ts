@@ -1176,6 +1176,66 @@ const migrations: Migration[] = [
       db.exec(`CREATE INDEX IF NOT EXISTS idx_acp_bindings_thread ON acp_bindings(discord_thread_id)`);
       console.log('[Migration 025] acp_bindings table created');
     }
+  },
+  {
+    id: '026',
+    name: 'repo_workspace_cleanup',
+    up: (db) => {
+      console.log('[Migration 026] Cleaning up workspaces for repo-driven model...');
+
+      // Delete test-flow-workspace and its associated data
+      const testWs = db.prepare("SELECT id FROM workspaces WHERE slug = 'test-flow-workspace'").get() as { id: string } | undefined;
+      if (testWs) {
+        db.prepare('DELETE FROM workflow_templates WHERE workspace_id = ?').run(testWs.id);
+        db.prepare('DELETE FROM tasks WHERE workspace_id = ?').run(testWs.id);
+        db.prepare('DELETE FROM sprints WHERE workspace_id = ?').run(testWs.id);
+        db.prepare('DELETE FROM milestones WHERE workspace_id = ?').run(testWs.id);
+        db.prepare('DELETE FROM workspaces WHERE id = ?').run(testWs.id);
+        console.log('[Migration 026] Deleted test-flow-workspace and its data');
+      }
+
+      // Update default workspace to be repo-linked to mission-control
+      db.prepare(`
+        UPDATE workspaces
+        SET name = 'Mission Control', slug = 'mission-control', github_repo = 'https://github.com/Blockether/mission-control', updated_at = datetime('now')
+        WHERE id = 'default'
+      `).run();
+
+      console.log('[Migration 026] Updated default workspace -> mission-control');
+    }
+  },
+  {
+    id: '027',
+    name: 'add_workspace_organization',
+    up: (db) => {
+      console.log('[Migration 027] Adding organization column to workspaces...');
+
+      const cols = (db.prepare('PRAGMA table_info(workspaces)').all() as { name: string }[]).map(c => c.name);
+
+      if (!cols.includes('organization')) {
+        db.exec('ALTER TABLE workspaces ADD COLUMN organization TEXT');
+        db.exec('CREATE INDEX IF NOT EXISTS idx_workspaces_organization ON workspaces(organization)');
+      }
+
+      // Set organization for existing workspaces based on github_repo
+      db.prepare(`
+        UPDATE workspaces
+        SET organization = 'blockether'
+        WHERE github_repo LIKE '%github.com/Blockether/%'
+      `).run();
+
+      // Rename slugs to org-repo format
+      db.prepare(`
+        UPDATE workspaces SET slug = 'blockether-mission-control' WHERE id = 'default'
+      `).run();
+
+      // Rename spel workspace slug
+      db.prepare(`
+        UPDATE workspaces SET slug = 'blockether-spel' WHERE slug = 'spel' OR slug = 'blockether-spel'
+      `).run();
+
+      console.log('[Migration 027] Organization column added, slugs updated to org-repo format');
+    }
   }
 ];
 

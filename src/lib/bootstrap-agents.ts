@@ -2,13 +2,13 @@
  * Bootstrap Core Agents
  *
  * Ensures core agents (Orchestrator, Builder, Tester, Reviewer, Learner)
- * exist for a workspace. Also clones workflow
- * templates from the default workspace to new workspaces.
+ * exist for a workspace. Provisions workflow templates from code constants.
  */
 
 import Database from 'better-sqlite3';
 import { getDb } from '@/lib/db';
 import { getMissionControlUrl } from '@/lib/config';
+import { provisionWorkflowTemplates } from '@/lib/workflow-templates';
 
 // ── Agent Definitions ──────────────────────────────────────────────
 
@@ -252,25 +252,9 @@ export function bootstrapCoreAgentsRaw(
 }
 
 /**
- * Clone workflow templates from the default workspace into a new workspace.
+ * Provision workflow templates for a workspace from code constants.
+ * Delegates to provisionWorkflowTemplates — kept as a named export for backward compatibility.
  */
 export function cloneWorkflowTemplates(db: Database.Database, targetWorkspaceId: string): void {
-  const templates = db.prepare(
-    "SELECT * FROM workflow_templates WHERE workspace_id = 'default'"
-  ).all() as { id: string; name: string; description: string; stages: string; fail_targets: string; is_default: number }[];
-
-  if (templates.length === 0) return;
-
-  const now = new Date().toISOString();
-  const insert = db.prepare(`
-    INSERT INTO workflow_templates (id, workspace_id, name, description, stages, fail_targets, is_default, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-
-  for (const tpl of templates) {
-    const newId = `${tpl.id}-${targetWorkspaceId}`;
-    insert.run(newId, targetWorkspaceId, tpl.name, tpl.description, tpl.stages, tpl.fail_targets, tpl.is_default, now, now);
-  }
-
-  console.warn(`[Bootstrap] Cloned ${templates.length} workflow template(s) to workspace ${targetWorkspaceId}`);
+  provisionWorkflowTemplates(db, targetWorkspaceId);
 }

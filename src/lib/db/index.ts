@@ -3,6 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import { schema } from './schema';
 import { runMigrations } from './migrations';
+import { discoverRepoWorkspaces } from '@/lib/repo-discovery';
 
 const DB_PATH = process.env.DATABASE_PATH || path.join(process.cwd(), 'mission-control.db');
 
@@ -27,7 +28,10 @@ export function getDb(): Database.Database {
     // For new DBs, migrations are no-ops (tables already exist)
     // For existing DBs, migrations add new tables/columns/indexes
     runMigrations(instance);
-    
+
+    // Auto-discover workspaces from blockether repos
+    discoverRepoWorkspaces(instance);
+
     // Only assign singleton AFTER successful initialization
     db = instance;
   }

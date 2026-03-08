@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS workspaces (
   owner_email TEXT,
   coordinator_email TEXT,
   logo_url TEXT,
+  organization TEXT,
   created_at TEXT DEFAULT (datetime('now')),
   updated_at TEXT DEFAULT (datetime('now'))
 );

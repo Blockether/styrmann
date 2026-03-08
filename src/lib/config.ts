@@ -74,5 +74,5 @@ export function getMissionControlUrl(): string {
 }
 
 export function getProjectsPath(): string {
-  return process.env.PROJECTS_PATH || '/root/Documents/Shared/projects';
+  return process.env.PROJECTS_PATH || '/root/repos';
 }

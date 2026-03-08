@@ -260,6 +260,7 @@ export interface Workspace {
   owner_email?: string;
   coordinator_email?: string;
   logo_url?: string;
+  organization?: string;
   created_at: string;
   updated_at: string;
 }
@@ -274,6 +275,7 @@ export interface WorkspaceStats {
   owner_email?: string;
   coordinator_email?: string;
   logo_url?: string;
+  organization?: string;
   taskCounts: {
     pending_dispatch: number;
     planning: number;

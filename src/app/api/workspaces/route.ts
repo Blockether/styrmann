@@ -63,6 +63,7 @@ export async function GET(request: NextRequest) {
           owner_email: workspace.owner_email,
           coordinator_email: workspace.coordinator_email,
           logo_url: workspace.logo_url,
+          organization: workspace.organization,
           taskCounts: counts,
         };
       });
