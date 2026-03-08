@@ -247,8 +247,9 @@ Fallback: Task polling every 60s, event polling every 30s.
 | DELETE | `/api/tasks/{id}` | Delete task |
 | POST | `/api/tasks/{id}/dispatch` | Dispatch to agent via OpenClaw |
 | POST | `/api/tasks/{id}/fail` | Report stage failure (triggers fail-loopback) |
-| GET/POST | `/api/tasks/{id}/activities` | Activity audit log |
-| GET/POST | `/api/tasks/{id}/deliverables` | File/URL/artifact outputs |
+| GET/POST | `/api/tasks/{id}/activities` | Activity audit log (supports ?limit&offset pagination) |
+| GET/POST | `/api/tasks/{id}/deliverables` | File/URL/artifact outputs (list/create) |
+| GET/DELETE | `/api/tasks/{id}/deliverables/{deliverableId}` | Single deliverable (read/delete) |
 | GET/POST | `/api/tasks/{id}/subagent` | Legacy session registration endpoint (compatibility) |
 | GET | `/api/tasks/{id}/sessions` | Task session list (session-centric) |
 | GET | `/api/tasks/{id}/sessions/{sessionId}/trace` | Full session trace (dispatch invocation + OpenClaw history) |
