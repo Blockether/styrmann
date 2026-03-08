@@ -519,6 +519,7 @@ export type SSEEventType =
   | 'task_deleted'
   | 'activity_logged'
   | 'deliverable_added'
+  | 'deliverable_deleted'
   | 'agent_spawned'
   | 'agent_completed'
   | 'github_issues_synced'
