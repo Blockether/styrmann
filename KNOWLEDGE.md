@@ -275,7 +275,8 @@ Fallback: Task polling every 60s, event polling every 30s.
 |--------|----------|---------|
 | GET/POST | `/api/workspaces` | List (optional stats=true) / create workspace |
 | GET/PATCH/DELETE | `/api/workspaces/{id}` | Workspace CRUD (lookup by ID or slug) |
-| GET/POST | `/api/workspaces/{id}/knowledge` | Learner knowledge entries |
+| GET/POST | `/api/workspaces/{id}/knowledge` | Knowledge entries (list/create) |
+| GET/PATCH/DELETE | `/api/workspaces/{id}/knowledge/{entryId}` | Single knowledge entry (read/update/delete) |
 | GET/POST | `/api/workspaces/{id}/workflows` | Workflow templates |
 
 ### Other
