@@ -116,9 +116,78 @@ Focus on:
 /**
  * Get relevant knowledge entries to inject into a builder's dispatch context.
  * Called before dispatching to the builder agent.
+ *
+ * Uses task title keywords to prioritize entries with matching terms.
+ * Falls back to confidence-based ordering when no keyword matches exist.
  */
 export function getRelevantKnowledge(workspaceId: string, taskTitle: string, limit = 5): KnowledgeEntry[] {
-  // Get recent knowledge entries from this workspace, prioritize high confidence
+  // Extract significant words from task title (skip common words)
+  const stopWords = new Set(['a', 'an', 'the', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'from', 'is', 'are', 'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might', 'must', 'shall', 'can', 'need', 'it', 'its', 'this', 'that', 'these', 'those', 'as', 'if', 'when', 'than', 'so', 'no', 'not', 'only', 'own', 'same', 'into', 'also', 'just', 'now', 'here', 'there', 'where', 'which', 'who', 'what', 'how', 'why', 'all', 'any', 'both', 'each', 'few', 'more', 'most', 'other', 'some', 'such', 'up', 'down', 'out', 'over', 'under', 'again', 'further', 'then', 'once']);
+
+  const keywords = taskTitle
+    .toLowerCase()
+    .split(/\s+/)
+    .map(w => w.replace(/[^a-z0-9]/g, ''))
+    .filter(w => w.length > 2 && !stopWords.has(w))
+    .slice(0, 5); // Limit to 5 keywords
+
+  // If no keywords, fall back to confidence-based ordering
+  if (keywords.length === 0) {
+    return getEntriesByConfidence(workspaceId, limit);
+  }
+
+  // Build OR conditions for keyword matching
+  const conditions: string[] = [];
+  const params: unknown[] = [];
+
+  for (const kw of keywords) {
+    conditions.push(`LOWER(title) LIKE ? OR LOWER(content) LIKE ?`);
+    params.push(`%${kw}%`, `%${kw}%`);
+  }
+
+  // Query: entries matching any keyword, ordered by confidence
+  const matchingEntries = queryAll<KnowledgeEntry & { tags: string }>(
+    `SELECT * FROM knowledge_entries
+     WHERE workspace_id = ? AND (${conditions.join(' OR ')})
+     ORDER BY confidence DESC, created_at DESC
+     LIMIT ?`,
+    [workspaceId, ...params, limit]
+  );
+
+  // If we got enough matches, return them
+  if (matchingEntries.length >= limit) {
+    return matchingEntries.map(e => ({
+      ...e,
+      tags: e.tags ? (typeof e.tags === 'string' ? JSON.parse(e.tags) : e.tags) : [],
+    }));
+  }
+
+  // Otherwise, get all entries and prioritize keyword matches
+  const allEntries = queryAll<KnowledgeEntry & { tags: string }>(
+    `SELECT * FROM knowledge_entries
+     WHERE workspace_id = ?
+     ORDER BY confidence DESC, created_at DESC
+     LIMIT ?`,
+    [workspaceId, limit * 2] // Fetch extra to allow for re-ranking
+  );
+
+  // Re-rank: matching entries first, then others by confidence
+  const matchSet = new Set(matchingEntries.map(e => e.id));
+  const ranked = [
+    ...matchingEntries,
+    ...allEntries.filter(e => !matchSet.has(e.id))
+  ].slice(0, limit);
+
+  return ranked.map(e => ({
+    ...e,
+    tags: e.tags ? (typeof e.tags === 'string' ? JSON.parse(e.tags) : e.tags) : [],
+  }));
+}
+
+/**
+ * Fallback: get entries by confidence score only
+ */
+function getEntriesByConfidence(workspaceId: string, limit: number): KnowledgeEntry[] {
   const entries = queryAll<KnowledgeEntry & { tags: string }>(
     `SELECT * FROM knowledge_entries
      WHERE workspace_id = ?
