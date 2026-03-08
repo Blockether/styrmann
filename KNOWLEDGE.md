@@ -67,7 +67,7 @@ Also: `pending_dispatch` (transient, pre-dispatch state).
 
 Tasks get sprint context via `milestone.sprint_id`. There is no direct `sprint_id` on tasks.
 
-**Task sub-resources**: comments, blockers (with blocked_by_task_id), resources (links/docs/designs), acceptance criteria (with is_met flag), activities (audit log), deliverables (file/url/artifact), sub-agent sessions.
+**Task sub-resources**: comments, blockers (with blocked_by_task_id), resources (links/docs/designs), acceptance criteria (with is_met flag), activities (audit log), deliverables (file/url/artifact), task sessions and traces.
 
 ---
 
@@ -236,7 +236,10 @@ Fallback: Task polling every 60s, event polling every 30s.
 | POST | `/api/tasks/{id}/fail` | Report stage failure (triggers fail-loopback) |
 | GET/POST | `/api/tasks/{id}/activities` | Activity audit log |
 | GET/POST | `/api/tasks/{id}/deliverables` | File/URL/artifact outputs |
-| GET/POST | `/api/tasks/{id}/subagent` | Sub-agent session registration |
+| GET/POST | `/api/tasks/{id}/subagent` | Legacy session registration endpoint (compatibility) |
+| GET | `/api/tasks/{id}/sessions` | Task session list (session-centric) |
+| GET | `/api/tasks/{id}/sessions/{sessionId}/trace` | Full session trace (dispatch invocation + OpenClaw history) |
+| GET | `/api/tasks/{id}/changes` | Task changes summary (workspace, files, commits, sessions) |
 | GET/PUT | `/api/tasks/{id}/roles` | Role-to-agent assignments |
 
 ### Sprints and Milestones
