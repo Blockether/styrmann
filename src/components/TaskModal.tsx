@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { X, Save, Trash2, Activity, Package, Bot, ClipboardList, Plus, Users } from 'lucide-react';
+import { X, Save, Trash2, Activity, Package, Bot, ClipboardList, Plus, Users, Play, Pause } from 'lucide-react';
 import { useMissionControl } from '@/lib/store';
 import { triggerAutoDispatch, shouldTriggerAutoDispatch } from '@/lib/auto-dispatch';
 import { ActivityLog } from './ActivityLog';
@@ -25,6 +25,7 @@ interface TaskModalProps {
 export function TaskModal({ task, onClose, workspaceId, defaultSprintId, githubIssue }: TaskModalProps) {
   const { agents, addTask, updateTask, addEvent } = useMissionControl();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [autoTrainActionLoading, setAutoTrainActionLoading] = useState<'start' | 'stop' | null>(null);
   const [showAgentModal, setShowAgentModal] = useState(false);
   const [usePlanningMode, setUsePlanningMode] = useState(false);
   // Auto-switch to planning tab if task is in planning status
@@ -218,6 +219,69 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId, githubI
       }
     } catch (error) {
       console.error('Failed to delete task:', error);
+    }
+  };
+
+  const handleAutoTrainAction = async (action: 'start' | 'stop') => {
+    if (!task || task.task_type !== 'autotrain') return;
+
+    setAutoTrainActionLoading(action);
+    setSaveError(null);
+    try {
+      if (action === 'stop') {
+        await fetch(`/api/tasks/${task.id}/activities`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            activity_type: 'status_changed',
+            message: 'AUTOTRAIN_STOP: Manual supervisor stop requested from task modal.',
+          }),
+        });
+
+        if (task.status === 'assigned') {
+          const patchRes = await fetch(`/api/tasks/${task.id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              status: 'inbox',
+              status_reason: 'Auto-Train paused by supervisor control.',
+            }),
+          });
+          if (patchRes.ok) {
+            const updated = await patchRes.json();
+            updateTask(updated);
+          }
+        }
+        return;
+      }
+
+      await fetch(`/api/tasks/${task.id}/activities`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          activity_type: 'status_changed',
+          message: 'AUTOTRAIN_RESUME: Manual supervisor resume requested from task modal.',
+        }),
+      });
+
+      if (['done', 'inbox', 'review', 'verification', 'testing', 'planning', 'pending_dispatch'].includes(task.status)) {
+        const patchRes = await fetch(`/api/tasks/${task.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            status: 'assigned',
+            status_reason: 'Auto-Train resumed by supervisor control.',
+          }),
+        });
+        if (patchRes.ok) {
+          const updated = await patchRes.json();
+          updateTask(updated);
+        }
+      }
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : 'Auto-Train action failed');
+    } finally {
+      setAutoTrainActionLoading(null);
     }
   };
 
@@ -542,6 +606,28 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId, githubI
             <div className="flex gap-2">
               {task && (
                 <>
+                  {task.task_type === 'autotrain' && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => handleAutoTrainAction('start')}
+                        disabled={autoTrainActionLoading !== null}
+                        className="min-h-11 flex items-center gap-2 px-3 py-2 border border-mc-accent text-mc-accent hover:bg-mc-accent/10 rounded text-sm disabled:opacity-50"
+                      >
+                        <Play className="w-4 h-4" />
+                        {autoTrainActionLoading === 'start' ? 'Starting...' : 'Start Loop'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleAutoTrainAction('stop')}
+                        disabled={autoTrainActionLoading !== null}
+                        className="min-h-11 flex items-center gap-2 px-3 py-2 border border-mc-border text-mc-text-secondary hover:bg-mc-bg-tertiary rounded text-sm disabled:opacity-50"
+                      >
+                        <Pause className="w-4 h-4" />
+                        {autoTrainActionLoading === 'stop' ? 'Stopping...' : 'Stop Loop'}
+                      </button>
+                    </>
+                  )}
                   <button
                     type="button"
                     onClick={handleDelete}

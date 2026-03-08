@@ -29,8 +29,12 @@ function getMaxIterations(description?: string): number {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_MAX_ITERATIONS;
 }
 
-function hasStopSignal(activities: TaskActivity[]): boolean {
-  return activities.some((activity) => /AUTOTRAIN_STOP/i.test(activity.message));
+function getControlSignal(activities: TaskActivity[]): 'stop' | 'resume' | null {
+  for (const activity of activities) {
+    if (/AUTOTRAIN_STOP/i.test(activity.message)) return 'stop';
+    if (/AUTOTRAIN_RESUME/i.test(activity.message)) return 'resume';
+  }
+  return null;
 }
 
 export function startAutoTrain(config: DaemonConfig, stats: DaemonStats): () => void {
@@ -61,14 +65,15 @@ export function startAutoTrain(config: DaemonConfig, stats: DaemonStats): () => 
         const dispatchCount = activities.filter((a) => a.activity_type === 'dispatch_invocation').length;
         const maxIterations = getMaxIterations(task.description);
 
-        if (hasStopSignal(activities) || dispatchCount >= maxIterations) {
+        const controlSignal = getControlSignal(activities);
+        if (controlSignal === 'stop' || dispatchCount >= maxIterations) {
           handledStates.set(task.id, stateKey);
           stats.autotrainStoppedCount = (stats.autotrainStoppedCount || 0) + 1;
           await mcFetch(`/api/tasks/${task.id}/activities`, {
             method: 'POST',
             body: JSON.stringify({
               activity_type: 'status_changed',
-              message: hasStopSignal(activities)
+              message: controlSignal === 'stop'
                 ? 'Auto-Train loop stopped by explicit stop signal.'
                 : `Auto-Train loop reached max iterations (${maxIterations}).`,
             }),

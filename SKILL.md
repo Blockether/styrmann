@@ -21,6 +21,9 @@ This file defines the operational contract for agents working through Mission Co
 - `task_type='autotrain'` means the task is a continuous improvement loop for one workspace repo.
 - The task description is the supervisor prompt.
 - Optional control: include `MAX_ITERATIONS: N` in the prompt.
+- Manual supervisor controls are available in Task Modal:
+  - **Start Loop** writes `AUTOTRAIN_RESUME` and sets status to `assigned` when needed.
+  - **Stop Loop** writes `AUTOTRAIN_STOP`; daemon stops re-looping on that signal.
 - The daemon reopens completed autotrain tasks for the next iteration automatically.
 - Each iteration must:
   - inspect one improvement area,

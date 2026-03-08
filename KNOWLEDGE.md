@@ -185,6 +185,10 @@ The Strict template is the default. The `review` stage is labeled "Human Verifie
 - The daemon module `src/daemon/autotrain.ts` watches `done` autotrain tasks and reopens them to `assigned` for the next iteration.
 - Scope is workspace-local only; dispatch pins work to the workspace repo and `.mission-control/tasks/{taskId}/iter-{n}`.
 - The task description acts as the supervisor prompt. Optional stop control: include `MAX_ITERATIONS: N` in the prompt.
+- Manual control buttons in Task Modal Overview:
+  - **Start Loop** logs `AUTOTRAIN_RESUME` and moves task to `assigned` when needed.
+  - **Stop Loop** logs `AUTOTRAIN_STOP` and pauses queued `assigned` tasks back to `inbox`.
+  - Daemon honors latest STOP/RESUME control signal from task activities.
 
 ---
 
