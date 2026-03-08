@@ -37,6 +37,12 @@ function getControlSignal(activities: TaskActivity[]): 'stop' | 'resume' | null 
   return null;
 }
 
+function countControlSignals(activities: TaskActivity[]): number {
+  return activities.filter(
+    (a) => /AUTOTRAIN_(STOP|RESUME)/i.test(a.message)
+  ).length;
+}
+
 export function startAutoTrain(config: DaemonConfig, stats: DaemonStats): () => void {
   const handledStates = new Map<string, string>();
 
@@ -52,9 +58,6 @@ export function startAutoTrain(config: DaemonConfig, stats: DaemonStats): () => 
 
       const tasks = (await tasksRes.json()) as AutoTrainTask[];
       for (const task of tasks) {
-        const stateKey = `${task.status}:${task.updated_at || ''}`;
-        if (handledStates.get(task.id) === stateKey) continue;
-
         const activitiesRes = await mcFetch(`/api/tasks/${task.id}/activities`);
         if (!activitiesRes.ok) {
           log.warn(`Failed to fetch activities for autotrain task ${task.id}`);
@@ -64,9 +67,20 @@ export function startAutoTrain(config: DaemonConfig, stats: DaemonStats): () => 
         const activities = (await activitiesRes.json()) as TaskActivity[];
         const dispatchCount = activities.filter((a) => a.activity_type === 'dispatch_invocation').length;
         const maxIterations = getMaxIterations(task.description);
+        const signalCount = countControlSignals(activities);
+
+        // Include signal count in stateKey so RESUME after STOP works
+        const stateKey = `${task.status}:${task.updated_at || ''}:${signalCount}`;
+        if (handledStates.get(task.id) === stateKey) {
+          log.info(`Task ${task.id}: skipping - state already processed (iter=${dispatchCount}/${maxIterations}, signals=${signalCount})`);
+          continue;
+        }
+
+        log.info(`Task ${task.id}: processing (iter=${dispatchCount}/${maxIterations}, signals=${signalCount}, stateKey=${stateKey})`);
 
         const controlSignal = getControlSignal(activities);
         if (controlSignal === 'stop' || dispatchCount >= maxIterations) {
+          log.info(`Task ${task.id}: stopping - signal=${controlSignal || 'none'}, atMax=${dispatchCount >= maxIterations}`);
           handledStates.set(task.id, stateKey);
           stats.autotrainStoppedCount = (stats.autotrainStoppedCount || 0) + 1;
           await mcFetch(`/api/tasks/${task.id}/activities`, {
@@ -83,6 +97,7 @@ export function startAutoTrain(config: DaemonConfig, stats: DaemonStats): () => 
 
         if (!task.assigned_agent_id) {
           handledStates.set(task.id, stateKey);
+          log.info(`Task ${task.id}: pausing - no agent assigned`);
           await mcFetch(`/api/tasks/${task.id}/activities`, {
             method: 'POST',
             body: JSON.stringify({
@@ -109,6 +124,7 @@ export function startAutoTrain(config: DaemonConfig, stats: DaemonStats): () => 
 
         handledStates.set(task.id, stateKey);
         stats.autotrainIterationsCount = (stats.autotrainIterationsCount || 0) + 1;
+        log.info(`Task ${task.id}: restarting iteration ${nextIteration}/${maxIterations}`);
         await mcFetch(`/api/tasks/${task.id}/activities`, {
           method: 'POST',
           body: JSON.stringify({
