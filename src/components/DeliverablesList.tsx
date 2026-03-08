@@ -14,6 +14,30 @@ interface DeliverablesListProps {
   taskId: string;
 }
 
+interface TaskChangesPayload {
+  workspace: {
+    id: string;
+    name: string | null;
+    slug: string | null;
+    organization: string | null;
+    repo: string | null;
+    repo_path: string | null;
+  };
+  summary: {
+    sessions_count: number;
+    deliverables_count: number;
+    changed_files_count: number;
+    commits_count: number;
+  };
+  changed_files: string[];
+  commits: Array<{
+    hash: string;
+    subject: string;
+    author: string;
+    date: string;
+  }>;
+}
+
 // File extensions that can be previewed in the browser
 const PREVIEWABLE_EXTENSIONS = new Set([
   '.html', '.htm', '.md', '.markdown', '.txt', '.csv', '.log', '.json', '.xml',
@@ -34,6 +58,7 @@ function isPreviewable(filePath: string | undefined): boolean {
 
 export function DeliverablesList({ taskId }: DeliverablesListProps) {
   const [deliverables, setDeliverables] = useState<TaskDeliverable[]>([]);
+  const [changes, setChanges] = useState<TaskChangesPayload | null>(null);
   const [loading, setLoading] = useState(true);
 
   const loadDeliverables = useCallback(async () => {
@@ -42,6 +67,12 @@ export function DeliverablesList({ taskId }: DeliverablesListProps) {
       if (res.ok) {
         const data = await res.json();
         setDeliverables(data);
+      }
+
+      const changesRes = await fetch(`/api/tasks/${taskId}/changes`);
+      if (changesRes.ok) {
+        const changesData = await changesRes.json();
+        setChanges(changesData);
       }
     } catch (error) {
       console.error('Failed to load deliverables:', error);
@@ -157,6 +188,64 @@ export function DeliverablesList({ taskId }: DeliverablesListProps) {
 
   return (
     <div data-component="src/components/DeliverablesList" className="space-y-3">
+      {changes && (
+        <div className="p-3 bg-mc-bg rounded-lg border border-mc-border space-y-3">
+          <div>
+            <h4 className="font-medium text-mc-text">Changes</h4>
+            <p className="text-xs text-mc-text-secondary mt-1">
+              Workspace: {changes.workspace.name || 'Unknown'}
+              {changes.workspace.repo ? ` (${changes.workspace.repo})` : ''}
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            <div className="p-2 rounded bg-mc-bg-tertiary">
+              <div className="text-mc-text-secondary">Sessions</div>
+              <div className="font-medium text-mc-text mt-0.5">{changes.summary.sessions_count}</div>
+            </div>
+            <div className="p-2 rounded bg-mc-bg-tertiary">
+              <div className="text-mc-text-secondary">Changed Files</div>
+              <div className="font-medium text-mc-text mt-0.5">{changes.summary.changed_files_count}</div>
+            </div>
+            <div className="p-2 rounded bg-mc-bg-tertiary">
+              <div className="text-mc-text-secondary">Commits</div>
+              <div className="font-medium text-mc-text mt-0.5">{changes.summary.commits_count}</div>
+            </div>
+            <div className="p-2 rounded bg-mc-bg-tertiary">
+              <div className="text-mc-text-secondary">Deliverables</div>
+              <div className="font-medium text-mc-text mt-0.5">{changes.summary.deliverables_count}</div>
+            </div>
+          </div>
+
+          {changes.changed_files.length > 0 && (
+            <div>
+              <div className="text-xs font-medium text-mc-text-secondary mb-1">Changed files</div>
+              <div className="space-y-1 max-h-32 overflow-y-auto">
+                {changes.changed_files.slice(0, 12).map((filePath) => (
+                  <div key={filePath} className="text-xs font-mono text-mc-text-secondary truncate">
+                    {filePath}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {changes.commits.length > 0 && (
+            <div>
+              <div className="text-xs font-medium text-mc-text-secondary mb-1">Recent commits</div>
+              <div className="space-y-1.5 max-h-32 overflow-y-auto">
+                {changes.commits.slice(0, 8).map((commit) => (
+                  <div key={`${commit.hash}-${commit.subject}`} className="text-xs">
+                    <div className="font-mono text-mc-accent">{commit.hash}</div>
+                    <div className="text-mc-text truncate">{commit.subject}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {deliverables.map((deliverable) => (
         <div
           key={deliverable.id}

@@ -1,6 +1,6 @@
 /**
  * SessionsList Component
- * Displays OpenClaw sub-agent sessions for a task
+ * Displays OpenClaw sessions for a task
  */
 
 'use client';
@@ -33,7 +33,7 @@ export function SessionsList({ taskId }: SessionsListProps) {
 
   const loadSessions = useCallback(async () => {
     try {
-      const res = await fetch(`/api/tasks/${taskId}/subagent`);
+      const res = await fetch(`/api/tasks/${taskId}/sessions`);
       if (res.ok) {
         const data = await res.json();
         setSessions(data);
@@ -109,7 +109,7 @@ export function SessionsList({ taskId }: SessionsListProps) {
   };
 
   const handleDelete = async (sessionId: string) => {
-    if (!confirm('Delete this sub-agent session?')) return;
+    if (!confirm('Delete this session?')) return;
     try {
       const res = await fetch(`/api/openclaw/sessions/${sessionId}`, {
         method: 'DELETE',
@@ -134,7 +134,7 @@ export function SessionsList({ taskId }: SessionsListProps) {
     return (
       <div className="flex flex-col items-center justify-center py-8 text-mc-text-secondary">
         <Bot className="w-10 h-10 text-mc-text-secondary mb-2" />
-        <p>No sub-agent sessions yet</p>
+        <p>No sessions yet</p>
       </div>
     );
   }
@@ -161,7 +161,7 @@ export function SessionsList({ taskId }: SessionsListProps) {
             <div className="flex items-center gap-2 mb-1">
               {getStatusIcon(session.status)}
               <span className="font-medium text-mc-text">
-                {session.agent_name || 'Sub-Agent'}
+                {session.agent_name || 'Session Agent'}
               </span>
               <span className="text-xs text-mc-text-secondary capitalize">
                 {session.status}
