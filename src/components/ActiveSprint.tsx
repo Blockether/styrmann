@@ -6,6 +6,7 @@ import { useMissionControl } from '@/lib/store';
 import { triggerAutoDispatch, shouldTriggerAutoDispatch } from '@/lib/auto-dispatch';
 import type { Task, TaskStatus, Sprint, Milestone, Agent } from '@/lib/types';
 import { TaskModal } from './TaskModal';
+import { CreateMilestoneModal } from './CreateMilestoneModal';
 import { AgentInitials } from './AgentInitials';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -63,6 +64,7 @@ export function ActiveSprint({ workspaceId, mobileMode = false, isPortrait = tru
   const [loading, setLoading] = useState(true);
   const [showSprintDropdown, setShowSprintDropdown] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showCreateMilestoneModal, setShowCreateMilestoneModal] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [endingSprint, setEndingSprint] = useState(false);
   const [creatingSprint, setCreatingSprint] = useState(false);
@@ -445,6 +447,14 @@ export function ActiveSprint({ workspaceId, mobileMode = false, isPortrait = tru
             </button>
           )}
           <button
+            onClick={() => setShowCreateMilestoneModal(true)}
+            aria-label="Create new milestone"
+            className="flex items-center gap-2 px-3 min-h-11 border border-mc-border rounded text-sm text-mc-text-secondary hover:bg-mc-bg-tertiary"
+          >
+            <Target className="w-4 h-4" />
+            <span className="hidden sm:inline">New Milestone</span>
+          </button>
+          <button
             onClick={() => setShowCreateModal(true)}
             aria-label="Create new task"
             className="flex items-center gap-2 px-4 min-h-11 bg-mc-accent text-white rounded text-sm font-medium hover:bg-mc-accent/90"
@@ -605,6 +615,23 @@ export function ActiveSprint({ workspaceId, mobileMode = false, isPortrait = tru
         />
       )}
 
+      {showCreateMilestoneModal && workspaceId && (
+        <CreateMilestoneModal
+          workspaceId={workspaceId}
+          sprintId={selectedSprintId || undefined}
+          agents={agents}
+          onClose={() => setShowCreateMilestoneModal(false)}
+          onCreated={() => {
+            const url = selectedSprintId
+              ? `/api/milestones?workspace_id=${workspaceId}&sprint_id=${selectedSprintId}`
+              : `/api/milestones?workspace_id=${workspaceId}`;
+            fetch(url).then(r => r.json()).then(data => {
+              setMilestones(data);
+              setExpandedMilestones(new Set(data.map((m: Milestone) => m.id)));
+            }).catch(() => {});
+          }}
+        />
+      )}
       {mobileMode && statusMoveTask && (
         <div className="fixed inset-0 z-50 bg-black/60 p-4 flex items-end sm:items-center sm:justify-center" onClick={() => setStatusMoveTask(null)}>
           <div
