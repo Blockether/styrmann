@@ -19,7 +19,6 @@ export function CreateMilestoneModal({ workspaceId, sprintId, agents, onClose, o
     name: '',
     description: '',
     priority: 'normal' as TaskPriority,
-    due_date: '',
     coordinator_agent_id: '',
   });
 
@@ -39,7 +38,6 @@ export function CreateMilestoneModal({ workspaceId, sprintId, agents, onClose, o
           name: form.name.trim(),
           description: form.description.trim() || null,
           priority: form.priority,
-          due_date: form.due_date || null,
           coordinator_agent_id: form.coordinator_agent_id || null,
         }),
       });
@@ -96,30 +94,18 @@ export function CreateMilestoneModal({ workspaceId, sprintId, agents, onClose, o
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-medium mb-1">Priority</label>
-              <select
-                value={form.priority}
-                onChange={(e) => setForm({ ...form, priority: e.target.value as TaskPriority })}
-                className="w-full min-h-11 px-3 py-2 bg-mc-bg border border-mc-border rounded text-sm focus:outline-none focus:border-mc-accent"
-              >
-                <option value="low">Low</option>
-                <option value="normal">Normal</option>
-                <option value="high">High</option>
-                <option value="urgent">Urgent</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-1">Due Date</label>
-              <input
-                type="date"
-                value={form.due_date}
-                onChange={(e) => setForm({ ...form, due_date: e.target.value })}
-                className="w-full min-h-11 px-3 py-2 bg-mc-bg border border-mc-border rounded text-sm focus:outline-none focus:border-mc-accent"
-              />
-            </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Priority</label>
+            <select
+              value={form.priority}
+              onChange={(e) => setForm({ ...form, priority: e.target.value as TaskPriority })}
+              className="w-full min-h-11 px-3 py-2 bg-mc-bg border border-mc-border rounded text-sm focus:outline-none focus:border-mc-accent"
+            >
+              <option value="low">Low</option>
+              <option value="normal">Normal</option>
+              <option value="high">High</option>
+              <option value="urgent">Urgent</option>
+            </select>
           </div>
 
           {agents.length > 0 && (
