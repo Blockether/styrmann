@@ -37,6 +37,10 @@ Actions:
   issue_list        List cached GitHub issues
   issue_sync        Trigger GitHub issues sync
 
+  acp_bindings      List ACP Discord thread bindings
+  acp_bind          Create an ACP Discord thread binding
+  acp_unbind        Close an ACP binding
+
   workspace_list    List all workspaces
 
   status            Show workspace overview (agents + active tasks)
@@ -422,6 +426,39 @@ def action_workspace_list(p: dict):
     result = api_get("/api/workspaces")
     ok(result)
 
+
+def action_acp_bindings(p: dict):
+    qs = f"workspace_id={ws(p)}"
+    status = p.get("status", "active")
+    if status and status != "all":
+        qs += f"&status={status}"
+    for field in ("agent_id", "discord_thread_id"):
+        if p.get(field):
+            qs += f"&{field}={p[field]}"
+    result = api_get(f"/api/acp/bindings?{qs}")
+    ok(result)
+
+
+def action_acp_bind(p: dict):
+    require(p, "discord_thread_id", "acp_session_key")
+    body = {
+        "workspace_id": ws(p),
+        "discord_thread_id": p["discord_thread_id"],
+        "acp_session_key": p["acp_session_key"],
+    }
+    for field in ("discord_channel_id", "acp_agent_id", "agent_id", "task_id", "cwd"):
+        if p.get(field) is not None:
+            body[field] = p[field]
+    result = api_post("/api/acp/bindings", body)
+    ok(result)
+
+
+def action_acp_unbind(p: dict):
+    require(p, "binding_id")
+    result = api_patch(f"/api/acp/bindings/{p['binding_id']}", {"status": "closed"})
+    ok(result)
+
+
 def action_status(p: dict):
     """
     Show workspace overview: agents + active tasks.
@@ -485,6 +522,9 @@ ACTIONS = {
     "agent_status": action_agent_status,
     "issue_list": action_issue_list,
     "issue_sync": action_issue_sync,
+    "acp_bindings": action_acp_bindings,
+    "acp_bind": action_acp_bind,
+    "acp_unbind": action_acp_unbind,
     "status": action_status,
     "workspace_list": action_workspace_list,
 }

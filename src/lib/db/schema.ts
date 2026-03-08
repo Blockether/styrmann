@@ -277,6 +277,23 @@ CREATE TABLE IF NOT EXISTS openclaw_sessions (
   updated_at TEXT DEFAULT (datetime('now'))
 );
 
+-- ACP Discord thread bindings
+CREATE TABLE IF NOT EXISTS acp_bindings (
+  id TEXT PRIMARY KEY,
+  workspace_id TEXT NOT NULL REFERENCES workspaces(id),
+  discord_thread_id TEXT NOT NULL,
+  discord_channel_id TEXT,
+  discord_guild_id TEXT DEFAULT '1406182923563958352',
+  acp_session_key TEXT NOT NULL,
+  acp_agent_id TEXT DEFAULT 'opencode',
+  agent_id TEXT REFERENCES agents(id),
+  task_id TEXT REFERENCES tasks(id),
+  status TEXT DEFAULT 'active' CHECK(status IN ('active','paused','closed')),
+  cwd TEXT DEFAULT '/root/.openclaw/workspace',
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now'))
+);
+
 -- Workflow templates (per-workspace workflow definitions)
 CREATE TABLE IF NOT EXISTS workflow_templates (
   id TEXT PRIMARY KEY,
@@ -366,6 +383,9 @@ CREATE INDEX IF NOT EXISTS idx_task_comments_task ON task_comments(task_id, crea
 CREATE INDEX IF NOT EXISTS idx_task_blockers_task ON task_blockers(task_id);
 CREATE INDEX IF NOT EXISTS idx_task_resources_task ON task_resources(task_id);
 CREATE INDEX IF NOT EXISTS idx_task_acceptance_criteria_task ON task_acceptance_criteria(task_id, sort_order);
+CREATE INDEX IF NOT EXISTS idx_acp_bindings_workspace ON acp_bindings(workspace_id);
+CREATE INDEX IF NOT EXISTS idx_acp_bindings_status ON acp_bindings(status);
+CREATE INDEX IF NOT EXISTS idx_acp_bindings_thread ON acp_bindings(discord_thread_id);
 -- Daemon tables
 CREATE TABLE IF NOT EXISTS agent_heartbeats (
   id TEXT PRIMARY KEY,

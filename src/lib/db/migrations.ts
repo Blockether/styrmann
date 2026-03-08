@@ -1148,6 +1148,34 @@ const migrations: Migration[] = [
       `);
       console.log('[Migration 024] agent_logs.task_id added and backfilled');
     }
+  },
+  {
+    id: '025',
+    name: 'add_acp_bindings_table',
+    up: (db) => {
+      console.log('[Migration 025] Adding acp_bindings table...');
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS acp_bindings (
+          id TEXT PRIMARY KEY,
+          workspace_id TEXT NOT NULL REFERENCES workspaces(id),
+          discord_thread_id TEXT NOT NULL,
+          discord_channel_id TEXT,
+          discord_guild_id TEXT DEFAULT '1406182923563958352',
+          acp_session_key TEXT NOT NULL,
+          acp_agent_id TEXT DEFAULT 'opencode',
+          agent_id TEXT REFERENCES agents(id),
+          task_id TEXT REFERENCES tasks(id),
+          status TEXT DEFAULT 'active' CHECK(status IN ('active','paused','closed')),
+          cwd TEXT DEFAULT '/root/.openclaw/workspace',
+          created_at TEXT DEFAULT (datetime('now')),
+          updated_at TEXT DEFAULT (datetime('now'))
+        )
+      `);
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_acp_bindings_workspace ON acp_bindings(workspace_id)`);
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_acp_bindings_status ON acp_bindings(status)`);
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_acp_bindings_thread ON acp_bindings(discord_thread_id)`);
+      console.log('[Migration 025] acp_bindings table created');
+    }
   }
 ];
 
