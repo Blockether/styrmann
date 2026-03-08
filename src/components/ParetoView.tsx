@@ -88,12 +88,6 @@ export function ParetoView({ workspaceId }: ParetoViewProps) {
           <span className="font-medium">Pareto</span>
           <span className="text-sm text-mc-text-secondary">{scoredTasks.length} scored, {tasks.length} total</span>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="px-2.5 py-1.5 rounded-md border border-mc-accent-green/40 bg-mc-accent-green/10 text-sm font-medium text-mc-accent-green flex items-center gap-1.5 min-h-9">
-            <Zap className="w-3.5 h-3.5" />
-            {quickWinsCount} <span className="hidden sm:inline">Quick Wins</span><span className="sm:hidden">QW</span>
-          </div>
-        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto">

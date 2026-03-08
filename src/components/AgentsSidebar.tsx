@@ -84,9 +84,9 @@ export function AgentsSidebar({
       .catch(() => {});
   }, [workspaceId, historyOpen]);
 
-  // Shared nav rendering
+  // Shared nav rendering (includes sprint history)
   const renderNav = (minimized: boolean) => (
-    <div className={minimized ? 'space-y-1' : 'space-y-1'}>
+    <div className="space-y-1">
       {NAV_ITEMS.map((item) => {
         const isActive = activeView === item.view;
         return (
@@ -103,59 +103,47 @@ export function AgentsSidebar({
           </button>
         );
       })}
-    </div>
-  );
-
-  // Shared sprint history rendering
-  const renderSprintHistory = (minimized: boolean) => (
-    <div className="border-b border-mc-border">
-      {minimized ? (
-        <button
-          onClick={() => setHistoryOpen(!historyOpen)}
-          className={`w-full flex justify-center py-2 rounded transition-colors ${historyOpen ? 'bg-mc-accent/10 text-mc-accent' : 'text-mc-text-secondary hover:text-mc-text hover:bg-mc-bg-tertiary'}`}
-          title="Sprint History"
-        >
-          <Clock className="w-4 h-4" />
-        </button>
-      ) : (
-        <>
-          <button
-            onClick={() => setHistoryOpen(!historyOpen)}
-            className="w-full p-3 flex items-center justify-between text-sm text-mc-text-secondary hover:text-mc-text hover:bg-mc-bg-tertiary transition-colors"
-          >
-            <div className="flex items-center gap-2">
-              <Clock className="w-4 h-4" />
-              <span className="uppercase tracking-wider font-medium text-xs">History</span>
-            </div>
+      <button
+        onClick={() => setHistoryOpen(!historyOpen)}
+        className={`w-full flex ${minimized ? 'justify-center py-2' : 'items-center gap-3 px-3 py-2'} rounded text-sm transition-colors ${
+          historyOpen ? 'bg-mc-accent/10 text-mc-accent' : 'text-mc-text-secondary hover:text-mc-text hover:bg-mc-bg-tertiary'
+        }`}
+        title={minimized ? 'Sprint History' : undefined}
+      >
+        <Clock className="w-4 h-4" />
+        {!minimized && (
+          <>
+            <span className="flex-1 text-left">History</span>
             {historyOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-          </button>
-          {historyOpen && (
-            <div className="px-2 pb-2 space-y-1">
-              {completedSprints.length === 0 ? (
-                <p className="text-xs text-mc-text-secondary px-3 py-2">No completed sprints</p>
-              ) : (
-                completedSprints.map(sprint => (
-                  <button
-                    key={sprint.id}
-                    onClick={() => {
-                      setSelectedSprintId(sprint.id);
-                      handleNavClick('sprint');
-                    }}
-                    className="w-full text-left px-3 py-2 rounded text-xs hover:bg-mc-bg-tertiary transition-colors"
-                  >
-                    <div className="font-medium text-mc-text truncate">{sprint.name}</div>
-                    <div className="text-mc-text-secondary mt-0.5">
-                      {sprint.status === 'completed' ? 'Completed' : 'Cancelled'}
-                    </div>
-                  </button>
-                ))
-              )}
-            </div>
+          </>
+        )}
+      </button>
+      {!minimized && historyOpen && (
+        <div className="ml-7 space-y-0.5">
+          {completedSprints.length === 0 ? (
+            <p className="text-xs text-mc-text-secondary px-3 py-1.5">No completed sprints</p>
+          ) : (
+            completedSprints.map(sprint => (
+              <button
+                key={sprint.id}
+                onClick={() => {
+                  setSelectedSprintId(sprint.id);
+                  handleNavClick('sprint');
+                }}
+                className="w-full text-left px-3 py-1.5 rounded text-xs hover:bg-mc-bg-tertiary transition-colors"
+              >
+                <div className="font-medium text-mc-text truncate">{sprint.name}</div>
+                <div className="text-mc-text-secondary mt-0.5">
+                  {sprint.status === 'completed' ? 'Completed' : 'Cancelled'}
+                </div>
+              </button>
+            ))
           )}
-        </>
+        </div>
       )}
     </div>
   );
+
 
   // Shared OpenClaw summary link
   const renderOpenClawLink = (minimized: boolean) => (
@@ -230,7 +218,6 @@ export function AgentsSidebar({
             </nav>
           </div>
 
-          {renderSprintHistory(false)}
           {renderOpenClawLink(false)}
         </aside>
       </div>
@@ -263,7 +250,6 @@ export function AgentsSidebar({
         </div>
       </div>
 
-      {renderSprintHistory(isMinimized)}
       {renderOpenClawLink(isMinimized)}
     </aside>
   );
