@@ -52,7 +52,7 @@ export function ParetoView({ workspaceId }: ParetoViewProps) {
       (task) => task.effort === null || task.effort === undefined || task.impact === null || task.impact === undefined
     );
     const quickWins = scored.filter(
-      (task) => (task.impact ?? 0) >= 4 && (task.effort ?? 5) <= 2
+      (task) => (task.impact ?? 0) >= 4 && (task.effort ?? 5) <= 3
     );
 
     return {
@@ -64,7 +64,7 @@ export function ParetoView({ workspaceId }: ParetoViewProps) {
 
   const tasksWithPosition = useMemo((): TaskWithPosition[] => {
     return scoredTasks.map((task) => {
-      const gridCol = 6 - (task.effort ?? 3);
+      const gridCol = task.effort ?? 3;
       const gridRow = 6 - (task.impact ?? 3);
       return { ...task, gridRow, gridCol };
     });
@@ -182,15 +182,19 @@ export function ParetoView({ workspaceId }: ParetoViewProps) {
                               <button
                                 key={task.id}
                                 onClick={() => setEditingTask(task)}
-                                className={`absolute w-5 h-5 sm:w-6 sm:h-6 rounded-full border-2 ${TASK_TYPE_COLORS[task.task_type]} ${TASK_TYPE_BORDER_COLORS[task.task_type]} cursor-pointer hover:scale-125 hover:z-10 hover:shadow-lg transition-transform`}
+                                className={`absolute w-3 h-3 sm:w-3.5 sm:h-3.5 rounded-full border-2 ${TASK_TYPE_COLORS[task.task_type]} ${TASK_TYPE_BORDER_COLORS[task.task_type]} cursor-pointer hover:scale-150 hover:z-20 hover:shadow-lg transition-transform`}
                                 style={{
-                                  left: `${20 + i * 8}%`,
-                                  top: `${20 + (i % 3) * 12}%`,
+                                  left: `${15 + i * 12}%`,
+                                  top: `${40 + (i % 3) * 10}%`,
                                 }}
                                 onMouseEnter={() => setHoveredTask(task)}
                                 onMouseLeave={() => setHoveredTask(null)}
                                 title={task.title}
-                              />
+                              >
+                                <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-0.5 text-[8px] sm:text-[9px] leading-tight font-medium text-mc-text whitespace-nowrap max-w-[80px] sm:max-w-[100px] truncate pointer-events-none">
+                                  {task.title}
+                                </span>
+                              </button>
                             ))}
                             {cellTasks.length > 5 && (
                               <div className="absolute bottom-1 right-1 text-[9px] bg-mc-bg-secondary/90 px-1 rounded text-mc-text-secondary">
