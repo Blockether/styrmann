@@ -71,7 +71,7 @@ export function AgentsSidebar({
 
   // Sprint history
   useEffect(() => {
-    if (!workspaceId || !historyOpen) return;
+    if (!workspaceId) return;
     fetch(`/api/sprints?workspace_id=${workspaceId}`)
       .then(r => r.json())
       .then(data => {
@@ -103,43 +103,43 @@ export function AgentsSidebar({
           </button>
         );
       })}
-      <button
-        onClick={() => setHistoryOpen(!historyOpen)}
-        className={`w-full flex ${minimized ? 'justify-center py-2' : 'items-center gap-3 px-3 py-2'} rounded text-sm transition-colors ${
-          historyOpen ? 'bg-mc-accent/10 text-mc-accent' : 'text-mc-text-secondary hover:text-mc-text hover:bg-mc-bg-tertiary'
-        }`}
-        title={minimized ? 'Sprint History' : undefined}
-      >
-        <Clock className="w-4 h-4" />
-        {!minimized && (
-          <>
-            <span className="flex-1 text-left">History</span>
-            {historyOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-          </>
-        )}
-      </button>
-      {!minimized && historyOpen && (
-        <div className="ml-7 space-y-0.5">
-          {completedSprints.length === 0 ? (
-            <p className="text-xs text-mc-text-secondary px-3 py-1.5">No completed sprints</p>
-          ) : (
-            completedSprints.map(sprint => (
-              <button
-                key={sprint.id}
-                onClick={() => {
-                  setSelectedSprintId(sprint.id);
-                  handleNavClick('sprint');
-                }}
-                className="w-full text-left px-3 py-1.5 rounded text-xs hover:bg-mc-bg-tertiary transition-colors"
-              >
-                <div className="font-medium text-mc-text truncate">{sprint.name}</div>
-                <div className="text-mc-text-secondary mt-0.5">
-                  {sprint.status === 'completed' ? 'Completed' : 'Cancelled'}
-                </div>
-              </button>
-            ))
+      {completedSprints.length > 0 && (
+        <>
+          <button
+            onClick={() => setHistoryOpen(!historyOpen)}
+            className={`w-full flex ${minimized ? 'justify-center py-2' : 'items-center gap-3 px-3 py-2'} rounded text-sm transition-colors ${
+              historyOpen ? 'bg-mc-accent/10 text-mc-accent' : 'text-mc-text-secondary hover:text-mc-text hover:bg-mc-bg-tertiary'
+            }`}
+            title={minimized ? 'Sprint History' : undefined}
+          >
+            <Clock className="w-4 h-4" />
+            {!minimized && (
+              <>
+                <span className="flex-1 text-left">History</span>
+                {historyOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+              </>
+            )}
+          </button>
+          {!minimized && historyOpen && (
+            <div className="ml-7 space-y-0.5">
+              {completedSprints.map(sprint => (
+                <button
+                  key={sprint.id}
+                  onClick={() => {
+                    setSelectedSprintId(sprint.id);
+                    handleNavClick('sprint');
+                  }}
+                  className="w-full text-left px-3 py-1.5 rounded text-xs hover:bg-mc-bg-tertiary transition-colors"
+                >
+                  <div className="font-medium text-mc-text truncate">{sprint.name}</div>
+                  <div className="text-mc-text-secondary mt-0.5">
+                    {sprint.status === 'completed' ? 'Completed' : 'Cancelled'}
+                  </div>
+                </button>
+              ))}
+            </div>
           )}
-        </div>
+        </>
       )}
     </div>
   );
