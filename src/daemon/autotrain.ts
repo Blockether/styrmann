@@ -72,15 +72,15 @@ export function startAutoTrain(config: DaemonConfig, stats: DaemonStats): () => 
         // Include signal count in stateKey so RESUME after STOP works
         const stateKey = `${task.status}:${task.updated_at || ''}:${signalCount}`;
         if (handledStates.get(task.id) === stateKey) {
-          log.info(`Task ${task.id}: skipping - state already processed (iter=${dispatchCount}/${maxIterations}, signals=${signalCount})`);
+          log.debug(`Task ${task.id}: skipping - state already processed (iter=${dispatchCount}/${maxIterations}, signals=${signalCount})`);
           continue;
         }
 
-        log.info(`Task ${task.id}: processing (iter=${dispatchCount}/${maxIterations}, signals=${signalCount}, stateKey=${stateKey})`);
+        log.debug(`Task ${task.id}: processing (iter=${dispatchCount}/${maxIterations}, signals=${signalCount}, stateKey=${stateKey})`);
 
         const controlSignal = getControlSignal(activities);
         if (controlSignal === 'stop' || dispatchCount >= maxIterations) {
-          log.info(`Task ${task.id}: stopping - signal=${controlSignal || 'none'}, atMax=${dispatchCount >= maxIterations}`);
+          log.debug(`Task ${task.id}: stopping - signal=${controlSignal || 'none'}, atMax=${dispatchCount >= maxIterations}`);
           handledStates.set(task.id, stateKey);
           stats.autotrainStoppedCount = (stats.autotrainStoppedCount || 0) + 1;
           await mcFetch(`/api/tasks/${task.id}/activities`, {
@@ -97,7 +97,7 @@ export function startAutoTrain(config: DaemonConfig, stats: DaemonStats): () => 
 
         if (!task.assigned_agent_id) {
           handledStates.set(task.id, stateKey);
-          log.info(`Task ${task.id}: pausing - no agent assigned`);
+          log.debug(`Task ${task.id}: pausing - no agent assigned`);
           await mcFetch(`/api/tasks/${task.id}/activities`, {
             method: 'POST',
             body: JSON.stringify({
