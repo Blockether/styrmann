@@ -7,6 +7,7 @@ import { startHealthCheck } from './health';
 import { startRouter } from './router';
 import { startLogPoller } from './logs';
 import { startReporter } from './reporter';
+import { startRecovery } from './recovery';
 import type { DaemonStats } from './types';
 
 const log = createLogger('daemon');
@@ -32,6 +33,8 @@ async function main() {
     routedEventCount: 0,
     logEntriesStored: 0,
     logEntriesCleaned: 0,
+    stalledRedispatchedCount: 0,
+    stalledReassignedCount: 0,
   };
 
   const config = {
@@ -41,6 +44,7 @@ async function main() {
     dispatchIntervalMs: 10_000,
     schedulerIntervalMs: 10_000,
     logPollIntervalMs: 30_000,
+    recoveryIntervalMs: 60_000,
   };
 
   // Start all modules
@@ -50,19 +54,21 @@ async function main() {
   const stopScheduler = startScheduler(config, stats);
   const stopRouter = startRouter(config, stats);
   const stopLogPoller = startLogPoller(config, stats);
+  const stopRecovery = startRecovery(config, stats);
   const stopReporter = startReporter(config, stats);
 
   // Clean shutdown
   const shutdown = () => {
     log.info('Shutting down...');
     stopReporter();
+    stopRecovery();
     stopLogPoller();
     stopRouter();
     stopScheduler();
     stopDispatcher();
     stopHeartbeat();
     stopHealth();
-    log.info(`Daemon stopped. Stats: dispatched=${stats.dispatchedCount} heartbeats=${stats.heartbeatCount} stale_recovered=${stats.staleRecoveredCount} events_routed=${stats.routedEventCount} logs_stored=${stats.logEntriesStored || 0}`);
+    log.info(`Daemon stopped. Stats: dispatched=${stats.dispatchedCount} heartbeats=${stats.heartbeatCount} stale_recovered=${stats.staleRecoveredCount} stale_redispatched=${stats.stalledRedispatchedCount || 0} stale_reassigned=${stats.stalledReassignedCount || 0} events_routed=${stats.routedEventCount} logs_stored=${stats.logEntriesStored || 0}`);
     process.exit(0);
   };
 

@@ -31,6 +31,7 @@ export function startReporter(config: DaemonConfig, stats: DaemonStats): () => v
         last_dispatch_tick: stats.lastDispatchTick,
         last_scheduler_tick: stats.lastSchedulerTick,
         last_log_poll_tick: stats.lastLogPollTick,
+        last_recovery_tick: stats.lastRecoveryTick,
         // Counters
         dispatched_count: stats.dispatchedCount,
         heartbeat_count: stats.heartbeatCount,
@@ -40,6 +41,8 @@ export function startReporter(config: DaemonConfig, stats: DaemonStats): () => v
         routed_event_count: stats.routedEventCount,
         log_entries_stored: stats.logEntriesStored || 0,
         log_entries_cleaned: stats.logEntriesCleaned || 0,
+        stalled_redispatched_count: stats.stalledRedispatchedCount || 0,
+        stalled_reassigned_count: stats.stalledReassignedCount || 0,
         // Process
         memory_mb: Math.round(mem.rss / 1024 / 1024 * 10) / 10,
         pid: process.pid,
@@ -51,6 +54,7 @@ export function startReporter(config: DaemonConfig, stats: DaemonStats): () => v
           { name: 'scheduler', interval_ms: config.schedulerIntervalMs, last_tick: stats.lastSchedulerTick },
           { name: 'router', interval_ms: 0, last_tick: undefined },  // continuous SSE
           { name: 'log_poller', interval_ms: config.logPollIntervalMs, last_tick: stats.lastLogPollTick },
+          { name: 'recovery', interval_ms: config.recoveryIntervalMs, last_tick: stats.lastRecoveryTick },
           { name: 'reporter', interval_ms: 30_000, last_tick: new Date().toISOString() },
         ],
         // Registered scheduled jobs

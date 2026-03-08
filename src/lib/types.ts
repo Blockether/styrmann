@@ -611,6 +611,7 @@ export interface DaemonStatsSnapshot {
   last_dispatch_tick?: string;
   last_scheduler_tick?: string;
   last_log_poll_tick?: string;
+  last_recovery_tick?: string;
   // Counters
   dispatched_count: number;
   heartbeat_count: number;
@@ -620,6 +621,8 @@ export interface DaemonStatsSnapshot {
   routed_event_count: number;
   log_entries_stored: number;
   log_entries_cleaned: number;
+  stalled_redispatched_count?: number;
+  stalled_reassigned_count?: number;
   // Process
   memory_mb: number;
   pid: number;

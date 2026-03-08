@@ -466,16 +466,18 @@ The Next.js server handles HTTP request/response cycles but has no built-in mech
 
 ### Architecture
 
-The daemon is a standalone Node.js process with six modules:
+The daemon is a standalone Node.js process with eight modules:
 
 | Module | Interval | Purpose |
 |--------|----------|---------|
 | **heartbeat** | 30s | Polls `/api/agents`, detects stale working agents (>60 min without activity), sets them to standby |
 | **dispatcher** | 10s | Polls `/api/tasks?status=assigned`, auto-dispatches each via `POST /api/tasks/{id}/dispatch` |
 | **scheduler** | 10s | Runs registered `ScheduledJob` entries on interval. Job registry starts empty — no hardcoded jobs |
+| **recovery** | 60s | Polls `in_progress` tasks, detects stale work (default >30m without updates), and performs auto-recovery (re-dispatch to assignee or reassign to fallback orchestrator) |
 | **health** | 60s | Pings MC to verify API is reachable, logs connection changes |
 | **router** | SSE stream | Subscribes to `/api/events/stream`, routes events (e.g., logs task assignments for dispatcher awareness) |
 | **logs** | 30s | Polls OpenClaw session histories via `/api/openclaw/sessions/{id}/history`, stores new entries in `agent_logs` table via `/api/logs/ingest`, broadcasts `agent_log_added` SSE events, auto-cleans entries older than 30 days |
+| **reporter** | 30s | Pushes daemon runtime snapshot to `/api/daemon/stats` for Operations UI visibility |
 Communication flow: `Daemon → HTTP API → Next.js → SQLite / OpenClaw Gateway → SSE broadcast → UI`
 
 For SSE relay (daemon pushing events to browser clients): `Daemon → POST /api/events/broadcast → in-memory SSE broadcaster → connected browsers`
@@ -490,7 +492,7 @@ npm run daemon
 npm run daemon:dev
 ```
 
-Env vars: `MC_URL` (default `http://localhost:4000`), `MC_API_TOKEN` (required — same token used by `mc` CLI).
+Env vars: `MC_URL` (default `http://localhost:4000`), `MC_API_TOKEN` (required — same token used by `mc` CLI), `MC_STALLED_TASK_THRESHOLD_MS` (default `1800000`), `MC_STALLED_TASK_COOLDOWN_MS` (default `600000`).
 
 ### Database Tables
 
