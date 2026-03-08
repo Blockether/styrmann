@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Plus, ArrowRight, Folder, CheckSquare, Trash2, AlertTriangle, Activity, Mail, Pencil, GitBranch } from 'lucide-react';
+import { ArrowRight, Folder, CheckSquare, Trash2, AlertTriangle, Pencil, GitBranch, Search, Loader2 } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import type { WorkspaceStats } from '@/lib/types';
@@ -142,11 +142,6 @@ export function WorkspaceDashboard() {
 function WorkspaceCard({ workspace, onDelete, onEdit }: { workspace: WorkspaceStats; onDelete: (id: string) => void; onEdit: (workspace: WorkspaceStats) => void }) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const normalizedGithubRepo = workspace.github_repo
-    ? (workspace.github_repo.startsWith('http://') || workspace.github_repo.startsWith('https://')
-      ? workspace.github_repo
-      : `https://${workspace.github_repo}`)
-    : null;
 
   const handleDelete = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -171,8 +166,8 @@ function WorkspaceCard({ workspace, onDelete, onEdit }: { workspace: WorkspaceSt
   return (
     <>
     <Link href={`/workspace/${workspace.slug}`}>
-      <div className="bg-mc-bg-secondary border border-mc-border rounded-xl p-4 sm:p-6 hover:border-mc-accent/50 transition-all hover:shadow-lg cursor-pointer group relative h-[240px]">
-        <div className="flex items-start justify-between mb-4">
+      <div className="bg-mc-bg-secondary border border-mc-border rounded-xl p-4 sm:p-5 hover:border-mc-accent/50 transition-all hover:shadow-lg cursor-pointer group">
+        <div className="flex items-start justify-between mb-3">
           <div className="flex items-center gap-3 min-w-0 flex-1">
             {workspace.logo_url ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -184,7 +179,7 @@ function WorkspaceCard({ workspace, onDelete, onEdit }: { workspace: WorkspaceSt
               {workspace.name}
             </h3>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
             <button
               onClick={(e) => {
                 e.preventDefault();
@@ -214,53 +209,12 @@ function WorkspaceCard({ workspace, onDelete, onEdit }: { workspace: WorkspaceSt
         </div>
 
         {workspace.description && (
-          <p className="text-xs text-mc-text-secondary line-clamp-2 mt-1">{workspace.description}</p>
+          <p className="text-xs text-mc-text-secondary line-clamp-2 mb-3">{workspace.description}</p>
         )}
 
-        <div className="flex items-center gap-4 text-sm text-mc-text-secondary mt-4">
-          <div className="flex items-center gap-1">
-            <CheckSquare className="w-4 h-4" />
-            <span>{workspace.taskCounts.total} tasks</span>
-          </div>
-        </div>
-
-        <div className="mt-3 space-y-1.5 text-sm text-mc-text-secondary">
-          {normalizedGithubRepo && (
-            <button
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                window.open(normalizedGithubRepo, '_blank', 'noopener,noreferrer');
-              }}
-              className="inline-flex items-center gap-1.5 hover:text-mc-accent transition-colors"
-            >
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="w-4 h-4"
-                aria-hidden="true"
-              >
-                <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22" />
-              </svg>
-              <span className="truncate max-w-[220px]">{workspace.github_repo}</span>
-            </button>
-          )}
-          {workspace.owner_email && (
-            <div className="flex items-center gap-1.5">
-              <Mail className="w-4 h-4" />
-              <span className="truncate">Owner: {workspace.owner_email}</span>
-            </div>
-          )}
-          {workspace.coordinator_email && (
-            <div className="flex items-center gap-1.5">
-              <Mail className="w-4 h-4" />
-              <span className="truncate">Coordinator: {workspace.coordinator_email}</span>
-            </div>
-          )}
+        <div className="flex items-center gap-1 text-sm text-mc-text-secondary">
+          <CheckSquare className="w-3.5 h-3.5" />
+          <span>{workspace.taskCounts.total} tasks</span>
         </div>
       </div>
     </Link>
@@ -441,86 +395,156 @@ function EditWorkspaceModal({ workspace, onClose, onSaved }: { workspace: Worksp
   );
 }
 
+interface GhRepoItem {
+  name: string;
+  fullName: string;
+  description: string | null;
+  cloned: boolean;
+}
+
 function CloneRepoModal({ onClose, onCloned }: { onClose: () => void; onCloned: () => void }) {
-  const [repo, setRepo] = useState('');
-  const [isCloning, setIsCloning] = useState(false);
+  const [org, setOrg] = useState('Blockether');
+  const [repos, setRepos] = useState<GhRepoItem[]>([]);
+  const [loadingRepos, setLoadingRepos] = useState(false);
+  const [filter, setFilter] = useState('');
+  const [cloning, setCloning] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!repo.trim()) return;
+  // Fetch repos when org changes
+  useEffect(() => {
+    if (!org.trim()) return;
+    let cancelled = false;
+    setLoadingRepos(true);
+    setError(null);
 
-    setIsCloning(true);
+    fetch(`/api/github/repos?org=${encodeURIComponent(org.trim())}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (cancelled) return;
+        if (Array.isArray(data)) {
+          setRepos(data);
+        } else {
+          setError(data.error || 'Failed to load repos');
+        }
+      })
+      .catch(() => !cancelled && setError('Failed to fetch repos'))
+      .finally(() => !cancelled && setLoadingRepos(false));
+
+    return () => { cancelled = true; };
+  }, [org]);
+
+  const handleClone = async (fullName: string) => {
+    setCloning(fullName);
     setError(null);
 
     try {
       const res = await fetch('/api/workspaces/clone', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ repo: repo.trim() }),
+        body: JSON.stringify({ repo: fullName }),
       });
-
       const data = await res.json();
 
       if (res.ok) {
+        // Update the list to mark as cloned
+        setRepos((prev) => prev.map((r) => r.fullName === fullName ? { ...r, cloned: true } : r));
         onCloned();
       } else {
-        setError(data.error || 'Failed to clone repository');
+        setError(data.error || 'Clone failed');
       }
     } catch {
-      setError('Failed to clone repository');
+      setError('Clone failed');
     } finally {
-      setIsCloning(false);
+      setCloning(null);
     }
   };
 
+  const filtered = repos.filter((r) =>
+    r.name.toLowerCase().includes(filter.toLowerCase()),
+  );
+
   return (
     <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-3 sm:p-4" onClick={onClose}>
-      <div className="bg-mc-bg-secondary border border-mc-border rounded-t-xl sm:rounded-xl w-full max-w-md pb-[env(safe-area-inset-bottom)] sm:pb-0" onClick={e => e.stopPropagation()}>
-        <div className="p-5 border-b border-mc-border">
+      <div className="bg-mc-bg-secondary border border-mc-border rounded-t-xl sm:rounded-xl w-full max-w-lg pb-[env(safe-area-inset-bottom)] sm:pb-0 max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <div className="p-5 border-b border-mc-border flex-shrink-0">
           <h2 className="text-lg font-semibold">Clone Repository</h2>
-          <p className="text-sm text-mc-text-secondary mt-1">
-            Clone a GitHub repo into the local workspace
-          </p>
-        </div>
-
-        <form onSubmit={handleSubmit} className="p-5 space-y-4">
-          <div>
-            <label className="block text-sm font-medium mb-2">Repository</label>
+          <div className="mt-3 flex gap-2">
             <input
               type="text"
-              value={repo}
-              onChange={(e) => setRepo(e.target.value)}
-              placeholder="org/repo-name"
-              className="w-full bg-mc-bg border border-mc-border rounded-lg px-4 py-2.5 font-mono text-sm focus:outline-none focus:border-mc-accent"
-              autoFocus
+              value={org}
+              onChange={(e) => setOrg(e.target.value)}
+              placeholder="GitHub org"
+              className="w-32 bg-mc-bg border border-mc-border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-mc-accent"
             />
-            <p className="text-xs text-mc-text-secondary mt-1.5">
-              Runs <code className="bg-mc-bg-tertiary px-1 py-0.5 rounded text-[11px]">gh repo clone</code> into /root/repos/org/repo
-            </p>
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-mc-text-secondary" />
+              <input
+                type="text"
+                value={filter}
+                onChange={(e) => setFilter(e.target.value)}
+                placeholder="Filter repos..."
+                className="w-full bg-mc-bg border border-mc-border rounded-lg pl-8 pr-3 py-1.5 text-sm focus:outline-none focus:border-mc-accent"
+              />
+            </div>
           </div>
+        </div>
 
-          {error && (
-            <div className="text-mc-accent-red text-sm bg-mc-accent-red/10 px-3 py-2 rounded-lg">{error}</div>
+        <div className="flex-1 overflow-y-auto min-h-0">
+          {loadingRepos ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-5 h-5 animate-spin text-mc-text-secondary" />
+              <span className="ml-2 text-sm text-mc-text-secondary">Loading repos...</span>
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="text-center py-12 text-sm text-mc-text-secondary">
+              {repos.length === 0 ? 'No repos found' : 'No matches'}
+            </div>
+          ) : (
+            <div className="divide-y divide-mc-border">
+              {filtered.map((repo) => (
+                <div
+                  key={repo.fullName}
+                  className="px-5 py-3 flex items-center justify-between gap-3 hover:bg-mc-bg-tertiary/50"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="font-medium text-sm truncate">{repo.name}</div>
+                    {repo.description && (
+                      <p className="text-xs text-mc-text-secondary truncate mt-0.5">{repo.description}</p>
+                    )}
+                  </div>
+                  {repo.cloned ? (
+                    <span className="text-xs text-mc-text-secondary bg-mc-bg-tertiary px-2 py-1 rounded flex-shrink-0">
+                      Cloned
+                    </span>
+                  ) : (
+                    <button
+                      onClick={() => handleClone(repo.fullName)}
+                      disabled={cloning !== null}
+                      className="text-xs font-medium text-mc-accent hover:text-mc-accent/80 bg-mc-accent/10 hover:bg-mc-accent/20 px-3 py-1 rounded transition-colors disabled:opacity-50 flex-shrink-0"
+                    >
+                      {cloning === repo.fullName ? 'Cloning...' : 'Clone'}
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
           )}
+        </div>
 
-          <div className="border-t border-mc-border pt-4 flex justify-end gap-3">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-sm text-mc-text-secondary hover:text-mc-text"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={!repo.trim() || isCloning}
-              className="px-5 py-2 text-sm bg-mc-accent text-white rounded-lg font-medium hover:bg-mc-accent/90 disabled:opacity-50"
-            >
-              {isCloning ? 'Cloning...' : 'Clone'}
-            </button>
+        {error && (
+          <div className="px-5 py-2 border-t border-mc-border">
+            <div className="text-mc-accent-red text-xs bg-mc-accent-red/10 px-3 py-2 rounded">{error}</div>
           </div>
-        </form>
+        )}
+
+        <div className="border-t border-mc-border p-4 flex justify-end flex-shrink-0">
+          <button
+            onClick={onClose}
+            className="px-4 py-1.5 text-sm text-mc-text-secondary hover:text-mc-text"
+          >
+            Done
+          </button>
+        </div>
       </div>
     </div>
   );
