@@ -263,11 +263,32 @@ If you need help or clarification, ask the orchestrator.`;
     try {
       const prefix = agent.session_key_prefix || 'agent:main:';
       const sessionKey = `${prefix}${session.openclaw_session_id}`;
+      const traceUrl = `${missionControlUrl}/api/tasks/${task.id}/sessions/${session.openclaw_session_id}/trace`;
       await client.call('chat.send', {
         sessionKey,
         message: taskMessage,
         idempotencyKey: `dispatch-${task.id}-${Date.now()}`,
       });
+
+      run(
+        `INSERT INTO task_activities (id, task_id, agent_id, activity_type, message, metadata, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [
+          crypto.randomUUID(),
+          task.id,
+          agent.id,
+          'dispatch_invocation',
+          `Dispatch invocation sent to ${agent.name}`,
+          JSON.stringify({
+            openclaw_session_id: session.openclaw_session_id,
+            session_key: sessionKey,
+            trace_url: traceUrl,
+            output_directory: taskProjectDir,
+            invocation: taskMessage,
+          }),
+          now,
+        ],
+      );
 
       if (task.status === 'assigned') {
         run('UPDATE tasks SET status = ?, updated_at = ? WHERE id = ?', ['in_progress', now, taskId]);

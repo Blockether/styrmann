@@ -22,7 +22,8 @@ const ActivityType = z.enum([
   'updated',
   'completed',
   'file_created',
-  'status_changed'
+  'status_changed',
+  'dispatch_invocation'
 ]);
 
 const DeliverableType = z.enum(['file', 'url', 'artifact']);

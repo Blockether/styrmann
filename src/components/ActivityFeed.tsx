@@ -45,6 +45,7 @@ interface FeedItem {
   message: string;
   role: string | null;
   metadata: Record<string, unknown> | null;
+  trace_url: string | null;
   created_at: string;
 }
 
@@ -445,6 +446,19 @@ export function ActivityFeed({ workspaceId, sprintId }: ActivityFeedProps) {
                                 >
                                   {expandedMessages.has(item.id) ? 'Show less' : 'Show more'}
                                 </button>
+                              )}
+
+                              {item.trace_url && (
+                                <div className="mt-2">
+                                  <a
+                                    href={item.trace_url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-xs text-mc-accent hover:underline"
+                                  >
+                                    Open session trace
+                                  </a>
+                                </div>
                               )}
                             </div>
                           </div>

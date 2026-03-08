@@ -380,6 +380,16 @@ Webhook verification: `WEBHOOK_SECRET` env var, HMAC signature in `x-webhook-sig
 
 **Git repo handling**: repo validation uses git worktree detection (`git rev-parse --is-inside-work-tree`), not `.git` directory checks, so linked worktrees are supported.
 
+**Session trace persistence**:
+- Every dispatch writes a `task_activities` record with `activity_type='dispatch_invocation'` and metadata including:
+  - `openclaw_session_id`
+  - `session_key`
+  - `trace_url`
+  - `output_directory`
+  - `invocation` (full dispatched prompt)
+- Per-session trace endpoint: `GET /api/tasks/{id}/sessions/{sessionId}/trace` returns dispatch invocation + normalized OpenClaw chat history.
+- Workspace Activity and Task Activity surfaces include links to session traces when available.
+
 **Completion format**: `TASK_COMPLETE: [summary] | deliverables: [paths] | verification: [how verified]`
 
 **Progress**: `PROGRESS_UPDATE: [what changed] | next: [next step] | eta: [time]`

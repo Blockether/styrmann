@@ -21,6 +21,7 @@ interface SessionWithAgent {
   created_at: string;
   updated_at: string;
   agent_name?: string;
+  trace_url?: string;
 }
 
 interface SessionsListProps {
@@ -172,6 +173,19 @@ export function SessionsList({ taskId }: SessionsListProps) {
             <div className="text-xs text-mc-text-secondary font-mono mb-2 truncate">
               Session: {session.openclaw_session_id}
             </div>
+
+            {session.trace_url && (
+              <div className="mb-2">
+                <a
+                  href={session.trace_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-mc-accent hover:underline"
+                >
+                  View full trace
+                </a>
+              </div>
+            )}
 
             {/* Duration and timestamps */}
             <div className="flex items-center gap-3 text-xs text-mc-text-secondary">

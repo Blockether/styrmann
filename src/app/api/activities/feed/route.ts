@@ -23,6 +23,7 @@ interface FeedItem {
   activity_type: string | null;
   message: string;
   metadata: string | null;
+  trace_url: string | null;
   // agent_log fields
   role: string | null;
   created_at: string;
@@ -81,6 +82,7 @@ export async function GET(request: NextRequest) {
           a.activity_type,
           a.message,
           a.metadata,
+          json_extract(a.metadata, '$.trace_url') as trace_url,
           NULL as role,
           a.created_at
         FROM task_activities a
@@ -107,6 +109,7 @@ export async function GET(request: NextRequest) {
           NULL as activity_type,
           l.content as message,
           NULL as metadata,
+          NULL as trace_url,
           l.role,
           l.created_at
         FROM agent_logs l

@@ -87,8 +87,21 @@ export function ActivityLog({ taskId }: ActivityLogProps) {
         return <div className={`${base} bg-purple-100 text-purple-600`}><FileText size={16} /></div>;
       case 'status_changed':
         return <div className={`${base} bg-slate-100 text-slate-500`}><ArrowRightLeft size={16} /></div>;
+      case 'dispatch_invocation':
+        return <div className={`${base} bg-mc-accent/20 text-mc-accent`}><Zap size={16} /></div>;
       default:
         return <div className={`${base} bg-mc-bg-secondary text-mc-text-secondary`}><Activity size={16} /></div>;
+    }
+  };
+
+  const getTraceUrl = (metadata?: string): string | null => {
+    if (!metadata) return null;
+    try {
+      const parsed = JSON.parse(metadata) as Record<string, unknown>;
+      const traceUrl = parsed.trace_url;
+      return typeof traceUrl === 'string' && traceUrl ? traceUrl : null;
+    } catch {
+      return null;
     }
   };
 
@@ -142,6 +155,19 @@ export function ActivityLog({ taskId }: ActivityLogProps) {
                 {typeof activity.metadata === 'string' 
                   ? activity.metadata 
                   : JSON.stringify(JSON.parse(activity.metadata), null, 2)}
+              </div>
+            )}
+
+            {getTraceUrl(activity.metadata) && (
+              <div className="mt-2">
+                <a
+                  href={getTraceUrl(activity.metadata) || '#'}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-mc-accent hover:underline"
+                >
+                  Open session trace
+                </a>
               </div>
             )}
 

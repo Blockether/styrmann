@@ -21,9 +21,14 @@ export async function GET(
         WHERE s.task_id = ? AND s.session_type = 'subagent'
         ORDER BY s.created_at DESC`,
       )
-      .all(taskId);
+      .all(taskId) as Array<Record<string, unknown>>;
 
-    return NextResponse.json(sessions);
+    const sessionsWithTrace = sessions.map((session) => ({
+      ...session,
+      trace_url: `/api/tasks/${taskId}/sessions/${String(session.openclaw_session_id)}/trace`,
+    }));
+
+    return NextResponse.json(sessionsWithTrace);
   } catch (error) {
     console.error('Error fetching task sessions:', error);
     return NextResponse.json({ error: 'Failed to fetch task sessions' }, { status: 500 });
