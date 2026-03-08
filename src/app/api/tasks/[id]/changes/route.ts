@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { existsSync } from 'fs';
-import path from 'path';
 import { execFileSync } from 'child_process';
 import { getDb } from '@/lib/db';
-import { getProjectsPath } from '@/lib/config';
+import { getWorkspaceRepoPath, isGitWorkTree } from '@/lib/git-repo';
 
 export const dynamic = 'force-dynamic';
 
@@ -89,10 +87,8 @@ export async function GET(
       )
       .all(taskId);
 
-    const projectsPath = getProjectsPath();
-    const repoRel = task.workspace_repo || '';
-    const repoPath = repoRel ? path.join(projectsPath, repoRel) : null;
-    const hasRepo = Boolean(repoPath && existsSync(repoPath) && existsSync(path.join(repoPath, '.git')));
+    const repoPath = getWorkspaceRepoPath(task.workspace_repo || null);
+    const hasRepo = Boolean(repoPath && isGitWorkTree(repoPath));
 
     let commits: CommitInfo[] = [];
     if (hasRepo && repoPath) {

@@ -374,6 +374,12 @@ Webhook verification: `WEBHOOK_SECRET` env var, HMAC signature in `x-webhook-sig
 
 **Dispatch**: Task dispatched to agent via OpenClaw `chat.send` RPC. Includes task ID, description, output directory, callback endpoints. Role-specific instructions (builder: "when done, update to testing"; tester: "pass -> review, fail -> POST /fail").
 
+**Pipeline storage rule**: Agent output path is workspace-repo anchored and always under `.mission-control`:
+- `<workspace-repo>/.mission-control/tasks/<task-id>`
+- This path is used so downstream stages read the same artifacts consistently.
+
+**Git repo handling**: repo validation uses git worktree detection (`git rev-parse --is-inside-work-tree`), not `.git` directory checks, so linked worktrees are supported.
+
 **Completion format**: `TASK_COMPLETE: [summary] | deliverables: [paths] | verification: [how verified]`
 
 **Progress**: `PROGRESS_UPDATE: [what changed] | next: [next step] | eta: [time]`

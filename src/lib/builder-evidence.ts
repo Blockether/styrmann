@@ -1,8 +1,7 @@
 import { execFileSync } from 'child_process';
 import path from 'path';
-import { existsSync } from 'fs';
 import { queryOne } from '@/lib/db';
-import { getProjectsPath } from '@/lib/config';
+import { getWorkspaceRepoPath, isGitWorkTree } from '@/lib/git-repo';
 
 type TaskEvidenceRow = {
   id: string;
@@ -43,23 +42,25 @@ export function checkBuilderEvidence(taskId: string): BuilderEvidenceCheck {
     return { ok: false, has_commit: false, has_workspace_file: false };
   }
 
+  const repoPath = getWorkspaceRepoPath(task.workspace_repo || null);
+  const pipelinePrefix = repoPath ? `${path.join(repoPath, '.mission-control')}${path.sep}` : '';
+
   const workspaceFile = queryOne<{ id: string }>(
     `SELECT id
      FROM task_deliverables
-     WHERE task_id = ? AND deliverable_type = 'file' AND path IS NOT NULL AND TRIM(path) != ''
+     WHERE task_id = ?
+       AND deliverable_type = 'file'
+       AND path IS NOT NULL
+       AND TRIM(path) != ''
+       AND (? = '' OR path LIKE ?)
      LIMIT 1`,
-    [taskId],
+    [taskId, pipelinePrefix, `${pipelinePrefix}%`],
   );
   const hasWorkspaceFile = Boolean(workspaceFile);
 
   let hasCommit = false;
-  const projectsPath = getProjectsPath();
-  const repoRel = task.workspace_repo || '';
-  if (repoRel) {
-    const repoPath = path.join(projectsPath, repoRel);
-    if (existsSync(repoPath) && existsSync(path.join(repoPath, '.git'))) {
-      hasCommit = hasRepoCommitSince(repoPath, task.created_at);
-    }
+  if (repoPath && isGitWorkTree(repoPath)) {
+    hasCommit = hasRepoCommitSince(repoPath, task.created_at);
   }
 
   return {

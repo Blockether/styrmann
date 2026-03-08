@@ -2,7 +2,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { queryOne, queryAll, run } from '@/lib/db';
 import { getOpenClawClient } from '@/lib/openclaw/client';
 import { broadcast } from '@/lib/events';
-import { getProjectsPath, getMissionControlUrl } from '@/lib/config';
+import { getMissionControlUrl } from '@/lib/config';
+import { getWorkspaceRepoPath, getTaskPipelineDir, isGitWorkTree } from '@/lib/git-repo';
 import { getRelevantKnowledge, formatKnowledgeForDispatch } from '@/lib/learner';
 import { getTaskWorkflow } from '@/lib/workflow-engine';
 import type { Task, Agent, OpenClawSession, WorkflowStage } from '@/lib/types';
@@ -109,9 +110,18 @@ export async function dispatchTaskToAgent(taskId: string): Promise<DispatchResul
       urgent: 'URGENT',
     }[task.priority] || 'NORMAL';
 
-    const projectsPath = getProjectsPath();
-    const projectDir = task.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-    const taskProjectDir = `${projectsPath}/${projectDir}`;
+    const workspace = queryOne<{ github_repo?: string | null }>(
+      'SELECT github_repo FROM workspaces WHERE id = ?',
+      [task.workspace_id],
+    );
+    const repoPath = getWorkspaceRepoPath(workspace?.github_repo || null);
+    if (!repoPath || !isGitWorkTree(repoPath)) {
+      return {
+        success: false,
+        error: `Workspace repo is not a valid git worktree: ${workspace?.github_repo || 'missing github_repo'}`,
+      };
+    }
+    const taskProjectDir = getTaskPipelineDir(repoPath, task.id);
     const missionControlUrl = getMissionControlUrl();
 
     const rawTask = task as Task & {
@@ -245,7 +255,7 @@ ${task.description ? `**Description:** ${task.description}\n` : ''}
 ${task.due_date ? `**Due:** ${task.due_date}\n` : ''}
 **Task ID:** ${task.id}
 ${planningSpecSection}${agentInstructionsSection}${knowledgeSection}
-${isBuilder ? `**OUTPUT DIRECTORY:** ${taskProjectDir}\nCreate this directory and save all deliverables there.\n` : `**OUTPUT DIRECTORY:** ${taskProjectDir}\n`}
+${isBuilder ? `**OUTPUT DIRECTORY:** ${taskProjectDir}\nCreate this directory and save all deliverables there. Do not write outside .mission-control/task pipeline path.\n` : `**OUTPUT DIRECTORY:** ${taskProjectDir}\nRead prior artifacts from this .mission-control path if needed.\n`}
 ${completionInstructions}
 
 If you need help or clarification, ask the orchestrator.`;
