@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { queryOne, run } from '@/lib/db';
 import { broadcast } from '@/lib/events';
+import { UpdateDeliverableSchema } from '@/lib/validation';
 import type { TaskDeliverable } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
@@ -93,21 +94,32 @@ export async function PATCH(
     }
 
     const body = await request.json();
+
+    // Validate input with Zod
+    const validation = UpdateDeliverableSchema.safeParse(body);
+    if (!validation.success) {
+      return NextResponse.json(
+        { error: 'Validation failed', details: validation.error.issues },
+        { status: 400 }
+      );
+    }
+
+    const { title, description, path } = validation.data;
     const updates: string[] = [];
     const values: unknown[] = [];
 
     // Build dynamic update query based on provided fields
-    if (body.title !== undefined) {
+    if (title !== undefined) {
       updates.push('title = ?');
-      values.push(body.title);
+      values.push(title);
     }
-    if (body.description !== undefined) {
+    if (description !== undefined) {
       updates.push('description = ?');
-      values.push(body.description);
+      values.push(description);
     }
-    if (body.path !== undefined) {
+    if (path !== undefined) {
       updates.push('path = ?');
-      values.push(body.path);
+      values.push(path);
     }
 
     if (updates.length === 0) {

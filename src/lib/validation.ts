@@ -115,6 +115,12 @@ export const CreateDeliverableSchema = z.object({
   description: z.string().optional(),
 });
 
+export const UpdateDeliverableSchema = z.object({
+  title: z.string().min(1, 'Title cannot be empty').optional(),
+  description: z.string().optional().nullable(),
+  path: z.string().optional().nullable(),
+});
+
 export const CreateMilestoneDependencySchema = z.object({
   depends_on_milestone_id: z.string().uuid().optional(),
   depends_on_task_id: z.string().uuid().optional(),
@@ -129,3 +135,4 @@ export type CreateTaskInput = z.infer<typeof CreateTaskSchema>;
 export type UpdateTaskInput = z.infer<typeof UpdateTaskSchema>;
 export type CreateActivityInput = z.infer<typeof CreateActivitySchema>;
 export type CreateDeliverableInput = z.infer<typeof CreateDeliverableSchema>;
+export type UpdateDeliverableInput = z.infer<typeof UpdateDeliverableSchema>;
