@@ -76,6 +76,7 @@ export function TeamTab({ taskId, workspaceId }: TeamTabProps) {
 
   // Unique roles (remove duplicates)
   const uniqueRoles = Array.from(new Set(requiredRoles));
+  const isTemplateLocked = Boolean(currentWorkflow);
 
   const handleWorkflowChange = async (templateId: string) => {
     setSelectedWorkflow(templateId);
@@ -92,21 +93,21 @@ export function TeamTab({ taskId, workspaceId }: TeamTabProps) {
       // Best-effort
     }
 
-    // If a workflow is selected, ensure role slots exist for its stages
     const wf = workflows.find(w => w.id === templateId);
     if (wf) {
       const wfRoles = Array.from(new Set(
         wf.stages.filter((s: WorkflowStage) => s.role).map((s: WorkflowStage) => s.role as string)
       ));
-      const existingRoleNames = roles.map(r => r.role);
-      const newRoles = [...roles];
-
-      for (const role of wfRoles) {
-        if (!existingRoleNames.includes(role)) {
-          newRoles.push({ role, agent_id: '' });
-        }
-      }
-      setRoles(newRoles);
+      const roleMap = new Map(roles.map((r) => [r.role, r]));
+      const nextRoles = wfRoles.map((role) => {
+        const existing = roleMap.get(role);
+        return {
+          role,
+          agent_id: existing?.agent_id || '',
+          agent_name: existing?.agent_name,
+        };
+      });
+      setRoles(nextRoles);
     }
   };
 
@@ -127,7 +128,11 @@ export function TeamTab({ taskId, workspaceId }: TeamTabProps) {
     setSaved(false);
 
     try {
-      const validRoles = roles.filter(r => r.role && r.agent_id);
+      const validRoles = roles.filter((r) => {
+        if (!r.role || !r.agent_id) return false;
+        if (isTemplateLocked) return uniqueRoles.includes(r.role);
+        return true;
+      });
       const res = await fetch(`/api/tasks/${taskId}/roles`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -163,6 +168,9 @@ export function TeamTab({ taskId, workspaceId }: TeamTabProps) {
   const missingRoles = uniqueRoles.filter(role =>
     !roles.find(r => r.role === role && r.agent_id)
   );
+  const visibleRoles = isTemplateLocked
+    ? uniqueRoles
+    : roles.map((r) => r.role).filter(Boolean);
 
   return (
     <div data-component="src/components/TeamTab" className="space-y-6">
@@ -234,7 +242,7 @@ export function TeamTab({ taskId, workspaceId }: TeamTabProps) {
       <div>
         <label className="block text-sm font-medium mb-2">Role Assignments</label>
         <div className="space-y-3">
-          {(uniqueRoles.length > 0 ? uniqueRoles : roles.map(r => r.role).filter(Boolean)).map(role => {
+          {visibleRoles.map(role => {
             if (!role) return null;
             const assignment = roles.find(r => r.role === role);
             return (
@@ -258,7 +266,7 @@ export function TeamTab({ taskId, workspaceId }: TeamTabProps) {
             );
           })}
 
-          {roles.filter(r => !uniqueRoles.includes(r.role) && r.role).map((r, i) => (
+          {!isTemplateLocked && roles.filter(r => !uniqueRoles.includes(r.role) && r.role).map((r, i) => (
             <div key={`custom-${i}`} className="flex items-center gap-3">
               <input
                 value={r.role}
@@ -285,7 +293,7 @@ export function TeamTab({ taskId, workspaceId }: TeamTabProps) {
             </div>
           ))}
 
-          {!uniqueRoles.includes('learner') && (
+          {!isTemplateLocked && !uniqueRoles.includes('learner') && (
             <div className="flex items-center gap-3 opacity-60 hover:opacity-100 transition-opacity">
               <div className="w-24 text-xs font-medium text-mc-text-secondary capitalize flex-shrink-0">
                 learner
@@ -305,12 +313,14 @@ export function TeamTab({ taskId, workspaceId }: TeamTabProps) {
             </div>
           )}
 
-          <button
-            onClick={addCustomRole}
-            className="text-xs text-mc-accent hover:text-mc-accent/80"
-          >
-            + Add custom role
-          </button>
+          {!isTemplateLocked && (
+            <button
+              onClick={addCustomRole}
+              className="text-xs text-mc-accent hover:text-mc-accent/80"
+            >
+              + Add custom role
+            </button>
+          )}
         </div>
       </div>
 
