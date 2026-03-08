@@ -154,13 +154,14 @@ Workspace-scoped. Many-to-many with tasks via `task_tags` junction table. Each t
 
 ## Workflow Engine
 
-Three workflow templates: Simple, Standard, Strict.
+Four workflow templates: Simple, Standard, Strict, Auto-Train.
 
 | Template | Pipeline | Default |
 |----------|----------|---------|
 | Simple | Builder -> Done | No |
 | Standard | Builder -> Tester -> Reviewer -> Done | No |
 | Strict | Builder -> Tester -> Human Verifier (queue) -> Reviewer (verification) -> Done | Yes |
+| Auto-Train | Builder -> Loop Complete | No |
 
 The Strict template is the default. The `review` stage is labeled "Human Verifier" -- it is a queue stage (role=null, no dispatch). Verification is active QC by the `reviewer` role.
 
@@ -177,6 +178,13 @@ The Strict template is the default. The `review` stage is labeled "Human Verifie
 - Violations return `409` and task status is not advanced.
 
 **Template definitions are hardcoded** in `src/lib/workflow-templates.ts`. New workspaces get templates provisioned from these code constants via `provisionWorkflowTemplates()`. The legacy `cloneWorkflowTemplates()` in `bootstrap-agents.ts` delegates to the same function for backward compatibility.
+
+**Auto-Train loop:**
+- `task_type='autotrain'` marks a task as a continuous repo-improvement loop.
+- New autotrain tasks auto-select the `Auto-Train` workflow template when available.
+- The daemon module `src/daemon/autotrain.ts` watches `done` autotrain tasks and reopens them to `assigned` for the next iteration.
+- Scope is workspace-local only; dispatch pins work to the workspace repo and `.mission-control/tasks/{taskId}/iter-{n}`.
+- The task description acts as the supervisor prompt. Optional stop control: include `MAX_ITERATIONS: N` in the prompt.
 
 ---
 
@@ -393,6 +401,11 @@ Webhook verification: `WEBHOOK_SECRET` env var, HMAC signature in `x-webhook-sig
 - Per-session trace endpoint: `GET /api/tasks/{id}/sessions/{sessionId}/trace` returns dispatch invocation + normalized OpenClaw chat history.
 - Workspace Activity and Task Activity surfaces include links to session traces when available.
 
+**Auto-Train dispatch specialization**:
+- For `task_type='autotrain'`, dispatch prompt switches to a continuous loop contract: inspect -> propose -> implement -> verify -> report.
+- Dispatch includes active ACP binding context for the workspace when present (`acp_session_key`, `acp_agent_id`, `discord_thread_id`).
+- Iteration summaries from recent activities are injected into the next loop dispatch.
+
 **Completion format**: `TASK_COMPLETE: [summary] | deliverables: [paths] | verification: [how verified]`
 
 **Progress**: `PROGRESS_UPDATE: [what changed] | next: [next step] | eta: [time]`
@@ -491,7 +504,7 @@ The Next.js server handles HTTP request/response cycles but has no built-in mech
 
 ### Architecture
 
-The daemon is a standalone Node.js process with eight modules:
+The daemon is a standalone Node.js process with nine modules:
 
 | Module | Interval | Purpose |
 |--------|----------|---------|
@@ -499,6 +512,7 @@ The daemon is a standalone Node.js process with eight modules:
 | **dispatcher** | 10s | Polls `/api/tasks?status=assigned`, auto-dispatches each via `POST /api/tasks/{id}/dispatch` |
 | **scheduler** | 10s | Runs registered `ScheduledJob` entries on interval. Job registry starts empty — no hardcoded jobs |
 | **recovery** | 60s | Polls `in_progress` tasks, detects stale work (default >30m without updates), and performs auto-recovery (re-dispatch to assignee or reassign to fallback orchestrator) |
+| **autotrain** | 30s | Polls completed `autotrain` tasks and reopens them for the next repo-improvement iteration until stop/max-iteration conditions are hit |
 | **health** | 60s | Pings MC to verify API is reachable, logs connection changes |
 | **router** | SSE stream | Subscribes to `/api/events/stream`, routes events (e.g., logs task assignments for dispatcher awareness) |
 | **logs** | 30s | Polls OpenClaw session histories via `/api/openclaw/sessions/{id}/history`, stores new entries in `agent_logs` table via `/api/logs/ingest`, broadcasts `agent_log_added` SSE events, auto-cleans entries older than 30 days |

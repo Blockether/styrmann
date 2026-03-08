@@ -6,6 +6,7 @@ export interface DaemonConfig {
   schedulerIntervalMs: number;
   logPollIntervalMs: number;
   recoveryIntervalMs: number;
+  autotrainIntervalMs: number;
 }
 
 export interface ScheduledJob {
@@ -23,6 +24,7 @@ export interface DaemonStats {
   lastSchedulerTick?: string;
   lastLogPollTick?: string;
   lastRecoveryTick?: string;
+  lastAutoTrainTick?: string;
   dispatchedCount: number;
   heartbeatCount: number;
   staleRecoveredCount: number;
@@ -33,4 +35,6 @@ export interface DaemonStats {
   logEntriesCleaned?: number;
   stalledRedispatchedCount?: number;
   stalledReassignedCount?: number;
+  autotrainIterationsCount?: number;
+  autotrainStoppedCount?: number;
 }

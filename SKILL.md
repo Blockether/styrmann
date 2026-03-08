@@ -16,6 +16,21 @@ This file defines the operational contract for agents working through Mission Co
   - at least one file deliverable, or
   - at least one git commit in the workspace repo since task creation.
 
+## Auto-Train Loop
+
+- `task_type='autotrain'` means the task is a continuous improvement loop for one workspace repo.
+- The task description is the supervisor prompt.
+- Optional control: include `MAX_ITERATIONS: N` in the prompt.
+- The daemon reopens completed autotrain tasks for the next iteration automatically.
+- Each iteration must:
+  - inspect one improvement area,
+  - write a proposal under `.mission-control/tasks/<task-id>/iter-<n>/proposal.md`,
+  - implement one focused improvement,
+  - verify using repo checks,
+  - report back through activities and deliverables.
+- Never work outside the task workspace repo.
+- Never expose credentials, secrets, tokens, or `.env` contents.
+
 ## Session and Traceability
 
 - Every dispatch must be traceable to an OpenClaw session.

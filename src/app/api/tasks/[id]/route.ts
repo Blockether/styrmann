@@ -100,6 +100,17 @@ export async function PATCH(
     if (validatedData.task_type !== undefined) {
       updates.push('task_type = ?');
       values.push(validatedData.task_type);
+
+      if (validatedData.task_type === 'autotrain' && validatedData.workflow_template_id === undefined) {
+        const autoTrainTemplate = queryOne<{ id: string }>(
+          'SELECT id FROM workflow_templates WHERE workspace_id = ? AND name = ? LIMIT 1',
+          [existing.workspace_id, 'Auto-Train']
+        );
+        if (autoTrainTemplate) {
+          updates.push('workflow_template_id = ?');
+          values.push(autoTrainTemplate.id);
+        }
+      }
     }
     if (validatedData.effort !== undefined) {
       updates.push('effort = ?');

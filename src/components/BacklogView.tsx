@@ -30,6 +30,7 @@ const TASK_TYPE_CONFIG: Record<TaskType, { icon: typeof Bug; color: string }> = 
   chore: { icon: Wrench, color: 'text-blue-500' },
   documentation: { icon: BookOpen, color: 'text-green-500' },
   research: { icon: FlaskConical, color: 'text-purple-500' },
+  autotrain: { icon: Target, color: 'text-amber-500' },
 };
 
 interface BacklogViewProps {
@@ -212,6 +213,7 @@ export function BacklogView({ workspaceId }: BacklogViewProps) {
                   <option value="chore">Chore</option>
                   <option value="documentation">Documentation</option>
                   <option value="research">Research</option>
+                  <option value="autotrain">Auto-Train</option>
                 </select>
               </div>
 

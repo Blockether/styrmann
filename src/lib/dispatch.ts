@@ -110,8 +110,8 @@ export async function dispatchTaskToAgent(taskId: string): Promise<DispatchResul
       urgent: 'URGENT',
     }[task.priority] || 'NORMAL';
 
-    const workspace = queryOne<{ github_repo?: string | null }>(
-      'SELECT github_repo FROM workspaces WHERE id = ?',
+    const workspace = queryOne<{ github_repo?: string | null; name?: string | null }>(
+      'SELECT github_repo, name FROM workspaces WHERE id = ?',
       [task.workspace_id],
     );
     const repoPath = getWorkspaceRepoPath(workspace?.github_repo || null);
@@ -123,6 +123,32 @@ export async function dispatchTaskToAgent(taskId: string): Promise<DispatchResul
     }
     const taskProjectDir = getTaskPipelineDir(repoPath, task.id);
     const missionControlUrl = getMissionControlUrl();
+    const autoTrainIteration = queryOne<{ count: number }>(
+      `SELECT COUNT(*) as count FROM task_activities
+       WHERE task_id = ? AND activity_type = 'dispatch_invocation'`,
+      [task.id],
+    )?.count || 0;
+    const activeAcpBinding = queryOne<{
+      acp_session_key: string;
+      acp_agent_id: string;
+      discord_thread_id: string;
+    }>(
+      `SELECT acp_session_key, acp_agent_id, discord_thread_id
+       FROM acp_bindings
+       WHERE workspace_id = ? AND status = 'active'
+       ORDER BY updated_at DESC, created_at DESC
+       LIMIT 1`,
+      [task.workspace_id],
+    );
+    const recentAutoTrainSummaries = task.task_type === 'autotrain'
+      ? queryAll<{ message: string }>(
+          `SELECT message FROM task_activities
+           WHERE task_id = ? AND activity_type IN ('completed', 'status_changed')
+           ORDER BY created_at DESC
+           LIMIT 3`,
+          [task.id],
+        )
+      : [];
 
     const rawTask = task as Task & {
       assigned_agent_name?: string;
@@ -195,9 +221,19 @@ export async function dispatchTaskToAgent(taskId: string): Promise<DispatchResul
     const isVerifier = currentStage?.role === 'verifier' || currentStage?.role === 'reviewer';
     const nextStatus = nextStage?.status || 'review';
     const failEndpoint = `POST ${missionControlUrl}/api/tasks/${task.id}/fail`;
+    const autoTrainIterationNumber = autoTrainIteration + 1;
+    const autoTrainOutputDir = `${taskProjectDir}/iter-${autoTrainIterationNumber}`;
+    const autoTrainSummariesSection = recentAutoTrainSummaries.length > 0
+      ? recentAutoTrainSummaries.map((item, index) => `${index + 1}. ${item.message}`).join('\n')
+      : 'No prior iterations yet.';
+    const acpSection = activeAcpBinding
+      ? `\n**ACP CONTEXT:**\n- ACP session key: ${activeAcpBinding.acp_session_key}\n- ACP agent: ${activeAcpBinding.acp_agent_id}\n- Discord thread: ${activeAcpBinding.discord_thread_id}\nUse this as supervisor context if your runtime can access ACP bindings.\n`
+      : '';
 
     let completionInstructions: string;
-    if (isBuilder) {
+    if (task.task_type === 'autotrain') {
+      completionInstructions = `**AUTO-TRAIN LOOP — ITERATION ${autoTrainIterationNumber}**\nYou are continuously improving ONLY the current Mission Control workspace repository.\n\nExecute in order:\n1. INSPECT the repository for one high-value bug, UX issue, script weakness, traceability gap, or feature-enablement improvement.\n2. PROPOSE the change in ${autoTrainOutputDir}/proposal.md.\n3. IMPLEMENT exactly one focused improvement in the repo.\n4. VERIFY with the repo's own commands (prefer scripts/check.sh, then targeted validation if needed).\n5. RECORD artifacts in ${autoTrainOutputDir}.\n6. COMMIT your change with a concise message only if your runtime supports git safely; otherwise still record file evidence and verification.\n7. REPORT back to Mission Control and set the task to done so the daemon can start the next iteration.\n\nConstraints:\n- Work ONLY inside workspace repo: ${repoPath}\n- Write ALL loop artifacts under ${autoTrainOutputDir}\n- NEVER expose credentials, tokens, secrets, .env contents, or sensitive configs\n- NEVER work on any other workspace/repo\n- Keep diffs reviewable and focused\n\nPrevious iteration summaries:\n${autoTrainSummariesSection}\n\nWhen complete, call:\n1. POST ${missionControlUrl}/api/tasks/${task.id}/activities\n   Body: {"activity_type": "completed", "message": "Auto-Train iteration ${autoTrainIterationNumber}: [what improved, why, verification]"}\n2. POST ${missionControlUrl}/api/tasks/${task.id}/deliverables\n   Body: {"deliverable_type": "file", "title": "Iteration ${autoTrainIterationNumber} proposal", "path": "${autoTrainOutputDir}/proposal.md"}\n3. PATCH ${missionControlUrl}/api/tasks/${task.id}\n   Body: {"status": "done"}`;
+    } else if (isBuilder) {
       completionInstructions = `**IMPORTANT:** After completing work, you MUST call these APIs:
 1. Log activity: POST ${missionControlUrl}/api/tasks/${task.id}/activities
    Body: {"activity_type": "completed", "message": "Description of what was done"}
@@ -255,7 +291,7 @@ ${task.description ? `**Description:** ${task.description}\n` : ''}
 ${task.due_date ? `**Due:** ${task.due_date}\n` : ''}
 **Task ID:** ${task.id}
 ${planningSpecSection}${agentInstructionsSection}${knowledgeSection}
-${isBuilder ? `**OUTPUT DIRECTORY:** ${taskProjectDir}\nCreate this directory and save all deliverables there. Do not write outside .mission-control/task pipeline path.\n` : `**OUTPUT DIRECTORY:** ${taskProjectDir}\nRead prior artifacts from this .mission-control path if needed.\n`}
+${acpSection}${task.task_type === 'autotrain' ? `**OUTPUT DIRECTORY:** ${autoTrainOutputDir}\nThis iteration must write artifacts under the iteration directory inside .mission-control.\n` : isBuilder ? `**OUTPUT DIRECTORY:** ${taskProjectDir}\nCreate this directory and save all deliverables there. Do not write outside .mission-control/task pipeline path.\n` : `**OUTPUT DIRECTORY:** ${taskProjectDir}\nRead prior artifacts from this .mission-control path if needed.\n`}
 ${completionInstructions}
 
 If you need help or clarification, ask the orchestrator.`;

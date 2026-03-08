@@ -8,6 +8,7 @@ import { startRouter } from './router';
 import { startLogPoller } from './logs';
 import { startReporter } from './reporter';
 import { startRecovery } from './recovery';
+import { startAutoTrain } from './autotrain';
 import type { DaemonStats } from './types';
 
 const log = createLogger('daemon');
@@ -35,6 +36,8 @@ async function main() {
     logEntriesCleaned: 0,
     stalledRedispatchedCount: 0,
     stalledReassignedCount: 0,
+    autotrainIterationsCount: 0,
+    autotrainStoppedCount: 0,
   };
 
   const config = {
@@ -45,6 +48,7 @@ async function main() {
     schedulerIntervalMs: 10_000,
     logPollIntervalMs: 30_000,
     recoveryIntervalMs: 60_000,
+    autotrainIntervalMs: 30_000,
   };
 
   // Start all modules
@@ -55,12 +59,14 @@ async function main() {
   const stopRouter = startRouter(config, stats);
   const stopLogPoller = startLogPoller(config, stats);
   const stopRecovery = startRecovery(config, stats);
+  const stopAutoTrain = startAutoTrain(config, stats);
   const stopReporter = startReporter(config, stats);
 
   // Clean shutdown
   const shutdown = () => {
     log.info('Shutting down...');
     stopReporter();
+    stopAutoTrain();
     stopRecovery();
     stopLogPoller();
     stopRouter();
@@ -68,7 +74,7 @@ async function main() {
     stopDispatcher();
     stopHeartbeat();
     stopHealth();
-    log.info(`Daemon stopped. Stats: dispatched=${stats.dispatchedCount} heartbeats=${stats.heartbeatCount} stale_recovered=${stats.staleRecoveredCount} stale_redispatched=${stats.stalledRedispatchedCount || 0} stale_reassigned=${stats.stalledReassignedCount || 0} events_routed=${stats.routedEventCount} logs_stored=${stats.logEntriesStored || 0}`);
+    log.info(`Daemon stopped. Stats: dispatched=${stats.dispatchedCount} heartbeats=${stats.heartbeatCount} stale_recovered=${stats.staleRecoveredCount} stale_redispatched=${stats.stalledRedispatchedCount || 0} stale_reassigned=${stats.stalledReassignedCount || 0} autotrain_iterations=${stats.autotrainIterationsCount || 0} autotrain_stopped=${stats.autotrainStoppedCount || 0} events_routed=${stats.routedEventCount} logs_stored=${stats.logEntriesStored || 0}`);
     process.exit(0);
   };
 

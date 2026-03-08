@@ -288,15 +288,25 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId, githubI
 
           {/* Description */}
           <div>
-            <label className="block text-sm font-medium mb-1">Description</label>
+            <label className="block text-sm font-medium mb-1">{form.task_type === 'autotrain' ? 'Supervisor Prompt' : 'Description'}</label>
             <textarea
               value={form.description}
               onChange={(e) => setForm({ ...form, description: e.target.value })}
               rows={3}
               className="w-full bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent resize-none"
-              placeholder="Add details..."
+              placeholder={form.task_type === 'autotrain' ? 'Describe the continuous improvement goal, constraints, and optional MAX_ITERATIONS: N...' : 'Add details...'}
             />
           </div>
+
+          {form.task_type === 'autotrain' && (
+            <div className="p-3 bg-mc-bg rounded-lg border border-mc-border">
+              <div className="text-sm font-medium text-mc-text">Auto-Train</div>
+              <p className="text-xs text-mc-text-secondary mt-1">
+                Runs a continuous improvement loop on this workspace repo only. The prompt above becomes the supervisor instruction.
+                Artifacts go to `.mission-control/tasks/&lt;task-id&gt;`, and you can add `MAX_ITERATIONS: 10` to stop automatically.
+              </p>
+            </div>
+          )}
 
           {/* Acceptance Criteria - only for new tasks */}
           {!task && (
@@ -392,6 +402,7 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId, githubI
                 <option value="chore">Chore</option>
                 <option value="documentation">Documentation</option>
                 <option value="research">Research</option>
+                <option value="autotrain">Auto-Train</option>
               </select>
             </div>
 

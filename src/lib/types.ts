@@ -20,7 +20,7 @@ export type EventType =
   | 'agent_joined'
   | 'system';
 
-export type TaskType = 'bug' | 'feature' | 'chore' | 'documentation' | 'research';
+export type TaskType = 'bug' | 'feature' | 'chore' | 'documentation' | 'research' | 'autotrain';
 
 export type SprintStatus = 'planning' | 'active' | 'completed' | 'cancelled';
 
@@ -612,6 +612,7 @@ export interface DaemonStatsSnapshot {
   last_scheduler_tick?: string;
   last_log_poll_tick?: string;
   last_recovery_tick?: string;
+  last_autotrain_tick?: string;
   // Counters
   dispatched_count: number;
   heartbeat_count: number;
@@ -623,6 +624,8 @@ export interface DaemonStatsSnapshot {
   log_entries_cleaned: number;
   stalled_redispatched_count?: number;
   stalled_reassigned_count?: number;
+  autotrain_iterations_count?: number;
+  autotrain_stopped_count?: number;
   // Process
   memory_mb: number;
   pid: number;

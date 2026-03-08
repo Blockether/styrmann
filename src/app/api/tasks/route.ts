@@ -125,7 +125,13 @@ export async function POST(request: NextRequest) {
       'SELECT id FROM workflow_templates WHERE workspace_id = ? AND is_default = 1 LIMIT 1',
       [workspaceId]
     );
-    const workflowTemplateId = defaultTemplate?.id || null;
+    const autoTrainTemplate = validatedData.task_type === 'autotrain'
+      ? queryOne<{ id: string }>(
+          'SELECT id FROM workflow_templates WHERE workspace_id = ? AND name = ? LIMIT 1',
+          [workspaceId, 'Auto-Train']
+        )
+      : null;
+    const workflowTemplateId = autoTrainTemplate?.id || defaultTemplate?.id || null;
 
     const { github_issue_id } = validatedData;
 

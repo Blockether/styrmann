@@ -43,6 +43,7 @@ const TASK_TYPE_COLORS: Record<TaskType, string> = {
   chore: 'bg-mc-text-secondary text-white',
   documentation: 'bg-mc-accent-purple text-white',
   research: 'bg-mc-accent-green text-white',
+  autotrain: 'bg-amber-500 text-white',
 };
 
 const PRIORITY_COLORS: Record<TaskPriority, string> = {
