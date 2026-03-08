@@ -238,19 +238,17 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId, githubI
           }),
         });
 
-        if (task.status === 'assigned') {
-          const patchRes = await fetch(`/api/tasks/${task.id}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              status: 'inbox',
-              status_reason: 'Auto-Train paused by supervisor control.',
-            }),
-          });
-          if (patchRes.ok) {
-            const updated = await patchRes.json();
-            updateTask(updated);
-          }
+        const patchRes = await fetch(`/api/tasks/${task.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            status: 'inbox',
+            status_reason: 'Auto-Train paused by supervisor control.',
+          }),
+        });
+        if (patchRes.ok) {
+          const updated = await patchRes.json();
+          updateTask(updated);
         }
         return;
       }
@@ -264,19 +262,17 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId, githubI
         }),
       });
 
-      if (['done', 'inbox', 'review', 'verification', 'testing', 'planning', 'pending_dispatch'].includes(task.status)) {
-        const patchRes = await fetch(`/api/tasks/${task.id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            status: 'assigned',
-            status_reason: 'Auto-Train resumed by supervisor control.',
-          }),
-        });
-        if (patchRes.ok) {
-          const updated = await patchRes.json();
-          updateTask(updated);
-        }
+      const patchRes = await fetch(`/api/tasks/${task.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          status: 'assigned',
+          status_reason: 'Auto-Train resumed by supervisor control.',
+        }),
+      });
+      if (patchRes.ok) {
+        const updated = await patchRes.json();
+        updateTask(updated);
       }
     } catch (error) {
       setSaveError(error instanceof Error ? error.message : 'Auto-Train action failed');
