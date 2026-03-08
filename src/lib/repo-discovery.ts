@@ -67,7 +67,7 @@ function scanRepos(): DiscoveredRepo[] {
         org,
         repo,
         slug: `${org}-${repo}`,
-        displayName: `${capitalizedOrg} / ${capitalizedRepo}`,
+        displayName: capitalizedRepo,
         githubRepo: `https://github.com/${capitalizedOrg}/${repo}`,
         repoPath: path.join(orgPath, repo),
       });

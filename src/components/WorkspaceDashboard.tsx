@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Plus, ArrowRight, Folder, CheckSquare, Trash2, AlertTriangle, Activity, Mail, Pencil } from 'lucide-react';
+import { Plus, ArrowRight, Folder, CheckSquare, Trash2, AlertTriangle, Activity, Mail, Pencil, GitBranch } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import type { WorkspaceStats } from '@/lib/types';
@@ -9,7 +9,7 @@ import type { WorkspaceStats } from '@/lib/types';
 export function WorkspaceDashboard() {
   const [workspaces, setWorkspaces] = useState<WorkspaceStats[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showCloneModal, setShowCloneModal] = useState(false);
   const [editingWorkspace, setEditingWorkspace] = useState<WorkspaceStats | null>(null);
 
   useEffect(() => {
@@ -55,16 +55,16 @@ export function WorkspaceDashboard() {
 
         {workspaces.length === 0 ? (
           <div className="text-center py-16">
-            <Folder className="w-16 h-16 mx-auto text-mc-text-secondary mb-4" />
-            <h3 className="text-lg font-medium mb-2">No workspaces yet</h3>
+            <GitBranch className="w-16 h-16 mx-auto text-mc-text-secondary mb-4" />
+            <h3 className="text-lg font-medium mb-2">No repositories yet</h3>
             <p className="text-mc-text-secondary mb-6">
-              Create your first workspace to get started
+              Clone a GitHub repo to get started
             </p>
             <button
-              onClick={() => setShowCreateModal(true)}
+              onClick={() => setShowCloneModal(true)}
               className="px-6 py-3 bg-mc-accent text-white rounded-lg font-medium hover:bg-mc-accent/90"
             >
-              Create Workspace
+              Clone Repository
             </button>
           </div>
         ) : (
@@ -103,23 +103,23 @@ export function WorkspaceDashboard() {
             })()}
 
             <button
-              onClick={() => setShowCreateModal(true)}
+              onClick={() => setShowCloneModal(true)}
               className="border-2 border-dashed border-mc-border rounded-xl p-6 hover:border-mc-accent/50 transition-colors flex flex-col items-center justify-center gap-3 min-h-[120px] w-full max-w-sm mx-auto mt-6"
             >
               <div className="w-10 h-10 rounded-full bg-mc-bg-tertiary flex items-center justify-center">
-                <Plus className="w-5 h-5 text-mc-text-secondary" />
+                <GitBranch className="w-5 h-5 text-mc-text-secondary" />
               </div>
-              <span className="text-mc-text-secondary font-medium">Add Workspace</span>
+              <span className="text-mc-text-secondary font-medium">Clone Repository</span>
             </button>
           </>
         )}
       </main>
 
-      {showCreateModal && (
-        <CreateWorkspaceModal 
-          onClose={() => setShowCreateModal(false)}
-          onCreated={() => {
-            setShowCreateModal(false);
+      {showCloneModal && (
+        <CloneRepoModal
+          onClose={() => setShowCloneModal(false)}
+          onCloned={() => {
+            setShowCloneModal(false);
             loadWorkspaces();
           }}
         />
@@ -179,11 +179,6 @@ function WorkspaceCard({ workspace, onDelete, onEdit }: { workspace: WorkspaceSt
               <img src={workspace.logo_url} alt={workspace.name} className="w-7 h-7 rounded object-contain flex-shrink-0" />
             ) : (
               <Folder className="w-7 h-7 text-mc-accent flex-shrink-0" />
-            )}
-            {workspace.organization && (
-              <span className="text-[10px] font-medium uppercase tracking-wider text-mc-accent/70 bg-mc-accent/10 px-1.5 py-0.5 rounded flex-shrink-0">
-                {workspace.organization}
-              </span>
             )}
             <h3 className="font-semibold text-lg group-hover:text-mc-accent transition-colors truncate">
               {workspace.name}
@@ -446,130 +441,83 @@ function EditWorkspaceModal({ workspace, onClose, onSaved }: { workspace: Worksp
   );
 }
 
-function CreateWorkspaceModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
-  const [name, setName] = useState('');
-  const [logoUrl, setLogoUrl] = useState('');
-  const [githubRepo, setGithubRepo] = useState('');
-  const [ownerEmail, setOwnerEmail] = useState('');
-  const [coordinatorEmail, setCoordinatorEmail] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
+function CloneRepoModal({ onClose, onCloned }: { onClose: () => void; onCloned: () => void }) {
+  const [repo, setRepo] = useState('');
+  const [isCloning, setIsCloning] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) return;
+    if (!repo.trim()) return;
 
-    setIsSubmitting(true);
+    setIsCloning(true);
     setError(null);
 
     try {
-      const res = await fetch('/api/workspaces', {
+      const res = await fetch('/api/workspaces/clone', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: name.trim(),
-          logo_url: logoUrl.trim() || null,
-          github_repo: githubRepo.trim() || null,
-          owner_email: ownerEmail.trim() || null,
-          coordinator_email: coordinatorEmail.trim() || null,
-        }),
+        body: JSON.stringify({ repo: repo.trim() }),
       });
 
+      const data = await res.json();
+
       if (res.ok) {
-        onCreated();
+        onCloned();
       } else {
-        const data = await res.json();
-        setError(data.error || 'Failed to create workspace');
+        setError(data.error || 'Failed to clone repository');
       }
     } catch {
-      setError('Failed to create workspace');
+      setError('Failed to clone repository');
     } finally {
-      setIsSubmitting(false);
+      setIsCloning(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-3 sm:p-4">
-      <div className="bg-mc-bg-secondary border border-mc-border rounded-t-xl sm:rounded-xl w-full max-w-md pb-[env(safe-area-inset-bottom)] sm:pb-0">
-        <div className="p-6 border-b border-mc-border">
-          <h2 className="text-lg font-semibold">Create New Workspace</h2>
+    <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-3 sm:p-4" onClick={onClose}>
+      <div className="bg-mc-bg-secondary border border-mc-border rounded-t-xl sm:rounded-xl w-full max-w-md pb-[env(safe-area-inset-bottom)] sm:pb-0" onClick={e => e.stopPropagation()}>
+        <div className="p-5 border-b border-mc-border">
+          <h2 className="text-lg font-semibold">Clone Repository</h2>
+          <p className="text-sm text-mc-text-secondary mt-1">
+            Clone a GitHub repo into the local workspace
+          </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="p-5 space-y-4">
           <div>
-            <label className="block text-sm font-medium mb-2">Name</label>
+            <label className="block text-sm font-medium mb-2">Repository</label>
             <input
               type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g., Acme Corp"
-              className="w-full bg-mc-bg border border-mc-border rounded-lg px-4 py-2 focus:outline-none focus:border-mc-accent"
+              value={repo}
+              onChange={(e) => setRepo(e.target.value)}
+              placeholder="org/repo-name"
+              className="w-full bg-mc-bg border border-mc-border rounded-lg px-4 py-2.5 font-mono text-sm focus:outline-none focus:border-mc-accent"
               autoFocus
             />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-2">Logo URL</label>
-            <input
-              type="text"
-              value={logoUrl}
-              onChange={(e) => setLogoUrl(e.target.value)}
-              placeholder="/workspace-logos/blockether-spel.svg"
-              className="w-full bg-mc-bg border border-mc-border rounded-lg px-4 py-2 focus:outline-none focus:border-mc-accent"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-2">GitHub Repository</label>
-            <input
-              type="text"
-              value={githubRepo}
-              onChange={(e) => setGithubRepo(e.target.value)}
-              placeholder="https://github.com/org/repo"
-              className="w-full bg-mc-bg border border-mc-border rounded-lg px-4 py-2 focus:outline-none focus:border-mc-accent"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-2">Owner Email</label>
-            <input
-              type="email"
-              value={ownerEmail}
-              onChange={(e) => setOwnerEmail(e.target.value)}
-              placeholder="owner@company.com"
-              className="w-full bg-mc-bg border border-mc-border rounded-lg px-4 py-2 focus:outline-none focus:border-mc-accent"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-2">Coordinator Email</label>
-            <input
-              type="email"
-              value={coordinatorEmail}
-              onChange={(e) => setCoordinatorEmail(e.target.value)}
-              placeholder="coordinator@company.com"
-              className="w-full bg-mc-bg border border-mc-border rounded-lg px-4 py-2 focus:outline-none focus:border-mc-accent"
-            />
+            <p className="text-xs text-mc-text-secondary mt-1.5">
+              Runs <code className="bg-mc-bg-tertiary px-1 py-0.5 rounded text-[11px]">gh repo clone</code> into /root/repos/org/repo
+            </p>
           </div>
 
           {error && (
-            <div className="text-mc-accent-red text-sm">{error}</div>
+            <div className="text-mc-accent-red text-sm bg-mc-accent-red/10 px-3 py-2 rounded-lg">{error}</div>
           )}
 
-          <div className="flex justify-end gap-3 pt-4">
+          <div className="border-t border-mc-border pt-4 flex justify-end gap-3">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-mc-text-secondary hover:text-mc-text"
+              className="px-4 py-2 text-sm text-mc-text-secondary hover:text-mc-text"
             >
               Cancel
             </button>
             <button
               type="submit"
-              disabled={!name.trim() || isSubmitting}
-              className="px-6 py-2 bg-mc-accent text-white rounded-lg font-medium hover:bg-mc-accent/90 disabled:opacity-50"
+              disabled={!repo.trim() || isCloning}
+              className="px-5 py-2 text-sm bg-mc-accent text-white rounded-lg font-medium hover:bg-mc-accent/90 disabled:opacity-50"
             >
-              {isSubmitting ? 'Creating...' : 'Create Workspace'}
+              {isCloning ? 'Cloning...' : 'Clone'}
             </button>
           </div>
         </form>
