@@ -15,12 +15,12 @@ const CANDIDATE_UNITS = [
   'openclaw',
 ];
 
-const CANDIDATE_RPC_METHODS = (
-  process.env.OPENCLAW_LOG_RPC_METHODS || 'logs.list,gateway.logs,system.logs,diagnostics.logs'
-)
-  .split(',')
-  .map((value) => value.trim())
-  .filter(Boolean);
+// No RPC method exists on the gateway for fetching logs.
+  // We go straight to journalctl. The env var is kept for future-proofing
+// in case a log RPC method is added to the gateway later.
+  const CANDIDATE_RPC_METHODS: string[] = process.env.OPENCLAW_LOG_RPC_METHODS
+  ? process.env.OPENCLAW_LOG_RPC_METHODS.split(',').map((v) => v.trim()).filter(Boolean)
+  : [];
 
 type LogLevel = 'error' | 'warn' | 'info' | 'debug';
 
