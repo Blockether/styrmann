@@ -13,7 +13,11 @@ export const dynamic = 'force-dynamic';
 
 /**
  * GET /api/tasks/[id]/activities
- * Retrieve all activities for a task
+ * Retrieve activities for a task with pagination
+ *
+ * Query params:
+ *   limit  - Page size (default 50, max 200)
+ *   offset - Pagination offset (default 0)
  */
 export async function GET(
   request: NextRequest,
@@ -23,7 +27,18 @@ export async function GET(
     const { id: taskId } = await params;
     const db = getDb();
 
-    // Get activities with agent info
+    // Parse pagination params
+    const { searchParams } = new URL(request.url);
+    const limit = Math.min(parseInt(searchParams.get('limit') || '50', 10) || 50, 200);
+    const offset = parseInt(searchParams.get('offset') || '0', 10) || 0;
+
+    // Get total count for pagination
+    const countRow = db.prepare(`
+      SELECT COUNT(*) as total FROM task_activities WHERE task_id = ?
+    `).get(taskId) as { total: number };
+    const total = countRow?.total || 0;
+
+    // Get activities with agent info (paginated)
     const activities = db.prepare(`
       SELECT 
         a.*,
@@ -33,7 +48,8 @@ export async function GET(
       LEFT JOIN agents ag ON a.agent_id = ag.id
       WHERE a.task_id = ?
       ORDER BY a.created_at DESC
-    `).all(taskId) as any[];
+      LIMIT ? OFFSET ?
+    `).all(taskId, limit, offset) as any[];
 
     const result: TaskActivity[] = activities.map(row => ({
       id: row.id,
@@ -56,7 +72,15 @@ export async function GET(
       } : undefined,
     }));
 
-    return NextResponse.json(result);
+    return NextResponse.json({
+      activities: result,
+      pagination: {
+        total,
+        limit,
+        offset,
+        has_more: offset + result.length < total,
+      },
+    });
   } catch (error) {
     console.error('Error fetching activities:', error);
     return NextResponse.json(
