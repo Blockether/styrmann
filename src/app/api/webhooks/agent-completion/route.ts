@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
 import { createHmac } from 'crypto';
 import { queryOne, queryAll, run } from '@/lib/db';
+import { checkBuilderEvidence } from '@/lib/builder-evidence';
 import type { Task, Agent, OpenClawSession } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
@@ -82,6 +83,20 @@ export async function POST(request: NextRequest) {
       // Only move to testing if not already in testing, review, or done
       // (Don't overwrite user's approval or testing results)
       if (task.status !== 'testing' && task.status !== 'review' && task.status !== 'done') {
+        const agentRole = queryOne<{ role: string }>('SELECT role FROM agents WHERE id = ?', [task.assigned_agent_id || ''])?.role;
+        if (agentRole === 'builder') {
+          const evidence = checkBuilderEvidence(task.id);
+          if (!evidence.ok) {
+            return NextResponse.json(
+              {
+                error:
+                  'Builder gate blocked: completion requires commit or workspace file evidence. Add file deliverable or commit first.',
+              },
+              { status: 409 },
+            );
+          }
+        }
+
         run(
           'UPDATE tasks SET status = ?, updated_at = ? WHERE id = ?',
           ['testing', now, task.id]
@@ -166,6 +181,20 @@ export async function POST(request: NextRequest) {
       // Only move to testing if not already in testing, review, or done
       // (Don't overwrite user's approval or testing results)
       if (task.status !== 'testing' && task.status !== 'review' && task.status !== 'done') {
+        const agentRole = queryOne<{ role: string }>('SELECT role FROM agents WHERE id = ?', [session.agent_id || ''])?.role;
+        if (agentRole === 'builder') {
+          const evidence = checkBuilderEvidence(task.id);
+          if (!evidence.ok) {
+            return NextResponse.json(
+              {
+                error:
+                  'Builder gate blocked: completion requires commit or workspace file evidence. Add file deliverable or commit first.',
+              },
+              { status: 409 },
+            );
+          }
+        }
+
         run(
           'UPDATE tasks SET status = ?, updated_at = ? WHERE id = ?',
           ['testing', now, task.id]

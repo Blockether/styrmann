@@ -5,6 +5,7 @@ import { broadcast } from '@/lib/events';
 import { getMissionControlUrl } from '@/lib/config';
 import { handleStageTransition, handleStageFailure, getTaskWorkflow, drainQueue, populateTaskRolesFromAgents } from '@/lib/workflow-engine';
 import { notifyLearner } from '@/lib/learner';
+import { checkBuilderEvidence } from '@/lib/builder-evidence';
 import { UpdateTaskSchema } from '@/lib/validation';
 import type { Task, UpdateTaskRequest, Agent, TaskDeliverable } from '@/lib/types';
 
@@ -167,6 +168,35 @@ export async function PATCH(
 
     // Handle status change
     if (nextStatus !== undefined && nextStatus !== existing.status) {
+      const workflow = getTaskWorkflow(id);
+      const currentStage = workflow?.stages.find((stage) => stage.status === existing.status)
+        || ((existing.status === 'assigned' || existing.status === 'in_progress')
+          ? workflow?.stages.find((stage) => stage.role === 'builder')
+          : undefined);
+
+      const assignedRole = queryOne<{ role: string }>(
+        'SELECT role FROM agents WHERE id = ?',
+        [effectiveAssignedAgentId || existing.assigned_agent_id || ''],
+      )?.role;
+
+      const currentRole = currentStage?.role || assignedRole;
+      const isForwardBuilderMove =
+        currentRole === 'builder' &&
+        ['testing', 'review', 'verification', 'done'].includes(nextStatus);
+
+      if (isForwardBuilderMove) {
+        const evidence = checkBuilderEvidence(id);
+        if (!evidence.ok) {
+          return NextResponse.json(
+            {
+              error:
+                'Builder gate blocked: task cannot progress without commit or workspace file evidence. Add at least one file deliverable or create a commit first.',
+            },
+            { status: 409 },
+          );
+        }
+      }
+
       updates.push('status = ?');
       values.push(nextStatus);
 

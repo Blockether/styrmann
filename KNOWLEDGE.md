@@ -170,6 +170,12 @@ The Strict template is the default. The `review` stage is labeled "Human Verifie
 - Fail-loopback: `POST /api/tasks/{id}/fail` routes task back to `in_progress` and re-dispatches builder.
 - **Orchestrator guard**: `populateTaskRolesFromAgents()` skips agents with `role = 'orchestrator'`. Orchestrators are not auto-assigned to workflow stages.
 
+**Builder hard gate (server-side):**
+- Builder-owned tasks cannot move forward (`testing`/`review`/`verification`/`done`) without implementation evidence.
+- Enforced in both `PATCH /api/tasks/{id}` and `POST /api/webhooks/agent-completion`.
+- Evidence rule: at least one file deliverable OR at least one git commit in workspace repo since task creation.
+- Violations return `409` and task status is not advanced.
+
 **Template definitions are hardcoded** in `src/lib/workflow-templates.ts`. New workspaces get templates provisioned from these code constants via `provisionWorkflowTemplates()`. The legacy `cloneWorkflowTemplates()` in `bootstrap-agents.ts` delegates to the same function for backward compatibility.
 
 ---
