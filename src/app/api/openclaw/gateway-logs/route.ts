@@ -61,7 +61,7 @@ interface RpcLogLike {
 function clampLimit(value: string | null): number {
   const parsed = Number.parseInt(value ?? '120', 10);
   if (!Number.isFinite(parsed) || parsed <= 0) return 120;
-  return Math.min(parsed, 400);
+  return Math.min(parsed, 2000);
 }
 
 function toIsoTimestamp(record: JournalRecord): string {

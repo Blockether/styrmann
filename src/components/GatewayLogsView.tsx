@@ -56,7 +56,7 @@ export function GatewayLogsView() {
       setLoading(true);
       setError(null);
 
-      const params = new URLSearchParams({ limit: '200' });
+      const params = new URLSearchParams({ limit: '2000' });
       if (debouncedSearch) params.set('search', debouncedSearch);
       if (levelFilter !== 'all') params.set('level', levelFilter);
       if (dateFrom) params.set('from', dateFrom);
@@ -85,13 +85,6 @@ export function GatewayLogsView() {
     fetchLogs();
   }, [fetchLogs]);
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (!loading) fetchLogs();
-    }, 10000);
-
-    return () => clearInterval(interval);
-  }, [fetchLogs, loading]);
 
   const clearFilters = () => {
     setLevelFilter('all');
