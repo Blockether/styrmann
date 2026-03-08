@@ -1236,6 +1236,71 @@ const migrations: Migration[] = [
 
       console.log('[Migration 027] Organization column added, slugs updated to org-repo format');
     }
+  },
+  {
+    id: '028',
+    name: 'extend_task_type_with_autotrain',
+    up: (db) => {
+      console.log('[Migration 028] Extending tasks.task_type CHECK to include autotrain...');
+
+      db.exec(`
+        CREATE TABLE tasks_new_028 (
+          id TEXT PRIMARY KEY,
+          title TEXT NOT NULL,
+          description TEXT,
+          status TEXT DEFAULT 'inbox' CHECK (status IN ('pending_dispatch', 'planning', 'inbox', 'assigned', 'in_progress', 'testing', 'review', 'verification', 'done')),
+          priority TEXT DEFAULT 'normal' CHECK (priority IN ('low', 'normal', 'high', 'urgent')),
+          task_type TEXT DEFAULT 'feature' CHECK (task_type IN ('bug', 'feature', 'chore', 'documentation', 'research', 'autotrain')),
+          effort INTEGER CHECK (effort IS NULL OR (effort >= 1 AND effort <= 5)),
+          impact INTEGER CHECK (impact IS NULL OR (impact >= 1 AND impact <= 5)),
+          assigned_agent_id TEXT REFERENCES agents(id),
+          created_by_agent_id TEXT REFERENCES agents(id),
+          workspace_id TEXT DEFAULT 'default' REFERENCES workspaces(id),
+          milestone_id TEXT REFERENCES milestones(id) ON DELETE SET NULL,
+          github_issue_id TEXT REFERENCES github_issues(id) ON DELETE SET NULL,
+          business_id TEXT DEFAULT 'default',
+          due_date TEXT,
+          workflow_template_id TEXT REFERENCES workflow_templates(id),
+          planning_session_key TEXT,
+          planning_messages TEXT,
+          planning_complete INTEGER DEFAULT 0,
+          planning_spec TEXT,
+          planning_agents TEXT,
+          planning_dispatch_error TEXT,
+          status_reason TEXT,
+          created_at TEXT DEFAULT (datetime('now')),
+          updated_at TEXT DEFAULT (datetime('now'))
+        )
+      `);
+
+      db.exec(`
+        INSERT INTO tasks_new_028 (
+          id, title, description, status, priority, task_type, effort, impact,
+          assigned_agent_id, created_by_agent_id, workspace_id, milestone_id,
+          github_issue_id, business_id, due_date, workflow_template_id, planning_session_key,
+          planning_messages, planning_complete, planning_spec, planning_agents,
+          planning_dispatch_error, status_reason, created_at, updated_at
+        )
+        SELECT
+          id, title, description, status, priority, task_type, effort, impact,
+          assigned_agent_id, created_by_agent_id, workspace_id, milestone_id,
+          github_issue_id, business_id, due_date, workflow_template_id, planning_session_key,
+          planning_messages, planning_complete, planning_spec, planning_agents,
+          planning_dispatch_error, status_reason, created_at, updated_at
+        FROM tasks
+      `);
+
+      db.exec('DROP TABLE tasks');
+      db.exec('ALTER TABLE tasks_new_028 RENAME TO tasks');
+
+      db.exec('CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status)');
+      db.exec('CREATE INDEX IF NOT EXISTS idx_tasks_assigned ON tasks(assigned_agent_id)');
+      db.exec('CREATE INDEX IF NOT EXISTS idx_tasks_workspace ON tasks(workspace_id)');
+      db.exec('CREATE INDEX IF NOT EXISTS idx_tasks_milestone ON tasks(milestone_id)');
+      db.exec('CREATE INDEX IF NOT EXISTS idx_tasks_type ON tasks(task_type)');
+
+      console.log('[Migration 028] tasks.task_type now supports autotrain');
+    }
   }
 ];
 
