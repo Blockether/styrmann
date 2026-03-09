@@ -388,6 +388,23 @@ CREATE TABLE IF NOT EXISTS task_run_result_artifacts (
   created_at TEXT DEFAULT (datetime('now'))
 );
 
+-- Task provenance (ACP input provenance and source receipts)
+CREATE TABLE IF NOT EXISTS task_provenance (
+  id TEXT PRIMARY KEY,
+  task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  session_id TEXT,
+  kind TEXT NOT NULL,
+  origin_session_id TEXT,
+  source_session_key TEXT,
+  source_channel TEXT,
+  source_tool TEXT,
+  receipt_text TEXT,
+  receipt_data TEXT,
+  message_role TEXT,
+  message_index INTEGER,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
 CREATE INDEX IF NOT EXISTS idx_tasks_assigned ON tasks(assigned_agent_id);
@@ -426,6 +443,8 @@ CREATE INDEX IF NOT EXISTS idx_task_acceptance_criteria_task ON task_acceptance_
 CREATE INDEX IF NOT EXISTS idx_acp_bindings_workspace ON acp_bindings(workspace_id);
 CREATE INDEX IF NOT EXISTS idx_acp_bindings_status ON acp_bindings(status);
 CREATE INDEX IF NOT EXISTS idx_acp_bindings_thread ON acp_bindings(discord_thread_id);
+CREATE INDEX IF NOT EXISTS idx_task_provenance_task ON task_provenance(task_id);
+CREATE INDEX IF NOT EXISTS idx_task_provenance_session ON task_provenance(session_id);
 -- Daemon tables
 CREATE TABLE IF NOT EXISTS agent_heartbeats (
   id TEXT PRIMARY KEY,

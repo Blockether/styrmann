@@ -1607,6 +1607,36 @@ const migrations: Migration[] = [
 
       console.log('[Migration 034] Session and deliverable linkage backfilled');
     }
+  },
+  {
+    id: '035',
+    name: 'add_task_provenance_table',
+    up: (db) => {
+      console.log('[Migration 035] Creating task_provenance table...');
+
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS task_provenance (
+          id TEXT PRIMARY KEY,
+          task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+          session_id TEXT,
+          kind TEXT NOT NULL,
+          origin_session_id TEXT,
+          source_session_key TEXT,
+          source_channel TEXT,
+          source_tool TEXT,
+          receipt_text TEXT,
+          receipt_data TEXT,
+          message_role TEXT,
+          message_index INTEGER,
+          created_at TEXT DEFAULT (datetime('now'))
+        )
+      `);
+
+      db.exec('CREATE INDEX IF NOT EXISTS idx_task_provenance_task ON task_provenance(task_id)');
+      db.exec('CREATE INDEX IF NOT EXISTS idx_task_provenance_session ON task_provenance(session_id)');
+
+      console.log('[Migration 035] task_provenance table created');
+    }
   }
 ];
 

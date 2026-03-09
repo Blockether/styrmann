@@ -1,12 +1,30 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { X, Bot, User, Cpu, Clock3, MessageSquare, ChevronRight } from 'lucide-react';
+import { X, Bot, User, Cpu, Clock3, MessageSquare, ChevronRight, Shield, ArrowRight } from 'lucide-react';
 
 interface TraceMessage {
   role: string;
   content: string;
   timestamp?: string;
+  provenance?: {
+    kind: string;
+    originSessionId?: string;
+    sourceSessionKey?: string;
+    sourceChannel?: string;
+    sourceTool?: string;
+  } | null;
+  receipt?: Record<string, string | undefined> | null;
+}
+
+interface ProvenanceEntry {
+  kind: string;
+  origin_session_id: string | null;
+  source_channel: string | null;
+  source_tool: string | null;
+  receipt: Record<string, string | undefined> | null;
+  message_role: string;
+  message_index: number;
 }
 
 interface TracePayload {
@@ -30,6 +48,7 @@ interface TracePayload {
     stage_flow: string[];
     highlights: string[];
   };
+  provenance?: ProvenanceEntry[];
   history: TraceMessage[];
 }
 
@@ -71,6 +90,19 @@ function roleBadge(role: string): string {
   if (role === 'assistant') return 'bg-mc-accent/20 text-mc-accent';
   if (role === 'user') return 'bg-blue-100 text-blue-700';
   return 'bg-mc-bg-tertiary text-mc-text-secondary';
+}
+
+function kindLabel(kind: string): string {
+  if (kind === 'external_user') return 'External (ACP Bridge)';
+  if (kind === 'inter_session') return 'Inter-Session (ACPX)';
+  if (kind === 'internal_system') return 'Internal System';
+  return kind;
+}
+
+function kindBadgeClass(kind: string): string {
+  if (kind === 'external_user') return 'bg-amber-100 text-amber-800 border-amber-200';
+  if (kind === 'inter_session') return 'bg-purple-100 text-purple-800 border-purple-200';
+  return 'bg-gray-100 text-gray-700 border-gray-200';
 }
 
 export function TraceViewerModal({ taskId, sessionId, onClose }: TraceViewerModalProps) {
@@ -201,6 +233,42 @@ export function TraceViewerModal({ taskId, sessionId, onClose }: TraceViewerModa
                     {summary.highlights.map((line, index) => (
                       <p key={`${line}-${index}`} className="text-sm text-mc-text">{line}</p>
                     ))}
+                  </div>
+                </div>
+              )}
+
+              {data.provenance && data.provenance.length > 0 && (
+                <div className="p-3 rounded border border-amber-200 bg-amber-50 space-y-2">
+                  <div className="text-xs uppercase tracking-wide text-amber-800 flex items-center gap-1.5">
+                    <Shield className="w-3.5 h-3.5" />
+                    ACP Provenance
+                  </div>
+                  <div className="space-y-2">
+                    {/* Provenance chain badges */}
+                    <div className="flex items-center flex-wrap gap-1.5 text-xs">
+                      {Array.from(new Set(data.provenance.map((p) => p.kind))).map((kind, idx) => (
+                        <div key={kind} className="flex items-center gap-1">
+                          {idx > 0 && <ArrowRight className="w-3 h-3 text-amber-600" />}
+                          <span className={`px-2 py-1 rounded border text-[11px] font-medium ${kindBadgeClass(kind)}`}>
+                            {kindLabel(kind)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                    {/* Receipt details */}
+                    {data.provenance.filter((p) => p.receipt).map((p, idx) => (
+                      <div key={`receipt-${idx}`} className="text-xs bg-white/60 rounded border border-amber-200 p-2 space-y-1 font-mono">
+                        {p.receipt?.bridge && <div><span className="text-amber-700">bridge:</span> {p.receipt.bridge}</div>}
+                        {p.receipt?.originHost && <div><span className="text-amber-700">host:</span> {p.receipt.originHost}</div>}
+                        {p.receipt?.originCwd && <div><span className="text-amber-700">cwd:</span> <span className="break-all">{p.receipt.originCwd}</span></div>}
+                        {p.receipt?.acpSessionId && <div><span className="text-amber-700">acp-session:</span> <span className="break-all">{p.receipt.acpSessionId}</span></div>}
+                        {p.receipt?.originSessionId && <div><span className="text-amber-700">origin-session:</span> <span className="break-all">{p.receipt.originSessionId}</span></div>}
+                        {p.receipt?.targetSession && <div><span className="text-amber-700">target:</span> <span className="break-all">{p.receipt.targetSession}</span></div>}
+                      </div>
+                    ))}
+                    <div className="text-[11px] text-amber-700">
+                      {data.provenance.length} provenance {data.provenance.length === 1 ? 'record' : 'records'} detected in session messages
+                    </div>
                   </div>
                 </div>
               )}

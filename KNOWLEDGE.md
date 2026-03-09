@@ -303,7 +303,7 @@ Fallback: Task polling every 60s, event polling every 30s.
 
 ## Database Schema
 
-27 migrations (001-027), auto-run on DB connection in `src/lib/db/index.ts`. Schema creation (`schema.ts`) only runs for fresh databases. After migrations, `discoverRepoWorkspaces()` scans `/root/repos/{org}/{repo}` for git repos and creates/syncs workspaces.
+35 migrations (001-035), auto-run on DB connection in `src/lib/db/index.ts`. Schema creation (`schema.ts`) only runs for fresh databases. After migrations, `discoverRepoWorkspaces()` scans `/root/repos/{org}/{repo}` for git repos and creates/syncs workspaces.
 
 ### Core Tables
 - **workspaces** -- slug (`{org}-{repo}` format), name, description, icon, github_repo, owner_email, coordinator_email, logo_url, organization
@@ -334,6 +334,7 @@ Fallback: Task polling every 60s, event polling every 30s.
 - **planning_questions** / **planning_specs** -- AI planning Q&A flow
 - **businesses** -- legacy table, kept for compatibility
 - **github_issues** -- workspace_id, github_id (integer), issue_number, title, body, state ('open'|'closed'), state_reason, labels (JSON string), assignees (JSON string), github_url, author, created_at_github, updated_at_github, synced_at, task_id (nullable FK to tasks). Unique constraint on (workspace_id, issue_number). Indexes on workspace_id and (workspace_id, state).
+- **task_provenance** -- task_id, session_id, kind ('external_user'|'inter_session'|'internal_system'), origin_session_id, source_session_key, source_channel, source_tool, receipt_text, receipt_data (JSON). Stores ACP provenance metadata and Source Receipt blocks parsed from OpenClaw session history.
 
 ---
 
@@ -410,8 +411,16 @@ Webhook verification: `WEBHOOK_SECRET` env var, HMAC signature in `x-webhook-sig
 
 **Auto-Train dispatch specialization**:
 - For `task_type='autotrain'`, dispatch prompt switches to a continuous loop contract: inspect -> propose -> implement -> verify -> report.
-- Dispatch includes active ACP binding context for the workspace when present (`acp_session_key`, `acp_agent_id`, `discord_thread_id`).
+- Dispatch includes active ACP binding context for the workspace when present (`acp_session_key`, `acp_agent_id`, `discord_thread_id`, provenance mode `meta+receipt`).
 - Iteration summaries from recent activities are injected into the next loop dispatch.
+
+**ACP Provenance Integration**:
+- OpenClaw `--provenance meta+receipt` mode attaches `InputProvenance` metadata and `[Source Receipt]` text blocks to messages sent via ACP bridge.
+- Provenance kinds: `external_user` (ACP bridge), `inter_session` (ACPX runtime), `internal_system`.
+- Trace API (`GET /api/tasks/{id}/sessions/{sessionId}/trace`) parses provenance from session history messages and stores records in `task_provenance` table.
+- Provenance API: `GET /api/tasks/{id}/provenance` returns all stored provenance records for a task.
+- TraceViewerModal displays provenance chain badges and Source Receipt details.
+- SessionsList shows a provenance summary banner when records exist.
 
 **Completion format**: `TASK_COMPLETE: [summary] | deliverables: [paths] | verification: [how verified]`
 

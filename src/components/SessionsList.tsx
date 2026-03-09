@@ -6,7 +6,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { Bot, CheckCircle, Circle, XCircle, Trash2, Check } from 'lucide-react';
+import { Bot, CheckCircle, Circle, XCircle, Trash2, Check, Shield } from 'lucide-react';
 import { AgentInitials } from './AgentInitials';
 import { TraceViewerModal } from './TraceViewerModal';
 import { useTraceDeepLink } from '@/hooks/useTraceDeepLink';
@@ -26,12 +26,23 @@ interface SessionWithAgent {
   trace_url?: string;
 }
 
+interface ProvenanceSummary {
+  count: number;
+  records: Array<{
+    kind: string;
+    source_tool: string | null;
+    source_channel: string | null;
+    receipt_data: Record<string, string | undefined> | null;
+  }>;
+}
+
 interface SessionsListProps {
   taskId: string;
 }
 
 export function SessionsList({ taskId }: SessionsListProps) {
   const [sessions, setSessions] = useState<SessionWithAgent[]>([]);
+  const [provenance, setProvenance] = useState<ProvenanceSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const { traceSessionId, openTrace, closeTrace } = useTraceDeepLink();
 
@@ -52,6 +63,13 @@ export function SessionsList({ taskId }: SessionsListProps) {
   useEffect(() => {
     loadSessions();
   }, [loadSessions]);
+
+  useEffect(() => {
+    fetch(`/api/tasks/${taskId}/provenance`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => { if (data) setProvenance(data as ProvenanceSummary); })
+      .catch(() => {});
+  }, [taskId]);
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -146,6 +164,27 @@ export function SessionsList({ taskId }: SessionsListProps) {
 
   return (
     <div data-component="src/components/SessionsList" className="space-y-3">
+      {/* ACP Provenance Banner */}
+      {provenance && provenance.count > 0 && (
+        <div className="p-3 rounded-lg border border-amber-200 bg-amber-50 text-xs space-y-1.5">
+          <div className="flex items-center gap-1.5 text-amber-800 font-medium">
+            <Shield className="w-3.5 h-3.5" />
+            ACP Provenance ({provenance.count} {provenance.count === 1 ? 'record' : 'records'})
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {Array.from(new Set(provenance.records.map((r) => r.kind))).map((kind) => (
+              <span key={kind} className="px-1.5 py-0.5 rounded border border-amber-200 bg-white/60 text-amber-700">
+                {kind === 'external_user' ? 'External (ACP Bridge)' : kind === 'inter_session' ? 'Inter-Session' : kind}
+              </span>
+            ))}
+          </div>
+          {provenance.records.some((r) => r.source_tool) && (
+            <div className="text-amber-700">
+              Tools: {Array.from(new Set(provenance.records.filter((r) => r.source_tool).map((r) => r.source_tool))).join(', ')}
+            </div>
+          )}
+        </div>
+      )}
       {sessions.map((session) => (
         <div
           key={session.id}

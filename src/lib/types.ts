@@ -635,3 +635,43 @@ export interface DaemonStatsSnapshot {
   modules: DaemonModuleInfo[];
   jobs: DaemonJobInfo[];
 }
+
+// ── ACP Provenance types ──────────────────────────────────────────────
+
+export type ProvenanceKind = 'external_user' | 'inter_session' | 'internal_system';
+
+export type ProvenanceMode = 'off' | 'meta' | 'meta+receipt';
+
+export interface InputProvenance {
+  kind: ProvenanceKind;
+  originSessionId?: string;
+  sourceSessionKey?: string;
+  sourceChannel?: string;
+  sourceTool?: string;
+}
+
+export interface SourceReceipt {
+  bridge?: string;
+  originHost?: string;
+  originCwd?: string;
+  acpSessionId?: string;
+  originSessionId?: string;
+  targetSession?: string;
+  [key: string]: string | undefined;
+}
+
+export interface ProvenanceRecord {
+  id: string;
+  task_id: string;
+  session_id?: string;
+  kind: ProvenanceKind;
+  origin_session_id?: string;
+  source_session_key?: string;
+  source_channel?: string;
+  source_tool?: string;
+  receipt_text?: string;
+  receipt_data?: SourceReceipt;
+  message_role?: string;
+  message_index?: number;
+  created_at: string;
+}
