@@ -43,7 +43,14 @@ const TASK_TYPE_COLORS: Record<TaskType, string> = {
   chore: 'bg-mc-text-secondary text-white',
   documentation: 'bg-mc-accent-purple text-white',
   research: 'bg-mc-accent-green text-white',
-  autotrain: 'bg-amber-500 text-white',
+};
+
+const TASK_TYPE_LABELS: Record<TaskType, string> = {
+  bug: 'bug',
+  feature: 'feature',
+  chore: 'chore',
+  documentation: 'documentation',
+  research: 'research',
 };
 
 const PRIORITY_COLORS: Record<TaskPriority, string> = {
@@ -487,23 +494,23 @@ export function TaskDetailPanel({ taskId, onClose }: TaskDetailPanelProps) {
       <div className="absolute inset-0 bg-black/40" />
 
       <div className="relative w-full max-w-[480px] h-full bg-mc-bg-secondary border-l border-mc-border flex flex-col animate-slide-in">
-        <div className="flex items-center justify-between p-4 border-b border-mc-border">
-          <div className="flex items-center gap-2">
+        <div className="flex items-center justify-between p-4 border-b border-mc-border gap-2">
+          <div className="flex items-center gap-1.5 flex-wrap min-w-0">
             {task && (
-              <span className={`px-2 py-0.5 rounded text-xs uppercase ${TASK_TYPE_COLORS[task.task_type]}`}>
-                {task.task_type}
+              <span className={`px-2 py-0.5 rounded text-xs uppercase flex-shrink-0 ${TASK_TYPE_COLORS[task.task_type]}`}>
+                {TASK_TYPE_LABELS[task.task_type]}
               </span>
             )}
-            <span className={`px-2 py-0.5 rounded text-xs uppercase ${task ? PRIORITY_COLORS[task.priority] : ''}`}>
+            <span className={`px-2 py-0.5 rounded text-xs uppercase flex-shrink-0 ${task ? PRIORITY_COLORS[task.priority] : ''}`}>
               {task?.priority}
             </span>
-            <span className={`px-2 py-0.5 rounded text-xs uppercase ${task ? STATUS_COLORS[task.status] : ''}`}>
+            <span className={`px-2 py-0.5 rounded text-xs uppercase flex-shrink-0 truncate ${task ? STATUS_COLORS[task.status] : ''}`}>
               {task?.status?.replace('_', ' ')}
             </span>
           </div>
           <button
             onClick={onClose}
-            className="p-1 hover:bg-mc-bg-tertiary rounded"
+            className="p-1 hover:bg-mc-bg-tertiary rounded flex-shrink-0"
           >
             <X className="w-5 h-5" />
           </button>
@@ -561,8 +568,8 @@ export function TaskDetailPanel({ taskId, onClose }: TaskDetailPanelProps) {
               </div>
 
               <div className="p-4 border-b border-mc-border bg-mc-bg-tertiary/30">
-                <div className="flex items-center gap-6">
-                  <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                  <div className="flex items-center gap-2 flex-shrink-0">
                     <button
                       onClick={() => handleEffortChange(Math.max(1, (task.effort ?? 3) - 1))}
                       className="w-6 h-6 flex items-center justify-center text-mc-text-secondary hover:text-mc-text"
@@ -577,7 +584,7 @@ export function TaskDetailPanel({ taskId, onClose }: TaskDetailPanelProps) {
                       +
                     </button>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-shrink-0">
                     <button
                       onClick={() => handleImpactChange(Math.max(1, (task.impact ?? 3) - 1))}
                       className="w-6 h-6 flex items-center justify-center text-mc-text-secondary hover:text-mc-text"
@@ -593,7 +600,7 @@ export function TaskDetailPanel({ taskId, onClose }: TaskDetailPanelProps) {
                     </button>
                   </div>
                   {paretoScore && (
-                    <div className="flex items-center gap-2 ml-auto">
+                    <div className="flex items-center gap-2 flex-shrink-0">
                       <span className="text-xs text-mc-text-secondary">Pareto Score</span>
                       <span className={`px-2 py-1 rounded text-sm font-bold ${
                         parseFloat(paretoScore) >= 2
@@ -658,24 +665,24 @@ export function TaskDetailPanel({ taskId, onClose }: TaskDetailPanelProps) {
                     {taskTags.map(tag => (
                       <div
                         key={tag.id}
-                        className="flex items-center gap-1 px-2 py-1 rounded-full text-xs"
+                        className="flex items-center gap-1 px-2 py-1 rounded-full text-xs max-w-full"
                         style={{ backgroundColor: `${tag.color}20`, color: tag.color, borderColor: `${tag.color}50`, borderWidth: 1 }}
                       >
-                        {tag.name}
+                        <span className="truncate">{tag.name}</span>
                         <button
                           onClick={() => handleRemoveTag(tag.id)}
-                          className="ml-1 hover:opacity-70"
+                          className="ml-1 hover:opacity-70 flex-shrink-0"
                         >
                           <X className="w-3 h-3" />
                         </button>
                       </div>
                     ))}
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
                     <select
                       value={addingTagId}
                       onChange={(e) => setAddingTagId(e.target.value)}
-                      className="flex-1 min-h-11 bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent"
+                      className="flex-1 min-h-11 bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent min-w-0"
                     >
                       <option value="">Add tag...</option>
                       {availableTags.filter(t => !taskTags.some(tt => tt.id === t.id)).map(t => (
@@ -685,7 +692,7 @@ export function TaskDetailPanel({ taskId, onClose }: TaskDetailPanelProps) {
                     <button
                       onClick={handleAddTag}
                       disabled={!addingTagId}
-                      className="min-h-11 px-3 bg-mc-accent text-white rounded text-sm hover:bg-mc-accent/90 disabled:opacity-50"
+                      className="min-h-11 px-3 bg-mc-accent text-white rounded text-sm hover:bg-mc-accent/90 disabled:opacity-50 flex-shrink-0"
                     >
                       <Plus className="w-4 h-4" />
                     </button>

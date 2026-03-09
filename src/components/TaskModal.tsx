@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { X, Save, Trash2, Activity, Package, Bot, ClipboardList, Plus, Users, Play, Pause } from 'lucide-react';
+import { X, Save, Trash2, Activity, Package, Bot, ClipboardList, Plus, Users } from 'lucide-react';
 import { useMissionControl } from '@/lib/store';
 import { triggerAutoDispatch, shouldTriggerAutoDispatch } from '@/lib/auto-dispatch';
 import { ActivityLog } from './ActivityLog';
@@ -10,6 +10,7 @@ import { SessionsList } from './SessionsList';
 import { PlanningTab } from './PlanningTab';
 import { TeamTab } from './TeamTab';
 import { AgentModal } from './AgentModal';
+import { CreateMilestoneModal } from './CreateMilestoneModal';
 import type { Task, TaskPriority, TaskStatus, TaskType, GitHubIssue } from '@/lib/types';
 
 type TabType = 'overview' | 'planning' | 'team' | 'activity' | 'deliverables' | 'sessions';
@@ -22,11 +23,12 @@ interface TaskModalProps {
   githubIssue?: GitHubIssue;
 }
 
-export function TaskModal({ task, onClose, workspaceId, defaultSprintId, githubIssue }: TaskModalProps) {
+export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaultSprintId, githubIssue }: TaskModalProps) {
   const { agents, addTask, updateTask, addEvent } = useMissionControl();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [autoTrainActionLoading, setAutoTrainActionLoading] = useState<'start' | 'stop' | null>(null);
+  const [isProcessingAcceptance, setIsProcessingAcceptance] = useState(false);
   const [showAgentModal, setShowAgentModal] = useState(false);
+  const [showMilestoneModal, setShowMilestoneModal] = useState(false);
   const [usePlanningMode, setUsePlanningMode] = useState(false);
   // Auto-switch to planning tab if task is in planning status
   const [activeTab, setActiveTab] = useState<TabType>(task?.status === 'planning' ? 'planning' : 'overview');
@@ -58,15 +60,25 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId, githubI
 
   const [acceptanceCriteria, setAcceptanceCriteria] = useState<string[]>([]);
   const [newCriteriaInput, setNewCriteriaInput] = useState('');
+  const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
   const [milestones, setMilestones] = useState<{ id: string; name: string }[]>([]);
+  const resolvedWorkspaceId = workspaceId || task?.workspace_id || 'default';
+
+  const loadMilestones = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/milestones?workspace_id=${resolvedWorkspaceId}`);
+      const data = await res.json();
+      setMilestones(Array.isArray(data) ? data : []);
+      return Array.isArray(data) ? data : [];
+    } catch {
+      setMilestones([]);
+      return [] as { id: string; name: string }[];
+    }
+  }, [resolvedWorkspaceId]);
 
   useEffect(() => {
-    const wsId = workspaceId || task?.workspace_id || 'default';
-    fetch(`/api/milestones?workspace_id=${wsId}`)
-      .then(res => res.json())
-      .then(data => setMilestones(Array.isArray(data) ? data : []))
-      .catch(() => {});
-  }, [workspaceId, task?.workspace_id]);
+    loadMilestones().catch(() => {});
+  }, [loadMilestones]);
 
   const resolveStatus = (): TaskStatus => {
     // Planning mode overrides everything
@@ -83,6 +95,27 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId, githubI
   };
 
   const [saveError, setSaveError] = useState<string | null>(null);
+
+  const uploadAttachedFiles = async (taskId: string): Promise<void> => {
+    if (attachedFiles.length === 0) return;
+
+    for (const file of attachedFiles) {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('title', file.name);
+      formData.append('resource_type', 'document');
+
+      const res = await fetch(`/api/tasks/${taskId}/resources`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({ error: 'Failed to upload attachment' }));
+        throw new Error(errData.error || `Failed to upload ${file.name}`);
+      }
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent, keepOpen = false) => {
     e.preventDefault();
@@ -118,6 +151,7 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId, githubI
       const savedTask = await res.json();
 
       if (task) {
+        await uploadAttachedFiles(savedTask.id);
         // Editing existing task
         updateTask(savedTask);
 
@@ -159,6 +193,8 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId, githubI
         );
       }
 
+      await uploadAttachedFiles(savedTask.id);
+
       if (usePlanningMode) {
         // Start planning session (fire-and-forget), then close modal.
         // User reopens the task from the board to see the planning tab.
@@ -195,6 +231,7 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId, githubI
         setUsePlanningMode(false);
         setAcceptanceCriteria([]);
         setNewCriteriaInput('');
+        setAttachedFiles([]);
       } else {
         onClose();
       }
@@ -222,62 +259,67 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId, githubI
     }
   };
 
-  const handleAutoTrainAction = async (action: 'start' | 'stop') => {
-    if (!task || task.task_type !== 'autotrain') return;
-
-    setAutoTrainActionLoading(action);
+  const handleAcceptAndMerge = async () => {
+    if (!task) return;
+    setIsProcessingAcceptance(true);
     setSaveError(null);
     try {
-      if (action === 'stop') {
-        await fetch(`/api/tasks/${task.id}/activities`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            activity_type: 'status_changed',
-            message: 'AUTOTRAIN_STOP: Manual supervisor stop requested from task modal.',
-          }),
-        });
+      const res = await fetch(`/api/tasks/${task.id}/accept`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'accept' }),
+      });
 
-        const patchRes = await fetch(`/api/tasks/${task.id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            status: 'inbox',
-            status_reason: 'Auto-Train paused by supervisor control.',
-          }),
-        });
-        if (patchRes.ok) {
-          const updated = await patchRes.json();
-          updateTask(updated);
-        }
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setSaveError(data.error || data.message || `Accept failed (${res.status})`);
         return;
       }
 
-      await fetch(`/api/tasks/${task.id}/activities`, {
+      if (data.task) {
+        updateTask(data.task);
+      }
+
+      onClose();
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : 'Accept failed');
+    } finally {
+      setIsProcessingAcceptance(false);
+    }
+  };
+
+  const handleRaiseProblem = async () => {
+    if (!task) return;
+    const reason = window.prompt('Describe the problem to send the task back for rework:');
+    if (!reason || !reason.trim()) return;
+
+    setIsProcessingAcceptance(true);
+    setSaveError(null);
+
+    try {
+      const res = await fetch(`/api/tasks/${task.id}/accept`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          activity_type: 'status_changed',
-          message: 'AUTOTRAIN_RESUME: Manual supervisor resume requested from task modal.',
-        }),
+        body: JSON.stringify({ action: 'reject', reason: reason.trim() }),
       });
 
-      const patchRes = await fetch(`/api/tasks/${task.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          status: 'assigned',
-          status_reason: 'Auto-Train resumed by supervisor control.',
-        }),
-      });
-      if (patchRes.ok) {
-        const updated = await patchRes.json();
-        updateTask(updated);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setSaveError(data.error || data.message || `Reject failed (${res.status})`);
+        return;
       }
+
+      const refreshed = await fetch(`/api/tasks/${task.id}`);
+      if (refreshed.ok) {
+        const refreshedTask = await refreshed.json();
+        updateTask(refreshedTask);
+      }
+
+      onClose();
     } catch (error) {
-      setSaveError(error instanceof Error ? error.message : 'Auto-Train action failed');
+      setSaveError(error instanceof Error ? error.message : 'Reject failed');
     } finally {
-      setAutoTrainActionLoading(null);
+      setIsProcessingAcceptance(false);
     }
   };
 
@@ -348,25 +390,51 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId, githubI
 
           {/* Description */}
           <div>
-            <label className="block text-sm font-medium mb-1">{form.task_type === 'autotrain' ? 'Supervisor Prompt' : 'Description'}</label>
+            <label className="block text-sm font-medium mb-1">Description</label>
             <textarea
               value={form.description}
               onChange={(e) => setForm({ ...form, description: e.target.value })}
               rows={3}
               className="w-full bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent resize-none"
-              placeholder={form.task_type === 'autotrain' ? 'Describe the continuous improvement goal, constraints, and optional MAX_ITERATIONS: N...' : 'Add details...'}
+              placeholder="Add details..."
             />
           </div>
 
-          {form.task_type === 'autotrain' && (
-            <div className="p-3 bg-mc-bg rounded-lg border border-mc-border">
-              <div className="text-sm font-medium text-mc-text">Auto-Train</div>
-              <p className="text-xs text-mc-text-secondary mt-1">
-                Runs a continuous improvement loop on this workspace repo only. The prompt above becomes the supervisor instruction.
-                Artifacts go to `.mission-control/tasks/&lt;task-id&gt;`, and you can add `MAX_ITERATIONS: 10` to stop automatically.
+          <div>
+            <label className="block text-sm font-medium mb-1">Files for Agent Context</label>
+            <div className="space-y-2">
+              <input
+                type="file"
+                multiple
+                onChange={(e) => {
+                  const files = Array.from(e.target.files || []);
+                  if (files.length === 0) return;
+                  setAttachedFiles((prev) => [...prev, ...files]);
+                  e.currentTarget.value = '';
+                }}
+                className="w-full min-h-11 bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm"
+              />
+              <p className="text-xs text-mc-text-secondary">
+                Attached files are stored under this task&apos;s `.mission-control` resource directory and automatically ingested into dispatch prompts for agent runs.
               </p>
+              {attachedFiles.length > 0 && (
+                <div className="space-y-1">
+                  {attachedFiles.map((file, index) => (
+                    <div key={`${file.name}-${file.size}-${index}`} className="flex items-center justify-between gap-2 text-xs bg-mc-bg border border-mc-border rounded px-2 py-1">
+                      <span className="truncate">{file.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => setAttachedFiles((prev) => prev.filter((_, i) => i !== index))}
+                        className="text-mc-text-secondary hover:text-mc-accent-red"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-          )}
+          </div>
 
           {/* Acceptance Criteria - only for new tasks */}
           {!task && (
@@ -449,7 +517,7 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId, githubI
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium mb-1">Task Type</label>
               <select
@@ -462,7 +530,6 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId, githubI
                 <option value="chore">Chore</option>
                 <option value="documentation">Documentation</option>
                 <option value="research">Research</option>
-                <option value="autotrain">Auto-Train</option>
               </select>
             </div>
 
@@ -482,7 +549,7 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId, githubI
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium mb-1">Effort</label>
               <select
@@ -516,7 +583,7 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId, githubI
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium mb-1">Assign to</label>
               <select
@@ -546,7 +613,13 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId, githubI
               <label className="block text-sm font-medium mb-1">Milestone</label>
               <select
                 value={form.milestone_id}
-                onChange={(e) => setForm({ ...form, milestone_id: e.target.value })}
+                onChange={(e) => {
+                  if (e.target.value === '__add_new__') {
+                    setShowMilestoneModal(true);
+                    return;
+                  }
+                  setForm({ ...form, milestone_id: e.target.value });
+                }}
                 className="w-full min-h-11 bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent"
               >
                 <option value="">No milestone</option>
@@ -555,6 +628,9 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId, githubI
                     {milestone.name}
                   </option>
                 ))}
+                <option value="__add_new__" className="text-mc-accent">
+                  + Add new milestone...
+                </option>
               </select>
             </div>
           </div>
@@ -598,32 +674,17 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId, githubI
 
         {/* Footer - only show on overview tab */}
         {activeTab === 'overview' && (
-          <div className="flex items-center justify-between p-4 border-t border-mc-border flex-shrink-0">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between p-4 border-t border-mc-border flex-shrink-0 gap-2 sm:gap-0">
             <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="min-h-11 px-4 py-2 text-sm text-mc-text-secondary hover:text-mc-text"
+              >
+                Cancel
+              </button>
               {task && (
                 <>
-                  {task.task_type === 'autotrain' && (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => handleAutoTrainAction('start')}
-                        disabled={autoTrainActionLoading !== null}
-                        className="min-h-11 flex items-center gap-2 px-3 py-2 border border-mc-accent text-mc-accent hover:bg-mc-accent/10 rounded text-sm disabled:opacity-50"
-                      >
-                        <Play className="w-4 h-4" />
-                        {autoTrainActionLoading === 'start' ? 'Starting...' : 'Start Loop'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleAutoTrainAction('stop')}
-                        disabled={autoTrainActionLoading !== null}
-                        className="min-h-11 flex items-center gap-2 px-3 py-2 border border-mc-border text-mc-text-secondary hover:bg-mc-bg-tertiary rounded text-sm disabled:opacity-50"
-                      >
-                        <Pause className="w-4 h-4" />
-                        {autoTrainActionLoading === 'stop' ? 'Stopping...' : 'Stop Loop'}
-                      </button>
-                    </>
-                  )}
                   <button
                     type="button"
                     onClick={handleDelete}
@@ -635,14 +696,27 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId, githubI
                 </>
               )}
             </div>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={onClose}
-                className="min-h-11 px-4 py-2 text-sm text-mc-text-secondary hover:text-mc-text"
-              >
-                Cancel
-              </button>
+            <div className="flex flex-wrap gap-2 justify-end">
+              {task && ['review', 'verification'].includes(task.status) && (
+                <>
+                  <button
+                    type="button"
+                    onClick={handleRaiseProblem}
+                    disabled={isProcessingAcceptance}
+                    className="min-h-11 px-3 py-2 border border-mc-accent-red text-mc-accent-red rounded text-sm font-medium hover:bg-mc-accent-red/10 disabled:opacity-50"
+                  >
+                    Raise Problem
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleAcceptAndMerge}
+                    disabled={isProcessingAcceptance}
+                    className="min-h-11 px-3 py-2 bg-mc-accent-green text-white rounded text-sm font-medium hover:bg-mc-accent-green/90 disabled:opacity-50"
+                  >
+                    {isProcessingAcceptance ? 'Processing...' : 'Accept & Merge'}
+                  </button>
+                </>
+              )}
               {!task && (
                 <button
                   onClick={(e) => handleSubmit(e, true)}
@@ -675,6 +749,27 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId, githubI
             // Auto-select the newly created agent
             setForm({ ...form, assigned_agent_id: agentId });
             setShowAgentModal(false);
+          }}
+        />
+      )}
+
+      {showMilestoneModal && (
+        <CreateMilestoneModal
+          workspaceId={resolvedWorkspaceId}
+          agents={agents}
+          onClose={() => setShowMilestoneModal(false)}
+          onCreated={(milestoneId) => {
+            loadMilestones().then((items) => {
+              if (milestoneId) {
+                setForm((prev) => ({ ...prev, milestone_id: milestoneId }));
+                return;
+              }
+              const latestId = items[0]?.id;
+              if (latestId) {
+                setForm((prev) => ({ ...prev, milestone_id: latestId }));
+              }
+            }).catch(() => {});
+            setShowMilestoneModal(false);
           }}
         />
       )}

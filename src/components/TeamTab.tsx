@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Users, Save, AlertCircle, CheckCircle2, RefreshCw } from 'lucide-react';
+import { Save, AlertCircle, CheckCircle2, RefreshCw } from 'lucide-react';
 import { useMissionControl } from '@/lib/store';
 import type { WorkflowTemplate, WorkflowStage } from '@/lib/types';
 
@@ -15,9 +15,41 @@ interface RoleAssignment {
   agent_id: string;
   agent_name?: string;
 }
-function formatAgentLabel(name: string, role: string, max = 60): string {
-  const full = `${name} — ${role}`;
-  return full.length > max ? full.slice(0, max - 1) + '…' : full;
+
+function toTitleCase(value: string): string {
+  return value
+    .split(/[_\s-]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join(' ');
+}
+
+function compactRole(role: string): string {
+  const normalized = role.trim().toLowerCase();
+  if (!normalized) return 'Agent';
+  if (normalized.includes('orchestrator')) return 'Orchestrator';
+  if (normalized.includes('product_owner') || normalized.includes('product owner') || normalized.includes('project manager')) return 'Product Owner';
+  if (normalized.includes('builder')) return 'Builder';
+  if (normalized.includes('tester')) return 'Tester';
+  if (normalized.includes('reviewer')) return 'Reviewer';
+  if (normalized.includes('learner')) return 'Learner';
+
+  const firstClause = role.split(/[—-]/)[0]?.trim() || role;
+  return toTitleCase(firstClause).slice(0, 24);
+}
+
+function formatAgentLabel(name: string, role: string, max = 48): string {
+  const full = `${name} (${compactRole(role)})`;
+  return full.length > max ? `${full.slice(0, max - 1)}…` : full;
+}
+
+const WORKFLOW_SUMMARY: Record<string, string> = {
+  Simple: 'Builder implementation -> reviewer quality pass -> human acceptance merge.',
+  Standard: 'Builder implementation -> tester validation -> reviewer quality pass -> human acceptance merge.',
+  Strict: 'Builder -> tester -> reviewer verification -> reviewer final review -> human acceptance merge for critical work.',
+};
+function getWorkflowLabel(name: string): string {
+  return name;
 }
 
 
@@ -180,19 +212,19 @@ export function TeamTab({ taskId, workspaceId }: TeamTabProps) {
         <select
           value={selectedWorkflow}
           onChange={(e) => handleWorkflowChange(e.target.value)}
-          className="w-full min-h-11 bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent"
+          className="w-full min-h-11 bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent min-w-0"
         >
-          <option value="">No workflow (single agent)</option>
+            <option value="">No workflow (single agent)</option>
           {workflows.map(wf => (
             <option key={wf.id} value={wf.id}>
-              {wf.name}{wf.is_default ? ' (Default)' : ''}
+              {getWorkflowLabel(wf.name)}{wf.is_default ? ' (Default)' : ''}
             </option>
           ))}
-        </select>
+      </select>
 
-      {currentWorkflow && (
-        <p className="mt-1.5 text-xs text-mc-text-secondary">
-          {currentWorkflow.description}
+          {currentWorkflow && (
+        <p className="mt-1.5 text-xs text-mc-text-secondary break-words">
+          {WORKFLOW_SUMMARY[currentWorkflow.name] || currentWorkflow.description}
         </p>
       )}
       </div>
@@ -201,19 +233,19 @@ export function TeamTab({ taskId, workspaceId }: TeamTabProps) {
       {currentWorkflow && (
         <div>
           <label className="block text-sm font-medium mb-2">Stages</label>
-          <div className="flex items-center gap-1 overflow-x-auto pb-1">
+          <div className="flex items-center gap-1 overflow-x-auto pb-1 max-w-full">
             {currentWorkflow.stages.map((stage: WorkflowStage, i: number) => (
               <div key={stage.id} className="flex items-center gap-1 flex-shrink-0">
-                <div className={`px-3 py-1.5 rounded-full text-xs font-medium ${
+                <div className={`px-3 py-1.5 rounded-full text-xs font-medium max-w-[120px] sm:max-w-none truncate ${
                   stage.role
                     ? 'bg-mc-accent/10 border border-mc-accent/30 text-mc-accent'
                     : 'bg-mc-bg-tertiary border border-mc-border text-mc-text-secondary'
                 }`}>
-                  {stage.label}
+                  <span className="truncate">{stage.label}</span>
                   {stage.role && <span className="ml-1 opacity-60">({stage.role})</span>}
                 </div>
                 {i < currentWorkflow.stages.length - 1 && (
-                  <span className="text-mc-text-secondary/40 text-xs">→</span>
+                  <span className="text-mc-text-secondary/40 text-xs flex-shrink-0">→</span>
                 )}
               </div>
             ))}
@@ -226,8 +258,8 @@ export function TeamTab({ taskId, workspaceId }: TeamTabProps) {
         <div className="p-3 bg-orange-500/10 border border-orange-500/30 rounded-lg">
           <div className="flex items-start gap-2">
             <AlertCircle className="w-4 h-4 text-orange-300 mt-0.5 flex-shrink-0" />
-            <div>
-              <p className="text-sm text-orange-200">
+            <div className="min-w-0">
+              <p className="text-sm text-orange-200 break-words">
                 Missing agents for: {missingRoles.join(', ')}
               </p>
               <p className="text-xs text-orange-300/70 mt-1">
@@ -241,19 +273,22 @@ export function TeamTab({ taskId, workspaceId }: TeamTabProps) {
       {/* Role Assignments */}
       <div>
         <label className="block text-sm font-medium mb-2">Role Assignments</label>
+        <p className="mb-2 text-xs text-mc-text-secondary">
+          Optional <span className="font-medium text-mc-text">learner</span>: captures reusable lessons from stage transitions and syncs agent-scoped learnings into OpenClaw memory.
+        </p>
         <div className="space-y-3">
           {visibleRoles.map(role => {
             if (!role) return null;
             const assignment = roles.find(r => r.role === role);
             return (
-              <div key={role} className="flex items-center gap-3">
-                <div className="w-24 text-xs font-medium text-mc-text-secondary capitalize flex-shrink-0">
+              <div key={role} className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 min-w-0">
+                <div className="sm:w-24 text-xs font-medium text-mc-text-secondary capitalize flex-shrink-0">
                   {role}
                 </div>
                 <select
                   value={assignment?.agent_id || ''}
                   onChange={(e) => handleRoleAgentChange(role, e.target.value)}
-                  className="flex-1 min-h-11 bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent"
+                  className="flex-1 min-h-11 bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent min-w-0"
                 >
                   <option value="">Unassigned</option>
                   {agents.map(agent => (
@@ -267,7 +302,7 @@ export function TeamTab({ taskId, workspaceId }: TeamTabProps) {
           })}
 
           {!isTemplateLocked && roles.filter(r => !uniqueRoles.includes(r.role) && r.role).map((r, i) => (
-            <div key={`custom-${i}`} className="flex items-center gap-3">
+            <div key={`custom-${i}`} className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 min-w-0">
               <input
                 value={r.role}
                 onChange={(e) => {
@@ -276,12 +311,12 @@ export function TeamTab({ taskId, workspaceId }: TeamTabProps) {
                   ));
                 }}
                 placeholder="Role name"
-                className="w-24 bg-mc-bg border border-mc-border rounded px-2 py-2 text-xs focus:outline-none focus:border-mc-accent"
+                className="sm:w-24 bg-mc-bg border border-mc-border rounded px-2 py-2 text-xs focus:outline-none focus:border-mc-accent"
               />
               <select
                 value={r.agent_id}
                 onChange={(e) => handleRoleAgentChange(r.role, e.target.value)}
-                className="flex-1 min-h-11 bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent"
+                className="flex-1 min-h-11 bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent min-w-0"
               >
                 <option value="">Unassigned</option>
                 {agents.map(agent => (
@@ -294,14 +329,14 @@ export function TeamTab({ taskId, workspaceId }: TeamTabProps) {
           ))}
 
           {!isTemplateLocked && !uniqueRoles.includes('learner') && (
-            <div className="flex items-center gap-3 opacity-60 hover:opacity-100 transition-opacity">
-              <div className="w-24 text-xs font-medium text-mc-text-secondary capitalize flex-shrink-0">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 opacity-60 hover:opacity-100 transition-opacity min-w-0">
+              <div className="sm:w-24 text-xs font-medium text-mc-text-secondary capitalize flex-shrink-0">
                 learner
               </div>
               <select
                 value={roles.find(r => r.role === 'learner')?.agent_id || ''}
                 onChange={(e) => handleRoleAgentChange('learner', e.target.value)}
-                className="flex-1 min-h-11 bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent"
+                className="flex-1 min-h-11 bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent min-w-0"
               >
                 <option value="">Unassigned (optional)</option>
                 {agents.map(agent => (
@@ -327,23 +362,23 @@ export function TeamTab({ taskId, workspaceId }: TeamTabProps) {
       {/* Error / Success */}
       {error && (
         <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
-          <p className="text-sm text-red-400">{error}</p>
+          <p className="text-sm text-red-400 break-words">{error}</p>
         </div>
       )}
 
       {saved && (
         <div className="p-3 bg-green-500/10 border border-green-500/30 rounded-lg flex items-center gap-2">
-          <CheckCircle2 className="w-4 h-4 text-green-400" />
+          <CheckCircle2 className="w-4 h-4 text-green-400 flex-shrink-0" />
           <p className="text-sm text-green-400">Team saved successfully</p>
         </div>
       )}
 
       {/* Footer */}
-      <div className="flex items-center justify-end pt-4 border-t border-mc-border">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-end pt-4 border-t border-mc-border gap-2 sm:gap-0">
         <button
           onClick={handleSave}
           disabled={saving}
-          className="min-h-11 flex items-center gap-2 px-4 py-2 bg-mc-accent text-white rounded text-sm font-medium hover:bg-mc-accent/90 disabled:opacity-50"
+          className="min-h-11 flex items-center justify-center gap-2 px-4 py-2 bg-mc-accent text-white rounded text-sm font-medium hover:bg-mc-accent/90 disabled:opacity-50"
         >
           <Save className="w-4 h-4" />
           {saving ? 'Saving...' : 'Save Team'}
