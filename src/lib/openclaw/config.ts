@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, writeFileSync, statSync } from 'fs';
+import { existsSync, readFileSync, writeFileSync, statSync, mkdirSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
 
@@ -56,6 +56,7 @@ export interface ResolvedAgent {
   soulMd: string | null;
   userMd: string | null;
   agentsMd: string | null;
+  memoryMd: string | null;
   systemMd: string | null;
   role: string;
 }
@@ -127,6 +128,7 @@ export function resolveAgents(config: OpenClawFullConfig): ResolvedAgent[] {
     const soulMd = workspacePath ? readFileSafe(join(workspacePath, 'SOUL.md')) : null;
     const userMd = workspacePath ? readFileSafe(join(workspacePath, 'USER.md')) : null;
     const agentsMd = workspacePath ? readFileSafe(join(workspacePath, 'AGENTS.md')) : null;
+    const memoryMd = workspacePath ? readFileSafe(join(workspacePath, 'MEMORY.md')) : null;
     const systemMd = agentDir ? readFileSafe(join(agentDir, 'system.md')) : null;
 
     const name = agent.identity?.name || agent.name || agent.id;
@@ -142,6 +144,7 @@ export function resolveAgents(config: OpenClawFullConfig): ResolvedAgent[] {
       soulMd,
       userMd,
       agentsMd,
+      memoryMd,
       systemMd,
       role,
     };
@@ -152,12 +155,14 @@ export function readAgentMdFromDisk(workspacePath: string | null | undefined): {
   soul_md: string | null;
   user_md: string | null;
   agents_md: string | null;
+  memory_md: string | null;
 } {
-  if (!workspacePath) return { soul_md: null, user_md: null, agents_md: null };
+  if (!workspacePath) return { soul_md: null, user_md: null, agents_md: null, memory_md: null };
   return {
     soul_md: readFileSafe(join(workspacePath, 'SOUL.md')),
     user_md: readFileSafe(join(workspacePath, 'USER.md')),
     agents_md: readFileSafe(join(workspacePath, 'AGENTS.md')),
+    memory_md: readFileSafe(join(workspacePath, 'MEMORY.md')),
   };
 }
 
@@ -206,5 +211,75 @@ export function writeAgentMdFile(
   } catch (err) {
     console.error(`[openclaw-config] Failed to write ${filename} to ${dirPath}:`, err);
     return false;
+  }
+}
+
+interface CreateOpenClawAgentInput {
+  id: string;
+  name: string;
+  role: string;
+  model?: string;
+  soulMd?: string;
+  userMd?: string;
+  agentsMd?: string;
+  memoryMd?: string;
+  systemMd?: string;
+}
+
+export function createAgentInOpenClawConfig(input: CreateOpenClawAgentInput): {
+  ok: boolean;
+  error?: string;
+  workspacePath?: string;
+  agentDir?: string;
+} {
+  const configPath = getConfigPath();
+  try {
+    const config = readOpenClawConfig();
+    if (!config) {
+      return { ok: false, error: 'OpenClaw config not found' };
+    }
+
+    if (!config.agents) config.agents = {};
+    if (!Array.isArray(config.agents.list)) config.agents.list = [];
+
+    const alreadyExists = config.agents.list.some((agent) => agent.id === input.id);
+    if (alreadyExists) {
+      return { ok: false, error: `Agent id already exists: ${input.id}` };
+    }
+
+    const workspacePath = join(homedir(), '.openclaw', 'workspaces', input.id);
+    const agentDir = join(homedir(), '.openclaw', 'agents', input.id, 'agent');
+    mkdirSync(workspacePath, { recursive: true });
+    mkdirSync(agentDir, { recursive: true });
+
+    const model = input.model || config.agents.defaults?.model?.primary || undefined;
+
+    config.agents.list.push({
+      id: input.id,
+      name: input.name,
+      workspace: workspacePath,
+      agentDir,
+      model,
+      identity: { name: input.name },
+    });
+
+    writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf-8');
+
+    const soulMd = input.soulMd || `# ${input.name}\n\nYou are ${input.name}. Work clearly, safely, and with strong execution discipline.`;
+    const userMd = input.userMd || '# USER\n\nContext about the human operator.';
+    const agentsMd = input.agentsMd || '# AGENTS\n\nTeam coordination notes.';
+    const memoryMd = input.memoryMd || '# MEMORY\n\nDurable lessons learned and stable operating preferences.';
+    const systemMd = input.systemMd || `---\ndescription: ${input.role}\n---\n\n# ${input.role}\n\nYou are ${input.name}. Execute tasks accurately and report verifiable outcomes.`;
+
+    writeFileSync(join(workspacePath, 'SOUL.md'), soulMd, 'utf-8');
+    writeFileSync(join(workspacePath, 'USER.md'), userMd, 'utf-8');
+    writeFileSync(join(workspacePath, 'AGENTS.md'), agentsMd, 'utf-8');
+    writeFileSync(join(workspacePath, 'MEMORY.md'), memoryMd, 'utf-8');
+    writeFileSync(join(agentDir, 'system.md'), systemMd, 'utf-8');
+
+    return { ok: true, workspacePath, agentDir };
+  } catch (err) {
+    console.error('[openclaw-config] Failed to create agent in config:', err);
+    return { ok: false, error: 'Failed to create OpenClaw agent' };
   }
 }

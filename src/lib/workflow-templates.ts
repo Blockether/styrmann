@@ -26,21 +26,22 @@ export interface WorkflowTemplateDefinition {
 export const WORKFLOW_TEMPLATES: WorkflowTemplateDefinition[] = [
   {
     name: 'Simple',
-    description: 'Builder only — for quick, straightforward tasks',
+    description: 'Builder implementation -> reviewer quality pass -> human acceptance merge.',
     stages: [
       { id: 'build', label: 'Build', role: 'builder', status: 'in_progress' },
+      { id: 'review', label: 'Review', role: 'reviewer', status: 'review' },
       { id: 'done', label: 'Done', role: null, status: 'done' },
     ],
-    failTargets: {},
+    failTargets: { review: 'in_progress' },
     isDefault: false,
   },
   {
     name: 'Standard',
-    description: 'Builder → Tester → Human Verifier — for most projects',
+    description: 'Builder implementation -> tester validation -> reviewer quality pass -> human acceptance merge.',
     stages: [
       { id: 'build', label: 'Build', role: 'builder', status: 'in_progress' },
       { id: 'test', label: 'Test', role: 'tester', status: 'testing' },
-      { id: 'review', label: 'Human Verifier', role: 'reviewer', status: 'review' },
+      { id: 'review', label: 'Review', role: 'reviewer', status: 'review' },
       { id: 'done', label: 'Done', role: null, status: 'done' },
     ],
     failTargets: { testing: 'in_progress', review: 'in_progress' },
@@ -48,26 +49,16 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplateDefinition[] = [
   },
   {
     name: 'Strict',
-    description: 'Builder → Tester → Human Verifier → Reviewer — for critical projects',
+    description: 'Builder -> tester -> reviewer verification -> reviewer final review -> human acceptance merge for critical work.',
     stages: [
       { id: 'build', label: 'Build', role: 'builder', status: 'in_progress' },
       { id: 'test', label: 'Test', role: 'tester', status: 'testing' },
-      { id: 'review', label: 'Human Verifier', role: null, status: 'review' },
       { id: 'verify', label: 'Verify', role: 'reviewer', status: 'verification' },
+      { id: 'review', label: 'Review', role: 'reviewer', status: 'review' },
       { id: 'done', label: 'Done', role: null, status: 'done' },
     ],
-    failTargets: { testing: 'in_progress', review: 'in_progress', verification: 'in_progress' },
+    failTargets: { testing: 'in_progress', verification: 'in_progress', review: 'in_progress' },
     isDefault: true,
-  },
-  {
-    name: 'Auto-Train',
-    description: 'Continuous repo improvement loop for one workspace-scoped task prompt',
-    stages: [
-      { id: 'improve', label: 'Improve', role: 'builder', status: 'in_progress' },
-      { id: 'done', label: 'Loop Complete', role: null, status: 'done' },
-    ],
-    failTargets: {},
-    isDefault: false,
   },
 ];
 
@@ -104,4 +95,37 @@ export function provisionWorkflowTemplates(db: Database.Database, workspaceId: s
   }
 
   console.log(`[WorkflowTemplates] Provisioned ${WORKFLOW_TEMPLATES.length} templates for workspace ${workspaceId}`);
+}
+
+export function ensureWorkflowTemplate(db: Database.Database, workspaceId: string, templateName: string): string | null {
+  let template = db.prepare(
+    'SELECT id FROM workflow_templates WHERE workspace_id = ? AND name = ? LIMIT 1'
+  ).get(workspaceId, templateName) as { id: string } | undefined;
+
+  if (!template) {
+    const definition = WORKFLOW_TEMPLATES.find((item) => item.name === templateName);
+    if (!definition) return null;
+
+    const now = new Date().toISOString();
+    db.prepare(
+      `INSERT INTO workflow_templates (id, workspace_id, name, description, stages, fail_targets, is_default, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(
+      crypto.randomUUID(),
+      workspaceId,
+      definition.name,
+      definition.description,
+      JSON.stringify(definition.stages),
+      JSON.stringify(definition.failTargets),
+      definition.isDefault ? 1 : 0,
+      now,
+      now,
+    );
+
+    template = db.prepare(
+      'SELECT id FROM workflow_templates WHERE workspace_id = ? AND name = ? LIMIT 1'
+    ).get(workspaceId, templateName) as { id: string } | undefined;
+  }
+
+  return template?.id || null;
 }
