@@ -1,11 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { X, Bot, User, Cpu, Clock3, MessageSquare, ChevronRight, Shield, ArrowRight } from 'lucide-react';
+import { X, Bot, User, Cpu, Clock3, MessageSquare, ChevronRight, Shield, ArrowRight, Wrench, Terminal } from 'lucide-react';
 
 interface TraceMessage {
   role: string;
   content: string;
+  tool_calls?: { name: string; input?: string }[];
+  tool_result?: string;
   timestamp?: string;
   provenance?: {
     kind: string;
@@ -83,12 +85,14 @@ function formatDuration(value?: number | null): string {
 function roleIcon(role: string) {
   if (role === 'assistant') return <Bot className="w-3.5 h-3.5" />;
   if (role === 'user') return <User className="w-3.5 h-3.5" />;
+  if (role === 'tool' || role === 'toolResult') return <Terminal className="w-3.5 h-3.5" />;
   return <Cpu className="w-3.5 h-3.5" />;
 }
 
 function roleBadge(role: string): string {
   if (role === 'assistant') return 'bg-mc-accent/20 text-mc-accent';
   if (role === 'user') return 'bg-blue-100 text-blue-700';
+  if (role === 'tool' || role === 'toolResult') return 'bg-emerald-100 text-emerald-700';
   return 'bg-mc-bg-tertiary text-mc-text-secondary';
 }
 
@@ -153,7 +157,7 @@ export function TraceViewerModal({ taskId, sessionId, onClose }: TraceViewerModa
   if (!sessionId) return null;
 
   const summary = data?.summary;
-  const previewMessages = (data?.history || []).slice(0, 16);
+  const previewMessages = data?.history || [];
 
   return (
     <div
@@ -274,7 +278,7 @@ export function TraceViewerModal({ taskId, sessionId, onClose }: TraceViewerModa
               )}
 
               <div className="p-3 rounded border border-mc-border bg-mc-bg space-y-2">
-                <div className="text-xs uppercase tracking-wide text-mc-text-secondary">Trace preview</div>
+                <div className="text-xs uppercase tracking-wide text-mc-text-secondary">Trace preview ({previewMessages.length} messages)</div>
                 <div className="space-y-2">
                   {previewMessages.map((message, index) => (
                     <div key={`${message.role}-${index}`} className="p-2 rounded border border-mc-border bg-mc-bg-secondary">
@@ -285,12 +289,37 @@ export function TraceViewerModal({ taskId, sessionId, onClose }: TraceViewerModa
                         </span>
                         <span className="text-[11px] text-mc-text-secondary">{formatTimestamp(message.timestamp)}</span>
                       </div>
-                      <p className="text-xs text-mc-text whitespace-pre-wrap break-words line-clamp-4">{message.content || '(empty message)'}</p>
+                      {message.content && (
+                        <p className="text-xs text-mc-text whitespace-pre-wrap break-words">{message.content}</p>
+                      )}
+                      {message.tool_calls && message.tool_calls.length > 0 && (
+                        <div className="mt-1 space-y-1">
+                          {message.tool_calls.map((tc, tcIdx) => (
+                            <div key={`tc-${tcIdx}`} className="flex items-start gap-1.5 text-xs">
+                              <Wrench className="w-3 h-3 mt-0.5 text-mc-text-secondary flex-shrink-0" />
+                              <div className="min-w-0">
+                                <span className="font-mono font-medium text-mc-accent">{tc.name}</span>
+                                {tc.input && (
+                                  <pre className="mt-0.5 p-1.5 rounded bg-mc-bg border border-mc-border text-[11px] text-mc-text-secondary overflow-x-auto max-h-32 whitespace-pre-wrap break-words">{tc.input.length > 500 ? `${tc.input.slice(0, 500)}...` : tc.input}</pre>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {message.tool_result && (
+                        <div className="mt-1 flex items-start gap-1.5 text-xs">
+                          <Terminal className="w-3 h-3 mt-0.5 text-emerald-600 flex-shrink-0" />
+                          <pre className="p-1.5 rounded bg-emerald-50 border border-emerald-200 text-[11px] text-emerald-800 overflow-x-auto max-h-32 whitespace-pre-wrap break-words min-w-0 flex-1">{message.tool_result.length > 500 ? `${message.tool_result.slice(0, 500)}...` : message.tool_result}</pre>
+                        </div>
+                      )}
+                      {!message.content && !message.tool_calls?.length && !message.tool_result && (
+                        <p className="text-xs text-mc-text-secondary italic">(empty message)</p>
+                      )}
                     </div>
                   ))}
                 </div>
               </div>
-
               <details className="p-3 rounded border border-mc-border bg-mc-bg">
                 <summary className="cursor-pointer text-sm text-mc-text">Technical details</summary>
                 <div className="mt-2 space-y-2 text-xs">

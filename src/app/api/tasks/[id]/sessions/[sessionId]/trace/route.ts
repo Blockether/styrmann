@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 
 type Params = { params: Promise<{ id: string; sessionId: string }> };
 
-type TraceMessage = { role: string; content: string; timestamp?: string; provenance?: InputProvenance | null; receipt?: SourceReceipt | null };
+type TraceMessage = { role: string; content: string; tool_calls?: { name: string; input?: string }[]; tool_result?: string; timestamp?: string; provenance?: InputProvenance | null; receipt?: SourceReceipt | null };
 
 const SOURCE_RECEIPT_RE = /\[Source Receipt\]\n([\s\S]*?)\n\[\/?Source Receipt\]/;
 
@@ -40,14 +40,38 @@ function extractProvenance(msg: Record<string, unknown>): InputProvenance | null
 
 function normalizeMessage(raw: unknown): TraceMessage {
   const msg = raw as Record<string, unknown>;
-  let content: string;
+  let content = '';
+  const toolCalls: { name: string; input?: string }[] = [];
+  let toolResult: string | undefined;
+
   if (Array.isArray(msg.content)) {
-    content = (msg.content as Array<{ type?: string; text?: string }>)
-      .filter((b) => b.type === 'text' && b.text)
-      .map((b) => b.text)
-      .join('\n');
+    const blocks = msg.content as Array<Record<string, unknown>>;
+    const textParts: string[] = [];
+    for (const block of blocks) {
+      if (block.type === 'text' && block.text) {
+        textParts.push(String(block.text));
+      } else if (block.type === 'tool_use' || block.type === 'toolUse') {
+        toolCalls.push({
+          name: String(block.name || block.toolName || 'unknown'),
+          input: block.input ? (typeof block.input === 'string' ? block.input : JSON.stringify(block.input, null, 2)) : undefined,
+        });
+      } else if (block.type === 'tool_result' || block.type === 'toolResult') {
+        const resultContent = block.content || block.output || block.text || '';
+        toolResult = typeof resultContent === 'string' ? resultContent : JSON.stringify(resultContent, null, 2);
+      }
+    }
+    content = textParts.join('\n');
   } else {
     content = String(msg.content || '');
+  }
+
+  // Fallback: check top-level tool_use / tool_result fields
+  if (msg.tool_use && typeof msg.tool_use === 'object' && toolCalls.length === 0) {
+    const tu = msg.tool_use as Record<string, unknown>;
+    toolCalls.push({ name: String(tu.name || 'unknown'), input: tu.input ? JSON.stringify(tu.input, null, 2) : undefined });
+  }
+  if (!toolResult && msg.tool_result) {
+    toolResult = typeof msg.tool_result === 'string' ? msg.tool_result : JSON.stringify(msg.tool_result, null, 2);
   }
 
   const timestamp =
@@ -58,7 +82,15 @@ function normalizeMessage(raw: unknown): TraceMessage {
   const provenance = extractProvenance(msg);
   const receipt = parseSourceReceipt(content);
 
-  return { role: String(msg.role || 'unknown'), content, timestamp, provenance, receipt };
+  return {
+    role: String(msg.role || 'unknown'),
+    content,
+    ...(toolCalls.length > 0 ? { tool_calls: toolCalls } : {}),
+    ...(toolResult ? { tool_result: toolResult } : {}),
+    timestamp,
+    provenance,
+    receipt,
+  };
 }
 
 function extractSessionMetadata(taskId: string, sessionId: string): {

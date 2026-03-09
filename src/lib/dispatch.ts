@@ -292,14 +292,17 @@ export async function dispatchTaskToAgent(taskId: string): Promise<DispatchResul
       ? `\n**ACP CONTEXT:**\n- ACP session key: ${activeAcpBinding.acp_session_key}\n- ACP agent: ${activeAcpBinding.acp_agent_id}\n- Discord thread: ${activeAcpBinding.discord_thread_id}\n- **ACP Provenance mode:** meta+receipt\n- When sending messages via ACP bridge, always use: \`openclaw acp --provenance meta+receipt\` (or the \`openclaw-acp\` alias)\n- This attaches InputProvenance metadata and Source Receipt blocks to messages for traceability\nUse this as supervisor context if your runtime can access ACP bindings.\n`
       : '';
 
+    const mcApiToken = process.env.MC_API_TOKEN;
+    const authHeader = mcApiToken ? `\n   Headers: {"Authorization": "Bearer ${mcApiToken}"}` : '';
+
     let completionInstructions: string;
     if (isBuilder) {
       completionInstructions = `**IMPORTANT:** After completing work, you MUST call these APIs:
-1. Log activity: POST ${missionControlUrl}/api/tasks/${task.id}/activities
+1. Log activity: POST ${missionControlUrl}/api/tasks/${task.id}/activities${authHeader}
    Body: {"activity_type": "completed", "message": "Description of what was done", "metadata": {"branch": "task/${task.id}"}}
-2. Register deliverable: POST ${missionControlUrl}/api/tasks/${task.id}/deliverables
+2. Register deliverable: POST ${missionControlUrl}/api/tasks/${task.id}/deliverables${authHeader}
    Body: {"deliverable_type": "file", "title": "File name", "path": "${taskProjectDir}/filename.html"}
-3. Update status: PATCH ${missionControlUrl}/api/tasks/${task.id}
+3. Update status: PATCH ${missionControlUrl}/api/tasks/${task.id}${authHeader}
    Body: {"status": "${nextStatus}"}
 
 Branch rule:
@@ -314,13 +317,13 @@ When complete, reply with:
 Review the output directory for deliverables and run any applicable tests.
 
 **If tests PASS:**
-1. Log activity: POST ${missionControlUrl}/api/tasks/${task.id}/activities
+1. Log activity: POST ${missionControlUrl}/api/tasks/${task.id}/activities${authHeader}
    Body: {"activity_type": "completed", "message": "Tests passed: [summary]"}
-2. Update status: PATCH ${missionControlUrl}/api/tasks/${task.id}
+2. Update status: PATCH ${missionControlUrl}/api/tasks/${task.id}${authHeader}
    Body: {"status": "${nextStatus}"}
 
 **If tests FAIL:**
-1. ${failEndpoint}
+1. ${failEndpoint}${authHeader}
    Body: {"reason": "Detailed description of what failed and what needs fixing"}
 
 Reply with: \`TEST_PASS: [summary]\` or \`TEST_FAIL: [what failed]\``;
@@ -330,19 +333,19 @@ Reply with: \`TEST_PASS: [summary]\` or \`TEST_FAIL: [what failed]\``;
 Review deliverables, test results, and task requirements.
 
 **If verification PASSES:**
-1. Log activity: POST ${missionControlUrl}/api/tasks/${task.id}/activities
+1. Log activity: POST ${missionControlUrl}/api/tasks/${task.id}/activities${authHeader}
    Body: {"activity_type": "completed", "message": "Verification passed: [summary]"}
-2. Update status: PATCH ${missionControlUrl}/api/tasks/${task.id}
+2. Update status: PATCH ${missionControlUrl}/api/tasks/${task.id}${authHeader}
    Body: {"status": "${nextStatus}"}
 
 **If verification FAILS:**
-1. ${failEndpoint}
+1. ${failEndpoint}${authHeader}
    Body: {"reason": "Detailed description of what failed and what needs fixing"}
 
 Reply with: \`VERIFY_PASS: [summary]\` or \`VERIFY_FAIL: [what failed]\``;
     } else {
       completionInstructions = `**IMPORTANT:** After completing work:
-1. Update status: PATCH ${missionControlUrl}/api/tasks/${task.id}
+1. Update status: PATCH ${missionControlUrl}/api/tasks/${task.id}${authHeader}
    Body: {"status": "${nextStatus}"}`;
     }
 
