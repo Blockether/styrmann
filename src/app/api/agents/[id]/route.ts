@@ -192,9 +192,17 @@ export async function DELETE(
     run('DELETE FROM events WHERE agent_id = ?', [id]);
     run('DELETE FROM messages WHERE sender_agent_id = ?', [id]);
     run('DELETE FROM conversation_participants WHERE agent_id = ?', [id]);
+    run('DELETE FROM task_roles WHERE agent_id = ?', [id]);
+    run('DELETE FROM agent_heartbeats WHERE agent_id = ?', [id]);
+    run('DELETE FROM agent_logs WHERE agent_id = ?', [id]);
     run('UPDATE tasks SET assigned_agent_id = NULL WHERE assigned_agent_id = ?', [id]);
     run('UPDATE tasks SET created_by_agent_id = NULL WHERE created_by_agent_id = ?', [id]);
     run('UPDATE task_activities SET agent_id = NULL WHERE agent_id = ?', [id]);
+    run('UPDATE task_run_results SET agent_id = NULL WHERE agent_id = ?', [id]);
+    run('UPDATE knowledge_entries SET agent_id = NULL WHERE agent_id = ?', [id]);
+    run('UPDATE knowledge_entries SET created_by_agent_id = NULL WHERE created_by_agent_id = ?', [id]);
+    run('UPDATE milestones SET coordinator_agent_id = NULL WHERE coordinator_agent_id = ?', [id]);
+    run('UPDATE acp_bindings SET agent_id = NULL WHERE agent_id = ?', [id]);
 
     // Now delete the agent
     run('DELETE FROM agents WHERE id = ?', [id]);

@@ -1,7 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import { queryOne, queryAll, run } from '@/lib/db';
 import { existsSync, readFileSync } from 'fs';
-import { getOpenClawClient } from '@/lib/openclaw/client';
+import { getOpenClawClient, sendMessageWithProvenance } from '@/lib/openclaw/client';
 import { broadcast } from '@/lib/events';
 import { getMissionControlUrl } from '@/lib/config';
 import { getWorkspaceRepoPath, getTaskPipelineDir, isGitWorkTree } from '@/lib/git-repo';
@@ -367,10 +367,10 @@ If you need help or clarification, ask the orchestrator.`;
       const prefix = agent.session_key_prefix || 'agent:main:';
       const sessionKey = `${prefix}${session.openclaw_session_id}`;
       const traceUrl = `/api/tasks/${task.id}/sessions/${encodeURIComponent(session.openclaw_session_id)}/trace`;
-      await client.call('chat.send', {
-        sessionKey,
-        message: taskMessage,
-        idempotencyKey: `dispatch-${task.id}-${Date.now()}`,
+      // Send dispatch via ACP bridge with provenance (falls back to direct RPC)
+      const { provenance } = await sendMessageWithProvenance(sessionKey, taskMessage, {
+        cwd: repoPath,
+        timeoutMs: 30000,
       });
 
       run(
@@ -388,6 +388,7 @@ If you need help or clarification, ask the orchestrator.`;
             trace_url: traceUrl,
             output_directory: taskProjectDir,
             branch: `task/${task.id}`,
+            provenance,
             invocation: taskMessage,
           }),
           now,

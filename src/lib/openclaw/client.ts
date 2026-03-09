@@ -557,3 +557,63 @@ export function getOpenClawClient(): OpenClawClient {
   }
   return clientInstance;
 }
+
+/**
+ * Send a message to a Gateway session with ACP provenance (meta+receipt).
+ * Uses the `openclaw acp` CLI bridge so the Gateway sees the message as
+ * coming from an ACP bridge client, which is the only caller type allowed
+ * to inject InputProvenance and Source Receipt blocks.
+ *
+ * Falls back to direct `chat.send` RPC if the CLI is unavailable.
+ */
+export async function sendMessageWithProvenance(
+  sessionKey: string,
+  message: string,
+  options?: { cwd?: string; timeoutMs?: number },
+): Promise<{ provenance: boolean }> {
+  const { execFile } = await import('child_process');
+  const { promisify } = await import('util');
+  const execFileAsync = promisify(execFile);
+
+  const gatewayUrl = process.env.OPENCLAW_GATEWAY_URL || 'ws://127.0.0.1:18789';
+  const gatewayToken = process.env.OPENCLAW_GATEWAY_TOKEN || '';
+  const cwd = options?.cwd || process.cwd();
+  const timeoutMs = options?.timeoutMs || 30000;
+
+  // Build a one-shot script: start ACP bridge, pipe the message, close
+  // openclaw acp client reads from stdin when --server-args include the session
+  const args = [
+    'acp',
+    '--provenance', 'meta+receipt',
+    '--session', sessionKey,
+    '--url', gatewayUrl,
+    ...(gatewayToken ? ['--token', gatewayToken] : []),
+    'client',
+    '--cwd', cwd,
+  ];
+
+  try {
+    const child = execFileAsync('openclaw', args, {
+      timeout: timeoutMs,
+      maxBuffer: 1024 * 1024,
+      env: { ...process.env, FORCE_COLOR: '0', NO_COLOR: '1' },
+    });
+
+    // Write the message to stdin and close it so the ACP client sends + exits
+    if (child.child.stdin) {
+      child.child.stdin.write(message);
+      child.child.stdin.end();
+    }
+
+    await child;
+    console.log('[OpenClaw] Dispatch sent via ACP bridge with meta+receipt provenance');
+    return { provenance: true };
+  } catch (err) {
+    console.warn('[OpenClaw] ACP bridge dispatch failed, falling back to direct RPC:', (err as Error).message);
+    // Fallback: send via direct WebSocket (no provenance)
+    const client = getOpenClawClient();
+    if (!client.isConnected()) await client.connect();
+    await client.call('chat.send', { sessionKey, message });
+    return { provenance: false };
+  }
+}
