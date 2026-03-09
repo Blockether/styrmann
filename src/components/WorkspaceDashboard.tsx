@@ -46,11 +46,20 @@ export function WorkspaceDashboard() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
-        <div className="mb-8">
-          <h2 className="text-2xl font-bold mb-2">All Workspaces</h2>
-          <p className="text-mc-text-secondary">
-            Select a workspace to view its mission queue and agents
-          </p>
+        <div className="flex items-center justify-between gap-4 mb-8">
+          <div>
+            <h2 className="text-2xl font-bold mb-1">All Workspaces</h2>
+            <p className="text-mc-text-secondary text-sm">
+              Select a workspace to view its mission queue and agents
+            </p>
+          </div>
+          <button
+            onClick={() => setShowCloneModal(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-mc-accent text-white rounded-lg text-sm font-medium hover:bg-mc-accent/90 flex-shrink-0"
+          >
+            <GitBranch className="w-4 h-4" />
+            <span className="hidden sm:inline">Clone Repository</span>
+          </button>
         </div>
 
         {workspaces.length === 0 ? (
@@ -64,7 +73,7 @@ export function WorkspaceDashboard() {
               onClick={() => setShowCloneModal(true)}
               className="px-6 py-3 bg-mc-accent text-white rounded-lg font-medium hover:bg-mc-accent/90"
             >
-              Clone Repository
+              Clone your first repository
             </button>
           </div>
         ) : (
@@ -102,15 +111,6 @@ export function WorkspaceDashboard() {
               ));
             })()}
 
-            <button
-              onClick={() => setShowCloneModal(true)}
-              className="border-2 border-dashed border-mc-border rounded-xl p-6 hover:border-mc-accent/50 transition-colors flex flex-col items-center justify-center gap-3 min-h-[120px] w-full max-w-sm mx-auto mt-6"
-            >
-              <div className="w-10 h-10 rounded-full bg-mc-bg-tertiary flex items-center justify-center">
-                <GitBranch className="w-5 h-5 text-mc-text-secondary" />
-              </div>
-              <span className="text-mc-text-secondary font-medium">Clone Repository</span>
-            </button>
           </>
         )}
       </main>
