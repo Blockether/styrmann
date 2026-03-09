@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { X, Bot, User, Cpu, Clock3, MessageSquare, ChevronRight } from 'lucide-react';
 
 interface TraceMessage {
@@ -34,8 +34,8 @@ interface TracePayload {
 }
 
 interface TraceViewerModalProps {
-  taskId?: string;
-  traceUrl: string | null;
+  taskId: string;
+  sessionId: string | null;
   onClose: () => void;
 }
 
@@ -73,24 +73,13 @@ function roleBadge(role: string): string {
   return 'bg-mc-bg-tertiary text-mc-text-secondary';
 }
 
-export function TraceViewerModal({ taskId, traceUrl, onClose }: TraceViewerModalProps) {
+export function TraceViewerModal({ taskId, sessionId, onClose }: TraceViewerModalProps) {
   const [data, setData] = useState<TracePayload | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const normalizedPath = useMemo(() => {
-    if (!traceUrl) return null;
-    if (traceUrl.startsWith('/')) return traceUrl;
-    try {
-      const parsed = new URL(traceUrl);
-      return `${parsed.pathname}${parsed.search}${parsed.hash}`;
-    } catch {
-      return traceUrl;
-    }
-  }, [traceUrl]);
-
   useEffect(() => {
-    if (!normalizedPath) {
+    if (!sessionId) {
       setData(null);
       setError(null);
       setLoading(false);
@@ -102,7 +91,8 @@ export function TraceViewerModal({ taskId, traceUrl, onClose }: TraceViewerModal
       setLoading(true);
       setError(null);
       try {
-        const response = await fetch(normalizedPath);
+        const url = `/api/tasks/${taskId}/sessions/${encodeURIComponent(sessionId)}/trace`;
+        const response = await fetch(url);
         const payload = await response.json();
         if (!response.ok) {
           throw new Error(payload?.error || 'Failed to load trace');
@@ -126,9 +116,9 @@ export function TraceViewerModal({ taskId, traceUrl, onClose }: TraceViewerModal
     return () => {
       isCancelled = true;
     };
-  }, [normalizedPath]);
+  }, [taskId, sessionId]);
 
-  if (!normalizedPath) return null;
+  if (!sessionId) return null;
 
   const summary = data?.summary;
   const previewMessages = (data?.history || []).slice(0, 16);
@@ -217,7 +207,7 @@ export function TraceViewerModal({ taskId, traceUrl, onClose }: TraceViewerModal
 
               <div className="p-3 rounded border border-mc-border bg-mc-bg space-y-2">
                 <div className="text-xs uppercase tracking-wide text-mc-text-secondary">Trace preview</div>
-                <div className="space-y-2 max-h-[38vh] overflow-y-auto pr-1">
+                <div className="space-y-2">
                   {previewMessages.map((message, index) => (
                     <div key={`${message.role}-${index}`} className="p-2 rounded border border-mc-border bg-mc-bg-secondary">
                       <div className="flex items-center justify-between gap-2 mb-1">

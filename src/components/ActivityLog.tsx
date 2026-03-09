@@ -20,7 +20,7 @@ interface ActivityLogProps {
 export function ActivityLog({ taskId }: ActivityLogProps) {
   const [activities, setActivities] = useState<TaskActivity[]>([]);
   const [loading, setLoading] = useState(true);
-  const { traceUrl, openTrace, closeTrace } = useTraceDeepLink();
+  const { traceSessionId, openTrace, closeTrace } = useTraceDeepLink();
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
   const lastCountRef = useRef(0);
 
@@ -108,19 +108,20 @@ export function ActivityLog({ taskId }: ActivityLogProps) {
     }
   };
 
-  const getTraceUrl = (metadata?: string): string | null => {
+  const getTraceSessionId = (metadata?: string): string | null => {
     if (!metadata) return null;
     try {
       const parsed = JSON.parse(metadata) as Record<string, unknown>;
-      const traceUrl = parsed.trace_url;
-      if (typeof traceUrl !== 'string' || !traceUrl) return null;
-      if (traceUrl.startsWith('/')) return traceUrl;
-      try {
-        const normalized = new URL(traceUrl);
-        return `${normalized.pathname}${normalized.search}${normalized.hash}`;
-      } catch {
-        return traceUrl;
+      if (typeof parsed.openclaw_session_id === 'string' && parsed.openclaw_session_id) {
+        return parsed.openclaw_session_id;
       }
+      // Fallback: extract session ID from trace_url path
+      const traceUrl = parsed.trace_url;
+      if (typeof traceUrl === 'string' && traceUrl) {
+        const match = traceUrl.match(/\/sessions\/([^/]+)\/trace/);
+        if (match?.[1]) return decodeURIComponent(match[1]);
+      }
+      return null;
     } catch {
       return null;
     }
@@ -166,7 +167,7 @@ export function ActivityLog({ taskId }: ActivityLogProps) {
       {activities.map((activity) => (
         (() => {
           const parsedMetadata = parseMetadata(activity.metadata);
-          const activityTraceUrl = getTraceUrl(activity.metadata);
+          const activityTraceSessionId = getTraceSessionId(activity.metadata);
           const sessionId = typeof parsedMetadata?.openclaw_session_id === 'string' ? parsedMetadata.openclaw_session_id : null;
           const outputDirectory = typeof parsedMetadata?.output_directory === 'string' ? parsedMetadata.output_directory : null;
           const invocation = typeof parsedMetadata?.invocation === 'string' ? parsedMetadata.invocation : null;
@@ -226,11 +227,11 @@ export function ActivityLog({ taskId }: ActivityLogProps) {
               </div>
             )}
 
-            {activityTraceUrl && (
+            {activityTraceSessionId && (
               <div className="mt-2">
                 <button
                   type="button"
-                  onClick={() => openTrace(activityTraceUrl)}
+                  onClick={() => openTrace(activityTraceSessionId, taskId)}
                   className="text-xs text-mc-accent hover:underline"
                 >
                   Open session trace
@@ -249,7 +250,7 @@ export function ActivityLog({ taskId }: ActivityLogProps) {
       ))}
       <TraceViewerModal
         taskId={taskId}
-        traceUrl={traceUrl}
+        sessionId={traceSessionId}
         onClose={closeTrace}
       />
     </div>

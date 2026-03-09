@@ -33,7 +33,7 @@ interface SessionsListProps {
 export function SessionsList({ taskId }: SessionsListProps) {
   const [sessions, setSessions] = useState<SessionWithAgent[]>([]);
   const [loading, setLoading] = useState(true);
-  const { traceUrl, openTrace, closeTrace } = useTraceDeepLink();
+  const { traceSessionId, openTrace, closeTrace } = useTraceDeepLink();
 
   const loadSessions = useCallback(async () => {
     try {
@@ -126,16 +126,6 @@ export function SessionsList({ taskId }: SessionsListProps) {
     }
   };
 
-  const getClientTraceUrl = (traceUrl?: string): string | null => {
-    if (!traceUrl) return null;
-    if (traceUrl.startsWith('/')) return traceUrl;
-    try {
-      const parsed = new URL(traceUrl);
-      return `${parsed.pathname}${parsed.search}${parsed.hash}`;
-    } catch {
-      return traceUrl;
-    }
-  };
 
   if (loading) {
     return (
@@ -188,11 +178,11 @@ export function SessionsList({ taskId }: SessionsListProps) {
               Session: {session.openclaw_session_id}
             </div>
 
-            {getClientTraceUrl(session.trace_url) && (
+            {session.trace_url && (
               <div className="mb-2">
                 <button
                   type="button"
-                  onClick={() => openTrace(getClientTraceUrl(session.trace_url))}
+                  onClick={() => openTrace(session.openclaw_session_id, taskId)}
                   className="text-xs text-mc-accent hover:underline"
                 >
                   View full trace
@@ -240,7 +230,7 @@ export function SessionsList({ taskId }: SessionsListProps) {
       ))}
       <TraceViewerModal
         taskId={taskId}
-        traceUrl={traceUrl}
+        sessionId={traceSessionId}
         onClose={closeTrace}
       />
     </div>

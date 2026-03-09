@@ -5,52 +5,50 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 /**
  * Syncs trace viewer open/close with the `?trace=` URL query parameter.
  *
- * - On mount: reads `?trace=` from URL and decodes it as the initial traceUrl.
- * - On openTrace: encodes the path into `?trace=`.
- * - On closeTrace: removes `?trace=` from the URL.
+ * The trace param is a plain openclaw_session_id (no encoding of full paths).
+ * URL shape: `?task=<id>&tab=sessions&trace=<sessionId>`
  *
+ * Also tracks the associated taskId for trace resolution.
  * Works alongside `useTaskDeepLink` which owns `?task=` and `?tab=`.
  */
 export function useTraceDeepLink() {
-  const [traceUrl, setTraceUrl] = useState<string | null>(null);
+  const [traceSessionId, setTraceSessionId] = useState<string | null>(null);
+  const [traceTaskId, setTraceTaskId] = useState<string | null>(null);
   const initializedRef = useRef(false);
 
-  // Read ?trace= on mount
+  // Read ?trace= on mount (taskId comes from ?task= which useTaskDeepLink manages)
   useEffect(() => {
     if (initializedRef.current) return;
     initializedRef.current = true;
 
     const params = new URLSearchParams(window.location.search);
-    const encodedTrace = params.get('trace');
-    if (encodedTrace) {
-      try {
-        setTraceUrl(decodeURIComponent(encodedTrace));
-      } catch {
-        // Malformed — remove from URL
-        const url = new URL(window.location.href);
-        url.searchParams.delete('trace');
-        window.history.replaceState({}, '', url.toString());
-      }
+    const traceParam = params.get('trace');
+    const taskParam = params.get('task');
+    if (traceParam) {
+      setTraceSessionId(traceParam);
+      if (taskParam) setTraceTaskId(taskParam);
     }
   }, []);
 
-  const openTrace = useCallback((url: string | null) => {
-    setTraceUrl(url);
-    const windowUrl = new URL(window.location.href);
-    if (url) {
-      windowUrl.searchParams.set('trace', encodeURIComponent(url));
+  const openTrace = useCallback((sessionId: string | null, taskId?: string) => {
+    setTraceSessionId(sessionId);
+    if (taskId) setTraceTaskId(taskId);
+    const url = new URL(window.location.href);
+    if (sessionId) {
+      url.searchParams.set('trace', sessionId);
     } else {
-      windowUrl.searchParams.delete('trace');
+      url.searchParams.delete('trace');
     }
-    window.history.replaceState({}, '', windowUrl.toString());
+    window.history.replaceState({}, '', url.toString());
   }, []);
 
   const closeTrace = useCallback(() => {
-    setTraceUrl(null);
+    setTraceSessionId(null);
+    setTraceTaskId(null);
     const url = new URL(window.location.href);
     url.searchParams.delete('trace');
     window.history.replaceState({}, '', url.toString());
   }, []);
 
-  return { traceUrl, openTrace, closeTrace };
+  return { traceSessionId, traceTaskId, openTrace, closeTrace };
 }

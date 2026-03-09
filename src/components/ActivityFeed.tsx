@@ -94,7 +94,7 @@ export function ActivityFeed({ workspaceId, sprintId }: ActivityFeedProps) {
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
   const [expandedMessages, setExpandedMessages] = useState<Set<string>>(new Set());
   const [milestones, setMilestones] = useState<Milestone[]>([]);
-  const { traceUrl, openTrace, closeTrace } = useTraceDeepLink();
+  const { traceSessionId, traceTaskId, openTrace, closeTrace } = useTraceDeepLink();
 
   // Fetch milestones for filter dropdown
   useEffect(() => {
@@ -250,15 +250,11 @@ export function ActivityFeed({ workspaceId, sprintId }: ActivityFeedProps) {
     return ROLE_ICONS[role] || null;
   };
 
-  const getClientTraceUrl = (traceUrl: string | null): string | null => {
+  const getTraceSessionId = (traceUrl: string | null): string | null => {
     if (!traceUrl) return null;
-    if (traceUrl.startsWith('/')) return traceUrl;
-    try {
-      const parsed = new URL(traceUrl);
-      return `${parsed.pathname}${parsed.search}${parsed.hash}`;
-    } catch {
-      return traceUrl;
-    }
+    const match = traceUrl.match(/\/sessions\/([^/]+)\/trace/);
+    if (match?.[1]) return decodeURIComponent(match[1]);
+    return null;
   };
 
   const formatCreatedAt = (createdAt: string): string => {
@@ -470,11 +466,11 @@ export function ActivityFeed({ workspaceId, sprintId }: ActivityFeedProps) {
                                 </button>
                               )}
 
-                              {getClientTraceUrl(item.trace_url) && (
+                              {getTraceSessionId(item.trace_url) && item.task_id && (
                                 <div className="mt-2">
                                   <button
                                     type="button"
-                                    onClick={() => openTrace(getClientTraceUrl(item.trace_url))}
+                                    onClick={() => openTrace(getTraceSessionId(item.trace_url)!, item.task_id!)}
                                     className="text-xs text-mc-accent hover:underline"
                                   >
                                     Open session trace
@@ -516,7 +512,8 @@ export function ActivityFeed({ workspaceId, sprintId }: ActivityFeedProps) {
         )}
       </div>
       <TraceViewerModal
-        traceUrl={traceUrl}
+        taskId={traceTaskId || ''}
+        sessionId={traceSessionId}
         onClose={closeTrace}
       />
     </div>
