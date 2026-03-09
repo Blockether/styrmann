@@ -562,10 +562,10 @@ export function ActiveSprint({ workspaceId, mobileMode = false, isPortrait = tru
                       <h4 className="font-medium text-sm line-clamp-2 flex-1">{task.title}</h4>
                     </div>
                     <div className="flex items-center gap-3 text-xs text-mc-text-secondary mb-3">
-                      {task.assigned_agent && (
+                      {task.assignee_display_name && (
                         <div className="flex items-center gap-1.5">
-                          <AgentInitials name={(task.assigned_agent as unknown as { name: string }).name} size="xs" />
-                          <span className="truncate">{(task.assigned_agent as unknown as { name: string }).name}</span>
+                          <AgentInitials name={task.assignee_display_name} size="xs" />
+                          <span className="truncate">{task.assignee_display_name}</span>
                         </div>
                       )}
                       <span className="capitalize">{task.priority}</span>
@@ -936,8 +936,8 @@ function MilestoneBoard({
                           <h4 className="font-medium text-xs line-clamp-2 mb-1 pl-3">{task.title}</h4>
                           <div className="flex items-center gap-1.5">
                             <span className={`w-1.5 h-1.5 rounded-full ${task.priority === 'urgent' ? 'bg-red-500' : task.priority === 'high' ? 'bg-orange-500' : task.priority === 'normal' ? 'bg-yellow-500' : 'bg-gray-400'}`} />
-                            {task.assigned_agent && (
-                              <AgentInitials name={(task.assigned_agent as unknown as { name: string }).name} size="xs" />
+                            {task.assignee_display_name && (
+                              <AgentInitials name={task.assignee_display_name} size="xs" />
                             )}
                           </div>
                         </div>
@@ -1002,10 +1002,10 @@ function TaskRow({ task, isPortrait, onClick, onMoveStatus, mobileMode }: TaskRo
           )}
 
           <div className="flex items-center gap-3 text-xs text-mc-text-secondary">
-            {task.assigned_agent && (
+            {task.assignee_display_name && (
               <div className="flex items-center gap-1.5">
-                <AgentInitials name={(task.assigned_agent as unknown as { name: string }).name} size="xs" />
-                <span className="truncate">{(task.assigned_agent as unknown as { name: string }).name}</span>
+                <AgentInitials name={task.assignee_display_name} size="xs" />
+                <span className="truncate">{task.assignee_display_name}</span>
               </div>
             )}
             <span className="capitalize">{task.priority}</span>

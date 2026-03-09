@@ -38,7 +38,7 @@ export async function PATCH(
   
   try {
     const body = await request.json();
-    const { name, description, icon, github_repo, owner_email, coordinator_email, logo_url } = body;
+    const { name, description, icon, github_repo, owner_email, coordinator_email, himalaya_account, logo_url } = body;
     
     const db = getDb();
     
@@ -83,6 +83,10 @@ export async function PATCH(
     if (coordinator_email !== undefined) {
       updates.push('coordinator_email = ?');
       values.push(coordinator_email);
+    }
+    if (himalaya_account !== undefined) {
+      updates.push('himalaya_account = ?');
+      values.push(himalaya_account);
     }
     if (logo_url !== undefined) {
       updates.push('logo_url = ?');

@@ -255,8 +255,8 @@ export function ParetoView({ workspaceId }: ParetoViewProps) {
             <div className="font-medium text-sm mb-1 line-clamp-2">{hoveredTask.title}</div>
             <div className="text-xs text-mc-text-secondary space-y-1">
               <div>Impact: {hoveredTask.impact} / Effort: {hoveredTask.effort}</div>
-              {hoveredTask.assigned_agent && (
-                <div>Assigned: {(hoveredTask.assigned_agent as { name: string }).name}</div>
+              {hoveredTask.assignee_display_name && (
+                <div>Assigned: {hoveredTask.assignee_display_name}</div>
               )}
               <div className="capitalize">Type: {hoveredTask.task_type}</div>
             </div>

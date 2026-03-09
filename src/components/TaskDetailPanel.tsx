@@ -34,6 +34,7 @@ import type {
   Sprint,
   Milestone,
   Agent,
+  Human,
   ResourceType,
 } from '@/lib/types';
 
@@ -149,6 +150,7 @@ export function TaskDetailPanel({ taskId, onClose }: TaskDetailPanelProps) {
 
   const [milestones, setMilestones] = useState<Milestone[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
+  const [humans, setHumans] = useState<Human[]>([]);
   const [availableTags, setAvailableTags] = useState<Tag[]>([]);
 
   const [comments, setComments] = useState<TaskComment[]>([]);
@@ -205,14 +207,16 @@ export function TaskDetailPanel({ taskId, onClose }: TaskDetailPanelProps) {
 
     const loadMetadata = async () => {
       try {
-        const [milestonesRes, agentsRes, tagsRes] = await Promise.all([
+        const [milestonesRes, agentsRes, humansRes, tagsRes] = await Promise.all([
           fetch(`/api/milestones?workspace_id=${workspaceId}`),
           fetch(`/api/agents?workspace_id=${workspaceId}`),
+          fetch('/api/humans'),
           fetch(`/api/tags?workspace_id=${workspaceId}`),
         ]);
 
         if (milestonesRes.ok) setMilestones(await milestonesRes.json());
         if (agentsRes.ok) setAgents(await agentsRes.json());
+        if (humansRes.ok) setHumans(await humansRes.json());
         if (tagsRes.ok) setAvailableTags(await tagsRes.json());
       } catch (err) {
         console.error('Failed to load metadata:', err);
@@ -291,8 +295,12 @@ export function TaskDetailPanel({ taskId, onClose }: TaskDetailPanelProps) {
     await updateTask({ milestone_id: milestoneId || undefined });
   };
 
-  const handleAssigneeChange = async (agentId: string) => {
-    await updateTask({ assigned_agent_id: agentId || undefined });
+  const handleAssigneeTypeChange = async (assigneeType: 'ai' | 'human') => {
+    await updateTask({ assignee_type: assigneeType });
+  };
+
+  const handleHumanAssigneeChange = async (humanId: string) => {
+    await updateTask({ assignee_type: 'human', assigned_human_id: humanId || undefined });
   };
 
   const handleAddComment = async () => {
@@ -645,17 +653,37 @@ export function TaskDetailPanel({ taskId, onClose }: TaskDetailPanelProps) {
               </CollapsibleSection>
 
               <CollapsibleSection title="Assignee">
-                <div className="flex items-center gap-2">
-                  <select
-                    value={task.assigned_agent_id || ''}
-                    onChange={(e) => handleAssigneeChange(e.target.value)}
-                    className="flex-1 min-h-11 bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent"
-                  >
-                    <option value="">Unassigned</option>
-                    {agents.map(a => (
-                      <option key={a.id} value={a.id}>{a.name} - {a.role}</option>
-                    ))}
-                  </select>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleAssigneeTypeChange('ai')}
+                      className={`min-h-11 px-3 py-2 rounded border text-sm ${task.assignee_type !== 'human' ? 'border-mc-accent bg-mc-accent/10 text-mc-accent' : 'border-mc-border text-mc-text-secondary'}`}
+                    >
+                      AI
+                    </button>
+                    <button
+                      onClick={() => handleAssigneeTypeChange('human')}
+                      className={`min-h-11 px-3 py-2 rounded border text-sm ${task.assignee_type === 'human' ? 'border-mc-accent bg-mc-accent/10 text-mc-accent' : 'border-mc-border text-mc-text-secondary'}`}
+                    >
+                      Human
+                    </button>
+                  </div>
+                  {task.assignee_type === 'human' ? (
+                    <select
+                      value={task.assigned_human_id || ''}
+                      onChange={(e) => handleHumanAssigneeChange(e.target.value)}
+                      className="w-full min-h-11 bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent"
+                    >
+                      <option value="">Select human</option>
+                      {humans.map((human) => (
+                        <option key={human.id} value={human.id}>{human.name} - {human.email}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <div className="text-xs text-mc-text-secondary bg-mc-bg border border-mc-border rounded px-3 py-2">
+                      AI tasks use workflow role mapping in the Team tab. Direct agent selection is removed here.
+                    </div>
+                  )}
                 </div>
               </CollapsibleSection>
 

@@ -298,7 +298,7 @@ export function BacklogView({ workspaceId }: BacklogViewProps) {
                 {filteredTasks.map((task) => {
                   const TypeIcon = TASK_TYPE_CONFIG[task.task_type].icon;
                   const typeColor = TASK_TYPE_CONFIG[task.task_type].color;
-                  const assignee = getAgent(task.assigned_agent_id);
+                  const assignee = task.assignee_display_name || getAgent(task.assigned_agent_id)?.name || null;
 
                   return (
                     <tr
@@ -341,8 +341,8 @@ export function BacklogView({ workspaceId }: BacklogViewProps) {
                       <td className="px-4 py-3">
                         {assignee ? (
                           <div className="flex items-center gap-1.5">
-                            <AgentInitials name={assignee.name} size="xs" />
-                            <span className="text-xs truncate max-w-[100px]">{assignee.name}</span>
+                            <AgentInitials name={assignee} size="xs" />
+                            <span className="text-xs truncate max-w-[100px]">{assignee}</span>
                           </div>
                         ) : (
                           <span className="text-xs text-mc-text-secondary">-</span>

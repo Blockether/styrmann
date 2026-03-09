@@ -10,7 +10,7 @@ import { SessionsList } from './SessionsList';
 import { PlanningTab } from './PlanningTab';
 import { TeamTab } from './TeamTab';
 import { CreateMilestoneModal } from './CreateMilestoneModal';
-import type { Task, TaskPriority, TaskStatus, TaskType, GitHubIssue } from '@/lib/types';
+import type { Task, TaskPriority, TaskStatus, TaskType, GitHubIssue, Human, HimalayaStatus } from '@/lib/types';
 
 type TabType = 'overview' | 'planning' | 'team' | 'activity' | 'deliverables' | 'sessions';
 
@@ -55,7 +55,9 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
     description: githubIssue?.body || task?.description || '',
     priority: task?.priority || 'normal' as TaskPriority,
     status: task?.status || 'inbox' as TaskStatus,
+    assignee_type: task?.assignee_type || 'ai' as 'ai' | 'human',
     assigned_agent_id: task?.assigned_agent_id || '',
+    assigned_human_id: task?.assigned_human_id || '',
     task_type: task?.task_type || 'feature' as TaskType,
     effort: task?.effort || null as number | null,
     impact: task?.impact || null as number | null,
@@ -67,6 +69,8 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
   const [newCriteriaInput, setNewCriteriaInput] = useState('');
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
   const [milestones, setMilestones] = useState<{ id: string; name: string }[]>([]);
+  const [humans, setHumans] = useState<Human[]>([]);
+  const [himalayaStatus, setHimalayaStatus] = useState<HimalayaStatus | null>(null);
   const resolvedWorkspaceId = workspaceId || task?.workspace_id || 'default';
 
   const loadMilestones = useCallback(async () => {
@@ -85,14 +89,21 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
     loadMilestones().catch(() => {});
   }, [loadMilestones]);
 
+  useEffect(() => {
+    fetch('/api/humans').then((res) => res.json()).then((data) => {
+      if (Array.isArray(data)) setHumans(data);
+    }).catch(() => {});
+    fetch('/api/system/himalaya').then((res) => res.json()).then((data) => setHimalayaStatus(data)).catch(() => {});
+  }, []);
+
   const resolveStatus = (): TaskStatus => {
     // Planning mode overrides everything
     if (!task && usePlanningMode) return 'planning';
     if (!task) {
+      if (form.assignee_type === 'human' && form.assigned_human_id) return 'assigned';
       return 'inbox';
     }
-    // Existing task: if in inbox and agent just assigned, promote to assigned
-    if (task.status === 'inbox' && form.assigned_agent_id) return 'assigned';
+    if (task.status === 'inbox' && ((form.assignee_type === 'human' && form.assigned_human_id) || (form.assignee_type === 'ai' && form.assigned_agent_id))) return 'assigned';
     return form.status;
   };
 
@@ -223,7 +234,9 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
           description: '',
           priority: 'normal' as TaskPriority,
           status: 'inbox' as TaskStatus,
+          assignee_type: 'ai' as 'ai' | 'human',
           assigned_agent_id: '',
+          assigned_human_id: '',
           task_type: 'feature' as TaskType,
           effort: null,
           impact: null,
@@ -586,23 +599,52 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
           </div>
 
           <div className={`grid grid-cols-1 ${task ? 'sm:grid-cols-2' : ''} gap-4`}>
-            {task && (
+            <div className="space-y-3">
               <div>
-                <label className="block text-sm font-medium mb-1">Assign to</label>
-                <select
-                  value={form.assigned_agent_id}
-                  onChange={(e) => setForm({ ...form, assigned_agent_id: e.target.value })}
-                  className="w-full min-h-11 bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent"
-                >
-                  <option value="">Unassigned</option>
-                  {agents.map((agent) => (
-                    <option key={agent.id} value={agent.id}>
-                      {agent.name}{agent.role ? ` — ${agent.role.slice(0, 40)}${agent.role.length > 40 ? '…' : ''}` : ''}
-                    </option>
-                  ))}
-                </select>
+                <label className="block text-sm font-medium mb-1">Assignee Type</label>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setForm({ ...form, assignee_type: 'ai', assigned_human_id: '' })}
+                    className={`min-h-11 px-3 py-2 rounded border text-sm ${form.assignee_type === 'ai' ? 'border-mc-accent bg-mc-accent/10 text-mc-accent' : 'border-mc-border text-mc-text-secondary'}`}
+                  >
+                    AI
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setForm({ ...form, assignee_type: 'human', assigned_agent_id: '' })}
+                    className={`min-h-11 px-3 py-2 rounded border text-sm ${form.assignee_type === 'human' ? 'border-mc-accent bg-mc-accent/10 text-mc-accent' : 'border-mc-border text-mc-text-secondary'}`}
+                  >
+                    Human
+                  </button>
+                </div>
               </div>
-            )}
+
+              {form.assignee_type === 'human' ? (
+                <div>
+                  <label className="block text-sm font-medium mb-1">Human Assignee</label>
+                  <select
+                    value={form.assigned_human_id}
+                    onChange={(e) => setForm({ ...form, assigned_human_id: e.target.value })}
+                    className="w-full min-h-11 bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent"
+                  >
+                    <option value="">Select human</option>
+                    {humans.map((human) => (
+                      <option key={human.id} value={human.id}>{human.name} — {human.email}</option>
+                    ))}
+                  </select>
+                  {himalayaStatus && (!himalayaStatus.installed || !himalayaStatus.configured || !himalayaStatus.healthy_account) && (
+                    <div className="mt-2 text-xs text-mc-accent-red bg-red-500/10 border border-red-500/30 rounded px-3 py-2">
+                      Human assignment mail is not ready: {himalayaStatus.error || 'Himalaya is not configured.'}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="text-xs text-mc-text-secondary bg-mc-bg border border-mc-border rounded px-3 py-2">
+                  AI tasks are routed through workflow roles in the Team tab. Direct agent picking is removed from the overview form.
+                </div>
+              )}
+            </div>
 
             <div>
               <label className="block text-sm font-medium mb-1">Milestone</label>
@@ -630,9 +672,9 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
             </div>
           </div>
 
-          {!task && (
+          {!task && form.assignee_type === 'ai' && (
             <div className="text-xs text-mc-text-secondary bg-mc-bg border border-mc-border rounded px-3 py-2">
-              Tasks are created unassigned. Configure workflow roles and assign agents after creation in the task&apos;s Team tab.
+              AI tasks are created without a direct agent. Configure workflow roles after creation in the task&apos;s Team tab.
             </div>
           )}
 

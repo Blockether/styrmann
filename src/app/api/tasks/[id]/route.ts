@@ -3,12 +3,13 @@ import { v4 as uuidv4 } from 'uuid';
 import { queryOne, run } from '@/lib/db';
 import { broadcast } from '@/lib/events';
 import { getMissionControlUrl } from '@/lib/config';
+import { getHimalayaStatus, sendHumanAssignmentEmail } from '@/lib/himalaya';
 import { handleStageTransition, getTaskWorkflow, drainQueue, populateTaskRolesFromAgents } from '@/lib/workflow-engine';
 import { notifyLearner } from '@/lib/learner';
 import { captureTaskRunResult } from '@/lib/task-run-results';
 import { checkBuilderEvidence } from '@/lib/builder-evidence';
 import { UpdateTaskSchema } from '@/lib/validation';
-import type { Task, UpdateTaskRequest, Agent } from '@/lib/types';
+import type { Task, UpdateTaskRequest, Agent, Human } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,9 +22,12 @@ export async function GET(
     const { id } = await params;
     const task = queryOne<Task>(
       `SELECT t.*,
-        aa.name as assigned_agent_name
+        aa.name as assigned_agent_name,
+        h.name as assigned_human_name,
+        h.email as assigned_human_email
        FROM tasks t
        LEFT JOIN agents aa ON t.assigned_agent_id = aa.id
+       LEFT JOIN humans h ON t.assigned_human_id = h.id
        WHERE t.id = ?`,
       [id]
     );
@@ -31,6 +35,21 @@ export async function GET(
     if (!task) {
       return NextResponse.json({ error: 'Task not found' }, { status: 404 });
     }
+
+    const typedTask = task as Task & { assigned_agent_name?: string; assigned_human_name?: string; assigned_human_email?: string };
+    typedTask.assigned_human = task.assigned_human_id
+      ? {
+          id: task.assigned_human_id,
+          name: typedTask.assigned_human_name || '',
+          email: typedTask.assigned_human_email || '',
+          is_active: 1,
+          created_at: task.created_at,
+          updated_at: task.updated_at,
+        }
+      : undefined;
+    typedTask.assignee_display_name = task.assignee_type === 'human'
+      ? (typedTask.assigned_human_name || typedTask.assigned_human_email || null)
+      : (typedTask.assigned_agent_name || null);
 
     return NextResponse.json(task);
   } catch (error) {
@@ -121,9 +140,16 @@ export async function PATCH(
       validatedData.assigned_agent_id !== undefined
         ? validatedData.assigned_agent_id
         : existing.assigned_agent_id;
+    const effectiveAssigneeType = validatedData.assignee_type !== undefined
+      ? validatedData.assignee_type
+      : (existing.assignee_type || 'ai');
+    const effectiveAssignedHumanId = validatedData.assigned_human_id !== undefined
+      ? validatedData.assigned_human_id
+      : (existing.assigned_human_id || null);
 
     const readinessIssues: string[] = [];
-    if (!effectiveAssignedAgentId) readinessIssues.push('No agent assigned');
+    if (effectiveAssigneeType === 'ai' && !effectiveAssignedAgentId) readinessIssues.push('No agent assigned');
+    if (effectiveAssigneeType === 'human' && !effectiveAssignedHumanId) readinessIssues.push('No human assigned');
 
     // If task came from planning mode, require planning to be complete before auto-start
     const planningComplete = Number((existing as any).planning_complete || 0) === 1;
@@ -132,7 +158,7 @@ export async function PATCH(
     }
 
     // Auto-assign default workflow template if task has none
-    if (!existing.workflow_template_id && validatedData.assigned_agent_id) {
+    if (!existing.workflow_template_id && validatedData.assigned_agent_id && effectiveAssigneeType === 'ai') {
       const defaultTpl = queryOne<{ id: string }>(
         'SELECT id FROM workflow_templates WHERE workspace_id = ? AND is_default = 1 LIMIT 1',
         [existing.workspace_id]
@@ -150,8 +176,18 @@ export async function PATCH(
     // TaskModal always sends status, so handle both undefined and explicit inbox.
     if (
       (nextStatus === undefined || nextStatus === 'inbox') &&
+      effectiveAssigneeType === 'ai' &&
       validatedData.assigned_agent_id !== undefined &&
       validatedData.assigned_agent_id &&
+      existing.status === 'inbox'
+    ) {
+      nextStatus = 'assigned';
+    }
+
+    if (
+      effectiveAssigneeType === 'human' &&
+      validatedData.assigned_human_id !== undefined &&
+      validatedData.assigned_human_id &&
       existing.status === 'inbox'
     ) {
       nextStatus = 'assigned';
@@ -192,7 +228,7 @@ export async function PATCH(
       values.push(nextStatus);
 
       // Auto-dispatch when moving to assigned (if we have a valid assignee)
-      if (nextStatus === 'assigned' && effectiveAssignedAgentId) {
+      if (nextStatus === 'assigned' && effectiveAssignedAgentId && effectiveAssigneeType === 'ai') {
         shouldDispatch = true;
       }
 
@@ -208,7 +244,7 @@ export async function PATCH(
     // Handle assignment change
     if (validatedData.assigned_agent_id !== undefined && validatedData.assigned_agent_id !== existing.assigned_agent_id) {
       updates.push('assigned_agent_id = ?');
-      values.push(validatedData.assigned_agent_id);
+      values.push(effectiveAssigneeType === 'ai' ? validatedData.assigned_agent_id : null);
 
       if (validatedData.assigned_agent_id) {
         const agent = queryOne<Agent>('SELECT name FROM agents WHERE id = ?', [validatedData.assigned_agent_id]);
@@ -220,13 +256,46 @@ export async function PATCH(
           );
 
           // Auto-dispatch if already in assigned status or being assigned now
-          if (existing.status === 'assigned' || nextStatus === 'assigned') {
+          if ((existing.status === 'assigned' || nextStatus === 'assigned') && effectiveAssigneeType === 'ai') {
             shouldDispatch = true;
-          } else if (['testing', 'review', 'verification'].includes(nextStatus || existing.status)) {
+          } else if (['testing', 'review', 'verification'].includes(nextStatus || existing.status) && effectiveAssigneeType === 'ai') {
             // Agent manually assigned to a task in a workflow stage — dispatch directly
             shouldDispatchWorkflowStage = true;
           }
         }
+      }
+    }
+
+    if (validatedData.assignee_type !== undefined && validatedData.assignee_type !== existing.assignee_type) {
+      updates.push('assignee_type = ?');
+      values.push(validatedData.assignee_type);
+      if (validatedData.assignee_type === 'human') {
+        updates.push('assigned_agent_id = ?');
+        values.push(null);
+        shouldDispatch = false;
+        shouldDispatchWorkflowStage = false;
+        nextStatus = nextStatus || 'assigned';
+      }
+      if (validatedData.assignee_type === 'ai') {
+        updates.push('assigned_human_id = ?');
+        values.push(null);
+      }
+    }
+
+    let assignedHuman: Human | null = null;
+    if (validatedData.assigned_human_id !== undefined && validatedData.assigned_human_id !== existing.assigned_human_id) {
+      updates.push('assigned_human_id = ?');
+      values.push(validatedData.assigned_human_id);
+      if (validatedData.assigned_human_id) {
+        assignedHuman = queryOne<Human>('SELECT * FROM humans WHERE id = ? AND is_active = 1', [validatedData.assigned_human_id]) || null;
+        if (!assignedHuman) {
+          return NextResponse.json({ error: 'Selected human assignee not found' }, { status: 404 });
+        }
+        updates.push('assigned_agent_id = ?');
+        values.push(null);
+        nextStatus = nextStatus || 'assigned';
+        shouldDispatch = false;
+        shouldDispatchWorkflowStage = false;
       }
     }
 
@@ -253,13 +322,60 @@ export async function PATCH(
     const task = queryOne<Task>(
       `SELECT t.*,
         aa.name as assigned_agent_name,
+        h.name as assigned_human_name,
+        h.email as assigned_human_email,
         ca.name as created_by_agent_name
        FROM tasks t
        LEFT JOIN agents aa ON t.assigned_agent_id = aa.id
+       LEFT JOIN humans h ON t.assigned_human_id = h.id
        LEFT JOIN agents ca ON t.created_by_agent_id = ca.id
        WHERE t.id = ?`,
       [id]
     );
+
+    if (task) {
+      const typedTask = task as Task & { assigned_human_name?: string; assigned_human_email?: string; assigned_agent_name?: string };
+      typedTask.assigned_human = task.assigned_human_id
+        ? {
+            id: task.assigned_human_id,
+            name: typedTask.assigned_human_name || '',
+            email: typedTask.assigned_human_email || '',
+            is_active: 1,
+            created_at: task.created_at,
+            updated_at: task.updated_at,
+          }
+        : undefined;
+      typedTask.assignee_display_name = task.assignee_type === 'human'
+        ? (typedTask.assigned_human_name || typedTask.assigned_human_email || null)
+        : (typedTask.assigned_agent_name || null);
+    }
+
+    if (effectiveAssigneeType === 'human' && (validatedData.assigned_human_id !== undefined || validatedData.assignee_type === 'human')) {
+      const humanToNotify = assignedHuman || (effectiveAssignedHumanId ? queryOne<Human>('SELECT * FROM humans WHERE id = ? AND is_active = 1', [effectiveAssignedHumanId]) || null : null);
+      const workspace = queryOne<{ name: string; slug: string; coordinator_email?: string | null; himalaya_account?: string | null }>('SELECT name, slug, coordinator_email, himalaya_account FROM workspaces WHERE id = ?', [existing.workspace_id]);
+      if (!workspace?.coordinator_email) {
+        return NextResponse.json({ error: 'Workspace coordinator email is not configured' }, { status: 409 });
+      }
+      const himalaya = getHimalayaStatus(workspace.himalaya_account || null);
+      if (!himalaya.installed || !himalaya.configured || !himalaya.configured_account || !himalaya.healthy_account) {
+        return NextResponse.json({ error: himalaya.error || 'Himalaya is not configured correctly' }, { status: 409 });
+      }
+      if (!humanToNotify) {
+        return NextResponse.json({ error: 'No active human selected for human assignment' }, { status: 409 });
+      }
+      const sent = sendHumanAssignmentEmail({
+        account: himalaya.configured_account,
+        fromEmail: workspace.coordinator_email,
+        toEmail: humanToNotify.email,
+        taskTitle: task?.title || existing.title,
+        taskDescription: task?.description || existing.description || null,
+        workspaceName: workspace.name,
+        taskUrl: `${getMissionControlUrl()}/workspace/${workspace.slug}`,
+      });
+      if (!sent.ok) {
+        return NextResponse.json({ error: sent.error || 'Failed to send assignment email' }, { status: 502 });
+      }
+    }
 
     // Broadcast task update via SSE
     if (task) {
@@ -270,7 +386,7 @@ export async function PATCH(
     }
 
     // Trigger workflow-aware dispatch if needed
-    if (shouldDispatch && readinessIssues.length === 0) {
+    if (shouldDispatch && readinessIssues.length === 0 && effectiveAssigneeType === 'ai') {
       // Try the workflow engine first — it handles role-based handoffs
       const workflowResult = await handleStageTransition(id, nextStatus || 'assigned', {
         previousStatus: existing.status,
@@ -335,7 +451,7 @@ export async function PATCH(
     }
 
     // Agent manually assigned to a task already in a workflow stage — dispatch directly
-    if (shouldDispatchWorkflowStage && effectiveAssignedAgentId) {
+    if (shouldDispatchWorkflowStage && effectiveAssignedAgentId && effectiveAssigneeType === 'ai') {
       const currentStatus = nextStatus || existing.status;
       console.log(`[PATCH] Agent assigned in workflow stage "${currentStatus}" — dispatching`);
       // Clear any previous dispatch error

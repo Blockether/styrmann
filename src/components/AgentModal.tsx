@@ -53,6 +53,7 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated }: Agen
   const [skillsBrowser, setSkillsBrowser] = useState<BrowserPayload | null>(null);
   const [workspaceLoading, setWorkspaceLoading] = useState(false);
   const [workspaceError, setWorkspaceError] = useState<string | null>(null);
+  const isReadOnlySyncedAgent = Boolean(agent && agent.source === 'synced');
 
   const [form, setForm] = useState({
     name: agent?.name || '',
@@ -305,6 +306,7 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated }: Agen
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
                   required
+                  disabled={isReadOnlySyncedAgent}
                   className="w-full min-h-11 bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent"
                   placeholder="Agent name"
                 />
@@ -318,6 +320,7 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated }: Agen
                   value={form.role}
                   onChange={(e) => setForm({ ...form, role: e.target.value })}
                   required
+                  disabled={isReadOnlySyncedAgent}
                   className="w-full min-h-11 bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent"
                   placeholder="e.g., Code & Automation"
                 />
@@ -330,6 +333,7 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated }: Agen
                   value={form.description}
                   onChange={(e) => setForm({ ...form, description: e.target.value })}
                   rows={8}
+                  disabled={isReadOnlySyncedAgent}
                   className="w-full bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent resize-y"
                   placeholder="What does this agent do?"
                 />
@@ -341,6 +345,7 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated }: Agen
                 <select
                   value={form.status}
                   onChange={(e) => setForm({ ...form, status: e.target.value as AgentStatus })}
+                  disabled={isReadOnlySyncedAgent}
                   className="w-full min-h-11 bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent"
                 >
                   <option value="standby">Standby</option>
@@ -365,6 +370,7 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated }: Agen
                   <select
                     value={form.model}
                     onChange={(e) => setForm({ ...form, model: e.target.value })}
+                    disabled={isReadOnlySyncedAgent}
                     className="w-full min-h-11 bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent"
                   >
                     <option value="">-- Use Default Model --</option>
@@ -481,6 +487,7 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated }: Agen
                 value={form.soul_md}
                 onChange={(e) => setForm({ ...form, soul_md: e.target.value })}
                 rows={15}
+                disabled={isReadOnlySyncedAgent}
                 className="w-full bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm font-mono focus:outline-none focus:border-mc-accent resize-none"
                 placeholder="# Agent Name&#10;&#10;Define this agent's personality, values, and communication style..."
               />
@@ -496,6 +503,7 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated }: Agen
                 value={form.user_md}
                 onChange={(e) => setForm({ ...form, user_md: e.target.value })}
                 rows={15}
+                disabled={isReadOnlySyncedAgent}
                 className="w-full bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm font-mono focus:outline-none focus:border-mc-accent resize-none"
                 placeholder="# User Context&#10;&#10;Information about the human this agent works with..."
               />
@@ -511,6 +519,7 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated }: Agen
                 value={form.agents_md}
                 onChange={(e) => setForm({ ...form, agents_md: e.target.value })}
                 rows={15}
+                disabled={isReadOnlySyncedAgent}
                 className="w-full bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm font-mono focus:outline-none focus:border-mc-accent resize-none"
                 placeholder="# Team Roster&#10;&#10;Information about other agents this agent works with..."
               />
@@ -521,7 +530,7 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated }: Agen
         {/* Footer */}
         <div className="flex items-center justify-between p-4 border-t border-mc-border flex-shrink-0">
           <div>
-            {agent && (
+            {agent && !isReadOnlySyncedAgent && (
               <button
                 type="button"
                 onClick={handleDelete}
@@ -540,14 +549,16 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated }: Agen
             >
               Cancel
             </button>
-            <button
-              onClick={handleSubmit}
-              disabled={isSubmitting}
-              className="min-h-11 flex items-center gap-2 px-4 py-2 bg-mc-accent text-white rounded text-sm font-medium hover:bg-mc-accent/90 disabled:opacity-50"
-            >
-              <Save className="w-4 h-4" />
-              {isSubmitting ? 'Saving...' : 'Save'}
-            </button>
+            {!isReadOnlySyncedAgent && (
+              <button
+                onClick={handleSubmit}
+                disabled={isSubmitting}
+                className="min-h-11 flex items-center gap-2 px-4 py-2 bg-mc-accent text-white rounded text-sm font-medium hover:bg-mc-accent/90 disabled:opacity-50"
+              >
+                <Save className="w-4 h-4" />
+                {isSubmitting ? 'Saving...' : 'Save'}
+              </button>
+            )}
           </div>
         </div>
       </div>

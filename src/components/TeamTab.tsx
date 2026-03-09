@@ -58,6 +58,7 @@ export function TeamTab({ taskId, workspaceId }: TeamTabProps) {
   const [roles, setRoles] = useState<RoleAssignment[]>([]);
   const [workflows, setWorkflows] = useState<WorkflowTemplate[]>([]);
   const [selectedWorkflow, setSelectedWorkflow] = useState<string>('');
+  const [assigneeType, setAssigneeType] = useState<'ai' | 'human'>('ai');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -90,6 +91,7 @@ export function TeamTab({ taskId, workspaceId }: TeamTabProps) {
         if (taskRes.ok) {
           const task = await taskRes.json();
           setSelectedWorkflow(task.workflow_template_id || '');
+          setAssigneeType(task.assignee_type || 'ai');
         }
       } catch (err) {
         console.error('Failed to load team data:', err);
@@ -206,12 +208,18 @@ export function TeamTab({ taskId, workspaceId }: TeamTabProps) {
 
   return (
     <div data-component="src/components/TeamTab" className="space-y-6">
+      {assigneeType === 'human' && (
+        <div className="p-3 bg-mc-bg rounded-lg border border-mc-border text-sm text-mc-text-secondary">
+          This task is assigned to a human. Workflow role mapping is inactive until you switch the assignee type back to AI.
+        </div>
+      )}
       {/* Workflow Template Selector */}
       <div>
         <label className="block text-sm font-medium mb-2">Workflow Template</label>
         <select
           value={selectedWorkflow}
           onChange={(e) => handleWorkflowChange(e.target.value)}
+          disabled={assigneeType === 'human'}
           className="w-full min-h-11 bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent min-w-0"
         >
             <option value="">No workflow (single agent)</option>
@@ -288,6 +296,7 @@ export function TeamTab({ taskId, workspaceId }: TeamTabProps) {
                 <select
                   value={assignment?.agent_id || ''}
                   onChange={(e) => handleRoleAgentChange(role, e.target.value)}
+                  disabled={assigneeType === 'human'}
                   className="flex-1 min-h-11 bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent min-w-0"
                 >
                   <option value="">Unassigned</option>
@@ -316,6 +325,7 @@ export function TeamTab({ taskId, workspaceId }: TeamTabProps) {
               <select
                 value={r.agent_id}
                 onChange={(e) => handleRoleAgentChange(r.role, e.target.value)}
+                disabled={assigneeType === 'human'}
                 className="flex-1 min-h-11 bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent min-w-0"
               >
                 <option value="">Unassigned</option>
@@ -336,6 +346,7 @@ export function TeamTab({ taskId, workspaceId }: TeamTabProps) {
               <select
                 value={roles.find(r => r.role === 'learner')?.agent_id || ''}
                 onChange={(e) => handleRoleAgentChange('learner', e.target.value)}
+                disabled={assigneeType === 'human'}
                 className="flex-1 min-h-11 bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent min-w-0"
               >
                 <option value="">Unassigned (optional)</option>
@@ -351,6 +362,7 @@ export function TeamTab({ taskId, workspaceId }: TeamTabProps) {
           {!isTemplateLocked && (
             <button
               onClick={addCustomRole}
+              disabled={assigneeType === 'human'}
               className="text-xs text-mc-accent hover:text-mc-accent/80"
             >
               + Add custom role
@@ -377,7 +389,7 @@ export function TeamTab({ taskId, workspaceId }: TeamTabProps) {
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-end pt-4 border-t border-mc-border gap-2 sm:gap-0">
         <button
           onClick={handleSave}
-          disabled={saving}
+          disabled={saving || assigneeType === 'human'}
           className="min-h-11 flex items-center justify-center gap-2 px-4 py-2 bg-mc-accent text-white rounded text-sm font-medium hover:bg-mc-accent/90 disabled:opacity-50"
         >
           <Save className="w-4 h-4" />

@@ -37,7 +37,9 @@ export const CreateTaskSchema = z.object({
   task_type: TaskType.optional(),
   effort: z.number().int().min(1).max(5).optional().nullable(),
   impact: z.number().int().min(1).max(5).optional().nullable(),
+  assignee_type: z.enum(['ai', 'human']).optional(),
   assigned_agent_id: z.string().uuid().optional().nullable(),
+  assigned_human_id: z.string().uuid().optional().nullable(),
   created_by_agent_id: z.string().uuid().optional().nullable(),
   business_id: z.string().optional(),
   workspace_id: z.string().optional(),
@@ -55,12 +57,25 @@ export const UpdateTaskSchema = z.object({
   task_type: TaskType.optional(),
   effort: z.number().int().min(1).max(5).optional().nullable(),
   impact: z.number().int().min(1).max(5).optional().nullable(),
+  assignee_type: z.enum(['ai', 'human']).optional(),
   assigned_agent_id: z.string().uuid().optional().nullable(),
+  assigned_human_id: z.string().uuid().optional().nullable(),
   workflow_template_id: z.string().optional().nullable(),
   milestone_id: z.string().optional().nullable(),
   due_date: z.string().optional().nullable(),
   updated_by_agent_id: z.string().uuid().optional(),
   tags: z.array(z.string()).optional(),
+});
+
+export const CreateHumanSchema = z.object({
+  name: z.string().min(1).max(200),
+  email: z.string().email(),
+});
+
+export const UpdateHumanSchema = z.object({
+  name: z.string().min(1).max(200).optional(),
+  email: z.string().email().optional(),
+  is_active: z.number().int().min(0).max(1).optional(),
 });
 
 export const SprintStatus = z.enum(['planning', 'active', 'completed', 'cancelled']);
@@ -137,3 +152,5 @@ export type UpdateTaskInput = z.infer<typeof UpdateTaskSchema>;
 export type CreateActivityInput = z.infer<typeof CreateActivitySchema>;
 export type CreateDeliverableInput = z.infer<typeof CreateDeliverableSchema>;
 export type UpdateDeliverableInput = z.infer<typeof UpdateDeliverableSchema>;
+export type CreateHumanInput = z.infer<typeof CreateHumanSchema>;
+export type UpdateHumanInput = z.infer<typeof UpdateHumanSchema>;

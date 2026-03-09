@@ -1637,6 +1637,49 @@ const migrations: Migration[] = [
 
       console.log('[Migration 035] task_provenance table created');
     }
+  },
+  {
+    id: '036',
+    name: 'add_human_assignments_and_himalaya_workspace_config',
+    up: (db) => {
+      console.log('[Migration 036] Adding human assignment support and Himalaya workspace config...');
+
+      const workspaceInfo = db.prepare("PRAGMA table_info(workspaces)").all() as { name: string }[];
+      if (!workspaceInfo.some((col) => col.name === 'himalaya_account')) {
+        db.exec(`ALTER TABLE workspaces ADD COLUMN himalaya_account TEXT`);
+      }
+
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS humans (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          email TEXT NOT NULL UNIQUE,
+          is_active INTEGER DEFAULT 1,
+          created_at TEXT DEFAULT (datetime('now')),
+          updated_at TEXT DEFAULT (datetime('now'))
+        )
+      `);
+
+      db.exec(`
+        INSERT OR IGNORE INTO humans (id, name, email, is_active)
+        VALUES
+          ('human-karol', 'Karol', 'karol@blockether.com', 1),
+          ('human-alex', 'Alex', 'alex@blockether.com', 1)
+      `);
+
+      const taskInfo = db.prepare("PRAGMA table_info(tasks)").all() as { name: string }[];
+      if (!taskInfo.some((col) => col.name === 'assignee_type')) {
+        db.exec(`ALTER TABLE tasks ADD COLUMN assignee_type TEXT DEFAULT 'ai' CHECK (assignee_type IN ('ai', 'human'))`);
+      }
+      if (!taskInfo.some((col) => col.name === 'assigned_human_id')) {
+        db.exec(`ALTER TABLE tasks ADD COLUMN assigned_human_id TEXT REFERENCES humans(id)`);
+      }
+
+      db.exec(`UPDATE tasks SET assignee_type = CASE WHEN assigned_human_id IS NOT NULL THEN 'human' ELSE 'ai' END WHERE assignee_type IS NULL OR assignee_type = ''`);
+      db.exec('CREATE INDEX IF NOT EXISTS idx_tasks_assigned_human ON tasks(assigned_human_id)');
+
+      console.log('[Migration 036] Human assignment support ready');
+    }
   }
 ];
 

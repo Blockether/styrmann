@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS workspaces (
   github_repo TEXT,
   owner_email TEXT,
   coordinator_email TEXT,
+  himalaya_account TEXT,
   logo_url TEXT,
   organization TEXT,
   created_at TEXT DEFAULT (datetime('now')),
@@ -118,7 +119,9 @@ CREATE TABLE IF NOT EXISTS tasks (
   task_type TEXT DEFAULT 'feature' CHECK (task_type IN ('bug', 'feature', 'chore', 'documentation', 'research')),
   effort INTEGER CHECK (effort IS NULL OR (effort >= 1 AND effort <= 5)),
   impact INTEGER CHECK (impact IS NULL OR (impact >= 1 AND impact <= 5)),
+  assignee_type TEXT DEFAULT 'ai' CHECK (assignee_type IN ('ai', 'human')),
   assigned_agent_id TEXT REFERENCES agents(id),
+  assigned_human_id TEXT REFERENCES humans(id),
   created_by_agent_id TEXT REFERENCES agents(id),
   workspace_id TEXT DEFAULT 'default' REFERENCES workspaces(id),
   milestone_id TEXT REFERENCES milestones(id) ON DELETE SET NULL,
@@ -133,6 +136,15 @@ CREATE TABLE IF NOT EXISTS tasks (
   planning_agents TEXT,
   planning_dispatch_error TEXT,
   status_reason TEXT,
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS humans (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  email TEXT NOT NULL UNIQUE,
+  is_active INTEGER DEFAULT 1,
   created_at TEXT DEFAULT (datetime('now')),
   updated_at TEXT DEFAULT (datetime('now'))
 );
@@ -408,6 +420,7 @@ CREATE TABLE IF NOT EXISTS task_provenance (
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
 CREATE INDEX IF NOT EXISTS idx_tasks_assigned ON tasks(assigned_agent_id);
+CREATE INDEX IF NOT EXISTS idx_tasks_assigned_human ON tasks(assigned_human_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_workspace ON tasks(workspace_id);
 CREATE INDEX IF NOT EXISTS idx_agents_workspace ON agents(workspace_id);
 CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id);

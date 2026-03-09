@@ -270,8 +270,23 @@ function EditWorkspaceModal({ workspace, onClose, onSaved }: { workspace: Worksp
   const [githubRepo, setGithubRepo] = useState(workspace.github_repo || '');
   const [ownerEmail, setOwnerEmail] = useState(workspace.owner_email || '');
   const [coordinatorEmail, setCoordinatorEmail] = useState(workspace.coordinator_email || '');
+  const [himalayaAccount, setHimalayaAccount] = useState(workspace.himalaya_account || '');
+  const [availableHimalayaAccounts, setAvailableHimalayaAccounts] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch('/api/system/himalaya')
+      .then((res) => res.json())
+      .then((data) => {
+        const accountNames = Array.isArray(data.accounts) ? data.accounts.map((account: { name: string }) => account.name) : [];
+        setAvailableHimalayaAccounts(accountNames);
+        if (!workspace.himalaya_account && data.default_account) {
+          setHimalayaAccount(data.default_account);
+        }
+      })
+      .catch(() => {});
+  }, [workspace.himalaya_account]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -290,6 +305,7 @@ function EditWorkspaceModal({ workspace, onClose, onSaved }: { workspace: Worksp
           github_repo: githubRepo.trim() || null,
           owner_email: ownerEmail.trim() || null,
           coordinator_email: coordinatorEmail.trim() || null,
+          himalaya_account: himalayaAccount.trim() || null,
         }),
       });
 
@@ -367,6 +383,23 @@ function EditWorkspaceModal({ workspace, onClose, onSaved }: { workspace: Worksp
               placeholder="coordinator@company.com"
               className="w-full bg-mc-bg border border-mc-border rounded-lg px-4 py-2 focus:outline-none focus:border-mc-accent"
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-2">Himalaya Sender Account</label>
+            <select
+              value={himalayaAccount}
+              onChange={(e) => setHimalayaAccount(e.target.value)}
+              className="w-full bg-mc-bg border border-mc-border rounded-lg px-4 py-2 focus:outline-none focus:border-mc-accent"
+            >
+              <option value="">Use Himalaya default account</option>
+              {availableHimalayaAccounts.map((account) => (
+                <option key={account} value={account}>{account}</option>
+              ))}
+            </select>
+            <p className="mt-1 text-xs text-mc-text-secondary">
+              This account is used when Mission Control sends human task-assignment emails via Himalaya.
+            </p>
           </div>
 
           {error && (

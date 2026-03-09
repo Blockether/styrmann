@@ -80,11 +80,11 @@ export async function PUT(
       }
 
       // Also set the primary assigned_agent_id to the builder (first role) if not set
-      if (roles.length > 0 && !task.assigned_agent_id) {
+      if (roles.length > 0 && !task.assigned_agent_id && (task.assignee_type || 'ai') === 'ai') {
         const builderRole = roles.find((r: { role: string }) => r.role === 'builder') || roles[0];
         if (builderRole) {
-          db.prepare('UPDATE tasks SET assigned_agent_id = ?, updated_at = datetime(\'now\') WHERE id = ?')
-            .run(builderRole.agent_id, taskId);
+          db.prepare('UPDATE tasks SET assignee_type = ?, assigned_human_id = NULL, assigned_agent_id = ?, updated_at = datetime(\'now\') WHERE id = ?')
+            .run('ai', builderRole.agent_id, taskId);
         }
       }
     })();

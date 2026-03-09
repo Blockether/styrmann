@@ -183,7 +183,9 @@ export interface Task {
   task_type: TaskType;
   effort?: number;
   impact?: number;
+  assignee_type?: 'ai' | 'human';
   assigned_agent_id: string | null;
+  assigned_human_id?: string | null;
   created_by_agent_id: string | null;
   workspace_id: string;
   milestone_id?: string;
@@ -198,6 +200,8 @@ export interface Task {
   created_at: string;
   updated_at: string;
   assigned_agent?: Agent;
+  assigned_human?: Human;
+  assignee_display_name?: string | null;
   created_by_agent?: Agent;
   milestone?: Milestone;
   tags?: Tag[];
@@ -260,6 +264,7 @@ export interface Workspace {
   github_repo?: string;
   owner_email?: string;
   coordinator_email?: string;
+  himalaya_account?: string;
   logo_url?: string;
   organization?: string;
   created_at: string;
@@ -275,6 +280,7 @@ export interface WorkspaceStats {
   github_repo?: string;
   owner_email?: string;
   coordinator_email?: string;
+  himalaya_account?: string;
   logo_url?: string;
   organization?: string;
   taskCounts: {
@@ -449,7 +455,9 @@ export interface CreateTaskRequest {
   task_type?: TaskType;
   effort?: number;
   impact?: number;
+  assignee_type?: 'ai' | 'human';
   assigned_agent_id?: string;
+  assigned_human_id?: string;
   created_by_agent_id?: string;
   workspace_id?: string;
   milestone_id?: string;
@@ -460,6 +468,25 @@ export interface CreateTaskRequest {
 
 export interface UpdateTaskRequest extends Partial<CreateTaskRequest> {
   status?: TaskStatus;
+}
+
+export interface Human {
+  id: string;
+  name: string;
+  email: string;
+  is_active: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface HimalayaStatus {
+  installed: boolean;
+  configured: boolean;
+  accounts: { name: string; backend?: string; default?: boolean }[];
+  default_account?: string | null;
+  configured_account?: string | null;
+  healthy_account?: boolean;
+  error?: string | null;
 }
 
 export interface SendMessageRequest {

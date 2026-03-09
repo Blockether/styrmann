@@ -11,6 +11,7 @@ import {
   ChevronDown,
   Check,
   Activity,
+  Bot,
 } from 'lucide-react';
 import { useMissionControl } from '@/lib/store';
 import { format } from 'date-fns';
@@ -200,6 +201,15 @@ export function Header({ workspace, isPortrait = true, onMenuToggle, sidebarOpen
 
 
           <div className="flex items-center gap-2 md:gap-4">
+            {workspace && (
+              <Link
+                href="/operations#openclaw"
+                className="inline-flex items-center gap-2 px-2.5 py-1.5 border border-mc-border rounded bg-mc-bg hover:bg-mc-bg-tertiary transition-colors text-sm text-mc-text"
+              >
+                <Bot className="w-4 h-4 text-mc-accent" />
+                <span className="hidden md:inline">Manage Agents</span>
+              </Link>
+            )}
             <span className="hidden md:block text-mc-text-secondary text-sm font-mono">{format(currentTime, 'HH:mm:ss')}</span>
             <span
               title={isOnline ? "System Online" : "System Offline"}

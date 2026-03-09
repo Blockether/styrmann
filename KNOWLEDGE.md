@@ -63,9 +63,9 @@ Also: `pending_dispatch` (transient, pre-dispatch state).
 
 **Fail-loopback**: Testing or verification failure returns task to `in_progress` and re-dispatches the builder.
 
-**Task creation behavior**: New tasks are created unassigned and stay in `inbox` (or `planning` when planning mode is enabled). Agent assignment and workflow role mapping happen after creation in the task's Team tab. Inline agent creation was removed from the task creation modal.
+**Task creation behavior**: New tasks choose an assignee type. `ai` tasks are created without direct agent picking and stay in `inbox` (or `planning` when planning mode is enabled), with workflow role mapping handled later in the task's Team tab. `human` tasks require a selected human and move to `assigned`, which triggers an email through Himalaya.
 
-**Task fields**: title, description, status, priority (low/normal/high/urgent), task_type (bug/feature/chore/documentation/research), effort (1-5), impact (1-5), assigned_agent_id, milestone_id, workflow_template_id, due_date, tags.
+**Task fields**: title, description, status, priority (low/normal/high/urgent), task_type (bug/feature/chore/documentation/research), effort (1-5), impact (1-5), assignee_type (`ai` | `human`), assigned_agent_id, assigned_human_id, milestone_id, workflow_template_id, due_date, tags.
 
 Tasks get sprint context via `milestone.sprint_id`. There is no direct `sprint_id` on tasks.
 
@@ -207,6 +207,17 @@ The Strict template is the default. The `review` stage is labeled "Human Verifie
 
 **Workspace visibility**: Synced OpenClaw agents expose their real filesystem paths via `agent_dir` and `agent_workspace_path`. Mission Control includes a read-only browser endpoint for these roots so the agent modal can inspect the actual workspace/config directories and installed `skills/` entries on disk.
 
+**OpenClaw modal policy**: Synced OpenClaw agents are inspected read-only in the Agent modal. The Operations/OpenClaw view is now a management entrypoint, not a direct prompt editor for synced agents.
+
+### Human Assignments & Himalaya
+
+- `humans` table stores assignable humans with `name`, `email`, and `is_active`.
+- Migration seeds `Karol <karol@blockether.com>` and `Alex <alex@blockether.com>` as initial human assignees.
+- `workspaces.himalaya_account` selects which Himalaya account Mission Control uses for human-assignment email delivery.
+- `workspaces.coordinator_email` is used as the sender address in those emails.
+- `GET /api/system/himalaya` reports CLI availability, configured accounts, selected account, and whether `himalaya account doctor` passes.
+- Human-assigned tasks suppress AI dispatch and disable Team-tab role mapping until switched back to `ai`.
+
 **Manual sync**: `POST /api/agents/sync` triggers `syncAgentsWithRpcCheck()` (attempts RPC to gateway, falls back to config-only).
 
 ### Orchestrator Role
@@ -275,6 +286,9 @@ Fallback: Task polling every 60s, event polling every 30s.
 | GET/PATCH/DELETE | `/api/agents/{id}` | Agent CRUD (PATCH writes back to OpenClaw config; cannot demote orchestrator) |
 | GET | `/api/agents/{id}/workspace` | Read-only browser for synced agent workspace/config roots (`scope=workspace|agent`, `path=...`) |
 | POST | `/api/agents/sync` | Manual sync from gateway config |
+| GET/POST | `/api/humans` | List or create human assignees |
+| GET/PATCH/DELETE | `/api/humans/{id}` | Read, update, or deactivate a human assignee |
+| GET | `/api/system/himalaya` | Inspect Himalaya CLI/account health for human assignment email delivery |
 
 ### Workspaces
 | Method | Endpoint | Purpose |
