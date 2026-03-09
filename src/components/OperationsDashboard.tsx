@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Activity, ArrowDown, Bot, CheckCircle2, Cpu, RefreshCw, ShieldCheck, Wrench, XCircle } from 'lucide-react';
+import { Activity, ArrowDown, Bot, CheckCircle2, Cpu, Mail, RefreshCw, ShieldCheck, Wrench, XCircle } from 'lucide-react';
 import { OpenClawPanel } from './OpenClawPanel';
+import { HumanManagementPanel } from './HumanManagementPanel';
 import { SystemPanel } from './SystemPanel';
 
 interface OpenClawStatusSummary {
@@ -110,6 +111,10 @@ export function OperationsDashboard() {
                 <Cpu className="h-4 w-4 text-mc-accent" />
                 <span>OpenClaw</span>
               </Link>
+              <Link href="#humans" className="inline-flex items-center justify-center gap-2 px-3 min-h-11 border border-mc-border rounded bg-mc-bg hover:bg-mc-bg-tertiary transition-colors text-mc-text">
+                <Mail className="h-4 w-4 text-mc-accent" />
+                <span>Humans</span>
+              </Link>
             </div>
           </div>
 
@@ -197,6 +202,10 @@ export function OperationsDashboard() {
             </div>
           </div>
           <OpenClawPanel embedded />
+        </section>
+
+        <section id="humans">
+          <HumanManagementPanel />
         </section>
       </main>
     </div>

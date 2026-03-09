@@ -217,6 +217,7 @@ The Strict template is the default. The `review` stage is labeled "Human Verifie
 - `workspaces.coordinator_email` is used as the sender address in those emails.
 - `GET /api/system/himalaya` reports CLI availability, configured accounts, selected account, and whether `himalaya account doctor` passes.
 - Human-assigned tasks suppress AI dispatch and disable Team-tab role mapping until switched back to `ai`.
+- Operations now includes a dedicated Human Assignment Routing panel for managing human assignees and default sender settings (`coordinator_email`, `himalaya_account`).
 
 **Manual sync**: `POST /api/agents/sync` triggers `syncAgentsWithRpcCheck()` (attempts RPC to gateway, falls back to config-only).
 
