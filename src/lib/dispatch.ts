@@ -1,5 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import { queryOne, queryAll, run } from '@/lib/db';
+import { existsSync, readFileSync } from 'fs';
 import { getOpenClawClient } from '@/lib/openclaw/client';
 import { broadcast } from '@/lib/events';
 import { getMissionControlUrl } from '@/lib/config';
@@ -18,6 +19,65 @@ export interface DispatchResult {
   updatedAgent?: Agent;
   warning?: string;
   otherOrchestrators?: Array<{ id: string; name: string; role: string }>;
+}
+
+function normalizeSessionSlug(value: string): string {
+  const cleaned = value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .replace(/-+/g, '-');
+  return cleaned || 'agent';
+}
+
+function resourcePathFromPreviewUrl(url: string): string | null {
+  if (!url.startsWith('/api/files/preview?path=')) return null;
+  const marker = 'path=';
+  const idx = url.indexOf(marker);
+  if (idx < 0) return null;
+  const encoded = url.slice(idx + marker.length);
+  try {
+    return decodeURIComponent(encoded);
+  } catch {
+    return null;
+  }
+}
+
+function buildResourceContext(taskId: string): string {
+  const resources = queryAll<{ title: string; url: string; resource_type: string }>(
+    `SELECT title, url, resource_type
+     FROM task_resources
+     WHERE task_id = ?
+     ORDER BY created_at ASC`,
+    [taskId],
+  );
+
+  if (resources.length === 0) return '';
+
+  const list = resources
+    .map((resource, index) => `${index + 1}. [${resource.resource_type}] ${resource.title} -> ${resource.url}`)
+    .join('\n');
+
+  const snippets: string[] = [];
+  for (const resource of resources) {
+    if (resource.resource_type !== 'document') continue;
+    const localPath = resourcePathFromPreviewUrl(resource.url);
+    if (!localPath || !existsSync(localPath)) continue;
+    try {
+      const content = readFileSync(localPath, 'utf-8').replace(/\u0000/g, '').trim();
+      if (!content) continue;
+      const excerpt = content.slice(0, 2500);
+      snippets.push(`- ${resource.title}:\n${excerpt}${content.length > excerpt.length ? '\n...[truncated]' : ''}`);
+      if (snippets.length >= 3) break;
+    } catch {
+    }
+  }
+
+  const snippetSection = snippets.length > 0
+    ? `\n\n**INGESTED FILE EXCERPTS (document resources):**\n${snippets.join('\n\n')}`
+    : '';
+
+  return `\n**TASK RESOURCES:**\n${list}${snippetSection}\nUse these resources as required input when implementing and verifying this task.`;
 }
 
 export async function dispatchTaskToAgent(taskId: string): Promise<DispatchResult> {
@@ -73,21 +133,41 @@ export async function dispatchTaskToAgent(taskId: string): Promise<DispatchResul
       }
     }
 
+    const now = new Date().toISOString();
+
     let session = queryOne<OpenClawSession>(
-      'SELECT * FROM openclaw_sessions WHERE agent_id = ? AND status = ?',
-      [agent.id, 'active']
+      `SELECT * FROM openclaw_sessions
+       WHERE agent_id = ? AND status = ? AND task_id = ?
+       ORDER BY updated_at DESC, created_at DESC
+       LIMIT 1`,
+      [agent.id, 'active', task.id],
     );
 
-    const now = new Date().toISOString();
+    if (!session) {
+      const orphanSession = queryOne<OpenClawSession>(
+        `SELECT * FROM openclaw_sessions
+         WHERE agent_id = ? AND status = ? AND task_id IS NULL
+         ORDER BY updated_at DESC, created_at DESC
+         LIMIT 1`,
+        [agent.id, 'active'],
+      );
+      if (orphanSession) {
+        run(
+          'UPDATE openclaw_sessions SET task_id = ?, session_type = ?, updated_at = ? WHERE id = ?',
+          [task.id, 'subagent', now, orphanSession.id],
+        );
+        session = queryOne<OpenClawSession>('SELECT * FROM openclaw_sessions WHERE id = ?', [orphanSession.id]);
+      }
+    }
 
     if (!session) {
       const sessionId = uuidv4();
-      const openclawSessionId = `mission-control-${agent.name.toLowerCase().replace(/\s+/g, '-')}`;
+      const openclawSessionId = `mission-control-${normalizeSessionSlug(agent.name)}-${task.id.slice(0, 8)}`;
 
       run(
-        `INSERT INTO openclaw_sessions (id, agent_id, openclaw_session_id, channel, status, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [sessionId, agent.id, openclawSessionId, 'mission-control', 'active', now, now]
+        `INSERT INTO openclaw_sessions (id, agent_id, openclaw_session_id, channel, status, session_type, task_id, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [sessionId, agent.id, openclawSessionId, 'mission-control', 'active', 'subagent', task.id, now, now]
       );
 
       session = queryOne<OpenClawSession>('SELECT * FROM openclaw_sessions WHERE id = ?', [sessionId]);
@@ -123,11 +203,6 @@ export async function dispatchTaskToAgent(taskId: string): Promise<DispatchResul
     }
     const taskProjectDir = getTaskPipelineDir(repoPath, task.id);
     const missionControlUrl = getMissionControlUrl();
-    const autoTrainIteration = queryOne<{ count: number }>(
-      `SELECT COUNT(*) as count FROM task_activities
-       WHERE task_id = ? AND activity_type = 'dispatch_invocation'`,
-      [task.id],
-    )?.count || 0;
     const activeAcpBinding = queryOne<{
       acp_session_key: string;
       acp_agent_id: string;
@@ -140,15 +215,6 @@ export async function dispatchTaskToAgent(taskId: string): Promise<DispatchResul
        LIMIT 1`,
       [task.workspace_id],
     );
-    const recentAutoTrainSummaries = task.task_type === 'autotrain'
-      ? queryAll<{ message: string }>(
-          `SELECT message FROM task_activities
-           WHERE task_id = ? AND activity_type IN ('completed', 'status_changed')
-           ORDER BY created_at DESC
-           LIMIT 3`,
-          [task.id],
-        )
-      : [];
 
     const rawTask = task as Task & {
       assigned_agent_name?: string;
@@ -197,10 +263,11 @@ export async function dispatchTaskToAgent(taskId: string): Promise<DispatchResul
 
     let knowledgeSection = '';
     try {
-      const knowledge = getRelevantKnowledge(task.workspace_id, task.title);
+      const knowledge = getRelevantKnowledge(task.workspace_id, task.title, agent.id);
       knowledgeSection = formatKnowledgeForDispatch(knowledge);
     } catch {
     }
+    const resourceSection = buildResourceContext(task.id);
 
     const workflow = getTaskWorkflow(taskId);
     let currentStage: WorkflowStage | undefined;
@@ -221,30 +288,23 @@ export async function dispatchTaskToAgent(taskId: string): Promise<DispatchResul
     const isVerifier = currentStage?.role === 'verifier' || currentStage?.role === 'reviewer';
     const nextStatus = nextStage?.status || 'review';
     const failEndpoint = `POST ${missionControlUrl}/api/tasks/${task.id}/fail`;
-    const autoTrainIterationNumber = autoTrainIteration + 1;
-    const autoTrainOutputDir = `${taskProjectDir}/iter-${autoTrainIterationNumber}`;
-    const autoTrainSummariesSection = recentAutoTrainSummaries.length > 0
-      ? recentAutoTrainSummaries.map((item, index) => `${index + 1}. ${item.message}`).join('\n')
-      : 'No prior iterations yet.';
-    const evolveAgentPrompts = task.task_type === 'autotrain' && /EVOLVE_AGENT_PROMPTS\s*:\s*true/i.test(task.description || '');
-    const agentPromptEvolutionSection = evolveAgentPrompts && agent.agent_workspace_path
-      ? `\n8. LEARN: append iteration lessons to:\n   - ${agent.agent_workspace_path}/SOUL.md\n   - ${agent.agent_workspace_path}/AGENTS.md\n   Keep entries concise, append-only, and never include secrets.\n`
-      : '';
     const acpSection = activeAcpBinding
       ? `\n**ACP CONTEXT:**\n- ACP session key: ${activeAcpBinding.acp_session_key}\n- ACP agent: ${activeAcpBinding.acp_agent_id}\n- Discord thread: ${activeAcpBinding.discord_thread_id}\nUse this as supervisor context if your runtime can access ACP bindings.\n`
       : '';
 
     let completionInstructions: string;
-    if (task.task_type === 'autotrain') {
-      completionInstructions = `**AUTO-TRAIN LOOP — ITERATION ${autoTrainIterationNumber}**\nYou are continuously improving ONLY the current Mission Control workspace repository.\n\nExecute in order:\n1. INSPECT the repository for one high-value bug, UX issue, script weakness, traceability gap, or feature-enablement improvement.\n2. PROPOSE the change in ${autoTrainOutputDir}/proposal.md.\n3. IMPLEMENT exactly one focused improvement in the repo.\n4. VERIFY with the repo's own commands (prefer scripts/check.sh, then targeted validation if needed).\n5. RECORD artifacts in ${autoTrainOutputDir}.\n6. COMMIT your change with a concise message only if your runtime supports git safely; otherwise still record file evidence and verification.\n7. REPORT back to Mission Control and set the task to done so the daemon can start the next iteration.${agentPromptEvolutionSection}\nConstraints:\n- Work ONLY inside workspace repo: ${repoPath}\n- Write ALL loop artifacts under ${autoTrainOutputDir}\n- NEVER expose credentials, tokens, secrets, .env contents, or sensitive configs\n- NEVER work on any other workspace/repo\n- Keep diffs reviewable and focused\n\nPrevious iteration summaries:\n${autoTrainSummariesSection}\n\nWhen complete, call:\n1. POST ${missionControlUrl}/api/tasks/${task.id}/activities\n   Body: {"activity_type": "completed", "message": "Auto-Train iteration ${autoTrainIterationNumber}: [what improved, why, verification]"}\n2. POST ${missionControlUrl}/api/tasks/${task.id}/deliverables\n   Body: {"deliverable_type": "file", "title": "Iteration ${autoTrainIterationNumber} proposal", "path": "${autoTrainOutputDir}/proposal.md"}\n3. PATCH ${missionControlUrl}/api/tasks/${task.id}\n   Body: {"status": "done"}`;
-    } else if (isBuilder) {
+    if (isBuilder) {
       completionInstructions = `**IMPORTANT:** After completing work, you MUST call these APIs:
 1. Log activity: POST ${missionControlUrl}/api/tasks/${task.id}/activities
-   Body: {"activity_type": "completed", "message": "Description of what was done"}
+   Body: {"activity_type": "completed", "message": "Description of what was done", "metadata": {"branch": "task/${task.id}"}}
 2. Register deliverable: POST ${missionControlUrl}/api/tasks/${task.id}/deliverables
    Body: {"deliverable_type": "file", "title": "File name", "path": "${taskProjectDir}/filename.html"}
 3. Update status: PATCH ${missionControlUrl}/api/tasks/${task.id}
    Body: {"status": "${nextStatus}"}
+
+Branch rule:
+- Do all git work on a task branch (for example: task/${task.id})
+- Commit freely on that branch and include the branch in activity metadata above
 
 When complete, reply with:
 \`TASK_COMPLETE: [brief summary of what you did]\``;
@@ -294,8 +354,8 @@ ${task.description ? `**Description:** ${task.description}\n` : ''}
 **Priority:** ${task.priority.toUpperCase()}
 ${task.due_date ? `**Due:** ${task.due_date}\n` : ''}
 **Task ID:** ${task.id}
-${planningSpecSection}${agentInstructionsSection}${knowledgeSection}
-${acpSection}${task.task_type === 'autotrain' ? `**OUTPUT DIRECTORY:** ${autoTrainOutputDir}\nThis iteration must write artifacts under the iteration directory inside .mission-control.\n` : isBuilder ? `**OUTPUT DIRECTORY:** ${taskProjectDir}\nCreate this directory and save all deliverables there. Do not write outside .mission-control/task pipeline path.\n` : `**OUTPUT DIRECTORY:** ${taskProjectDir}\nRead prior artifacts from this .mission-control path if needed.\n`}
+${planningSpecSection}${agentInstructionsSection}${knowledgeSection}${resourceSection}
+${acpSection}${isBuilder ? `**OUTPUT DIRECTORY:** ${taskProjectDir}\nCreate this directory and save all deliverables there. Do not write outside .mission-control/task pipeline path.\n` : `**OUTPUT DIRECTORY:** ${taskProjectDir}\nRead prior artifacts from this .mission-control path if needed.\n`}
 ${completionInstructions}
 
 If you need help or clarification, ask the orchestrator.`;
@@ -303,7 +363,7 @@ If you need help or clarification, ask the orchestrator.`;
     try {
       const prefix = agent.session_key_prefix || 'agent:main:';
       const sessionKey = `${prefix}${session.openclaw_session_id}`;
-      const traceUrl = `${missionControlUrl}/api/tasks/${task.id}/sessions/${session.openclaw_session_id}/trace`;
+      const traceUrl = `/api/tasks/${task.id}/sessions/${encodeURIComponent(session.openclaw_session_id)}/trace`;
       await client.call('chat.send', {
         sessionKey,
         message: taskMessage,
@@ -324,6 +384,7 @@ If you need help or clarification, ask the orchestrator.`;
             session_key: sessionKey,
             trace_url: traceUrl,
             output_directory: taskProjectDir,
+            branch: `task/${task.id}`,
             invocation: taskMessage,
           }),
           now,
