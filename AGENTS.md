@@ -6,7 +6,7 @@
 2. **Git**: Push to `origin` (Blockether fork). Never push to `upstream`. Branch: `main`.
 3. **Commits**: Prefix `feat:` / `fix:` / `refactor:` / `chore:` / `docs:`. English. Footer always includes:
    ```
-   Ultraworked with [Sisyphus] from OhMyOpenAgent (https://github.com/code-yeongyu/oh-my-openagent)
+   Ultraworked with [Sisyphus] from OhMyOpenCode v3.11.2 (https://github.com/code-yeongyu/oh-my-openagent)
 
    Co-authored-by: Sisyphus <clio-agent@sisyphuslabs.ai>
    ```
