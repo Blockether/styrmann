@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { X, Save, Trash2, Folder, FileText, RefreshCw, ChevronRight } from 'lucide-react';
+import { X, Save, Trash2, Folder, FileText, RefreshCw, ChevronRight, Link2, Link2Off } from 'lucide-react';
 import { useMissionControl } from '@/lib/store';
 import type { Agent, AgentStatus } from '@/lib/types';
 
@@ -24,6 +24,20 @@ interface BrowserPayload {
   root_path: string;
   requested_path: string;
   entries: BrowserEntry[];
+}
+
+interface SkillsPayload {
+  agent: {
+    id: string;
+    name: string;
+    source: string;
+    gateway_agent_id: string | null;
+    is_main: boolean;
+  };
+  shared_root: string;
+  agent_skills_root: string | null;
+  available_shared: string[];
+  installed: { name: string; source: 'shared' | 'linked' | 'local'; is_symlink: boolean; linked_target: string | null }[];
 }
 
 function parentPath(path: string): string {
@@ -51,8 +65,10 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated }: Agen
   const [workspaceBrowser, setWorkspaceBrowser] = useState<BrowserPayload | null>(null);
   const [agentDirBrowser, setAgentDirBrowser] = useState<BrowserPayload | null>(null);
   const [skillsBrowser, setSkillsBrowser] = useState<BrowserPayload | null>(null);
+  const [skillsInfo, setSkillsInfo] = useState<SkillsPayload | null>(null);
   const [workspaceLoading, setWorkspaceLoading] = useState(false);
   const [workspaceError, setWorkspaceError] = useState<string | null>(null);
+  const [skillsActionLoading, setSkillsActionLoading] = useState<string | null>(null);
   const isReadOnlySyncedAgent = Boolean(agent && agent.source === 'synced');
 
   const [form, setForm] = useState({
@@ -109,15 +125,20 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated }: Agen
       setWorkspaceLoading(true);
       setWorkspaceError(null);
       try {
-        const [workspaceData, agentDirData, skillsData] = await Promise.all([
+        const [workspaceData, agentDirData, skillsData, skillsInfoData] = await Promise.all([
           fetchBrowser('workspace', workspaceBrowserPath),
           fetchBrowser('agent', agentDirBrowserPath),
           fetchBrowser('workspace', 'skills'),
+          fetch(`/api/agents/${agent.id}/skills`).then(async (res) => {
+            if (!res.ok) return null;
+            return res.json();
+          }),
         ]);
         if (!cancelled) {
           setWorkspaceBrowser(workspaceData);
           setAgentDirBrowser(agentDirData);
           setSkillsBrowser(skillsData);
+          setSkillsInfo(skillsInfoData?.data || skillsInfoData || null);
         }
       } catch (error) {
         if (!cancelled) {
@@ -136,6 +157,33 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated }: Agen
       cancelled = true;
     };
   }, [activeTab, agent?.id, agent?.source, workspaceBrowserPath, agentDirBrowserPath]);
+
+  const runSkillsAction = async (action: 'link' | 'unlink' | 'replace_with_link' | 'sync_all', skillName?: string) => {
+    if (!agent?.id) return;
+    const key = `${action}:${skillName || '*'}`;
+    setSkillsActionLoading(key);
+    setWorkspaceError(null);
+    try {
+      const res = await fetch(`/api/agents/${agent.id}/skills`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, skill_name: skillName }),
+      });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(payload.error || 'Skill action failed');
+      }
+      setSkillsInfo(payload.data || null);
+      const refreshed = await fetch(`/api/agents/${agent.id}/workspace?scope=workspace&path=skills`);
+      if (refreshed.ok) {
+        setSkillsBrowser(await refreshed.json());
+      }
+    } catch (error) {
+      setWorkspaceError(error instanceof Error ? error.message : 'Skill action failed');
+    } finally {
+      setSkillsActionLoading(null);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -405,7 +453,7 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated }: Agen
                       <div>
                         <div className="text-sm font-medium text-mc-text">OpenClaw-backed agent</div>
                         <div className="text-xs text-mc-text-secondary mt-1">
-                          Edits in this modal write to the real OpenClaw files on disk.
+                          Inspect real OpenClaw files and manage skill links for this agent workspace.
                         </div>
                       </div>
                       <button
@@ -452,21 +500,95 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated }: Agen
                       {renderBrowser('Workspace Browser', workspaceBrowser, setWorkspaceBrowserPath, 'No files found in the agent workspace.')}
 
                       <div className="space-y-3 rounded-lg border border-mc-border bg-mc-bg p-3">
-                        <div className="text-sm font-medium text-mc-text">Installed skills</div>
-                        <div className="text-xs text-mc-text-secondary">
-                          These entries come from the real <span className="font-mono">skills/</span> directory inside the OpenClaw workspace.
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <div className="text-sm font-medium text-mc-text">Skill Links</div>
+                          {skillsInfo && !skillsInfo.agent.is_main && (
+                            <button
+                              type="button"
+                              onClick={() => runSkillsAction('sync_all')}
+                              disabled={skillsActionLoading === 'sync_all:*'}
+                              className="min-h-11 px-3 py-2 border border-mc-border rounded text-xs hover:bg-mc-bg-secondary disabled:opacity-50"
+                            >
+                              {skillsActionLoading === 'sync_all:*' ? 'Syncing...' : 'Sync all links'}
+                            </button>
+                          )}
                         </div>
-                        {skillsBrowser && skillsBrowser.entries.length > 0 ? (
+                        <div className="text-xs text-mc-text-secondary">
+                          Main agent skills are the shared source. Sub-agents link shared skills by symlink (no copying).
+                        </div>
+                        {skillsInfo?.agent.is_main && (
+                          <div className="text-xs text-mc-text-secondary bg-mc-bg-secondary border border-mc-border rounded px-2 py-2">
+                            This is the main shared skill source.
+                          </div>
+                        )}
+                        {skillsInfo && skillsInfo.available_shared.length > 0 ? (
                           <div className="space-y-1">
-                            {skillsBrowser.entries.map((entry) => (
-                              <div key={`skill-${entry.relative_path}`} className="flex items-center gap-2 rounded px-2 py-1.5 text-xs">
-                                <Folder className="w-3.5 h-3.5 text-mc-accent flex-shrink-0" />
-                                <span className="text-mc-text">{entry.name}{entry.is_symlink ? ' [symlink]' : ''}</span>
+                            {skillsInfo.available_shared.map((skillName) => {
+                              const installedSkill = skillsInfo.installed.find((entry) => entry.name === skillName);
+                              const state = installedSkill ? installedSkill.source : 'missing';
+                              return (
+                              <div key={`skill-${skillName}`} className="flex items-center justify-between gap-2 rounded px-2 py-1.5 text-xs border border-mc-border bg-mc-bg-secondary">
+                                <div className="min-w-0 flex items-center gap-2">
+                                  <Folder className="w-3.5 h-3.5 text-mc-accent flex-shrink-0" />
+                                  <span className="text-mc-text truncate">{skillName}</span>
+                                  <span className="text-mc-text-secondary">
+                                    {state === 'shared' ? '[shared]'
+                                      : state === 'linked' ? '[linked]'
+                                      : state === 'local' ? '[local copy]'
+                                      : '[not linked]'}
+                                  </span>
+                                </div>
+                                {!skillsInfo.agent.is_main && (
+                                  <div className="flex items-center gap-1.5">
+                                    {state === 'linked' ? (
+                                      <button
+                                        type="button"
+                                        onClick={() => runSkillsAction('unlink', skillName)}
+                                        disabled={skillsActionLoading === `unlink:${skillName}`}
+                                        className="min-h-11 px-2 py-1 border border-mc-border rounded hover:bg-mc-bg text-mc-text-secondary disabled:opacity-50"
+                                      >
+                                        <span className="inline-flex items-center gap-1"><Link2Off className="w-3 h-3" />Unlink</span>
+                                      </button>
+                                    ) : state === 'local' ? (
+                                      <button
+                                        type="button"
+                                        onClick={() => runSkillsAction('replace_with_link', skillName)}
+                                        disabled={skillsActionLoading === `replace_with_link:${skillName}`}
+                                        className="min-h-11 px-2 py-1 border border-mc-accent rounded text-mc-accent hover:bg-mc-accent/10 disabled:opacity-50"
+                                      >
+                                        {skillsActionLoading === `replace_with_link:${skillName}` ? 'Converting...' : 'Replace with link'}
+                                      </button>
+                                    ) : (
+                                      <button
+                                        type="button"
+                                        onClick={() => runSkillsAction('link', skillName)}
+                                        disabled={skillsActionLoading === `link:${skillName}`}
+                                        className="min-h-11 px-2 py-1 border border-mc-border rounded hover:bg-mc-bg text-mc-text-secondary disabled:opacity-50"
+                                      >
+                                        <span className="inline-flex items-center gap-1"><Link2 className="w-3 h-3" />Link</span>
+                                      </button>
+                                    )}
+                                  </div>
+                                )}
                               </div>
-                            ))}
+                              );
+                            })}
                           </div>
                         ) : (
-                          <div className="text-xs text-mc-text-secondary">No skills installed in this workspace.</div>
+                          <div className="text-xs text-mc-text-secondary">No shared skills found.</div>
+                        )}
+
+                        {skillsInfo && !skillsInfo.agent.is_main && skillsInfo.installed.filter((entry) => !skillsInfo.available_shared.includes(entry.name)).length > 0 && (
+                          <div className="space-y-1">
+                            <div className="text-xs text-mc-text-secondary">Non-shared local skills in this agent workspace</div>
+                            {skillsInfo.installed
+                              .filter((entry) => !skillsInfo.available_shared.includes(entry.name))
+                              .map((entry) => (
+                                <div key={`local-skill-${entry.name}`} className="text-xs rounded px-2 py-1 border border-mc-border bg-mc-bg-secondary text-mc-text-secondary">
+                                  {entry.name} {entry.is_symlink ? '[custom symlink]' : '[local copy]'}
+                                </div>
+                              ))}
+                          </div>
                         )}
                       </div>
 

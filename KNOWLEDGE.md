@@ -209,6 +209,8 @@ The Strict template is the default. The `review` stage is labeled "Human Verifie
 
 **OpenClaw modal policy**: Synced OpenClaw agents are inspected read-only in the Agent modal. The Operations/OpenClaw view is now a management entrypoint, not a direct prompt editor for synced agents.
 
+**Skill linking policy**: Main OpenClaw agent skills are treated as the shared source. Sub-agents link skills via symlinks into their workspace `skills/` directories (no copy). Mission Control exposes `/api/agents/{id}/skills` for listing and link/unlink/sync actions.
+
 ### Human Assignments & Himalaya
 
 - `humans` table stores assignable humans with `name`, `email`, and `is_active`.
@@ -286,6 +288,7 @@ Fallback: Task polling every 60s, event polling every 30s.
 | GET | `/api/agents` | List agents (triggers ensureSynced); enriches each agent with `active_task_count` and `current_task_title` from tasks table |
 | GET/PATCH/DELETE | `/api/agents/{id}` | Agent CRUD (PATCH writes back to OpenClaw config; cannot demote orchestrator) |
 | GET | `/api/agents/{id}/workspace` | Read-only browser for synced agent workspace/config roots (`scope=workspace|agent`, `path=...`) |
+| GET/POST | `/api/agents/{id}/skills` | Inspect and manage shared skill links for synced agents (`link`, `unlink`, `replace_with_link`, `sync_all`) |
 | POST | `/api/agents/sync` | Manual sync from gateway config |
 | GET/POST | `/api/humans` | List or create human assignees |
 | GET/PATCH/DELETE | `/api/humans/{id}` | Read, update, or deactivate a human assignee |
