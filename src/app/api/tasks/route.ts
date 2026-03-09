@@ -3,7 +3,6 @@ import { v4 as uuidv4 } from 'uuid';
 import { queryAll, queryOne, run } from '@/lib/db';
 import { broadcast } from '@/lib/events';
 import { CreateTaskSchema } from '@/lib/validation';
-import { populateTaskRolesFromAgents } from '@/lib/workflow-engine';
 import type { Task, CreateTaskRequest, Agent } from '@/lib/types';
 
 // GET /api/tasks - List all tasks with optional filters
@@ -128,6 +127,7 @@ export async function POST(request: NextRequest) {
     const workflowTemplateId = defaultTemplate?.id || null;
 
     const { github_issue_id } = validatedData;
+    const assignedAgentId = null;
 
     run(
       `INSERT INTO tasks (id, title, description, status, priority, task_type, effort, impact, assigned_agent_id, created_by_agent_id, workspace_id, milestone_id, business_id, due_date, workflow_template_id, github_issue_id, created_at, updated_at)
@@ -141,7 +141,7 @@ export async function POST(request: NextRequest) {
         validatedData.task_type || 'feature',
         validatedData.effort || null,
         validatedData.impact || null,
-        validatedData.assigned_agent_id || null,
+        assignedAgentId,
         validatedData.created_by_agent_id || null,
         workspaceId,
         validatedData.milestone_id || null,
@@ -186,9 +186,6 @@ export async function POST(request: NextRequest) {
       [id]
     );
     
-    // Auto-populate workflow roles from workspace agents
-    populateTaskRolesFromAgents(id, workspaceId);
-
     // Broadcast task creation via SSE
     if (task) {
       broadcast({

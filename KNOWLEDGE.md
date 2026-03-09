@@ -1,6 +1,6 @@
 # KNOWLEDGE.md -- Mission Control
 
-Last updated: 2026-03-07
+Last updated: 2026-03-09
 
 ---
 
@@ -62,6 +62,8 @@ PLANNING -> INBOX -> ASSIGNED -> IN_PROGRESS -> TESTING -> REVIEW -> VERIFICATIO
 Also: `pending_dispatch` (transient, pre-dispatch state).
 
 **Fail-loopback**: Testing or verification failure returns task to `in_progress` and re-dispatches the builder.
+
+**Task creation behavior**: New tasks are created unassigned and stay in `inbox` (or `planning` when planning mode is enabled). Agent assignment and workflow role mapping happen after creation in the task's Team tab. Inline agent creation was removed from the task creation modal.
 
 **Task fields**: title, description, status, priority (low/normal/high/urgent), task_type (bug/feature/chore/documentation/research), effort (1-5), impact (1-5), assigned_agent_id, milestone_id, workflow_template_id, due_date, tags.
 
@@ -203,6 +205,8 @@ The Strict template is the default. The `review` stage is labeled "Human Verifie
 
 **Prompts stored in files**: soul_md, user_md, agents_md are read from OpenClaw agent workspace directories on disk. Double binding -- files are the source of truth, DB reflects them.
 
+**Workspace visibility**: Synced OpenClaw agents expose their real filesystem paths via `agent_dir` and `agent_workspace_path`. Mission Control includes a read-only browser endpoint for these roots so the agent modal can inspect the actual workspace/config directories and installed `skills/` entries on disk.
+
 **Manual sync**: `POST /api/agents/sync` triggers `syncAgentsWithRpcCheck()` (attempts RPC to gateway, falls back to config-only).
 
 ### Orchestrator Role
@@ -269,6 +273,7 @@ Fallback: Task polling every 60s, event polling every 30s.
 |--------|----------|---------|
 | GET | `/api/agents` | List agents (triggers ensureSynced); enriches each agent with `active_task_count` and `current_task_title` from tasks table |
 | GET/PATCH/DELETE | `/api/agents/{id}` | Agent CRUD (PATCH writes back to OpenClaw config; cannot demote orchestrator) |
+| GET | `/api/agents/{id}/workspace` | Read-only browser for synced agent workspace/config roots (`scope=workspace|agent`, `path=...`) |
 | POST | `/api/agents/sync` | Manual sync from gateway config |
 
 ### Workspaces

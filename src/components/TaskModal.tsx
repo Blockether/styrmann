@@ -9,7 +9,6 @@ import { DeliverablesList } from './DeliverablesList';
 import { SessionsList } from './SessionsList';
 import { PlanningTab } from './PlanningTab';
 import { TeamTab } from './TeamTab';
-import { AgentModal } from './AgentModal';
 import { CreateMilestoneModal } from './CreateMilestoneModal';
 import type { Task, TaskPriority, TaskStatus, TaskType, GitHubIssue } from '@/lib/types';
 
@@ -29,7 +28,6 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
   const { agents, addTask, updateTask, addEvent } = useMissionControl();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isProcessingAcceptance, setIsProcessingAcceptance] = useState(false);
-  const [showAgentModal, setShowAgentModal] = useState(false);
   const [showMilestoneModal, setShowMilestoneModal] = useState(false);
   const [usePlanningMode, setUsePlanningMode] = useState(false);
   // Auto-switch to planning tab if task is in planning status
@@ -90,14 +88,11 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
   const resolveStatus = (): TaskStatus => {
     // Planning mode overrides everything
     if (!task && usePlanningMode) return 'planning';
-    // Auto-determine based on agent assignment
-    const hasAgent = !!form.assigned_agent_id;
     if (!task) {
-      // New task: agent → assigned, no agent → inbox
-      return hasAgent ? 'assigned' : 'inbox';
+      return 'inbox';
     }
     // Existing task: if in inbox and agent just assigned, promote to assigned
-    if (task.status === 'inbox' && hasAgent) return 'assigned';
+    if (task.status === 'inbox' && form.assigned_agent_id) return 'assigned';
     return form.status;
   };
 
@@ -137,7 +132,7 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
       const payload: Record<string, unknown> = {
         ...form,
         status: resolvedStatus,
-        assigned_agent_id: form.assigned_agent_id || null,
+        assigned_agent_id: task ? (form.assigned_agent_id || null) : null,
         milestone_id: form.milestone_id || null,
         workspace_id: workspaceId || task?.workspace_id || 'default',
       };
@@ -590,31 +585,24 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-1">Assign to</label>
-              <select
-                value={form.assigned_agent_id}
-                onChange={(e) => {
-                  if (e.target.value === '__add_new__') {
-                    setShowAgentModal(true);
-                  } else {
-                    setForm({ ...form, assigned_agent_id: e.target.value });
-                  }
-                }}
-                className="w-full min-h-11 bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent"
-              >
-                <option value="">Unassigned</option>
-                {agents.map((agent) => (
-                  <option key={agent.id} value={agent.id}>
-                    {agent.name}{agent.role ? ` — ${agent.role.slice(0, 40)}${agent.role.length > 40 ? '…' : ''}` : ''}
-                  </option>
-                ))}
-                <option value="__add_new__" className="text-mc-accent">
-                  + Add new agent...
-                </option>
-              </select>
-            </div>
+          <div className={`grid grid-cols-1 ${task ? 'sm:grid-cols-2' : ''} gap-4`}>
+            {task && (
+              <div>
+                <label className="block text-sm font-medium mb-1">Assign to</label>
+                <select
+                  value={form.assigned_agent_id}
+                  onChange={(e) => setForm({ ...form, assigned_agent_id: e.target.value })}
+                  className="w-full min-h-11 bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent"
+                >
+                  <option value="">Unassigned</option>
+                  {agents.map((agent) => (
+                    <option key={agent.id} value={agent.id}>
+                      {agent.name}{agent.role ? ` — ${agent.role.slice(0, 40)}${agent.role.length > 40 ? '…' : ''}` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             <div>
               <label className="block text-sm font-medium mb-1">Milestone</label>
@@ -641,6 +629,12 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
               </select>
             </div>
           </div>
+
+          {!task && (
+            <div className="text-xs text-mc-text-secondary bg-mc-bg border border-mc-border rounded px-3 py-2">
+              Tasks are created unassigned. Configure workflow roles and assign agents after creation in the task&apos;s Team tab.
+            </div>
+          )}
 
           {saveError && (
             <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-md">
@@ -745,19 +739,6 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
           </div>
         )}
       </div>
-
-      {/* Nested Agent Modal for inline agent creation */}
-      {showAgentModal && (
-        <AgentModal
-          workspaceId={workspaceId}
-          onClose={() => setShowAgentModal(false)}
-          onAgentCreated={(agentId) => {
-            // Auto-select the newly created agent
-            setForm({ ...form, assigned_agent_id: agentId });
-            setShowAgentModal(false);
-          }}
-        />
-      )}
 
       {showMilestoneModal && (
         <CreateMilestoneModal
