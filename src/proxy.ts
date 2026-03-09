@@ -19,10 +19,13 @@ function isSameOriginRequest(request: NextRequest): boolean {
   // Server-side fetches from Next.js (no origin/referer) — same process
   const origin = request.headers.get('origin');
   const referer = request.headers.get('referer');
+  const fetchSite = request.headers.get('sec-fetch-site');
 
   // If neither origin nor referer is set, this is likely a server-side
   // fetch or a direct curl. Require auth for these (external API calls).
-  if (!origin && !referer) return false;
+  if (!origin && !referer) {
+    return fetchSite === 'same-origin' || fetchSite === 'same-site';
+  }
 
   // Check if Origin matches the host
   if (origin) {

@@ -5,7 +5,30 @@ import { getProjectsPath } from '@/lib/config';
 
 export function getWorkspaceRepoPath(workspaceRepo?: string | null): string | null {
   if (!workspaceRepo) return null;
-  return path.join(getProjectsPath(), workspaceRepo);
+
+  const trimmed = workspaceRepo.trim();
+
+  if (path.isAbsolute(trimmed)) {
+    return trimmed;
+  }
+
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    try {
+      const parsed = new URL(trimmed);
+      const segments = parsed.pathname.split('/').filter(Boolean);
+      if (segments.length >= 2) {
+        const org = segments[0];
+        const repo = segments[1].replace(/\.git$/i, '');
+        const exactPath = path.join(getProjectsPath(), org, repo);
+        if (existsSync(exactPath)) return exactPath;
+        return path.join(getProjectsPath(), org.toLowerCase(), repo.toLowerCase());
+      }
+    } catch {
+      return path.join(getProjectsPath(), trimmed);
+    }
+  }
+
+  return path.join(getProjectsPath(), trimmed);
 }
 
 export function isGitWorkTree(repoPath: string): boolean {
