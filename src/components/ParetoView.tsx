@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { useMissionControl } from '@/lib/store';
 import { TaskModal } from '@/components/TaskModal';
+import { useTaskDeepLink } from '@/hooks/useTaskDeepLink';
 import type { Task, TaskType } from '@/lib/types';
 
 const TASK_TYPE_COLORS: Record<TaskType, string> = {
@@ -43,6 +44,9 @@ export function ParetoView({ workspaceId }: ParetoViewProps) {
   const { tasks } = useMissionControl();
   const [hoveredTask, setHoveredTask] = useState<Task | null>(null);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const { linkedTask, initialTab, openTask, closeTask, updateTab } = useTaskDeepLink();
+  const activeEditingTask = editingTask || linkedTask;
+  const handleTaskClick = (task: Task) => { setEditingTask(task); openTask(task); };
 
   const { scoredTasks, unscoredTasks, quickWinsCount } = useMemo(() => {
     const scored = tasks.filter(
@@ -175,7 +179,7 @@ export function ParetoView({ workspaceId }: ParetoViewProps) {
                             {cellTasks.slice(0, 5).map((task, i) => (
                               <button
                                 key={task.id}
-                                onClick={() => setEditingTask(task)}
+                                onClick={() => handleTaskClick(task)}
                                 className={`absolute w-3 h-3 sm:w-3.5 sm:h-3.5 rounded-full border-2 ${TASK_TYPE_COLORS[task.task_type]} ${TASK_TYPE_BORDER_COLORS[task.task_type]} cursor-pointer hover:scale-150 hover:z-20 hover:shadow-lg transition-transform`}
                                 style={{
                                   left: `${15 + i * 12}%`,
@@ -273,7 +277,7 @@ export function ParetoView({ workspaceId }: ParetoViewProps) {
               {unscoredTasks.map((task) => (
                 <button
                   key={task.id}
-                  onClick={() => setEditingTask(task)}
+                  onClick={() => handleTaskClick(task)}
                   className="p-3 bg-mc-bg border border-mc-border rounded-lg hover:border-mc-accent/50 transition-colors text-left"
                 >
                   <div className="font-medium text-sm line-clamp-1">{task.title}</div>
@@ -291,11 +295,13 @@ export function ParetoView({ workspaceId }: ParetoViewProps) {
       </div>
       </div>
 
-      {editingTask && (
+      {activeEditingTask && (
         <TaskModal
-          task={editingTask}
-          onClose={() => setEditingTask(null)}
+          task={activeEditingTask}
+          onClose={() => { setEditingTask(null); closeTask(); }}
           workspaceId={workspaceId}
+          defaultTab={linkedTask ? initialTab : undefined}
+          onTabChange={updateTab}
         />
       )}
     </div>

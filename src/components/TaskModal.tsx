@@ -21,9 +21,11 @@ interface TaskModalProps {
   workspaceId?: string;
   defaultSprintId?: string;
   githubIssue?: GitHubIssue;
+  defaultTab?: TabType;
+  onTabChange?: (tab: TabType) => void;
 }
 
-export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaultSprintId, githubIssue }: TaskModalProps) {
+export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaultSprintId, githubIssue, defaultTab, onTabChange }: TaskModalProps) {
   const { agents, addTask, updateTask, addEvent } = useMissionControl();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isProcessingAcceptance, setIsProcessingAcceptance] = useState(false);
@@ -31,8 +33,13 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
   const [showMilestoneModal, setShowMilestoneModal] = useState(false);
   const [usePlanningMode, setUsePlanningMode] = useState(false);
   // Auto-switch to planning tab if task is in planning status
-  const [activeTab, setActiveTab] = useState<TabType>(task?.status === 'planning' ? 'planning' : 'overview');
+  const [activeTab, setActiveTab] = useState<TabType>(defaultTab || (task?.status === 'planning' ? 'planning' : 'overview'));
   const contentRef = useRef<HTMLDivElement>(null);
+
+  const handleTabChange = useCallback((tab: TabType) => {
+    setActiveTab(tab);
+    onTabChange?.(tab);
+  }, [onTabChange]);
 
   useEffect(() => {
     if (contentRef.current) {
@@ -356,7 +363,7 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
             {tabs.map((tab) => (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => handleTabChange(tab.id)}
                 className={`flex-1 flex items-center justify-center gap-2 px-4 min-h-11 py-2 text-sm font-medium transition-colors whitespace-nowrap ${
                   activeTab === tab.id
                     ? 'text-mc-accent border-b-2 border-mc-accent'
@@ -674,29 +681,27 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
 
         {/* Footer - only show on overview tab */}
         {activeTab === 'overview' && (
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between p-4 border-t border-mc-border flex-shrink-0 gap-2 sm:gap-0">
-            <div className="flex gap-2">
+          <div className="p-3 border-t border-mc-border flex-shrink-0 flex items-center justify-between gap-2 flex-wrap">
+            <div className="flex items-center gap-1">
               <button
                 type="button"
                 onClick={onClose}
-                className="min-h-11 px-4 py-2 text-sm text-mc-text-secondary hover:text-mc-text"
+                className="min-h-11 px-3 py-2 text-sm text-mc-text-secondary hover:text-mc-text rounded"
               >
                 Cancel
               </button>
               {task && (
-                <>
-                  <button
-                    type="button"
-                    onClick={handleDelete}
-                    className="min-h-11 flex items-center gap-2 px-3 py-2 text-mc-accent-red hover:bg-mc-accent-red/10 rounded text-sm"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                    Delete
-                  </button>
-                </>
+                <button
+                  type="button"
+                  onClick={handleDelete}
+                  className="min-h-11 flex items-center gap-1.5 px-3 py-2 text-mc-accent-red hover:bg-mc-accent-red/10 rounded text-sm"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span className="hidden sm:inline">Delete</span>
+                </button>
               )}
             </div>
-            <div className="flex flex-wrap gap-2 justify-end">
+            <div className="flex items-center gap-2">
               {task && ['review', 'verification'].includes(task.status) && (
                 <>
                   <button
@@ -705,7 +710,8 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
                     disabled={isProcessingAcceptance}
                     className="min-h-11 px-3 py-2 border border-mc-accent-red text-mc-accent-red rounded text-sm font-medium hover:bg-mc-accent-red/10 disabled:opacity-50"
                   >
-                    Raise Problem
+                    <span className="hidden sm:inline">Raise Problem</span>
+                    <span className="sm:hidden">Problem</span>
                   </button>
                   <button
                     type="button"
@@ -713,7 +719,7 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
                     disabled={isProcessingAcceptance}
                     className="min-h-11 px-3 py-2 bg-mc-accent-green text-white rounded text-sm font-medium hover:bg-mc-accent-green/90 disabled:opacity-50"
                   >
-                    {isProcessingAcceptance ? 'Processing...' : 'Accept & Merge'}
+                    {isProcessingAcceptance ? 'Processing...' : 'Accept'}
                   </button>
                 </>
               )}
@@ -721,19 +727,19 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
                 <button
                   onClick={(e) => handleSubmit(e, true)}
                   disabled={isSubmitting}
-                  className="min-h-11 flex items-center gap-2 px-4 py-2 border border-mc-accent text-mc-accent rounded text-sm font-medium hover:bg-mc-accent/10 disabled:opacity-50"
+                  className="min-h-11 flex items-center gap-1.5 px-3 py-2 border border-mc-accent text-mc-accent rounded text-sm font-medium hover:bg-mc-accent/10 disabled:opacity-50"
                 >
                   <Plus className="w-4 h-4" />
-                  {isSubmitting ? 'Saving...' : 'Save & New'}
+                  <span className="hidden sm:inline">{isSubmitting ? 'Saving...' : 'Save & New'}</span>
                 </button>
               )}
               <button
                 onClick={handleSubmit}
                 disabled={isSubmitting}
-                className="min-h-11 flex items-center gap-2 px-4 py-2 bg-mc-accent text-white rounded text-sm font-medium hover:bg-mc-accent/90 disabled:opacity-50"
+                className="min-h-11 flex items-center gap-1.5 px-3 py-2 bg-mc-accent text-white rounded text-sm font-medium hover:bg-mc-accent/90 disabled:opacity-50"
               >
                 <Save className="w-4 h-4" />
-                {isSubmitting ? 'Saving...' : 'Save'}
+                <span className="hidden sm:inline">{isSubmitting ? 'Saving...' : 'Save'}</span>
               </button>
             </div>
           </div>

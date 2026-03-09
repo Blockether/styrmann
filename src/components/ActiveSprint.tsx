@@ -9,6 +9,7 @@ import { TaskModal } from './TaskModal';
 import { CreateMilestoneModal } from './CreateMilestoneModal';
 import { AgentInitials } from './AgentInitials';
 import { formatDistanceToNow } from 'date-fns';
+import { useTaskDeepLink } from '@/hooks/useTaskDeepLink';
 
 interface ActiveSprintProps {
   workspaceId?: string;
@@ -65,7 +66,10 @@ export function ActiveSprint({ workspaceId, mobileMode = false, isPortrait = tru
   const [showSprintDropdown, setShowSprintDropdown] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showCreateMilestoneModal, setShowCreateMilestoneModal] = useState(false);
+  const { linkedTask, initialTab, openTask, closeTask, updateTab } = useTaskDeepLink();
   const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const activeEditingTask = editingTask || linkedTask;
+  const handleTaskClick = (task: Task) => { setEditingTask(task); openTask(task); };
   const [endingSprint, setEndingSprint] = useState(false);
   const [creatingSprint, setCreatingSprint] = useState(false);
   const [statusMoveTask, setStatusMoveTask] = useState<Task | null>(null);
@@ -496,7 +500,7 @@ export function ActiveSprint({ workspaceId, mobileMode = false, isPortrait = tru
                   isPortrait={isPortrait}
                   isExpanded={isExpanded}
                   onToggle={() => toggleMilestone(milestoneId)}
-                  onTaskClick={setEditingTask}
+                  onTaskClick={handleTaskClick}
                   onMoveStatus={setStatusMoveTask}
                   mobileMode={mobileMode}
                 />
@@ -514,7 +518,7 @@ export function ActiveSprint({ workspaceId, mobileMode = false, isPortrait = tru
                 isPortrait={isPortrait}
                 isExpanded={expandedMilestones.has('ungrouped')}
                 onToggle={() => toggleMilestone('ungrouped')}
-                onTaskClick={setEditingTask}
+                onTaskClick={handleTaskClick}
                 onMoveStatus={setStatusMoveTask}
                 mobileMode={mobileMode}
               />
@@ -550,7 +554,7 @@ export function ActiveSprint({ workspaceId, mobileMode = false, isPortrait = tru
                 .map((task) => (
                   <div
                     key={task.id}
-                    onClick={() => setEditingTask(task)}
+                    onClick={() => handleTaskClick(task)}
                     className="bg-mc-bg-secondary border border-mc-border/50 rounded-lg p-3 cursor-pointer hover:border-mc-accent/40 transition-colors"
                   >
                     <div className="flex items-start gap-2 mb-2">
@@ -592,7 +596,7 @@ export function ActiveSprint({ workspaceId, mobileMode = false, isPortrait = tru
             tasksByMilestone={tasksByMilestone}
             hasUngrouped={hasUngrouped}
             agents={agents}
-            onTaskClick={setEditingTask}
+            onTaskClick={handleTaskClick}
             draggedTask={draggedTask}
             setDraggedTask={setDraggedTask}
             updateTaskStatusWithPersist={updateTaskStatusWithPersist}
@@ -607,11 +611,13 @@ export function ActiveSprint({ workspaceId, mobileMode = false, isPortrait = tru
           defaultSprintId={selectedSprintId || undefined}
         />
       )}
-      {editingTask && (
+      {activeEditingTask && (
         <TaskModal
-          task={editingTask}
-          onClose={() => setEditingTask(null)}
+          task={activeEditingTask}
+          onClose={() => { setEditingTask(null); closeTask(); }}
           workspaceId={workspaceId}
+          defaultTab={linkedTask ? initialTab : undefined}
+          onTabChange={updateTab}
         />
       )}
 

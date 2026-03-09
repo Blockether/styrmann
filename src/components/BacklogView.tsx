@@ -23,6 +23,7 @@ import { format, parseISO } from 'date-fns';
 import { useMissionControl } from '@/lib/store';
 import type { Task, TaskType, TaskPriority, Sprint, Milestone, Agent } from '@/lib/types';
 import { TaskModal } from '@/components/TaskModal';
+import { useTaskDeepLink } from '@/hooks/useTaskDeepLink';
 import { AgentInitials } from '@/components/AgentInitials';
 
 const PRIORITY_ORDER: TaskPriority[] = ['urgent', 'high', 'normal', 'low'];
@@ -54,6 +55,9 @@ export function BacklogView({ workspaceId }: BacklogViewProps) {
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const { linkedTask, initialTab, openTask, closeTask, updateTab } = useTaskDeepLink();
+  const activeEditingTask = editingTask || linkedTask;
+  const handleTaskClick = (task: Task) => { setEditingTask(task); openTask(task); };
   const [assigningMilestone, setAssigningMilestone] = useState<string | null>(null);
 
   useEffect(() => {
@@ -299,7 +303,7 @@ export function BacklogView({ workspaceId }: BacklogViewProps) {
                   return (
                     <tr
                       key={task.id}
-                      onClick={() => setEditingTask(task)}
+                      onClick={() => handleTaskClick(task)}
                       className="cursor-pointer hover:bg-mc-bg-tertiary/30 transition-colors"
                     >
                       <td className="px-4 py-3">
@@ -396,11 +400,13 @@ export function BacklogView({ workspaceId }: BacklogViewProps) {
           workspaceId={workspaceId}
         />
       )}
-      {editingTask && (
+      {activeEditingTask && (
         <TaskModal
-          task={editingTask}
-          onClose={() => setEditingTask(null)}
+          task={activeEditingTask}
+          onClose={() => { setEditingTask(null); closeTask(); }}
           workspaceId={workspaceId}
+          defaultTab={linkedTask ? initialTab : undefined}
+          onTabChange={updateTab}
         />
       )}
     </div>
