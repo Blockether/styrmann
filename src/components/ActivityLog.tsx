@@ -10,6 +10,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { Zap, PenLine, CheckCircle2, FileText, ArrowRightLeft, Activity } from 'lucide-react';
 import type { TaskActivity } from '@/lib/types';
 import { AgentInitials } from './AgentInitials';
+import { TraceViewerModal } from './TraceViewerModal';
 
 interface ActivityLogProps {
   taskId: string;
@@ -18,8 +19,18 @@ interface ActivityLogProps {
 export function ActivityLog({ taskId }: ActivityLogProps) {
   const [activities, setActivities] = useState<TaskActivity[]>([]);
   const [loading, setLoading] = useState(true);
+  const [traceUrl, setTraceUrl] = useState<string | null>(null);
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
   const lastCountRef = useRef(0);
+
+  const normalizeActivities = (payload: unknown): TaskActivity[] => {
+    if (Array.isArray(payload)) return payload as TaskActivity[];
+    if (payload && typeof payload === 'object') {
+      const maybe = (payload as { activities?: unknown }).activities;
+      if (Array.isArray(maybe)) return maybe as TaskActivity[];
+    }
+    return [];
+  };
 
   const loadActivities = useCallback(async (showLoading = false) => {
     try {
@@ -29,8 +40,9 @@ export function ActivityLog({ taskId }: ActivityLogProps) {
       const data = await res.json();
 
       if (res.ok) {
-        setActivities(data);
-        lastCountRef.current = data.length;
+        const normalized = normalizeActivities(data);
+        setActivities(normalized);
+        lastCountRef.current = normalized.length;
       }
     } catch (error) {
       console.error('Failed to load activities:', error);
@@ -50,10 +62,11 @@ export function ActivityLog({ taskId }: ActivityLogProps) {
       const res = await fetch(`/api/tasks/${taskId}/activities`);
       if (res.ok) {
         const data = await res.json();
+        const normalized = normalizeActivities(data);
         // Only update if there are new activities
-        if (data.length !== lastCountRef.current) {
-          setActivities(data);
-          lastCountRef.current = data.length;
+        if (normalized.length !== lastCountRef.current) {
+          setActivities(normalized);
+          lastCountRef.current = normalized.length;
         }
       }
     } catch (error) {
@@ -99,10 +112,35 @@ export function ActivityLog({ taskId }: ActivityLogProps) {
     try {
       const parsed = JSON.parse(metadata) as Record<string, unknown>;
       const traceUrl = parsed.trace_url;
-      return typeof traceUrl === 'string' && traceUrl ? traceUrl : null;
+      if (typeof traceUrl !== 'string' || !traceUrl) return null;
+      if (traceUrl.startsWith('/')) return traceUrl;
+      try {
+        const normalized = new URL(traceUrl);
+        return `${normalized.pathname}${normalized.search}${normalized.hash}`;
+      } catch {
+        return traceUrl;
+      }
     } catch {
       return null;
     }
+  };
+
+  const parseMetadata = (metadata?: string): Record<string, unknown> | null => {
+    if (!metadata) return null;
+    try {
+      const parsed = JSON.parse(metadata);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        return parsed as Record<string, unknown>;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  };
+
+  const getInvocationPreview = (invocation: string): string => {
+    const cleaned = invocation.replace(/\*\*/g, '').replace(/\n+/g, ' ').trim();
+    return cleaned.length > 180 ? `${cleaned.slice(0, 180)}...` : cleaned;
   };
 
   if (loading) {
@@ -125,6 +163,14 @@ export function ActivityLog({ taskId }: ActivityLogProps) {
   return (
     <div data-component="src/components/ActivityLog" className="space-y-3">
       {activities.map((activity) => (
+        (() => {
+          const parsedMetadata = parseMetadata(activity.metadata);
+          const activityTraceUrl = getTraceUrl(activity.metadata);
+          const sessionId = typeof parsedMetadata?.openclaw_session_id === 'string' ? parsedMetadata.openclaw_session_id : null;
+          const outputDirectory = typeof parsedMetadata?.output_directory === 'string' ? parsedMetadata.output_directory : null;
+          const invocation = typeof parsedMetadata?.invocation === 'string' ? parsedMetadata.invocation : null;
+
+          return (
         <div
           key={activity.id}
           className="flex gap-3 p-3 bg-mc-bg rounded-lg border border-mc-border"
@@ -150,24 +196,44 @@ export function ActivityLog({ taskId }: ActivityLogProps) {
             </p>
 
             {/* Metadata */}
-            {activity.metadata && (
-              <div className="mt-2 p-2 bg-mc-bg-tertiary rounded text-xs text-mc-text-secondary font-mono">
-                {typeof activity.metadata === 'string' 
-                  ? activity.metadata 
-                  : JSON.stringify(JSON.parse(activity.metadata), null, 2)}
+            {parsedMetadata && (
+              <div className="mt-2 p-2 bg-mc-bg-tertiary rounded text-xs text-mc-text-secondary space-y-1">
+                {sessionId && (
+                  <div>
+                    <span className="text-mc-text">Session:</span> {sessionId}
+                  </div>
+                )}
+                {outputDirectory && (
+                  <div className="break-all">
+                    <span className="text-mc-text">Artifacts:</span> {outputDirectory}
+                  </div>
+                )}
+                {invocation && (
+                  <div className="break-words">
+                    <span className="text-mc-text">Invocation:</span> {getInvocationPreview(invocation)}
+                  </div>
+                )}
+
+                <details className="pt-1">
+                  <summary className="cursor-pointer text-mc-text-secondary hover:text-mc-text">
+                    Show technical metadata
+                  </summary>
+                  <pre className="mt-2 p-2 bg-mc-bg rounded text-[11px] overflow-x-auto font-mono whitespace-pre-wrap break-words">
+                    {JSON.stringify(parsedMetadata, null, 2)}
+                  </pre>
+                </details>
               </div>
             )}
 
-            {getTraceUrl(activity.metadata) && (
+            {activityTraceUrl && (
               <div className="mt-2">
-                <a
-                  href={getTraceUrl(activity.metadata) || '#'}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <button
+                  type="button"
+                  onClick={() => setTraceUrl(activityTraceUrl)}
                   className="text-xs text-mc-accent hover:underline"
                 >
                   Open session trace
-                </a>
+                </button>
               </div>
             )}
 
@@ -177,7 +243,14 @@ export function ActivityLog({ taskId }: ActivityLogProps) {
             </div>
           </div>
         </div>
+          );
+        })()
       ))}
+      <TraceViewerModal
+        taskId={taskId}
+        traceUrl={traceUrl}
+        onClose={() => setTraceUrl(null)}
+      />
     </div>
   );
 }

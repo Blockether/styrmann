@@ -7,7 +7,6 @@ import {
   ChevronDown,
   ChevronRight,
   RefreshCw,
-  Filter,
   Bot,
   User,
   Cpu,
@@ -16,6 +15,7 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { AgentInitials } from './AgentInitials';
+import { TraceViewerModal } from './TraceViewerModal';
 
 interface ActivityFeedProps {
   workspaceId: string;
@@ -93,6 +93,7 @@ export function ActivityFeed({ workspaceId, sprintId }: ActivityFeedProps) {
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
   const [expandedMessages, setExpandedMessages] = useState<Set<string>>(new Set());
   const [milestones, setMilestones] = useState<Milestone[]>([]);
+  const [traceUrl, setTraceUrl] = useState<string | null>(null);
 
   // Fetch milestones for filter dropdown
   useEffect(() => {
@@ -248,6 +249,23 @@ export function ActivityFeed({ workspaceId, sprintId }: ActivityFeedProps) {
     return ROLE_ICONS[role] || null;
   };
 
+  const getClientTraceUrl = (traceUrl: string | null): string | null => {
+    if (!traceUrl) return null;
+    if (traceUrl.startsWith('/')) return traceUrl;
+    try {
+      const parsed = new URL(traceUrl);
+      return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+    } catch {
+      return traceUrl;
+    }
+  };
+
+  const formatCreatedAt = (createdAt: string): string => {
+    const parsed = new Date(createdAt);
+    if (Number.isNaN(parsed.getTime())) return 'just now';
+    return formatDistanceToNow(parsed, { addSuffix: true });
+  };
+
   return (
     <div
       data-component="src/components/ActivityFeed"
@@ -386,6 +404,9 @@ export function ActivityFeed({ workspaceId, sprintId }: ActivityFeedProps) {
                     <div className="divide-y divide-mc-border">
                       {group.items.map((item) => (
                         <div key={item.id} className="p-3 hover:bg-mc-bg-tertiary/30 transition-colors">
+                          {(() => {
+                            const messageText = typeof item.message === 'string' ? item.message : '';
+                            return (
                           <div className="flex gap-3">
                             {/* Agent Avatar */}
                             <div className="flex-shrink-0 mt-1">
@@ -421,25 +442,25 @@ export function ActivityFeed({ workspaceId, sprintId }: ActivityFeedProps) {
                                 )}
                                 <span className="text-xs text-mc-text-secondary ml-auto flex items-center gap-1">
                                   <Clock className="w-3 h-3" />
-                                  {formatDistanceToNow(new Date(item.created_at), { addSuffix: true })}
+                                  {formatCreatedAt(item.created_at)}
                                 </span>
                               </div>
 
                               {/* Message Content */}
                               {item.source === 'activity' ? (
-                                <p className="text-sm text-mc-text">{item.message}</p>
+                                <p className="text-sm text-mc-text">{messageText}</p>
                               ) : (
                                 <div
                                   className={`text-sm text-mc-text font-mono whitespace-pre-wrap break-words bg-mc-bg-tertiary rounded p-2 ${
                                     expandedMessages.has(item.id) ? '' : 'line-clamp-4'
                                   }`}
                                 >
-                                  {item.message}
+                                  {messageText}
                                 </div>
                               )}
 
                               {/* Expand/Collapse for long agent logs */}
-                              {item.source === 'agent_log' && item.message.split('\n').length > 4 && (
+                              {item.source === 'agent_log' && messageText.split('\n').length > 4 && (
                                 <button
                                   onClick={() => toggleMessageExpand(item.id)}
                                   className="mt-2 text-xs text-mc-accent hover:underline"
@@ -448,20 +469,21 @@ export function ActivityFeed({ workspaceId, sprintId }: ActivityFeedProps) {
                                 </button>
                               )}
 
-                              {item.trace_url && (
+                              {getClientTraceUrl(item.trace_url) && (
                                 <div className="mt-2">
-                                  <a
-                                    href={item.trace_url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
+                                  <button
+                                    type="button"
+                                    onClick={() => setTraceUrl(getClientTraceUrl(item.trace_url))}
                                     className="text-xs text-mc-accent hover:underline"
                                   >
                                     Open session trace
-                                  </a>
+                                  </button>
                                 </div>
                               )}
                             </div>
                           </div>
+                            );
+                          })()}
                         </div>
                       ))}
                     </div>
@@ -492,6 +514,10 @@ export function ActivityFeed({ workspaceId, sprintId }: ActivityFeedProps) {
           </div>
         )}
       </div>
+      <TraceViewerModal
+        traceUrl={traceUrl}
+        onClose={() => setTraceUrl(null)}
+      />
     </div>
   );
 }

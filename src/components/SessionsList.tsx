@@ -8,6 +8,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Bot, CheckCircle, Circle, XCircle, Trash2, Check } from 'lucide-react';
 import { AgentInitials } from './AgentInitials';
+import { TraceViewerModal } from './TraceViewerModal';
 
 interface SessionWithAgent {
   id: string;
@@ -31,6 +32,7 @@ interface SessionsListProps {
 export function SessionsList({ taskId }: SessionsListProps) {
   const [sessions, setSessions] = useState<SessionWithAgent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [traceUrl, setTraceUrl] = useState<string | null>(null);
 
   const loadSessions = useCallback(async () => {
     try {
@@ -123,6 +125,17 @@ export function SessionsList({ taskId }: SessionsListProps) {
     }
   };
 
+  const getClientTraceUrl = (traceUrl?: string): string | null => {
+    if (!traceUrl) return null;
+    if (traceUrl.startsWith('/')) return traceUrl;
+    try {
+      const parsed = new URL(traceUrl);
+      return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+    } catch {
+      return traceUrl;
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-8">
@@ -174,16 +187,15 @@ export function SessionsList({ taskId }: SessionsListProps) {
               Session: {session.openclaw_session_id}
             </div>
 
-            {session.trace_url && (
+            {getClientTraceUrl(session.trace_url) && (
               <div className="mb-2">
-                <a
-                  href={session.trace_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <button
+                  type="button"
+                  onClick={() => setTraceUrl(getClientTraceUrl(session.trace_url))}
                   className="text-xs text-mc-accent hover:underline"
                 >
                   View full trace
-                </a>
+                </button>
               </div>
             )}
 
@@ -225,6 +237,11 @@ export function SessionsList({ taskId }: SessionsListProps) {
           </div>
         </div>
       ))}
+      <TraceViewerModal
+        taskId={taskId}
+        traceUrl={traceUrl}
+        onClose={() => setTraceUrl(null)}
+      />
     </div>
   );
 }
