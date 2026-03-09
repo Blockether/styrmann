@@ -6,8 +6,11 @@ import { X, Bot, User, Cpu, Clock3, MessageSquare, ChevronRight, Shield, ArrowRi
 interface TraceMessage {
   role: string;
   content: string;
-  tool_calls?: { name: string; input?: string }[];
+  tool_calls?: { id?: string; name: string; input?: string }[];
   tool_result?: string;
+  tool_name?: string;
+  tool_call_id?: string;
+  is_error?: boolean;
   timestamp?: string;
   provenance?: {
     kind: string;
@@ -82,10 +85,10 @@ function formatDuration(value?: number | null): string {
   return `${hours}h ${minutes % 60}m`;
 }
 
-function roleLabel(role: string): string {
+function roleLabel(role: string, toolName?: string): string {
   if (role === 'assistant') return 'assistant';
   if (role === 'user') return 'user';
-  if (role === 'tool' || role === 'toolResult') return 'tool output';
+  if (role === 'tool' || role === 'toolResult') return toolName ? `tool: ${toolName}` : 'tool output';
   return role;
 }
 
@@ -287,17 +290,25 @@ export function TraceViewerModal({ taskId, sessionId, onClose }: TraceViewerModa
               <div className="p-3 rounded border border-mc-border bg-mc-bg space-y-2">
                 <div className="text-xs uppercase tracking-wide text-mc-text-secondary">Trace preview ({previewMessages.length} messages)</div>
                 <div className="space-y-2">
-                  {previewMessages.map((message, index) => (
-                    <div key={`${message.role}-${index}`} className="p-2 rounded border border-mc-border bg-mc-bg-secondary">
+                  {previewMessages.map((message, index) => {
+                    const isToolOutput = message.role === 'toolResult' || message.role === 'tool';
+                    const isError = message.is_error === true;
+                    // Visually connect tool results to preceding tool calls with left border
+                    const connectorClass = isToolOutput ? 'ml-4 border-l-2 ' + (isError ? 'border-red-300' : 'border-emerald-300') : '';
+                    return (
+                    <div key={`${message.role}-${index}`} className={`p-2 rounded border border-mc-border bg-mc-bg-secondary ${connectorClass}`}>
                       <div className="flex items-center justify-between gap-2 mb-1">
-                        <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] ${roleBadge(message.role)}`}>
-                          {roleIcon(message.role)}
-                          {roleLabel(message.role)}
-                        </span>
-                        <span className="text-[11px] text-mc-text-secondary">{formatTimestamp(message.timestamp)}</span>
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] ${isError ? 'bg-red-100 text-red-700' : roleBadge(message.role)}`}>
+                            {roleIcon(message.role)}
+                            {roleLabel(message.role, message.tool_name)}
+                          </span>
+                          {isError && <span className="text-[11px] text-red-600 font-medium">error</span>}
+                        </div>
+                        <span className="text-[11px] text-mc-text-secondary flex-shrink-0">{formatTimestamp(message.timestamp)}</span>
                       </div>
-                      {message.content && (message.role === 'toolResult' || message.role === 'tool') ? (
-                        <pre className="text-xs p-1.5 mt-1 rounded bg-mc-bg border border-mc-border font-mono text-mc-text-secondary whitespace-pre-wrap break-words overflow-x-auto max-h-48">{message.content}</pre>
+                      {message.content && isToolOutput ? (
+                        <pre className={`text-xs p-1.5 mt-1 rounded font-mono whitespace-pre-wrap break-words overflow-x-auto max-h-48 ${isError ? 'bg-red-50 border border-red-200 text-red-800' : 'bg-mc-bg border border-mc-border text-mc-text-secondary'}`}>{message.content}</pre>
                       ) : message.content ? (
                         <p className="text-xs text-mc-text whitespace-pre-wrap break-words">{message.content}</p>
                       ) : null}
@@ -326,7 +337,8 @@ export function TraceViewerModal({ taskId, sessionId, onClose }: TraceViewerModa
                         <p className="text-xs text-mc-text-secondary italic">(empty message)</p>
                       )}
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
               <details className="p-3 rounded border border-mc-border bg-mc-bg">

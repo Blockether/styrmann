@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 
 type Params = { params: Promise<{ id: string; sessionId: string }> };
 
-type TraceMessage = { role: string; content: string; tool_calls?: { name: string; input?: string }[]; tool_result?: string; timestamp?: string; provenance?: InputProvenance | null; receipt?: SourceReceipt | null };
+type TraceMessage = { role: string; content: string; tool_calls?: { id?: string; name: string; input?: string }[]; tool_result?: string; tool_name?: string; tool_call_id?: string; is_error?: boolean; timestamp?: string; provenance?: InputProvenance | null; receipt?: SourceReceipt | null };
 
 const SOURCE_RECEIPT_RE = /\[Source Receipt\]\n([\s\S]*?)\n\[\/?Source Receipt\]/;
 
@@ -41,7 +41,7 @@ function extractProvenance(msg: Record<string, unknown>): InputProvenance | null
 function normalizeMessage(raw: unknown): TraceMessage {
   const msg = raw as Record<string, unknown>;
   let content = '';
-  const toolCalls: { name: string; input?: string }[] = [];
+  const toolCalls: { id?: string; name: string; input?: string }[] = [];
   let toolResult: string | undefined;
 
   if (Array.isArray(msg.content)) {
@@ -50,10 +50,15 @@ function normalizeMessage(raw: unknown): TraceMessage {
     for (const block of blocks) {
       if (block.type === 'text' && block.text) {
         textParts.push(String(block.text));
-      } else if (block.type === 'tool_use' || block.type === 'toolUse') {
+      } else if (block.type === 'tool_use' || block.type === 'toolUse' || block.type === 'toolCall') {
         toolCalls.push({
+          id: block.id ? String(block.id) : undefined,
           name: String(block.name || block.toolName || 'unknown'),
-          input: block.input ? (typeof block.input === 'string' ? block.input : JSON.stringify(block.input, null, 2)) : undefined,
+          input: block.input || block.arguments
+            ? (typeof (block.input || block.arguments) === 'string'
+              ? String(block.input || block.arguments)
+              : JSON.stringify(block.input || block.arguments, null, 2))
+            : undefined,
         });
       } else if (block.type === 'tool_result' || block.type === 'toolResult') {
         const resultContent = block.content || block.output || block.text || '';
@@ -68,7 +73,7 @@ function normalizeMessage(raw: unknown): TraceMessage {
   // Fallback: check top-level tool_use / tool_result fields
   if (msg.tool_use && typeof msg.tool_use === 'object' && toolCalls.length === 0) {
     const tu = msg.tool_use as Record<string, unknown>;
-    toolCalls.push({ name: String(tu.name || 'unknown'), input: tu.input ? JSON.stringify(tu.input, null, 2) : undefined });
+    toolCalls.push({ id: tu.id ? String(tu.id) : undefined, name: String(tu.name || 'unknown'), input: tu.input ? JSON.stringify(tu.input, null, 2) : undefined });
   }
   if (!toolResult && msg.tool_result) {
     toolResult = typeof msg.tool_result === 'string' ? msg.tool_result : JSON.stringify(msg.tool_result, null, 2);
@@ -82,11 +87,19 @@ function normalizeMessage(raw: unknown): TraceMessage {
   const provenance = extractProvenance(msg);
   const receipt = parseSourceReceipt(content);
 
+  // Extract tool correlation fields from toolResult messages (gateway pi-ai format)
+  const toolName = msg.toolName ? String(msg.toolName) : undefined;
+  const toolCallId = msg.toolCallId ? String(msg.toolCallId) : undefined;
+  const isError = typeof msg.isError === 'boolean' ? msg.isError : undefined;
+
   return {
     role: String(msg.role || 'unknown'),
     content,
     ...(toolCalls.length > 0 ? { tool_calls: toolCalls } : {}),
     ...(toolResult ? { tool_result: toolResult } : {}),
+    ...(toolName ? { tool_name: toolName } : {}),
+    ...(toolCallId ? { tool_call_id: toolCallId } : {}),
+    ...(isError !== undefined ? { is_error: isError } : {}),
     timestamp,
     provenance,
     receipt,
@@ -252,6 +265,24 @@ export async function GET(request: Request, { params }: Params) {
         if (!resolvedSessionKey) resolvedSessionKey = key;
       } catch {
         // Key not found in gateway, try next
+      }
+    }
+
+    // Post-process: correlate toolResult messages with preceding tool_call blocks
+    // Build a map of tool_call_id -> tool_name from assistant messages
+    const toolCallMap = new Map<string, string>();
+    for (const msg of history) {
+      if (msg.role === 'assistant' && msg.tool_calls) {
+        for (const tc of msg.tool_calls) {
+          if (tc.id) toolCallMap.set(tc.id, tc.name);
+        }
+      }
+    }
+    // Backfill tool_name on toolResult messages that don't have it
+    for (const msg of history) {
+      if ((msg.role === 'toolResult' || msg.role === 'tool') && msg.tool_call_id && !msg.tool_name) {
+        const name = toolCallMap.get(msg.tool_call_id);
+        if (name) msg.tool_name = name;
       }
     }
 
