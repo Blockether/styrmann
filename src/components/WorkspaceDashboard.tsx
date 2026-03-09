@@ -180,17 +180,6 @@ function WorkspaceCard({ workspace, onDelete, onEdit }: { workspace: WorkspaceSt
             </h3>
           </div>
           <div className="flex items-center gap-1">
-            <button
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                onEdit(workspace);
-              }}
-              className="p-1.5 rounded hover:bg-mc-accent/20 text-mc-text-secondary hover:text-mc-accent transition-colors opacity-0 group-hover:opacity-100"
-              title="Edit workspace"
-            >
-              <Pencil className="w-4 h-4" />
-            </button>
             {workspace.id !== 'default' && (
               <button
                 onClick={(e) => {
@@ -198,12 +187,23 @@ function WorkspaceCard({ workspace, onDelete, onEdit }: { workspace: WorkspaceSt
                   e.stopPropagation();
                   setShowDeleteConfirm(true);
                 }}
-                className="p-1.5 rounded hover:bg-mc-accent-red/20 text-mc-text-secondary hover:text-mc-accent-red transition-colors opacity-0 group-hover:opacity-100"
+                className="p-1.5 rounded hover:bg-mc-accent-red/20 text-mc-text-secondary hover:text-mc-accent-red transition-colors"
                 title="Delete workspace"
               >
                 <Trash2 className="w-4 h-4" />
               </button>
             )}
+            <button
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onEdit(workspace);
+              }}
+              className="p-1.5 rounded hover:bg-mc-accent/20 text-mc-text-secondary hover:text-mc-accent transition-colors"
+              title="Edit workspace"
+            >
+              <Pencil className="w-4 h-4" />
+            </button>
             <ArrowRight className="w-5 h-5 text-mc-text-secondary group-hover:text-mc-accent transition-colors" />
           </div>
         </div>

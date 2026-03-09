@@ -6,7 +6,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { FileText, Link as LinkIcon, Package, ExternalLink, Eye, Download } from 'lucide-react';
+import { FileText, Link as LinkIcon, Package, ExternalLink, Eye, Download, X } from 'lucide-react';
 import { debug } from '@/lib/debug';
 import type { TaskDeliverable } from '@/lib/types';
 
@@ -60,6 +60,9 @@ export function DeliverablesList({ taskId }: DeliverablesListProps) {
   const [deliverables, setDeliverables] = useState<TaskDeliverable[]>([]);
   const [changes, setChanges] = useState<TaskChangesPayload | null>(null);
   const [loading, setLoading] = useState(true);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewTitle, setPreviewTitle] = useState('');
+  const [previewUrl, setPreviewUrl] = useState('');
 
   const loadDeliverables = useCallback(async () => {
     try {
@@ -144,12 +147,14 @@ export function DeliverablesList({ taskId }: DeliverablesListProps) {
     }
   };
 
-  const handlePreview = (deliverable: TaskDeliverable) => {
-    if (deliverable.path) {
-      debug.file('Opening preview', { path: deliverable.path });
-      const returnUrl = encodeURIComponent(window.location.pathname + window.location.search);
-      window.open(`/api/files/preview?path=${encodeURIComponent(deliverable.path)}&returnUrl=${returnUrl}`, '_blank');
-    }
+  const handlePreview = async (deliverable: TaskDeliverable) => {
+    if (!deliverable.path) return;
+
+    debug.file('Opening preview', { path: deliverable.path });
+    setPreviewTitle(deliverable.title);
+    const returnUrl = encodeURIComponent(window.location.pathname + window.location.search);
+    setPreviewUrl(`/api/files/preview?path=${encodeURIComponent(deliverable.path)}&returnUrl=${returnUrl}`);
+    setPreviewOpen(true);
   };
 
   const handleDownload = (deliverable: TaskDeliverable) => {
@@ -279,7 +284,7 @@ export function DeliverablesList({ taskId }: DeliverablesListProps) {
                 {/* Preview button for previewable files */}
                 {deliverable.deliverable_type === 'file' && isPreviewable(deliverable.path) && (
                   <button
-                    onClick={(e) => { e.stopPropagation(); handlePreview(deliverable); }}
+                    onClick={(e) => { e.stopPropagation(); void handlePreview(deliverable); }}
                     className="flex-shrink-0 p-1.5 hover:bg-mc-bg-tertiary rounded text-mc-accent-cyan"
                     title="Preview in browser"
                   >
@@ -325,6 +330,30 @@ export function DeliverablesList({ taskId }: DeliverablesListProps) {
           </div>
         </div>
       ))}
+
+      {previewOpen && (
+        <div className="fixed inset-0 z-[60] bg-mc-bg-secondary flex flex-col">
+          <div className="p-3 border-b border-mc-border bg-mc-bg-tertiary flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-sm font-medium text-mc-text truncate">{previewTitle}</div>
+              <div className="text-xs text-mc-text-secondary">Preview</div>
+            </div>
+            <button className="p-1.5 rounded hover:bg-mc-bg" onClick={() => setPreviewOpen(false)}>
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          <div className="flex-1 min-h-0">
+            {previewUrl && (
+              <iframe
+                title={previewTitle || 'Deliverable preview'}
+                src={previewUrl}
+                className="w-full h-full border-0"
+              />
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -9,7 +9,7 @@ interface CreateMilestoneModalProps {
   sprintId?: string;
   agents: Agent[];
   onClose: () => void;
-  onCreated: () => void;
+  onCreated: (milestoneId?: string) => void;
 }
 
 export function CreateMilestoneModal({ workspaceId, sprintId, agents, onClose, onCreated }: CreateMilestoneModalProps) {
@@ -48,7 +48,8 @@ export function CreateMilestoneModal({ workspaceId, sprintId, agents, onClose, o
         return;
       }
 
-      onCreated();
+      const milestone = await res.json().catch(() => null);
+      onCreated(milestone?.id);
       onClose();
     } catch {
       setError('Failed to create milestone');

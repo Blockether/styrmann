@@ -20,7 +20,6 @@ const TASK_TYPE_COLORS: Record<TaskType, string> = {
   chore: 'bg-mc-text-secondary',
   documentation: 'bg-mc-accent-purple',
   research: 'bg-mc-accent-green',
-  autotrain: 'bg-amber-500',
 };
 
 const TASK_TYPE_BORDER_COLORS: Record<TaskType, string> = {
@@ -29,7 +28,6 @@ const TASK_TYPE_BORDER_COLORS: Record<TaskType, string> = {
   chore: 'border-mc-text-secondary',
   documentation: 'border-mc-accent-purple',
   research: 'border-mc-accent-green',
-  autotrain: 'border-amber-500',
 };
 
 interface TaskWithPosition extends Task {

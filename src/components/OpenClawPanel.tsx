@@ -311,36 +311,35 @@ export function OpenClawPanel({ embedded = false }: OpenClawPanelProps) {
                             {/* Name */}
                             <span className="font-medium text-sm truncate flex-1 min-w-0">{agent.name}</span>
 
-                            {/* Task count badge */}
-                            {taskCount > 0 && (
-                              <span className={`text-xs font-mono px-2 py-0.5 rounded-full ${
-                                isWorking ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
-                              }`}>
-                                {taskCount} task{taskCount !== 1 ? 's' : ''}
-                              </span>
-                            )}
-                            {taskCount === 0 && (
-                              <span className="text-xs text-mc-text-secondary">No tasks</span>
-                            )}
+                            <div className="ml-auto flex items-center gap-2 flex-shrink-0">
+                              {/* Task count badge */}
+                              {taskCount > 0 ? (
+                                <span className={`text-xs font-mono px-2 py-0.5 rounded-full ${
+                                  isWorking ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
+                                }`}>
+                                  {taskCount} task{taskCount !== 1 ? 's' : ''}
+                                </span>
+                              ) : (
+                                <span className="text-xs text-mc-text-secondary">No tasks</span>
+                              )}
 
-                            {/* Edit button */}
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setEditingAgent(agent);
-                              }}
-                              className="p-1 rounded hover:bg-mc-bg-tertiary text-mc-text-secondary hover:text-mc-text transition-colors flex-shrink-0"
-                              title={`Edit ${agent.name}`}
-                            >
-                              <Settings className="w-3.5 h-3.5" />
-                            </button>
+                              {/* Edit button */}
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditingAgent(agent);
+                                }}
+                                className="p-1 rounded hover:bg-mc-bg-tertiary text-mc-text-secondary hover:text-mc-text transition-colors flex-shrink-0"
+                                title={`Edit ${agent.name}`}
+                              >
+                                <Settings className="w-3.5 h-3.5" />
+                              </button>
 
-                            {/* Expand chevron */}
-                            {taskCount > 0 ? (
-                              isExpanded ? <ChevronDown className="w-4 h-4 text-mc-text-secondary flex-shrink-0" /> : <ChevronRight className="w-4 h-4 text-mc-text-secondary flex-shrink-0" />
-                            ) : (
-                              <span className="w-4" />
-                            )}
+                              {/* Expand chevron */}
+                              {taskCount > 0 && (
+                                isExpanded ? <ChevronDown className="w-4 h-4 text-mc-text-secondary flex-shrink-0" /> : <ChevronRight className="w-4 h-4 text-mc-text-secondary flex-shrink-0" />
+                              )}
+                            </div>
                           </button>
 
                           {/* Expanded task list */}

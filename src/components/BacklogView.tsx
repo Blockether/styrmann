@@ -11,8 +11,11 @@ import {
   Circle,
   Plus,
   Flag,
-  ArrowUpDown,
+  Calendar,
+  Type,
   Loader2,
+  ChevronDown,
+  ChevronUp,
   ChevronRight,
   Target,
 } from 'lucide-react';
@@ -30,7 +33,6 @@ const TASK_TYPE_CONFIG: Record<TaskType, { icon: typeof Bug; color: string }> = 
   chore: { icon: Wrench, color: 'text-blue-500' },
   documentation: { icon: BookOpen, color: 'text-green-500' },
   research: { icon: FlaskConical, color: 'text-purple-500' },
-  autotrain: { icon: Target, color: 'text-amber-500' },
 };
 
 interface BacklogViewProps {
@@ -161,30 +163,36 @@ export function BacklogView({ workspaceId }: BacklogViewProps) {
           <div className="flex items-center bg-mc-bg-tertiary rounded-lg p-0.5">
             <button
               onClick={() => toggleSort('created')}
+              title={`Sort by created (${sortBy === 'created' ? sortDir : 'desc'})`}
               className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-medium transition-colors min-h-9 ${
                 sortBy === 'created' ? 'bg-mc-accent text-white' : 'text-mc-text-secondary hover:text-mc-text'
               }`}
             >
-              <ArrowUpDown className="w-3.5 h-3.5" />
+              <Calendar className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Created</span>
+              {sortBy === 'created' && (sortDir === 'asc' ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />)}
             </button>
             <button
               onClick={() => toggleSort('priority')}
+              title={`Sort by priority (${sortBy === 'priority' ? sortDir : 'desc'})`}
               className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-medium transition-colors min-h-9 ${
                 sortBy === 'priority' ? 'bg-mc-accent text-white' : 'text-mc-text-secondary hover:text-mc-text'
               }`}
             >
-              <ArrowUpDown className="w-3.5 h-3.5" />
+              <Flag className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Priority</span>
+              {sortBy === 'priority' && (sortDir === 'asc' ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />)}
             </button>
             <button
               onClick={() => toggleSort('title')}
+              title={`Sort by title (${sortBy === 'title' ? sortDir : 'desc'})`}
               className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-medium transition-colors min-h-9 ${
                 sortBy === 'title' ? 'bg-mc-accent text-white' : 'text-mc-text-secondary hover:text-mc-text'
               }`}
             >
-              <ArrowUpDown className="w-3.5 h-3.5" />
+              <Type className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Title</span>
+              {sortBy === 'title' && (sortDir === 'asc' ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />)}
             </button>
           </div>
           <button
@@ -213,7 +221,6 @@ export function BacklogView({ workspaceId }: BacklogViewProps) {
                   <option value="chore">Chore</option>
                   <option value="documentation">Documentation</option>
                   <option value="research">Research</option>
-                  <option value="autotrain">Auto-Train</option>
                 </select>
               </div>
 
