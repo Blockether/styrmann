@@ -53,3 +53,6 @@ next-env.d.ts
 *.db.backup
 .sisyphus/
 .env.daemon
+
+# Mission Control task outputs (agent artifacts, screenshots)
+.mission-control/

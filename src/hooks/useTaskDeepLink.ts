@@ -78,6 +78,7 @@ export function useTaskDeepLink() {
     const url = new URL(window.location.href);
     url.searchParams.delete('task');
     url.searchParams.delete('tab');
+    url.searchParams.delete('trace');
     window.history.pushState({}, '', url.toString());
   }, []);
 

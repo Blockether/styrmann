@@ -9,6 +9,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { Bot, CheckCircle, Circle, XCircle, Trash2, Check } from 'lucide-react';
 import { AgentInitials } from './AgentInitials';
 import { TraceViewerModal } from './TraceViewerModal';
+import { useTraceDeepLink } from '@/hooks/useTraceDeepLink';
 
 interface SessionWithAgent {
   id: string;
@@ -32,7 +33,7 @@ interface SessionsListProps {
 export function SessionsList({ taskId }: SessionsListProps) {
   const [sessions, setSessions] = useState<SessionWithAgent[]>([]);
   const [loading, setLoading] = useState(true);
-  const [traceUrl, setTraceUrl] = useState<string | null>(null);
+  const { traceUrl, openTrace, closeTrace } = useTraceDeepLink();
 
   const loadSessions = useCallback(async () => {
     try {
@@ -191,7 +192,7 @@ export function SessionsList({ taskId }: SessionsListProps) {
               <div className="mb-2">
                 <button
                   type="button"
-                  onClick={() => setTraceUrl(getClientTraceUrl(session.trace_url))}
+                  onClick={() => openTrace(getClientTraceUrl(session.trace_url))}
                   className="text-xs text-mc-accent hover:underline"
                 >
                   View full trace
@@ -240,7 +241,7 @@ export function SessionsList({ taskId }: SessionsListProps) {
       <TraceViewerModal
         taskId={taskId}
         traceUrl={traceUrl}
-        onClose={() => setTraceUrl(null)}
+        onClose={closeTrace}
       />
     </div>
   );

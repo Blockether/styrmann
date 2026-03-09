@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { AgentInitials } from './AgentInitials';
 import { TraceViewerModal } from './TraceViewerModal';
+import { useTraceDeepLink } from '@/hooks/useTraceDeepLink';
 
 interface ActivityFeedProps {
   workspaceId: string;
@@ -93,7 +94,7 @@ export function ActivityFeed({ workspaceId, sprintId }: ActivityFeedProps) {
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
   const [expandedMessages, setExpandedMessages] = useState<Set<string>>(new Set());
   const [milestones, setMilestones] = useState<Milestone[]>([]);
-  const [traceUrl, setTraceUrl] = useState<string | null>(null);
+  const { traceUrl, openTrace, closeTrace } = useTraceDeepLink();
 
   // Fetch milestones for filter dropdown
   useEffect(() => {
@@ -473,7 +474,7 @@ export function ActivityFeed({ workspaceId, sprintId }: ActivityFeedProps) {
                                 <div className="mt-2">
                                   <button
                                     type="button"
-                                    onClick={() => setTraceUrl(getClientTraceUrl(item.trace_url))}
+                                    onClick={() => openTrace(getClientTraceUrl(item.trace_url))}
                                     className="text-xs text-mc-accent hover:underline"
                                   >
                                     Open session trace
@@ -516,7 +517,7 @@ export function ActivityFeed({ workspaceId, sprintId }: ActivityFeedProps) {
       </div>
       <TraceViewerModal
         traceUrl={traceUrl}
-        onClose={() => setTraceUrl(null)}
+        onClose={closeTrace}
       />
     </div>
   );

@@ -11,6 +11,7 @@ import { Zap, PenLine, CheckCircle2, FileText, ArrowRightLeft, Activity } from '
 import type { TaskActivity } from '@/lib/types';
 import { AgentInitials } from './AgentInitials';
 import { TraceViewerModal } from './TraceViewerModal';
+import { useTraceDeepLink } from '@/hooks/useTraceDeepLink';
 
 interface ActivityLogProps {
   taskId: string;
@@ -19,7 +20,7 @@ interface ActivityLogProps {
 export function ActivityLog({ taskId }: ActivityLogProps) {
   const [activities, setActivities] = useState<TaskActivity[]>([]);
   const [loading, setLoading] = useState(true);
-  const [traceUrl, setTraceUrl] = useState<string | null>(null);
+  const { traceUrl, openTrace, closeTrace } = useTraceDeepLink();
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
   const lastCountRef = useRef(0);
 
@@ -229,7 +230,7 @@ export function ActivityLog({ taskId }: ActivityLogProps) {
               <div className="mt-2">
                 <button
                   type="button"
-                  onClick={() => setTraceUrl(activityTraceUrl)}
+                  onClick={() => openTrace(activityTraceUrl)}
                   className="text-xs text-mc-accent hover:underline"
                 >
                   Open session trace
@@ -249,7 +250,7 @@ export function ActivityLog({ taskId }: ActivityLogProps) {
       <TraceViewerModal
         taskId={taskId}
         traceUrl={traceUrl}
-        onClose={() => setTraceUrl(null)}
+        onClose={closeTrace}
       />
     </div>
   );
