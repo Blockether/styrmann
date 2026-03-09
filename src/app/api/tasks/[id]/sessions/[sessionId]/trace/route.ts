@@ -243,10 +243,15 @@ export async function GET(request: Request, { params }: Params) {
     for (const key of candidateKeys) {
       try {
         const rawMessages = await client.getSessionHistory(key);
-        history = rawMessages.map(normalizeMessage);
-        resolvedSessionKey = key;
-        break;
+        if (rawMessages.length > 0) {
+          history = rawMessages.map(normalizeMessage);
+          resolvedSessionKey = key;
+          break;
+        }
+        // Track first key even if empty (fallback)
+        if (!resolvedSessionKey) resolvedSessionKey = key;
       } catch {
+        // Key not found in gateway, try next
       }
     }
 

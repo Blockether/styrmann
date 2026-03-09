@@ -11,6 +11,10 @@ export async function GET(
     const { id: taskId } = await params;
     const db = getDb();
 
+    // Get task status to infer session completion
+    const task = db.prepare('SELECT status FROM tasks WHERE id = ?').get(taskId) as { status: string } | undefined;
+    const taskDone = task && ['done', 'review', 'testing', 'verification', 'cancelled', 'archived'].includes(task.status);
+
     const sessions = db
       .prepare(
         `SELECT
@@ -23,10 +27,28 @@ export async function GET(
       )
       .all(taskId) as Array<Record<string, unknown>>;
 
-    const sessionsWithTrace = sessions.map((session) => ({
-      ...session,
-      trace_url: `/api/tasks/${taskId}/sessions/${encodeURIComponent(String(session.openclaw_session_id))}/trace`,
-    }));
+    // Check for TASK_COMPLETE in activities to detect finished sessions
+    const completedAgentIds = new Set<string>(
+      (db.prepare(
+        `SELECT DISTINCT agent_id FROM task_activities
+         WHERE task_id = ? AND (activity_type = 'completed' OR message LIKE '%TASK_COMPLETE%')`,
+      ).all(taskId) as Array<{ agent_id: string }>).map(r => r.agent_id).filter(Boolean)
+    );
+
+    const sessionsWithTrace = sessions.map((session) => {
+      // Infer effective status: mark as completed if task is done or agent reported completion
+      let effectiveStatus = String(session.status || 'active');
+      if (effectiveStatus === 'active') {
+        if (taskDone || completedAgentIds.has(String(session.agent_id || ''))) {
+          effectiveStatus = 'completed';
+        }
+      }
+      return {
+        ...session,
+        status: effectiveStatus,
+        trace_url: `/api/tasks/${taskId}/sessions/${encodeURIComponent(String(session.openclaw_session_id))}/trace`,
+      };
+    });
 
     return NextResponse.json(sessionsWithTrace);
   } catch (error) {

@@ -82,6 +82,13 @@ function formatDuration(value?: number | null): string {
   return `${hours}h ${minutes % 60}m`;
 }
 
+function roleLabel(role: string): string {
+  if (role === 'assistant') return 'assistant';
+  if (role === 'user') return 'user';
+  if (role === 'tool' || role === 'toolResult') return 'tool output';
+  return role;
+}
+
 function roleIcon(role: string) {
   if (role === 'assistant') return <Bot className="w-3.5 h-3.5" />;
   if (role === 'user') return <User className="w-3.5 h-3.5" />;
@@ -285,13 +292,15 @@ export function TraceViewerModal({ taskId, sessionId, onClose }: TraceViewerModa
                       <div className="flex items-center justify-between gap-2 mb-1">
                         <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] ${roleBadge(message.role)}`}>
                           {roleIcon(message.role)}
-                          {message.role}
+                          {roleLabel(message.role)}
                         </span>
                         <span className="text-[11px] text-mc-text-secondary">{formatTimestamp(message.timestamp)}</span>
                       </div>
-                      {message.content && (
+                      {message.content && (message.role === 'toolResult' || message.role === 'tool') ? (
+                        <pre className="text-xs p-1.5 mt-1 rounded bg-mc-bg border border-mc-border font-mono text-mc-text-secondary whitespace-pre-wrap break-words overflow-x-auto max-h-48">{message.content}</pre>
+                      ) : message.content ? (
                         <p className="text-xs text-mc-text whitespace-pre-wrap break-words">{message.content}</p>
-                      )}
+                      ) : null}
                       {message.tool_calls && message.tool_calls.length > 0 && (
                         <div className="mt-1 space-y-1">
                           {message.tool_calls.map((tc, tcIdx) => (
