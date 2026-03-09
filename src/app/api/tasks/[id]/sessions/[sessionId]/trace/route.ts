@@ -1,12 +1,14 @@
 import { NextResponse } from 'next/server';
 import { getOpenClawClient } from '@/lib/openclaw/client';
-import { queryOne, queryAll } from '@/lib/db';
+import { queryOne, queryAll, run } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
 type Params = { params: Promise<{ id: string; sessionId: string }> };
 
-function normalizeMessage(raw: unknown): { role: string; content: string; timestamp?: string } {
+type TraceMessage = { role: string; content: string; timestamp?: string };
+
+function normalizeMessage(raw: unknown): TraceMessage {
   const msg = raw as Record<string, unknown>;
   let content: string;
   if (Array.isArray(msg.content)) {
@@ -26,51 +28,135 @@ function normalizeMessage(raw: unknown): { role: string; content: string; timest
   return { role: String(msg.role || 'unknown'), content, timestamp };
 }
 
+function extractSessionMetadata(taskId: string, sessionId: string): {
+  session_id: string;
+  session_key: string;
+  output_directory: string;
+  invocation: string;
+  created_at: string;
+} | null {
+  const invocationRows = queryAll<{ metadata: string; created_at: string }>(
+    `SELECT metadata, created_at
+     FROM task_activities
+     WHERE task_id = ? AND activity_type = 'dispatch_invocation'
+     ORDER BY created_at DESC`,
+    [taskId],
+  );
+
+  return invocationRows
+    .map((row) => {
+      try {
+        const parsed = JSON.parse(row.metadata || '{}') as Record<string, unknown>;
+        return {
+          created_at: row.created_at,
+          session_id: String(parsed.openclaw_session_id || ''),
+          session_key: String(parsed.session_key || ''),
+          output_directory: String(parsed.output_directory || ''),
+          invocation: String(parsed.invocation || ''),
+        };
+      } catch {
+        return null;
+      }
+    })
+    .find((row) => row && row.session_id === sessionId) || null;
+}
+
+function buildTraceSummary(history: TraceMessage[], invocation: string | null) {
+  const roleCounts = history.reduce<Record<string, number>>((acc, item) => {
+    acc[item.role] = (acc[item.role] || 0) + 1;
+    return acc;
+  }, {});
+
+  const timestamps = history
+    .map((item) => item.timestamp)
+    .filter((value): value is string => typeof value === 'string' && value.length > 0)
+    .map((value) => new Date(value).getTime())
+    .filter((value) => Number.isFinite(value));
+
+  const startedAt = timestamps.length > 0 ? new Date(Math.min(...timestamps)).toISOString() : null;
+  const endedAt = timestamps.length > 0 ? new Date(Math.max(...timestamps)).toISOString() : null;
+  const durationSeconds = startedAt && endedAt
+    ? Math.max(0, Math.round((new Date(endedAt).getTime() - new Date(startedAt).getTime()) / 1000))
+    : null;
+
+  const stageMatches = invocation
+    ? Array.from(invocation.matchAll(/\*\*([^*\n]{3,120})\*\*/g)).map((match) => match[1].trim())
+    : [];
+
+  const stageFlow = Array.from(
+    new Set(stageMatches.filter((item) => item.length > 0).slice(0, 12)),
+  );
+
+  const highlights = history
+    .filter((item) => item.role === 'assistant')
+    .map((item) => item.content.replace(/\s+/g, ' ').trim())
+    .filter(Boolean)
+    .slice(0, 4)
+    .map((item) => (item.length > 180 ? `${item.slice(0, 180)}...` : item));
+
+  return {
+    message_count: history.length,
+    role_counts: roleCounts,
+    started_at: startedAt,
+    ended_at: endedAt,
+    duration_seconds: durationSeconds,
+    stage_flow: stageFlow,
+    highlights,
+  };
+}
+
 export async function GET(request: Request, { params }: Params) {
   try {
-    const { id: taskId, sessionId } = await params;
+    const { id: taskId, sessionId: rawSessionId } = await params;
+    const sessionId = decodeURIComponent(rawSessionId);
 
-    const session = queryOne<{
+    let session = queryOne<{
+      id: string;
       openclaw_session_id: string;
+      task_id?: string | null;
       agent_name?: string;
       session_key_prefix?: string;
     }>(
-      `SELECT s.openclaw_session_id, a.name as agent_name, a.session_key_prefix
+      `SELECT s.id, s.openclaw_session_id, s.task_id, a.name as agent_name, a.session_key_prefix
        FROM openclaw_sessions s
        LEFT JOIN agents a ON s.agent_id = a.id
-       WHERE s.task_id = ? AND s.openclaw_session_id = ?
+       WHERE s.task_id = ? AND (s.openclaw_session_id = ? OR s.id = ?)
        LIMIT 1`,
-      [taskId, sessionId],
+      [taskId, sessionId, sessionId],
     );
+
+    const invocation = extractSessionMetadata(taskId, sessionId);
+
+    if (!session) {
+      const bySession = queryOne<{
+        id: string;
+        openclaw_session_id: string;
+        task_id?: string | null;
+        agent_name?: string;
+        session_key_prefix?: string;
+      }>(
+        `SELECT s.id, s.openclaw_session_id, s.task_id, a.name as agent_name, a.session_key_prefix
+         FROM openclaw_sessions s
+         LEFT JOIN agents a ON s.agent_id = a.id
+         WHERE s.openclaw_session_id = ? OR s.id = ?
+         LIMIT 1`,
+        [sessionId, sessionId],
+      );
+
+      if (bySession && invocation) {
+        if (!bySession.task_id) {
+          run('UPDATE openclaw_sessions SET task_id = ?, session_type = ?, updated_at = datetime(\'now\') WHERE id = ?', [taskId, 'subagent', bySession.id]);
+        }
+        session = {
+          ...bySession,
+          task_id: taskId,
+        };
+      }
+    }
 
     if (!session) {
       return NextResponse.json({ error: 'Task session not found' }, { status: 404 });
     }
-
-    const invocationRows = queryAll<{ metadata: string; created_at: string }>(
-      `SELECT metadata, created_at
-       FROM task_activities
-       WHERE task_id = ? AND activity_type = 'dispatch_invocation'
-       ORDER BY created_at DESC`,
-      [taskId],
-    );
-
-    const invocation = invocationRows
-      .map((row) => {
-        try {
-          const parsed = JSON.parse(row.metadata || '{}') as Record<string, unknown>;
-          return {
-            created_at: row.created_at,
-            session_id: String(parsed.openclaw_session_id || ''),
-            session_key: String(parsed.session_key || ''),
-            output_directory: String(parsed.output_directory || ''),
-            invocation: String(parsed.invocation || ''),
-          };
-        } catch {
-          return null;
-        }
-      })
-      .find((row) => row && row.session_id === sessionId) || null;
 
     const client = getOpenClawClient();
     if (!client.isConnected()) {
@@ -80,12 +166,13 @@ export async function GET(request: Request, { params }: Params) {
     const candidateKeys = Array.from(
       new Set([
         invocation?.session_key,
-        `${session.session_key_prefix || 'agent:main:'}${sessionId}`,
+        `${session.session_key_prefix || 'agent:main:'}${session.openclaw_session_id}`,
         sessionId,
+        session.openclaw_session_id,
       ].filter(Boolean)),
     ) as string[];
 
-    let history: Array<{ role: string; content: string; timestamp?: string }> = [];
+    let history: TraceMessage[] = [];
     let resolvedSessionKey: string | null = null;
 
     for (const key of candidateKeys) {
@@ -100,10 +187,11 @@ export async function GET(request: Request, { params }: Params) {
 
     return NextResponse.json({
       task_id: taskId,
-      openclaw_session_id: sessionId,
+      openclaw_session_id: session.openclaw_session_id,
       agent_name: session.agent_name || null,
       session_key: resolvedSessionKey,
       invocation,
+      summary: buildTraceSummary(history, invocation?.invocation || null),
       history,
     });
   } catch (error) {

@@ -62,7 +62,7 @@ export async function POST(
       );
     }
 
-    const { deliverable_type, title, path, description } = validation.data;
+    const { deliverable_type, title, path, description, openclaw_session_id } = validation.data;
 
     // Validate file existence for file deliverables
     let fileExists = true;
@@ -81,15 +81,16 @@ export async function POST(
 
     // Insert deliverable
     db.prepare(`
-      INSERT INTO task_deliverables (id, task_id, deliverable_type, title, path, description)
-      VALUES (?, ?, ?, ?, ?, ?)
+      INSERT INTO task_deliverables (id, task_id, deliverable_type, title, path, description, openclaw_session_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
     `).run(
       id,
       taskId,
       deliverable_type,
       title,
       path || null,
-      description || null
+      description || null,
+      openclaw_session_id || null
     );
 
     // Get the created deliverable

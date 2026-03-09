@@ -112,6 +112,9 @@ export async function POST(
     }
 
     const { activity_type, message, agent_id, metadata } = validation.data;
+    const metadataValue = typeof metadata === 'string'
+      ? metadata
+      : (metadata ? JSON.stringify(metadata) : null);
 
     const db = getDb();
     const id = crypto.randomUUID();
@@ -126,7 +129,7 @@ export async function POST(
       agent_id || null,
       activity_type,
       message,
-      metadata ? JSON.stringify(metadata) : null
+      metadataValue
     );
 
     // Get the created activity with agent info

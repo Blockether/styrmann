@@ -18,14 +18,14 @@ export async function GET(
           a.name as agent_name
         FROM openclaw_sessions s
         LEFT JOIN agents a ON s.agent_id = a.id
-        WHERE s.task_id = ? AND s.session_type = 'subagent'
+        WHERE s.task_id = ?
         ORDER BY s.created_at DESC`,
       )
       .all(taskId) as Array<Record<string, unknown>>;
 
     const sessionsWithTrace = sessions.map((session) => ({
       ...session,
-      trace_url: `/api/tasks/${taskId}/sessions/${String(session.openclaw_session_id)}/trace`,
+      trace_url: `/api/tasks/${taskId}/sessions/${encodeURIComponent(String(session.openclaw_session_id))}/trace`,
     }));
 
     return NextResponse.json(sessionsWithTrace);
