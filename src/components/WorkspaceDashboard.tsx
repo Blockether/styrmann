@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { ArrowRight, Folder, CheckSquare, Trash2, AlertTriangle, Pencil, GitBranch, Search, Loader2 } from 'lucide-react';
+import { ArrowRight, Folder, CheckSquare, Trash2, AlertTriangle, Pencil, GitBranch, Search, Loader2, ExternalLink, GitFork, ChevronDown, User, Building2 } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import type { WorkspaceStats } from '@/lib/types';
@@ -402,13 +402,49 @@ interface GhRepoItem {
   cloned: boolean;
 }
 
+interface GhAccount {
+  login: string;
+  type: 'user' | 'org';
+}
+
 function CloneRepoModal({ onClose, onCloned }: { onClose: () => void; onCloned: () => void }) {
-  const [org, setOrg] = useState('Blockether');
+  const [tab, setTab] = useState<'browse' | 'fork'>('browse');
+  const [accounts, setAccounts] = useState<GhAccount[]>([]);
+  const [org, setOrg] = useState('');
   const [repos, setRepos] = useState<GhRepoItem[]>([]);
+  const [loadingAccounts, setLoadingAccounts] = useState(true);
   const [loadingRepos, setLoadingRepos] = useState(false);
   const [filter, setFilter] = useState('');
   const [cloning, setCloning] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Fork tab state
+  const [forkUrl, setForkUrl] = useState('');
+  const [forkTargetOrg, setForkTargetOrg] = useState('');
+  const [forking, setForking] = useState(false);
+  const [forkSuccess, setForkSuccess] = useState<string | null>(null);
+
+  // Fetch GitHub accounts on mount
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/github/orgs')
+      .then((res) => res.json())
+      .then((data) => {
+        if (cancelled) return;
+        if (Array.isArray(data)) {
+          setAccounts(data);
+          // Default to first org, or first account
+          const defaultOrg = data.find((a: GhAccount) => a.type === 'org') || data[0];
+          if (defaultOrg) {
+            setOrg(defaultOrg.login);
+            setForkTargetOrg(defaultOrg.login);
+          }
+        }
+      })
+      .catch(() => {})
+      .finally(() => !cancelled && setLoadingAccounts(false));
+    return () => { cancelled = true; };
+  }, []);
 
   // Fetch repos when org changes
   useEffect(() => {
@@ -446,7 +482,6 @@ function CloneRepoModal({ onClose, onCloned }: { onClose: () => void; onCloned: 
       const data = await res.json();
 
       if (res.ok) {
-        // Update the list to mark as cloned
         setRepos((prev) => prev.map((r) => r.fullName === fullName ? { ...r, cloned: true } : r));
         onCloned();
       } else {
@@ -459,6 +494,37 @@ function CloneRepoModal({ onClose, onCloned }: { onClose: () => void; onCloned: 
     }
   };
 
+  const handleForkAndClone = async () => {
+    if (!forkUrl.trim()) return;
+    setForking(true);
+    setError(null);
+    setForkSuccess(null);
+
+    try {
+      const res = await fetch('/api/workspaces/clone', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fork_from: forkUrl.trim(),
+          target_org: forkTargetOrg || undefined,
+        }),
+      });
+      const data = await res.json();
+
+      if (res.ok) {
+        setForkSuccess(data.message || 'Fork and clone successful');
+        setForkUrl('');
+        onCloned();
+      } else {
+        setError(data.error || 'Fork failed');
+      }
+    } catch {
+      setError('Fork failed');
+    } finally {
+      setForking(false);
+    }
+  };
+
   const filtered = repos.filter((r) =>
     r.name.toLowerCase().includes(filter.toLowerCase()),
   );
@@ -468,65 +534,171 @@ function CloneRepoModal({ onClose, onCloned }: { onClose: () => void; onCloned: 
       <div className="bg-mc-bg-secondary border border-mc-border rounded-t-xl sm:rounded-xl w-full max-w-lg pb-[env(safe-area-inset-bottom)] sm:pb-0 max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
         <div className="p-5 border-b border-mc-border flex-shrink-0">
           <h2 className="text-lg font-semibold">Clone Repository</h2>
-          <div className="mt-3 flex gap-2">
-            <input
-              type="text"
-              value={org}
-              onChange={(e) => setOrg(e.target.value)}
-              placeholder="GitHub org"
-              className="w-32 bg-mc-bg border border-mc-border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-mc-accent"
-            />
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-mc-text-secondary" />
-              <input
-                type="text"
-                value={filter}
-                onChange={(e) => setFilter(e.target.value)}
-                placeholder="Filter repos..."
-                className="w-full bg-mc-bg border border-mc-border rounded-lg pl-8 pr-3 py-1.5 text-sm focus:outline-none focus:border-mc-accent"
-              />
-            </div>
+
+          {/* Tab switcher */}
+          <div className="mt-3 flex gap-1 bg-mc-bg rounded-lg p-0.5 border border-mc-border">
+            <button
+              onClick={() => { setTab('browse'); setError(null); }}
+              className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${tab === 'browse' ? 'bg-mc-bg-secondary text-mc-text shadow-sm' : 'text-mc-text-secondary hover:text-mc-text'}`}
+            >
+              <Search className="w-3.5 h-3.5" />
+              <span>Browse Repos</span>
+            </button>
+            <button
+              onClick={() => { setTab('fork'); setError(null); }}
+              className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${tab === 'fork' ? 'bg-mc-bg-secondary text-mc-text shadow-sm' : 'text-mc-text-secondary hover:text-mc-text'}`}
+            >
+              <GitFork className="w-3.5 h-3.5" />
+              <span>Fork from URL</span>
+            </button>
           </div>
+
+          {/* Browse tab controls */}
+          {tab === 'browse' && (
+            <div className="mt-3 flex gap-2">
+              <div className="relative">
+                <select
+                  value={org}
+                  onChange={(e) => setOrg(e.target.value)}
+                  disabled={loadingAccounts}
+                  className="appearance-none bg-mc-bg border border-mc-border rounded-lg pl-3 pr-7 py-1.5 text-sm focus:outline-none focus:border-mc-accent cursor-pointer"
+                >
+                  {loadingAccounts && <option>Loading...</option>}
+                  {accounts.map((a) => (
+                    <option key={a.login} value={a.login}>
+                      {a.type === 'user' ? `${a.login}` : a.login}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-mc-text-secondary pointer-events-none" />
+              </div>
+              {accounts.find((a) => a.login === org) && (
+                <span className="flex items-center text-xs text-mc-text-secondary">
+                  {accounts.find((a) => a.login === org)?.type === 'user'
+                    ? <User className="w-3 h-3 mr-1" />
+                    : <Building2 className="w-3 h-3 mr-1" />}
+                  {accounts.find((a) => a.login === org)?.type === 'user' ? 'Personal' : 'Organization'}
+                </span>
+              )}
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-mc-text-secondary" />
+                <input
+                  type="text"
+                  value={filter}
+                  onChange={(e) => setFilter(e.target.value)}
+                  placeholder="Filter repos..."
+                  className="w-full bg-mc-bg border border-mc-border rounded-lg pl-8 pr-3 py-1.5 text-sm focus:outline-none focus:border-mc-accent"
+                />
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="flex-1 overflow-y-auto min-h-0">
-          {loadingRepos ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="w-5 h-5 animate-spin text-mc-text-secondary" />
-              <span className="ml-2 text-sm text-mc-text-secondary">Loading repos...</span>
-            </div>
-          ) : filtered.length === 0 ? (
-            <div className="text-center py-12 text-sm text-mc-text-secondary">
-              {repos.length === 0 ? 'No repos found' : 'No matches'}
-            </div>
-          ) : (
-            <div className="divide-y divide-mc-border">
-              {filtered.map((repo) => (
-                <div
-                  key={repo.fullName}
-                  className="px-5 py-3 flex items-center justify-between gap-3 hover:bg-mc-bg-tertiary/50"
-                >
-                  <div className="min-w-0 flex-1">
-                    <div className="font-medium text-sm truncate">{repo.name}</div>
-                    {repo.description && (
-                      <p className="text-xs text-mc-text-secondary truncate mt-0.5">{repo.description}</p>
-                    )}
-                  </div>
-                  {repo.cloned ? (
-                    <span className="text-xs text-mc-text-secondary bg-mc-bg-tertiary px-2 py-1 rounded flex-shrink-0">
-                      Cloned
-                    </span>
-                  ) : (
-                    <button
-                      onClick={() => handleClone(repo.fullName)}
-                      disabled={cloning !== null}
-                      className="text-xs font-medium text-mc-accent hover:text-mc-accent/80 bg-mc-accent/10 hover:bg-mc-accent/20 px-3 py-1 rounded transition-colors disabled:opacity-50 flex-shrink-0"
-                    >
-                      {cloning === repo.fullName ? 'Cloning...' : 'Clone'}
-                    </button>
-                  )}
+          {tab === 'browse' && (
+            <>
+              {loadingRepos ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="w-5 h-5 animate-spin text-mc-text-secondary" />
+                  <span className="ml-2 text-sm text-mc-text-secondary">Loading repos...</span>
                 </div>
-              ))}
+              ) : filtered.length === 0 ? (
+                <div className="text-center py-12 text-sm text-mc-text-secondary">
+                  {repos.length === 0 ? 'No repos found' : 'No matches'}
+                </div>
+              ) : (
+                <div className="divide-y divide-mc-border">
+                  {filtered.map((repo) => (
+                    <div
+                      key={repo.fullName}
+                      className="px-5 py-3 flex items-center justify-between gap-3 hover:bg-mc-bg-tertiary/50"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="font-medium text-sm truncate">{repo.name}</div>
+                        {repo.description && (
+                          <p className="text-xs text-mc-text-secondary truncate mt-0.5">{repo.description}</p>
+                        )}
+                      </div>
+                      {repo.cloned ? (
+                        <span className="text-xs text-mc-text-secondary bg-mc-bg-tertiary px-2 py-1 rounded flex-shrink-0">
+                          Cloned
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => handleClone(repo.fullName)}
+                          disabled={cloning !== null}
+                          className="text-xs font-medium text-mc-accent hover:text-mc-accent/80 bg-mc-accent/10 hover:bg-mc-accent/20 px-3 py-1 rounded transition-colors disabled:opacity-50 flex-shrink-0"
+                        >
+                          {cloning === repo.fullName ? 'Cloning...' : 'Clone'}
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+
+          {tab === 'fork' && (
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1.5">Repository URL</label>
+                <div className="relative">
+                  <ExternalLink className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-mc-text-secondary" />
+                  <input
+                    type="text"
+                    value={forkUrl}
+                    onChange={(e) => { setForkUrl(e.target.value); setForkSuccess(null); }}
+                    placeholder="https://github.com/owner/repo or owner/repo"
+                    className="w-full bg-mc-bg border border-mc-border rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:border-mc-accent font-mono"
+                    autoFocus
+                  />
+                </div>
+                <p className="text-xs text-mc-text-secondary mt-1">Paste a GitHub URL or owner/repo to fork it into your account</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1.5">Fork into</label>
+                <div className="relative">
+                  <select
+                    value={forkTargetOrg}
+                    onChange={(e) => setForkTargetOrg(e.target.value)}
+                    disabled={loadingAccounts}
+                    className="appearance-none w-full bg-mc-bg border border-mc-border rounded-lg pl-3 pr-8 py-2 text-sm focus:outline-none focus:border-mc-accent cursor-pointer"
+                  >
+                    {accounts.map((a) => (
+                      <option key={a.login} value={a.login}>
+                        {a.login} {a.type === 'user' ? '(personal)' : '(org)'}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-mc-text-secondary pointer-events-none" />
+                </div>
+              </div>
+
+              <button
+                onClick={handleForkAndClone}
+                disabled={!forkUrl.trim() || forking}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-mc-accent text-white rounded-lg text-sm font-medium hover:bg-mc-accent/90 disabled:opacity-50 transition-colors"
+              >
+                {forking ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Forking and cloning...
+                  </>
+                ) : (
+                  <>
+                    <GitFork className="w-4 h-4" />
+                    Fork and Clone
+                  </>
+                )}
+              </button>
+
+              {forkSuccess && (
+                <div className="text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-2 rounded">
+                  {forkSuccess}
+                </div>
+              )}
             </div>
           )}
         </div>
