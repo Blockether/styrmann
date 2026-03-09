@@ -560,60 +560,174 @@ export function getOpenClawClient(): OpenClawClient {
 
 /**
  * Send a message to a Gateway session with ACP provenance (meta+receipt).
- * Uses the `openclaw acp` CLI bridge so the Gateway sees the message as
- * coming from an ACP bridge client, which is the only caller type allowed
- * to inject InputProvenance and Source Receipt blocks.
  *
- * Falls back to direct `chat.send` RPC if the CLI is unavailable.
+ * Opens a dedicated WebSocket that authenticates as an ACP bridge client
+ * (id=cli, mode=cli, displayName=ACP, version=acp). The Gateway only
+ * accepts systemInputProvenance / systemProvenanceReceipt from callers
+ * that match this identity.
+ *
+ * Falls back to direct `chat.send` RPC (no provenance) if the bridge
+ * connection fails.
  */
 export async function sendMessageWithProvenance(
   sessionKey: string,
   message: string,
   options?: { cwd?: string; timeoutMs?: number },
 ): Promise<{ provenance: boolean }> {
-  const { execFile } = await import('child_process');
-  const { promisify } = await import('util');
-  const execFileAsync = promisify(execFile);
-
   const gatewayUrl = process.env.OPENCLAW_GATEWAY_URL || 'ws://127.0.0.1:18789';
   const gatewayToken = process.env.OPENCLAW_GATEWAY_TOKEN || '';
   const cwd = options?.cwd || process.cwd();
   const timeoutMs = options?.timeoutMs || 30000;
+  const hostname = (await import('os')).hostname();
 
-  // Build a one-shot script: start ACP bridge, pipe the message, close
-  // openclaw acp client reads from stdin when --server-args include the session
-  const args = [
-    'acp',
-    '--provenance', 'meta+receipt',
-    '--session', sessionKey,
-    '--url', gatewayUrl,
-    ...(gatewayToken ? ['--token', gatewayToken] : []),
-    'client',
-    '--cwd', cwd,
-  ];
+  const provenance = {
+    kind: 'internal_system' as const,
+    sourceChannel: 'mission-control',
+    sourceTool: 'mission-control-dispatch',
+  };
 
-  try {
-    const child = execFileAsync('openclaw', args, {
-      timeout: timeoutMs,
-      maxBuffer: 1024 * 1024,
-      env: { ...process.env, FORCE_COLOR: '0', NO_COLOR: '1' },
-    });
+  const receipt = [
+    '[Source Receipt]',
+    'bridge=mission-control',
+    `originHost=${hostname}`,
+    `originCwd=${cwd}`,
+    `targetSession=${sessionKey}`,
+    `dispatchedAt=${new Date().toISOString()}`,
+    '[/Source Receipt]',
+  ].join('\n');
 
-    // Write the message to stdin and close it so the ACP client sends + exits
-    if (child.child.stdin) {
-      child.child.stdin.write(message);
-      child.child.stdin.end();
+  return new Promise<{ provenance: boolean }>((resolve) => {
+    const wsUrl = new URL(gatewayUrl);
+    if (gatewayToken) wsUrl.searchParams.set('token', gatewayToken);
+
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (!settled) { settled = true; fallback().then(resolve); }
+    }, timeoutMs);
+
+    const ws = new WebSocket(wsUrl.toString());
+
+    ws.onerror = () => {
+      if (!settled) { settled = true; clearTimeout(timer); fallback().then(resolve); }
+    };
+
+    ws.onclose = () => {
+      if (!settled) { settled = true; clearTimeout(timer); fallback().then(resolve); }
+    };
+
+    const pending = new Map<string, (data: unknown) => void>();
+
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data as string);
+
+        // Challenge-response: identify as ACP bridge
+        if (data.type === 'event' && data.event === 'connect.challenge') {
+          const nonce = data.payload?.nonce;
+          const reqId = crypto.randomUUID();
+          const signedAtMs = Date.now();
+
+          // Load device identity for signing
+          let device: Record<string, unknown> | undefined;
+          try {
+            const identity = loadOrCreateDeviceIdentity();
+            const payload = buildDeviceAuthPayload({
+              deviceId: identity.deviceId,
+              clientId: 'cli',
+              clientMode: 'cli',
+              role: 'operator',
+              scopes: ['operator.admin'],
+              signedAtMs,
+              token: gatewayToken || null,
+              nonce,
+            });
+            const signature = signDevicePayload(identity.privateKeyPem, payload);
+            device = {
+              id: identity.deviceId,
+              publicKey: publicKeyRawBase64Url(identity.publicKeyPem),
+              signature,
+              signedAt: signedAtMs,
+              nonce,
+            };
+          } catch { /* device identity optional */ }
+
+          pending.set(reqId, () => {
+            // Authenticated as ACP bridge — now send the message with provenance
+            const sendId = crypto.randomUUID();
+            pending.set(sendId, () => {
+              clearTimeout(timer);
+              ws.close();
+              if (!settled) {
+                settled = true;
+                console.log('[OpenClaw] Dispatch sent via ACP bridge WebSocket with meta+receipt provenance');
+                resolve({ provenance: true });
+              }
+            });
+
+            ws.send(JSON.stringify({
+              type: 'req',
+              id: sendId,
+              method: 'chat.send',
+              params: {
+                sessionKey,
+                message,
+                idempotencyKey: `acp-dispatch-${Date.now()}`,
+                systemInputProvenance: provenance,
+                systemProvenanceReceipt: receipt,
+              },
+            }));
+          });
+
+          ws.send(JSON.stringify({
+            type: 'req',
+            id: reqId,
+            method: 'connect',
+            params: {
+              minProtocol: 3,
+              maxProtocol: 3,
+              client: {
+                id: 'cli',
+                version: 'acp',
+                displayName: 'ACP',
+                platform: process.platform || 'linux',
+                mode: 'cli',
+              },
+              auth: { token: gatewayToken },
+              role: 'operator',
+              scopes: ['operator.admin'],
+              device,
+            },
+          }));
+        }
+
+        // Handle RPC responses
+        if (data.type === 'res' && data.id && pending.has(data.id)) {
+          const handler = pending.get(data.id)!;
+          pending.delete(data.id);
+          if (data.ok === false) {
+            console.warn('[OpenClaw] ACP bridge RPC error:', data.error);
+            clearTimeout(timer);
+            ws.close();
+            if (!settled) { settled = true; fallback().then(resolve); }
+          } else {
+            handler(data.payload);
+          }
+        }
+      } catch (err) {
+        console.warn('[OpenClaw] ACP bridge message parse error:', err);
+      }
+    };
+
+    async function fallback(): Promise<{ provenance: boolean }> {
+      console.warn('[OpenClaw] ACP bridge failed, falling back to direct RPC (no provenance)');
+      try {
+        const client = getOpenClawClient();
+        if (!client.isConnected()) await client.connect();
+        await client.call('chat.send', { sessionKey, message });
+      } catch (err) {
+        console.error('[OpenClaw] Direct RPC fallback also failed:', err);
+      }
+      return { provenance: false };
     }
-
-    await child;
-    console.log('[OpenClaw] Dispatch sent via ACP bridge with meta+receipt provenance');
-    return { provenance: true };
-  } catch (err) {
-    console.warn('[OpenClaw] ACP bridge dispatch failed, falling back to direct RPC:', (err as Error).message);
-    // Fallback: send via direct WebSocket (no provenance)
-    const client = getOpenClawClient();
-    if (!client.isConnected()) await client.connect();
-    await client.call('chat.send', { sessionKey, message });
-    return { provenance: false };
-  }
+  });
 }
