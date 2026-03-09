@@ -8,6 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { readFileSync, existsSync, statSync, realpathSync } from 'fs';
 import path from 'path';
+import { getStoredArtifactByPath } from '@/lib/task-run-results';
 
 export const dynamic = 'force-dynamic';
 
@@ -75,12 +76,53 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Check file exists
-    if (!existsSync(targetPath)) {
+    const normalizedProjectsBase = path.normalize(PROJECTS_BASE);
+    const normalizedTargetPath = path.normalize(targetPath);
+    const storedArtifact = !existsSync(targetPath) ? getStoredArtifactByPath(normalizedTargetPath) : null;
+
+    if (!existsSync(targetPath) && !storedArtifact) {
       return NextResponse.json(
         { error: 'File not found' },
         { status: 404 }
       );
+    }
+
+    if (!existsSync(targetPath)) {
+      if (!normalizedTargetPath.startsWith(normalizedProjectsBase + path.sep) && normalizedTargetPath !== normalizedProjectsBase) {
+        return NextResponse.json(
+          { error: 'Access denied' },
+          { status: 403 }
+        );
+      }
+
+      const storedSize = storedArtifact?.size_bytes || 0;
+      const contentType = storedArtifact?.content_type || MIME_TYPES[path.extname(normalizedTargetPath).toLowerCase()] || 'application/octet-stream';
+      const content = storedArtifact?.encoding === 'base64'
+        ? Buffer.from(storedArtifact.content_base64 || '', 'base64')
+        : storedArtifact?.content_text || '';
+
+      if (raw) {
+        return new NextResponse(content, {
+          status: 200,
+          headers: {
+            'Content-Type': contentType,
+            'Content-Length': String(storedSize),
+            'X-Mission-Control-Stored-Snapshot': 'true',
+          },
+        });
+      }
+
+      return NextResponse.json({
+        success: true,
+        path: normalizedTargetPath,
+        relativePath: path.relative(PROJECTS_BASE, normalizedTargetPath),
+        size: storedSize,
+        contentType,
+        content: storedArtifact?.encoding === 'base64' ? storedArtifact.content_base64 : content,
+        encoding: storedArtifact?.encoding === 'base64' ? 'base64' : 'utf-8',
+        modifiedAt: storedArtifact?.created_at,
+        storedSnapshot: true,
+      });
     }
 
     // Resolve real path and validate it's under PROJECTS_BASE

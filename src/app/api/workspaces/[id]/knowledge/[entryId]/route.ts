@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
  * DELETE /api/workspaces/[id]/knowledge/[entryId]
  * Remove a knowledge entry from the workspace knowledge base.
  *
- * Used by agents and self-improve loops to clean up obsolete or incorrect entries.
+ * Used by agents and learner workflows to clean up obsolete or incorrect entries.
  */
 export async function DELETE(
   _request: NextRequest,

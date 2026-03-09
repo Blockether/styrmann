@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { readFileSync, existsSync, statSync } from 'fs';
 import path from 'path';
 import { marked } from 'marked';
+import { getStoredArtifactByPath } from '@/lib/task-run-results';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,16 +30,6 @@ const LIGHT_THEME_CSS = `
     background: #fff; border-bottom: 1px solid #e5d5b8;
     font-size: 13px; color: #666;
   }
-  .header .back-link {
-    display: inline-flex; align-items: center; gap: 5px;
-    color: #b8960c; text-decoration: none; font-weight: 600;
-    padding: 4px 10px; border-radius: 4px;
-    border: 1px solid #e5d5b8; background: #fdf4e5;
-    transition: background 0.15s, border-color 0.15s;
-    white-space: nowrap;
-  }
-  .header .back-link:hover { background: #f0e6d0; border-color: #b8960c; }
-  .header .back-link svg { width: 14px; height: 14px; }
   .header .file-info { display: flex; align-items: center; gap: 8px; }
   .header .filename { color: #b8960c; font-weight: 600; }
   .header .size { color: #999; }
@@ -87,9 +78,6 @@ const LIGHT_THEME_CSS = `
 
 export async function GET(request: NextRequest) {
   const filePath = request.nextUrl.searchParams.get('path');
-  const rawReturnUrl = request.nextUrl.searchParams.get('returnUrl');
-  // Only allow relative URLs (same-origin) to prevent open redirect
-  const returnUrl = rawReturnUrl && /^\/[^/\\]/.test(rawReturnUrl) ? rawReturnUrl : '/';
 
   if (!filePath) {
     return NextResponse.json({ error: 'path is required' }, { status: 400 });
@@ -122,12 +110,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Path not allowed' }, { status: 403 });
   }
 
-  if (!existsSync(normalizedPath)) {
+  const storedArtifact = !existsSync(normalizedPath) ? getStoredArtifactByPath(normalizedPath) : null;
+  if (!existsSync(normalizedPath) && !storedArtifact) {
     return NextResponse.json({ error: 'File not found' }, { status: 404 });
   }
 
-  const stats = statSync(normalizedPath);
-  if (stats.size > MAX_PREVIEW_SIZE) {
+  const stats = existsSync(normalizedPath) ? statSync(normalizedPath) : null;
+  if (stats && stats.size > MAX_PREVIEW_SIZE) {
     return NextResponse.json(
       { error: `File too large for preview (${(stats.size / 1024).toFixed(0)}KB, max ${MAX_PREVIEW_SIZE / 1024}KB)` },
       { status: 400 }
@@ -135,7 +124,13 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const content = readFileSync(normalizedPath, 'utf-8');
+    const content = storedArtifact
+      ? storedArtifact.content_text
+      : readFileSync(normalizedPath, 'utf-8');
+    if (typeof content !== 'string') {
+      return NextResponse.json({ error: 'Stored preview is not available for this file type' }, { status: 404 });
+    }
+
     const fileName = path.basename(normalizedPath);
 
     if (isHtml) {
@@ -161,13 +156,9 @@ export async function GET(request: NextRequest) {
   <style>${LIGHT_THEME_CSS}</style>
 </head><body>
   <div class="header">
-    <a class="back-link" href="${returnUrl.replace(/"/g, '&quot;')}">
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
-      Mission Control
-    </a>
     <div class="file-info">
       <span class="filename">${fileName}</span>
-      <span class="size">${(stats.size / 1024).toFixed(1)}KB</span>
+      <span class="size">${(((storedArtifact?.size_bytes ?? stats?.size) || 0) / 1024).toFixed(1)}KB</span>
     </div>
   </div>
   ${bodyContent}

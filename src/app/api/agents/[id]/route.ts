@@ -7,7 +7,7 @@ import type { Agent, UpdateAgentRequest } from '@/lib/types';
 export const dynamic = 'force-dynamic';
 // GET /api/agents/[id] - Get a single agent
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -23,6 +23,7 @@ export async function GET(
       agent.soul_md = mdFiles.soul_md ?? undefined;
       agent.user_md = mdFiles.user_md ?? undefined;
       agent.agents_md = mdFiles.agents_md ?? undefined;
+      agent.memory_md = mdFiles.memory_md ?? undefined;
       const systemMd = readAgentDescriptionFromDisk(agent.agent_dir);
       if (systemMd) agent.description = systemMd;
     }
@@ -110,6 +111,10 @@ export async function PATCH(
       updates.push('agents_md = ?');
       values.push(body.agents_md);
     }
+    if (body.memory_md !== undefined && !isSynced) {
+      updates.push('memory_md = ?');
+      values.push(body.memory_md);
+    }
     if (body.model !== undefined) {
       updates.push('model = ?');
       values.push(body.model);
@@ -146,6 +151,9 @@ export async function PATCH(
         if (body.agents_md !== undefined) {
           writeAgentMdFile(workspacePath, 'AGENTS.md', body.agents_md);
         }
+        if (body.memory_md !== undefined) {
+          writeAgentMdFile(workspacePath, 'MEMORY.md', body.memory_md);
+        }
       }
     }
 
@@ -155,6 +163,7 @@ export async function PATCH(
       agent.soul_md = mdFiles.soul_md ?? undefined;
       agent.user_md = mdFiles.user_md ?? undefined;
       agent.agents_md = mdFiles.agents_md ?? undefined;
+      agent.memory_md = mdFiles.memory_md ?? undefined;
       const systemMd = readAgentDescriptionFromDisk(agent.agent_dir);
       if (systemMd) agent.description = systemMd;
     }
@@ -167,7 +176,7 @@ export async function PATCH(
 
 // DELETE /api/agents/[id] - Delete an agent
 export async function DELETE(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {

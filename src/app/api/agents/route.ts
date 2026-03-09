@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
 import { queryAll, queryOne, run } from '@/lib/db';
-import { readAgentMdFromDisk, readAgentDescriptionFromDisk } from '@/lib/openclaw/config';
+import { readAgentMdFromDisk, readAgentDescriptionFromDisk, createAgentInOpenClawConfig, readOpenClawConfig, resolveAgents } from '@/lib/openclaw/config';
 import { ensureSynced } from '@/lib/openclaw/sync';
+import { syncAgentsWithRpcCheck } from '@/lib/openclaw/sync';
 import type { Agent, AgentStatus, CreateAgentRequest } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
@@ -30,6 +31,7 @@ const mdFiles = readAgentMdFromDisk(agent.agent_workspace_path);
 agent.soul_md = mdFiles.soul_md ?? undefined;
 agent.user_md = mdFiles.user_md ?? undefined;
 agent.agents_md = mdFiles.agents_md ?? undefined;
+agent.memory_md = mdFiles.memory_md ?? undefined;
 const systemMd = readAgentDescriptionFromDisk(agent.agent_dir);
 if (systemMd) agent.description = systemMd;
       }
@@ -78,25 +80,51 @@ if (systemMd) agent.description = systemMd;
   }
 }
 
-// POST /api/agents - Disabled: agents are created via OpenClaw sync only
+function normalizeAgentIdPart(input: string): string {
+  return input
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 48) || 'agent';
+}
+
+function nextGatewayAgentId(baseName: string): string {
+  const config = readOpenClawConfig();
+  const existingIds = new Set<string>();
+
+  if (config) {
+    for (const agent of resolveAgents(config)) {
+      existingIds.add(agent.id);
+    }
+  }
+
+  const base = normalizeAgentIdPart(baseName);
+  if (!existingIds.has(base)) return base;
+
+  for (let i = 2; i < 1000; i += 1) {
+    const candidate = `${base}-${i}`;
+    if (!existingIds.has(candidate)) return candidate;
+  }
+
+  return `${base}-${Date.now()}`;
+}
+
 export async function POST(request: NextRequest) {
   try {
-    const body: CreateAgentRequest = await request.json();
-
-    // Reject all external POST requests - agents are synced from OpenClaw Gateway only
-    // The 'source' field must never be accepted from external callers
-    if ((body as { source?: string }).source) {
-      return NextResponse.json({ error: 'Standalone agent creation is disabled. Agents are synced from OpenClaw Gateway.' }, { status: 403 });
-    }
-    return NextResponse.json({ error: 'Standalone agent creation is disabled. Agents are synced from OpenClaw Gateway.' }, { status: 403 });
+    const body = await request.json() as (CreateAgentRequest & { workspace_id?: string; source?: string });
 
     if (!body.name || !body.role) {
       return NextResponse.json({ error: 'Name and role are required' }, { status: 400 });
     }
 
+    const workspaceId = body.workspace_id || 'default';
+
+    if (body.source) {
+      return NextResponse.json({ error: 'source cannot be provided by clients' }, { status: 400 });
+    }
+
     // Enforce single orchestrator per workspace
     if (body.role === 'orchestrator') {
-      const workspaceId = (body as { workspace_id?: string }).workspace_id || 'default';
       const existingOrchestrator = queryOne<{ id: string }>(
         'SELECT id FROM agents WHERE workspace_id = ? AND role = ?',
         [workspaceId, 'orchestrator']
@@ -109,36 +137,40 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const id = uuidv4();
-    const now = new Date().toISOString();
+    const gatewayAgentId = nextGatewayAgentId(body.name);
+    const created = createAgentInOpenClawConfig({
+      id: gatewayAgentId,
+      name: body.name,
+      role: body.role,
+      model: body.model,
+      soulMd: body.soul_md,
+      userMd: body.user_md,
+      agentsMd: body.agents_md,
+      memoryMd: body.memory_md,
+      systemMd: body.description,
+    });
 
-    run(
-      `INSERT INTO agents (id, name, role, description, workspace_id, soul_md, user_md, agents_md, model, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        id,
-        body.name,
-        body.role,
-        body.description || null,
-        (body as { workspace_id?: string }).workspace_id || 'default',
-        body.soul_md || null,
-        body.user_md || null,
-        body.agents_md || null,
-        body.model || null,
-        now,
-        now,
-      ]
-    );
+    if (!created.ok) {
+      return NextResponse.json({ error: created.error || 'Failed to create OpenClaw agent' }, { status: 500 });
+    }
 
-    // Log event
+    await syncAgentsWithRpcCheck();
+
+    let agent = queryOne<Agent>('SELECT * FROM agents WHERE gateway_agent_id = ?', [gatewayAgentId]);
+    if (!agent) {
+      return NextResponse.json({ error: 'Agent created in OpenClaw config but not synced to Mission Control' }, { status: 500 });
+    }
+
+    run('UPDATE agents SET workspace_id = ?, updated_at = ? WHERE id = ?', [workspaceId, new Date().toISOString(), agent.id]);
+    agent = queryOne<Agent>('SELECT * FROM agents WHERE id = ?', [agent.id]) || agent;
+
     run(
       `INSERT INTO events (id, type, agent_id, message, created_at)
        VALUES (?, ?, ?, ?, ?)`,
-      [uuidv4(), 'agent_joined', id, `${body.name} joined the team`, now]
+      [uuidv4(), 'agent_joined', agent.id, `${body.name} created in OpenClaw and synced`, new Date().toISOString()]
     );
 
-    const agent = queryOne<Agent>('SELECT * FROM agents WHERE id = ?', [id]);
-    return NextResponse.json(agent, { status: 201 });
+    return NextResponse.json({ ...agent, created_via: 'openclaw_config_sync' }, { status: 201 });
   } catch (error) {
     console.error('Failed to create agent:', error);
     return NextResponse.json({ error: 'Failed to create agent' }, { status: 500 });

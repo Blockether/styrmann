@@ -1,19 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
-import { queryOne, run, queryAll } from '@/lib/db';
+import { queryOne, run } from '@/lib/db';
 import { broadcast } from '@/lib/events';
 import { getMissionControlUrl } from '@/lib/config';
-import { handleStageTransition, handleStageFailure, getTaskWorkflow, drainQueue, populateTaskRolesFromAgents } from '@/lib/workflow-engine';
+import { handleStageTransition, getTaskWorkflow, drainQueue, populateTaskRolesFromAgents } from '@/lib/workflow-engine';
 import { notifyLearner } from '@/lib/learner';
+import { captureTaskRunResult } from '@/lib/task-run-results';
 import { checkBuilderEvidence } from '@/lib/builder-evidence';
 import { UpdateTaskSchema } from '@/lib/validation';
-import type { Task, UpdateTaskRequest, Agent, TaskDeliverable } from '@/lib/types';
+import type { Task, UpdateTaskRequest, Agent } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
 
 // GET /api/tasks/[id] - Get a single task
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -68,21 +69,11 @@ export async function PATCH(
     const values: unknown[] = [];
     const now = new Date().toISOString();
 
-    // Workflow enforcement for agent-initiated approvals
-    // If an agent is trying to move review→done, they must be the orchestrator
-    // User-initiated moves (no agent ID) are allowed
-    if (validatedData.status === 'done' && existing.status === 'review' && validatedData.updated_by_agent_id) {
-      const updatingAgent = queryOne<Agent>(
-        'SELECT role FROM agents WHERE id = ?',
-        [validatedData.updated_by_agent_id]
+    if (validatedData.status === 'done' && validatedData.updated_by_agent_id) {
+      return NextResponse.json(
+        { error: 'Forbidden: agents cannot mark tasks done. Use human Accept & Merge action.' },
+        { status: 403 }
       );
-
-      if (!updatingAgent || updatingAgent.role !== 'orchestrator') {
-        return NextResponse.json(
-          { error: 'Forbidden: only the orchestrator can approve tasks' },
-          { status: 403 }
-        );
-      }
     }
 
     if (validatedData.title !== undefined) {
@@ -100,17 +91,6 @@ export async function PATCH(
     if (validatedData.task_type !== undefined) {
       updates.push('task_type = ?');
       values.push(validatedData.task_type);
-
-      if (validatedData.task_type === 'autotrain' && validatedData.workflow_template_id === undefined) {
-        const autoTrainTemplate = queryOne<{ id: string }>(
-          'SELECT id FROM workflow_templates WHERE workspace_id = ? AND name = ? LIMIT 1',
-          [existing.workspace_id, 'Auto-Train']
-        );
-        if (autoTrainTemplate) {
-          updates.push('workflow_template_id = ?');
-          values.push(autoTrainTemplate.id);
-        }
-      }
     }
     if (validatedData.effort !== undefined) {
       updates.push('effort = ?');
@@ -402,7 +382,13 @@ export async function PATCH(
     }
 
     // Drain the review queue when a task reaches 'done' (frees the verification slot)
-    if (nextStatus === 'done') {
+    if (nextStatus === 'done' && existing.status !== 'done') {
+      try {
+        captureTaskRunResult(id);
+      } catch (err) {
+        console.error('[Task Runs] snapshot capture failed:', err);
+      }
+
       drainQueue(id, existing.workspace_id).catch(err =>
         console.error('[Workflow] drainQueue after done failed:', err)
       );
@@ -448,7 +434,7 @@ export async function PATCH(
 
 // DELETE /api/tasks/[id] - Delete a task
 export async function DELETE(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
