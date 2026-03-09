@@ -182,14 +182,7 @@ export function DeliverablesList({ taskId }: DeliverablesListProps) {
     );
   }
 
-  if (deliverables.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center py-8 text-mc-text-secondary">
-        <div className="text-xl font-bold text-mc-text-secondary mb-2">No Deliverables</div>
-        <p>No deliverables yet</p>
-      </div>
-    );
-  }
+  const hasDeliverables = deliverables.length > 0;
 
   return (
     <div data-component="src/components/DeliverablesList" className="space-y-3">
@@ -251,7 +244,11 @@ export function DeliverablesList({ taskId }: DeliverablesListProps) {
         </div>
       )}
 
-      {deliverables.map((deliverable) => (
+      {!hasDeliverables && (
+        <div className="text-center py-6 text-sm text-mc-text-secondary">No deliverables registered for this task yet.</div>
+      )}
+
+      {hasDeliverables && deliverables.map((deliverable) => (
         <div
           key={deliverable.id}
           onClick={() => handleOpen(deliverable)}
