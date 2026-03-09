@@ -1301,6 +1301,312 @@ const migrations: Migration[] = [
 
       console.log('[Migration 028] tasks.task_type now supports autotrain');
     }
+  },
+  {
+    id: '029',
+    name: 'add_task_run_results_and_rename_self_improve_template',
+    up: (db) => {
+      console.log('[Migration 029] Adding task run snapshots and renaming old Auto-Train templates...');
+
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS task_run_results (
+          id TEXT PRIMARY KEY,
+          task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+          run_number INTEGER NOT NULL,
+          status TEXT NOT NULL,
+          summary TEXT,
+          agent_id TEXT REFERENCES agents(id),
+          openclaw_session_id TEXT,
+          completed_activity_id TEXT REFERENCES task_activities(id) ON DELETE SET NULL,
+          metadata TEXT,
+          created_at TEXT DEFAULT (datetime('now')),
+          UNIQUE(task_id, run_number)
+        )
+      `);
+
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS task_run_result_artifacts (
+          id TEXT PRIMARY KEY,
+          task_run_result_id TEXT NOT NULL REFERENCES task_run_results(id) ON DELETE CASCADE,
+          task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+          deliverable_id TEXT REFERENCES task_deliverables(id) ON DELETE SET NULL,
+          title TEXT NOT NULL,
+          path TEXT,
+          normalized_path TEXT,
+          content_type TEXT,
+          size_bytes INTEGER,
+          encoding TEXT,
+          content_text TEXT,
+          content_base64 TEXT,
+          metadata TEXT,
+          created_at TEXT DEFAULT (datetime('now'))
+        )
+      `);
+
+      db.exec('CREATE INDEX IF NOT EXISTS idx_task_run_results_task ON task_run_results(task_id, created_at DESC)');
+      db.exec('CREATE INDEX IF NOT EXISTS idx_task_run_result_artifacts_run ON task_run_result_artifacts(task_run_result_id)');
+      db.exec('CREATE INDEX IF NOT EXISTS idx_task_run_result_artifacts_task ON task_run_result_artifacts(task_id)');
+      db.exec('CREATE INDEX IF NOT EXISTS idx_task_run_result_artifacts_path ON task_run_result_artifacts(normalized_path, created_at DESC)');
+
+      db.prepare(`
+        UPDATE workflow_templates
+        SET name = 'Self Improve', updated_at = datetime('now')
+        WHERE name = 'Auto-Train'
+      `).run();
+
+      console.log('[Migration 029] Task run snapshots added and templates renamed to Self Improve');
+    }
+  },
+  {
+    id: '030',
+    name: 'add_agent_scoped_knowledge_and_memory',
+    up: (db) => {
+      console.log('[Migration 030] Adding agent-scoped knowledge and agent memory support...');
+
+      const agentColumns = db.prepare("PRAGMA table_info(agents)").all() as { name: string }[];
+      if (!agentColumns.some((column) => column.name === 'memory_md')) {
+        db.exec('ALTER TABLE agents ADD COLUMN memory_md TEXT');
+      }
+
+      const knowledgeColumns = db.prepare("PRAGMA table_info(knowledge_entries)").all() as { name: string }[];
+      if (!knowledgeColumns.some((column) => column.name === 'agent_id')) {
+        db.exec('ALTER TABLE knowledge_entries ADD COLUMN agent_id TEXT REFERENCES agents(id)');
+      }
+
+      db.exec('CREATE INDEX IF NOT EXISTS idx_knowledge_entries_agent ON knowledge_entries(agent_id, created_at DESC)');
+
+      console.log('[Migration 030] Agent-scoped knowledge and memory support added');
+    }
+  },
+  {
+    id: '031',
+    name: 'remove_legacy_autotrain_task_type',
+    up: (db) => {
+      console.log('[Migration 031] Removing legacy autotrain task type and normalizing old tasks...');
+
+      db.exec(`
+        UPDATE tasks
+        SET task_type = 'chore',
+            status_reason = CASE
+              WHEN status_reason IS NULL OR status_reason = '' THEN 'Legacy autotrain task converted to chore during migration.'
+              ELSE status_reason
+            END
+        WHERE task_type = 'autotrain'
+      `);
+
+      const taskSchema = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='tasks'").get() as { sql: string } | undefined;
+      if (taskSchema && taskSchema.sql.includes("'autotrain'")) {
+        db.exec(`ALTER TABLE tasks RENAME TO _tasks_old_031`);
+        db.exec(`
+          CREATE TABLE tasks (
+            id TEXT PRIMARY KEY,
+            title TEXT NOT NULL,
+            description TEXT,
+            status TEXT DEFAULT 'inbox' CHECK (status IN ('pending_dispatch', 'planning', 'inbox', 'assigned', 'in_progress', 'testing', 'review', 'verification', 'done')),
+            priority TEXT DEFAULT 'normal' CHECK (priority IN ('low', 'normal', 'high', 'urgent')),
+            task_type TEXT DEFAULT 'feature' CHECK (task_type IN ('bug', 'feature', 'chore', 'documentation', 'research')),
+            effort INTEGER CHECK (effort IS NULL OR (effort >= 1 AND effort <= 5)),
+            impact INTEGER CHECK (impact IS NULL OR (impact >= 1 AND impact <= 5)),
+            assigned_agent_id TEXT REFERENCES agents(id),
+            created_by_agent_id TEXT REFERENCES agents(id),
+            workspace_id TEXT DEFAULT 'default' REFERENCES workspaces(id),
+            milestone_id TEXT REFERENCES milestones(id) ON DELETE SET NULL,
+            github_issue_id TEXT REFERENCES github_issues(id) ON DELETE SET NULL,
+            business_id TEXT DEFAULT 'default',
+            due_date TEXT,
+            workflow_template_id TEXT REFERENCES workflow_templates(id),
+            planning_session_key TEXT,
+            planning_messages TEXT,
+            planning_complete INTEGER DEFAULT 0,
+            planning_spec TEXT,
+            planning_agents TEXT,
+            planning_dispatch_error TEXT,
+            status_reason TEXT,
+            created_at TEXT DEFAULT (datetime('now')),
+            updated_at TEXT DEFAULT (datetime('now'))
+          )
+        `);
+
+        db.exec(`
+          INSERT INTO tasks (
+            id, title, description, status, priority, task_type, effort, impact,
+            assigned_agent_id, created_by_agent_id, workspace_id, milestone_id, github_issue_id,
+            business_id, due_date, workflow_template_id,
+            planning_session_key, planning_messages, planning_complete, planning_spec, planning_agents,
+            planning_dispatch_error, status_reason, created_at, updated_at
+          )
+          SELECT
+            id, title, description, status, priority,
+            CASE WHEN task_type = 'autotrain' THEN 'chore' ELSE task_type END,
+            effort, impact,
+            assigned_agent_id, created_by_agent_id, workspace_id, milestone_id, github_issue_id,
+            business_id, due_date, workflow_template_id,
+            planning_session_key, planning_messages, planning_complete, planning_spec, planning_agents,
+            planning_dispatch_error, status_reason, created_at, updated_at
+          FROM _tasks_old_031
+        `);
+
+        db.exec('DROP TABLE _tasks_old_031');
+        db.exec('CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status)');
+        db.exec('CREATE INDEX IF NOT EXISTS idx_tasks_assigned ON tasks(assigned_agent_id)');
+        db.exec('CREATE INDEX IF NOT EXISTS idx_tasks_workspace ON tasks(workspace_id)');
+        db.exec('CREATE INDEX IF NOT EXISTS idx_tasks_milestone ON tasks(milestone_id)');
+        db.exec('CREATE INDEX IF NOT EXISTS idx_tasks_type ON tasks(task_type)');
+      }
+
+      db.exec(`
+        DELETE FROM workflow_templates
+        WHERE name = 'Self Improve'
+          AND id NOT IN (
+            SELECT DISTINCT workflow_template_id
+            FROM tasks
+            WHERE workflow_template_id IS NOT NULL
+          )
+      `);
+
+      console.log('[Migration 031] Legacy autotrain removed');
+    }
+  },
+  {
+    id: '032',
+    name: 'normalize_workflow_template_descriptions',
+    up: (db) => {
+      console.log('[Migration 032] Normalizing workflow template descriptions...');
+
+      db.prepare(
+        `UPDATE workflow_templates
+         SET description = ?, updated_at = datetime('now')
+         WHERE name = 'Simple'`
+      ).run('Single builder pass. Best for small, straightforward tasks.');
+
+      db.prepare(
+        `UPDATE workflow_templates
+         SET description = ?, updated_at = datetime('now')
+         WHERE name = 'Standard'`
+      ).run('Builder implementation -> tester validation -> reviewer approval. Best default for most tasks.');
+
+      db.prepare(
+        `UPDATE workflow_templates
+         SET description = ?, updated_at = datetime('now')
+         WHERE name = 'Strict'`
+      ).run('Builder -> tester -> human checkpoint -> reviewer verification. Use for high-risk or production-critical tasks.');
+
+      console.log('[Migration 032] Workflow template descriptions normalized');
+    }
+  },
+  {
+    id: '033',
+    name: 'agent_only_workflow_templates_with_human_acceptance_gate',
+    up: (db) => {
+      console.log('[Migration 033] Converting workflow templates to agent-only stages with explicit human acceptance gate...');
+
+      const simpleStages = JSON.stringify([
+        { id: 'build', label: 'Build', role: 'builder', status: 'in_progress' },
+        { id: 'review', label: 'Review', role: 'reviewer', status: 'review' },
+        { id: 'done', label: 'Done', role: null, status: 'done' },
+      ]);
+      const standardStages = JSON.stringify([
+        { id: 'build', label: 'Build', role: 'builder', status: 'in_progress' },
+        { id: 'test', label: 'Test', role: 'tester', status: 'testing' },
+        { id: 'review', label: 'Review', role: 'reviewer', status: 'review' },
+        { id: 'done', label: 'Done', role: null, status: 'done' },
+      ]);
+      const strictStages = JSON.stringify([
+        { id: 'build', label: 'Build', role: 'builder', status: 'in_progress' },
+        { id: 'test', label: 'Test', role: 'tester', status: 'testing' },
+        { id: 'verify', label: 'Verify', role: 'reviewer', status: 'verification' },
+        { id: 'review', label: 'Review', role: 'reviewer', status: 'review' },
+        { id: 'done', label: 'Done', role: null, status: 'done' },
+      ]);
+
+      db.prepare(
+        `UPDATE workflow_templates
+         SET stages = ?, fail_targets = ?, description = ?, updated_at = datetime('now')
+         WHERE name = 'Simple'`
+      ).run(
+        simpleStages,
+        JSON.stringify({ review: 'in_progress' }),
+        'Builder implementation -> reviewer quality pass -> human acceptance merge.'
+      );
+
+      db.prepare(
+        `UPDATE workflow_templates
+         SET stages = ?, fail_targets = ?, description = ?, updated_at = datetime('now')
+         WHERE name = 'Standard'`
+      ).run(
+        standardStages,
+        JSON.stringify({ testing: 'in_progress', review: 'in_progress' }),
+        'Builder implementation -> tester validation -> reviewer quality pass -> human acceptance merge.'
+      );
+
+      db.prepare(
+        `UPDATE workflow_templates
+         SET stages = ?, fail_targets = ?, description = ?, updated_at = datetime('now')
+         WHERE name = 'Strict'`
+      ).run(
+        strictStages,
+        JSON.stringify({ testing: 'in_progress', verification: 'in_progress', review: 'in_progress' }),
+        'Builder -> tester -> reviewer verification -> reviewer final review -> human acceptance merge for critical work.'
+      );
+
+      console.log('[Migration 033] Workflow templates converted');
+    }
+  },
+  {
+    id: '034',
+    name: 'link_task_sessions_and_deliverables_to_openclaw_sessions',
+    up: (db) => {
+      console.log('[Migration 034] Linking task sessions and deliverables to OpenClaw sessions...');
+
+      const deliverableColumns = db.prepare("PRAGMA table_info(task_deliverables)").all() as { name: string }[];
+      if (!deliverableColumns.some((column) => column.name === 'openclaw_session_id')) {
+        db.exec('ALTER TABLE task_deliverables ADD COLUMN openclaw_session_id TEXT');
+      }
+
+      db.exec(`
+        UPDATE openclaw_sessions
+        SET task_id = (
+          SELECT ta.task_id
+          FROM task_activities ta
+          WHERE ta.activity_type = 'dispatch_invocation'
+            AND json_extract(ta.metadata, '$.openclaw_session_id') = openclaw_sessions.openclaw_session_id
+          ORDER BY ta.created_at DESC
+          LIMIT 1
+        )
+        WHERE task_id IS NULL
+          AND EXISTS (
+            SELECT 1
+            FROM task_activities ta
+            WHERE ta.activity_type = 'dispatch_invocation'
+              AND json_extract(ta.metadata, '$.openclaw_session_id') = openclaw_sessions.openclaw_session_id
+          )
+      `);
+
+      db.exec(`
+        UPDATE openclaw_sessions
+        SET session_type = 'subagent'
+        WHERE session_type = 'persistent'
+          AND openclaw_session_id LIKE 'mission-control-%'
+          AND task_id IS NOT NULL
+      `);
+
+      db.exec(`
+        UPDATE task_deliverables
+        SET openclaw_session_id = (
+          SELECT json_extract(ta.metadata, '$.openclaw_session_id')
+          FROM task_activities ta
+          WHERE ta.task_id = task_deliverables.task_id
+            AND ta.activity_type = 'dispatch_invocation'
+          ORDER BY ta.created_at DESC
+          LIMIT 1
+        )
+        WHERE openclaw_session_id IS NULL
+      `);
+
+      db.exec('CREATE INDEX IF NOT EXISTS idx_deliverables_session ON task_deliverables(openclaw_session_id)');
+
+      console.log('[Migration 034] Session and deliverable linkage backfilled');
+    }
   }
 ];
 

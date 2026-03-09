@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS agents (
   soul_md TEXT,
   user_md TEXT,
   agents_md TEXT,
+  memory_md TEXT,
   model TEXT,
   source TEXT DEFAULT 'local',
   gateway_agent_id TEXT,
@@ -114,7 +115,7 @@ CREATE TABLE IF NOT EXISTS tasks (
   description TEXT,
   status TEXT DEFAULT 'inbox' CHECK (status IN ('pending_dispatch', 'planning', 'inbox', 'assigned', 'in_progress', 'testing', 'review', 'verification', 'done')),
   priority TEXT DEFAULT 'normal' CHECK (priority IN ('low', 'normal', 'high', 'urgent')),
-  task_type TEXT DEFAULT 'feature' CHECK (task_type IN ('bug', 'feature', 'chore', 'documentation', 'research', 'autotrain')),
+  task_type TEXT DEFAULT 'feature' CHECK (task_type IN ('bug', 'feature', 'chore', 'documentation', 'research')),
   effort INTEGER CHECK (effort IS NULL OR (effort >= 1 AND effort <= 5)),
   impact INTEGER CHECK (impact IS NULL OR (impact >= 1 AND impact <= 5)),
   assigned_agent_id TEXT REFERENCES agents(id),
@@ -323,6 +324,7 @@ CREATE TABLE IF NOT EXISTS knowledge_entries (
   id TEXT PRIMARY KEY,
   workspace_id TEXT DEFAULT 'default' REFERENCES workspaces(id),
   task_id TEXT REFERENCES tasks(id),
+  agent_id TEXT REFERENCES agents(id),
   category TEXT NOT NULL,
   title TEXT NOT NULL,
   content TEXT NOT NULL,
@@ -351,6 +353,38 @@ CREATE TABLE IF NOT EXISTS task_deliverables (
   title TEXT NOT NULL,
   path TEXT,
   description TEXT,
+  openclaw_session_id TEXT,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS task_run_results (
+  id TEXT PRIMARY KEY,
+  task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  run_number INTEGER NOT NULL,
+  status TEXT NOT NULL,
+  summary TEXT,
+  agent_id TEXT REFERENCES agents(id),
+  openclaw_session_id TEXT,
+  completed_activity_id TEXT REFERENCES task_activities(id) ON DELETE SET NULL,
+  metadata TEXT,
+  created_at TEXT DEFAULT (datetime('now')),
+  UNIQUE(task_id, run_number)
+);
+
+CREATE TABLE IF NOT EXISTS task_run_result_artifacts (
+  id TEXT PRIMARY KEY,
+  task_run_result_id TEXT NOT NULL REFERENCES task_run_results(id) ON DELETE CASCADE,
+  task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  deliverable_id TEXT REFERENCES task_deliverables(id) ON DELETE SET NULL,
+  title TEXT NOT NULL,
+  path TEXT,
+  normalized_path TEXT,
+  content_type TEXT,
+  size_bytes INTEGER,
+  encoding TEXT,
+  content_text TEXT,
+  content_base64 TEXT,
+  metadata TEXT,
   created_at TEXT DEFAULT (datetime('now'))
 );
 
@@ -364,12 +398,17 @@ CREATE INDEX IF NOT EXISTS idx_events_created ON events(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_agents_status ON agents(status);
 CREATE INDEX IF NOT EXISTS idx_activities_task ON task_activities(task_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_deliverables_task ON task_deliverables(task_id);
+CREATE INDEX IF NOT EXISTS idx_task_run_results_task ON task_run_results(task_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_task_run_result_artifacts_run ON task_run_result_artifacts(task_run_result_id);
+CREATE INDEX IF NOT EXISTS idx_task_run_result_artifacts_task ON task_run_result_artifacts(task_id);
+CREATE INDEX IF NOT EXISTS idx_task_run_result_artifacts_path ON task_run_result_artifacts(normalized_path, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_openclaw_sessions_task ON openclaw_sessions(task_id);
 CREATE INDEX IF NOT EXISTS idx_planning_questions_task ON planning_questions(task_id, sort_order);
 CREATE INDEX IF NOT EXISTS idx_workflow_templates_workspace ON workflow_templates(workspace_id);
 CREATE INDEX IF NOT EXISTS idx_task_roles_task ON task_roles(task_id);
 CREATE INDEX IF NOT EXISTS idx_knowledge_entries_workspace ON knowledge_entries(workspace_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_knowledge_entries_task ON knowledge_entries(task_id);
+CREATE INDEX IF NOT EXISTS idx_knowledge_entries_agent ON knowledge_entries(agent_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_milestones_sprint ON milestones(sprint_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_milestone ON tasks(milestone_id);
 CREATE INDEX IF NOT EXISTS idx_milestone_deps_milestone ON milestone_dependencies(milestone_id);

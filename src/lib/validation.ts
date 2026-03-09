@@ -15,7 +15,7 @@ const TaskStatus = z.enum([
 
 const TaskPriority = z.enum(['low', 'normal', 'high', 'urgent']);
 
-const TaskType = z.enum(['bug', 'feature', 'chore', 'documentation', 'research', 'autotrain']);
+const TaskType = z.enum(['bug', 'feature', 'chore', 'documentation', 'research']);
 
 const ActivityType = z.enum([
   'spawned',
@@ -104,7 +104,7 @@ export const CreateActivitySchema = z.object({
   activity_type: ActivityType,
   message: z.string().min(1, 'Message is required').max(5000, 'Message must be 5000 characters or less'),
   agent_id: z.string().uuid().optional(),
-  metadata: z.string().optional(),
+  metadata: z.union([z.string(), z.record(z.string(), z.unknown())]).optional(),
 });
 
 // Deliverable validation schema
@@ -113,6 +113,7 @@ export const CreateDeliverableSchema = z.object({
   title: z.string().min(1, 'Title is required'),
   path: z.string().optional(),
   description: z.string().optional(),
+  openclaw_session_id: z.string().optional(),
 });
 
 export const UpdateDeliverableSchema = z.object({

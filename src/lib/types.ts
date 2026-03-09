@@ -20,7 +20,7 @@ export type EventType =
   | 'agent_joined'
   | 'system';
 
-export type TaskType = 'bug' | 'feature' | 'chore' | 'documentation' | 'research' | 'autotrain';
+export type TaskType = 'bug' | 'feature' | 'chore' | 'documentation' | 'research';
 
 export type SprintStatus = 'planning' | 'active' | 'completed' | 'cancelled';
 
@@ -40,6 +40,7 @@ export interface Agent {
   soul_md?: string;
   user_md?: string;
   agents_md?: string;
+  memory_md?: string;
   model?: string;
   source: AgentSource;
   gateway_agent_id?: string;
@@ -324,6 +325,7 @@ export interface KnowledgeEntry {
   id: string;
   workspace_id: string;
   task_id?: string;
+  agent_id?: string;
   category: string;
   title: string;
   content: string;
@@ -369,6 +371,7 @@ export interface TaskDeliverable {
   title: string;
   path?: string;
   description?: string;
+  openclaw_session_id?: string;
   created_at: string;
 }
 
@@ -431,6 +434,7 @@ export interface CreateAgentRequest {
   soul_md?: string;
   user_md?: string;
   agents_md?: string;
+  memory_md?: string;
   model?: string;
 }
 
@@ -613,7 +617,6 @@ export interface DaemonStatsSnapshot {
   last_scheduler_tick?: string;
   last_log_poll_tick?: string;
   last_recovery_tick?: string;
-  last_autotrain_tick?: string;
   // Counters
   dispatched_count: number;
   heartbeat_count: number;
@@ -625,8 +628,6 @@ export interface DaemonStatsSnapshot {
   log_entries_cleaned: number;
   stalled_redispatched_count?: number;
   stalled_reassigned_count?: number;
-  autotrain_iterations_count?: number;
-  autotrain_stopped_count?: number;
   // Process
   memory_mb: number;
   pid: number;
