@@ -555,31 +555,24 @@ function CloneRepoModal({ onClose, onCloned }: { onClose: () => void; onCloned: 
 
           {/* Browse tab controls */}
           {tab === 'browse' && (
-            <div className="mt-3 flex gap-2">
-              <div className="relative">
+            <div className="mt-3 flex gap-2 items-center">
+              <div className="relative flex-shrink-0">
+                {accounts.find((a) => a.login === org)?.type === 'user'
+                  ? <User className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-mc-text-secondary pointer-events-none" />
+                  : <Building2 className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-mc-text-secondary pointer-events-none" />}
                 <select
                   value={org}
                   onChange={(e) => setOrg(e.target.value)}
                   disabled={loadingAccounts}
-                  className="appearance-none bg-mc-bg border border-mc-border rounded-lg pl-3 pr-7 py-1.5 text-sm focus:outline-none focus:border-mc-accent cursor-pointer"
+                  className="appearance-none bg-mc-bg border border-mc-border rounded-lg pl-8 pr-7 py-1.5 text-sm focus:outline-none focus:border-mc-accent cursor-pointer"
                 >
                   {loadingAccounts && <option>Loading...</option>}
                   {accounts.map((a) => (
-                    <option key={a.login} value={a.login}>
-                      {a.type === 'user' ? `${a.login}` : a.login}
-                    </option>
+                    <option key={a.login} value={a.login}>{a.login}</option>
                   ))}
                 </select>
                 <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-mc-text-secondary pointer-events-none" />
               </div>
-              {accounts.find((a) => a.login === org) && (
-                <span className="flex items-center text-xs text-mc-text-secondary">
-                  {accounts.find((a) => a.login === org)?.type === 'user'
-                    ? <User className="w-3 h-3 mr-1" />
-                    : <Building2 className="w-3 h-3 mr-1" />}
-                  {accounts.find((a) => a.login === org)?.type === 'user' ? 'Personal' : 'Organization'}
-                </span>
-              )}
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-mc-text-secondary" />
                 <input
