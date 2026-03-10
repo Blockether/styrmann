@@ -139,14 +139,6 @@ export function OperationsDashboard() {
             aria-labelledby="operations-tab-system"
             className="rounded-xl border border-mc-border bg-mc-bg overflow-hidden"
           >
-            <div className="p-4 border-b border-mc-border bg-mc-bg-secondary flex items-start justify-between gap-3 flex-wrap">
-              <div>
-                <div className="flex items-center gap-2 text-sm font-medium text-mc-text">
-                  <Activity className="w-4 h-4 text-mc-text-secondary" />
-                  <span>System Runtime</span>
-                </div>
-              </div>
-            </div>
             <SystemPanel embedded />
           </section>
         )}

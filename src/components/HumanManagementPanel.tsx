@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { CheckCircle2, Mail, Plus, RefreshCw, Trash2, UserRound, XCircle } from 'lucide-react';
+import { CheckCircle2, Mail, Plus, Trash2, UserRound, XCircle } from 'lucide-react';
 import type { HimalayaStatus, Human, Workspace } from '@/lib/types';
 
 export function HumanManagementPanel() {
@@ -123,13 +123,6 @@ export function HumanManagementPanel() {
             Manage human assignees and the coordinator sender settings used for Himalaya email delivery.
           </p>
         </div>
-        <button
-          onClick={() => loadData()}
-          className="min-h-11 px-3 py-2 border border-mc-border rounded bg-mc-bg hover:bg-mc-bg-tertiary transition-colors text-sm text-mc-text inline-flex items-center gap-2"
-        >
-          <RefreshCw className="w-4 h-4" />
-          Refresh
-        </button>
       </div>
 
       <div className="p-4 space-y-4">
