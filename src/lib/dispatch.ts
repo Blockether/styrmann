@@ -298,9 +298,17 @@ export async function dispatchTaskToAgent(taskId: string): Promise<DispatchResul
 
     let completionInstructions: string;
     if (isBuilder) {
-      completionInstructions = `**IMPORTANT:** After completing work, you MUST call these APIs:
+      completionInstructions = `**IMPORTANT:** Prefer Mission Control MCP endpoint over raw HTTP.
+Use JSON-RPC on ${missionControlUrl}/api/mcp:
+1. tools/call name=mc_task_log arguments={"task_id":"${task.id}","activity_type":"completed","message":"Description of what was done"}
+2. Register deliverable via API (no MCP tool yet):
+   \
+   curl -sS -X POST ${missionControlUrl}/api/tasks/${task.id}/deliverables -H 'Content-Type: application/json'${mcApiToken ? ` -H 'Authorization: Bearer ${mcApiToken}'` : ''} -d '{"deliverable_type":"file","title":"File name","path":"${taskProjectDir}/filename.html"}'
+3. tools/call name=mc_task_status arguments={"task_id":"${task.id}","status":"${nextStatus}"}
+
+Raw HTTP fallback (only if MCP is unavailable):
 1. Log activity: POST ${missionControlUrl}/api/tasks/${task.id}/activities${authHeader}
-   Body: {"activity_type": "completed", "message": "Description of what was done", "metadata": {"branch": "task/${task.id}"}}
+   Body: {"activity_type": "completed", "message": "Description of what was done", "metadata": {"branch": "${worktree.branchName}"}}
 2. Register deliverable: POST ${missionControlUrl}/api/tasks/${task.id}/deliverables${authHeader}
    Body: {"deliverable_type": "file", "title": "File name", "path": "${taskProjectDir}/filename.html"}
 3. Update status: PATCH ${missionControlUrl}/api/tasks/${task.id}${authHeader}
@@ -319,10 +327,9 @@ When complete, reply with:
 Review the output directory for deliverables and run any applicable tests.
 
 **If tests PASS:**
-1. Log activity: POST ${missionControlUrl}/api/tasks/${task.id}/activities${authHeader}
-   Body: {"activity_type": "completed", "message": "Tests passed: [summary]"}
-2. Update status: PATCH ${missionControlUrl}/api/tasks/${task.id}${authHeader}
-   Body: {"status": "${nextStatus}"}
+1. Prefer MCP endpoint:
+   - tools/call name=mc_task_log arguments={"task_id":"${task.id}","activity_type":"completed","message":"Tests passed: [summary]"}
+   - tools/call name=mc_task_status arguments={"task_id":"${task.id}","status":"${nextStatus}"}
 
 **If tests FAIL:**
 1. ${failEndpoint}${authHeader}
@@ -335,10 +342,9 @@ Reply with: \`TEST_PASS: [summary]\` or \`TEST_FAIL: [what failed]\``;
 Review deliverables, test results, and task requirements.
 
 **If verification PASSES:**
-1. Log activity: POST ${missionControlUrl}/api/tasks/${task.id}/activities${authHeader}
-   Body: {"activity_type": "completed", "message": "Verification passed: [summary]"}
-2. Update status: PATCH ${missionControlUrl}/api/tasks/${task.id}${authHeader}
-   Body: {"status": "${nextStatus}"}
+1. Prefer MCP endpoint:
+   - tools/call name=mc_task_log arguments={"task_id":"${task.id}","activity_type":"completed","message":"Verification passed: [summary]"}
+   - tools/call name=mc_task_status arguments={"task_id":"${task.id}","status":"${nextStatus}"}
 
 **If verification FAILS:**
 1. ${failEndpoint}${authHeader}
@@ -347,7 +353,10 @@ Review deliverables, test results, and task requirements.
 Reply with: \`VERIFY_PASS: [summary]\` or \`VERIFY_FAIL: [what failed]\``;
     } else {
       completionInstructions = `**IMPORTANT:** After completing work:
-1. Update status: PATCH ${missionControlUrl}/api/tasks/${task.id}${authHeader}
+1. Prefer MCP endpoint:
+   - tools/call name=mc_task_status arguments={"task_id":"${task.id}","status":"${nextStatus}"}
+2. Raw HTTP fallback:
+   PATCH ${missionControlUrl}/api/tasks/${task.id}${authHeader}
    Body: {"status": "${nextStatus}"}`;
     }
 
@@ -359,6 +368,7 @@ ${task.description ? `**Description:** ${task.description}\n` : ''}
 **Priority:** ${task.priority.toUpperCase()}
 ${task.due_date ? `**Due:** ${task.due_date}\n` : ''}
 **Task ID:** ${task.id}
+**Mission Control MCP endpoint (in Next.js):** ${missionControlUrl}/api/mcp
 ${planningSpecSection}${agentInstructionsSection}${knowledgeSection}${resourceSection}
 ${acpSection}${isBuilder ? `**OUTPUT DIRECTORY:** ${taskProjectDir}\nCreate this directory and save all deliverables there. Do not write outside .mission-control/task pipeline path.\n` : `**OUTPUT DIRECTORY:** ${taskProjectDir}\nRead prior artifacts from this .mission-control path if needed.\n`}
 ${completionInstructions}
