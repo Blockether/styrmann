@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { ArrowRight, Folder, CheckSquare, Trash2, AlertTriangle, Pencil, GitBranch, Search, Loader2, ExternalLink, GitFork, ChevronDown, User, Building2 } from 'lucide-react';
+import { ArrowRight, Folder, CheckSquare, Trash2, AlertTriangle, Pencil, GitBranch, Search, Loader2, ExternalLink, GitFork, ChevronDown, User, Building2, Plus } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import type { WorkspaceStats } from '@/lib/types';
@@ -10,6 +10,7 @@ export function WorkspaceDashboard() {
   const [workspaces, setWorkspaces] = useState<WorkspaceStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCloneModal, setShowCloneModal] = useState(false);
+  const [showCreateWorkspaceModal, setShowCreateWorkspaceModal] = useState(false);
   const [editingWorkspace, setEditingWorkspace] = useState<WorkspaceStats | null>(null);
 
   useEffect(() => {
@@ -46,20 +47,29 @@ export function WorkspaceDashboard() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
-        <div className="flex items-center justify-between gap-4 mb-8">
+        <div className="flex items-center justify-between gap-4 mb-8 flex-wrap">
           <div>
             <h2 className="text-2xl font-bold mb-1">All Workspaces</h2>
             <p className="text-mc-text-secondary text-sm">
               Select a workspace to view its mission queue and agents
             </p>
           </div>
-          <button
-            onClick={() => setShowCloneModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-mc-accent text-white rounded-lg text-sm font-medium hover:bg-mc-accent/90 flex-shrink-0"
-          >
-            <GitBranch className="w-4 h-4" />
-            <span className="hidden sm:inline">Clone Repository</span>
-          </button>
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <button
+              onClick={() => setShowCreateWorkspaceModal(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-mc-bg-secondary border border-mc-border rounded-lg text-sm font-medium hover:bg-mc-bg-tertiary flex-shrink-0"
+            >
+              <Plus className="w-4 h-4" />
+              <span className="hidden sm:inline">Create Workspace</span>
+            </button>
+            <button
+              onClick={() => setShowCloneModal(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-mc-accent text-white rounded-lg text-sm font-medium hover:bg-mc-accent/90 flex-shrink-0"
+            >
+              <GitBranch className="w-4 h-4" />
+              <span className="hidden sm:inline">Clone Repository</span>
+            </button>
+          </div>
         </div>
 
         {workspaces.length === 0 ? (
@@ -67,14 +77,22 @@ export function WorkspaceDashboard() {
             <GitBranch className="w-16 h-16 mx-auto text-mc-text-secondary mb-4" />
             <h3 className="text-lg font-medium mb-2">No repositories yet</h3>
             <p className="text-mc-text-secondary mb-6">
-              Clone a GitHub repo to get started
+              Create a local workspace or clone a GitHub repo to get started
             </p>
-            <button
-              onClick={() => setShowCloneModal(true)}
-              className="px-6 py-3 bg-mc-accent text-white rounded-lg font-medium hover:bg-mc-accent/90"
-            >
-              Clone your first repository
-            </button>
+            <div className="flex items-center justify-center gap-2 flex-wrap">
+              <button
+                onClick={() => setShowCreateWorkspaceModal(true)}
+                className="px-6 py-3 border border-mc-border rounded-lg font-medium hover:bg-mc-bg-tertiary"
+              >
+                Create local workspace
+              </button>
+              <button
+                onClick={() => setShowCloneModal(true)}
+                className="px-6 py-3 bg-mc-accent text-white rounded-lg font-medium hover:bg-mc-accent/90"
+              >
+                Clone your first repository
+              </button>
+            </div>
           </div>
         ) : (
           <>
@@ -120,6 +138,16 @@ export function WorkspaceDashboard() {
           onClose={() => setShowCloneModal(false)}
           onCloned={() => {
             setShowCloneModal(false);
+            loadWorkspaces();
+          }}
+        />
+      )}
+
+      {showCreateWorkspaceModal && (
+        <CreateWorkspaceModal
+          onClose={() => setShowCreateWorkspaceModal(false)}
+          onCreated={() => {
+            setShowCreateWorkspaceModal(false);
             loadWorkspaces();
           }}
         />
@@ -210,6 +238,12 @@ function WorkspaceCard({ workspace, onDelete, onEdit }: { workspace: WorkspaceSt
 
         {workspace.description && (
           <p className="text-xs text-mc-text-secondary line-clamp-2 mb-3">{workspace.description}</p>
+        )}
+
+        {!workspace.github_repo && (
+          <div className="inline-flex items-center rounded border border-mc-border bg-mc-bg px-2 py-0.5 text-[11px] text-mc-text-secondary mb-3">
+            Local workspace
+          </div>
         )}
 
         <div className="flex items-center gap-1 text-sm text-mc-text-secondary">
@@ -420,6 +454,98 @@ function EditWorkspaceModal({ workspace, onClose, onSaved }: { workspace: Worksp
               className="px-6 py-2 bg-mc-accent text-white rounded-lg font-medium hover:bg-mc-accent/90 disabled:opacity-50"
             >
               {isSubmitting ? 'Saving...' : 'Save Changes'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function CreateWorkspaceModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim()) return;
+
+    setIsSubmitting(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/workspaces', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: name.trim(),
+          description: description.trim() || null,
+          github_repo: null,
+        }),
+      });
+
+      if (res.ok) {
+        onCreated();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setError(data.error || 'Failed to create workspace');
+      }
+    } catch {
+      setError('Failed to create workspace');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-3 sm:p-4" onClick={onClose}>
+      <div className="bg-mc-bg-secondary border border-mc-border rounded-t-xl sm:rounded-xl w-full max-w-md pb-[env(safe-area-inset-bottom)] sm:pb-0" onClick={e => e.stopPropagation()}>
+        <div className="p-6 border-b border-mc-border">
+          <h2 className="text-lg font-semibold">Create Workspace</h2>
+          <p className="text-xs text-mc-text-secondary mt-1">No GitHub repository required. You can connect or back up later.</p>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <div>
+            <label className="block text-sm font-medium mb-2">Workspace Name</label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Client Dashboard"
+              className="w-full bg-mc-bg border border-mc-border rounded-lg px-4 py-2 focus:outline-none focus:border-mc-accent"
+              autoFocus
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-2">Description (optional)</label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="What this workspace is for"
+              rows={3}
+              className="w-full bg-mc-bg border border-mc-border rounded-lg px-4 py-2 focus:outline-none focus:border-mc-accent resize-y"
+            />
+          </div>
+
+          {error && <div className="text-mc-accent-red text-sm">{error}</div>}
+
+          <div className="flex justify-end gap-3 pt-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-mc-text-secondary hover:text-mc-text"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={!name.trim() || isSubmitting}
+              className="px-6 py-2 bg-mc-accent text-white rounded-lg font-medium hover:bg-mc-accent/90 disabled:opacity-50"
+            >
+              {isSubmitting ? 'Creating...' : 'Create Workspace'}
             </button>
           </div>
         </form>
