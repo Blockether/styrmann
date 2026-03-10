@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useState } from 'react';
 
 /**
  * Syncs trace viewer open/close with the `?trace=` URL query parameter.
@@ -12,23 +12,16 @@ import { useCallback, useEffect, useRef, useState } from 'react';
  * Works alongside `useTaskDeepLink` which owns `?task=` and `?tab=`.
  */
 export function useTraceDeepLink() {
-  const [traceSessionId, setTraceSessionId] = useState<string | null>(null);
-  const [traceTaskId, setTraceTaskId] = useState<string | null>(null);
-  const initializedRef = useRef(false);
-
-  // Read ?trace= on mount (taskId comes from ?task= which useTaskDeepLink manages)
-  useEffect(() => {
-    if (initializedRef.current) return;
-    initializedRef.current = true;
-
+  const [traceSessionId, setTraceSessionId] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null;
     const params = new URLSearchParams(window.location.search);
-    const traceParam = params.get('trace');
-    const taskParam = params.get('task');
-    if (traceParam) {
-      setTraceSessionId(traceParam);
-      if (taskParam) setTraceTaskId(taskParam);
-    }
-  }, []);
+    return params.get('trace');
+  });
+  const [traceTaskId, setTraceTaskId] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null;
+    const params = new URLSearchParams(window.location.search);
+    return params.get('trace') ? params.get('task') : null;
+  });
 
   const openTrace = useCallback((sessionId: string | null, taskId?: string) => {
     setTraceSessionId(sessionId);

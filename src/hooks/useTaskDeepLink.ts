@@ -11,6 +11,17 @@ function isValidTab(value: string | null): value is TabType {
   return value !== null && (VALID_TABS as string[]).includes(value);
 }
 
+function readInitialTaskDeepLink(): { taskId: string | null; tab: TabType | undefined } {
+  if (typeof window === 'undefined') return { taskId: null, tab: undefined };
+  const params = new URLSearchParams(window.location.search);
+  const taskId = params.get('task');
+  const tabParam = params.get('tab');
+  return {
+    taskId,
+    tab: isValidTab(tabParam) ? tabParam : undefined,
+  };
+}
+
 /**
  * Syncs task modal open/close + active tab with URL query params.
  *
@@ -23,8 +34,8 @@ function isValidTab(value: string | null): value is TabType {
  */
 export function useTaskDeepLink() {
   const [linkedTask, setLinkedTask] = useState<Task | null>(null);
-  const [initialTab, setInitialTab] = useState<TabType | undefined>(undefined);
-  const [loading, setLoading] = useState(false);
+  const [initialTab, setInitialTab] = useState<TabType | undefined>(() => readInitialTaskDeepLink().tab);
+  const [loading, setLoading] = useState(() => Boolean(readInitialTaskDeepLink().taskId));
   const initializedRef = useRef(false);
 
   // Read URL on mount and resolve the task
@@ -32,16 +43,9 @@ export function useTaskDeepLink() {
     if (initializedRef.current) return;
     initializedRef.current = true;
 
-    const params = new URLSearchParams(window.location.search);
-    const taskId = params.get('task');
+    const { taskId } = readInitialTaskDeepLink();
     if (!taskId) return;
 
-    const tabParam = params.get('tab');
-    if (isValidTab(tabParam)) {
-      setInitialTab(tabParam);
-    }
-
-    setLoading(true);
     fetch(`/api/tasks/${taskId}`)
       .then((res) => {
         if (!res.ok) throw new Error('Task not found');
