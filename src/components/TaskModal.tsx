@@ -19,12 +19,13 @@ interface TaskModalProps {
   onClose: () => void;
   workspaceId?: string;
   defaultSprintId?: string;
+  defaultMilestoneId?: string;
   githubIssue?: GitHubIssue;
   defaultTab?: TabType;
   onTabChange?: (tab: TabType) => void;
 }
 
-export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaultSprintId, githubIssue, defaultTab, onTabChange }: TaskModalProps) {
+export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaultSprintId, defaultMilestoneId, githubIssue, defaultTab, onTabChange }: TaskModalProps) {
   const { agents, addTask, updateTask, addEvent } = useMissionControl();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isProcessingAcceptance, setIsProcessingAcceptance] = useState(false);
@@ -61,7 +62,7 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
     task_type: task?.task_type || 'feature' as TaskType,
     effort: task?.effort || null as number | null,
     impact: task?.impact || null as number | null,
-    milestone_id: task?.milestone_id || '',
+    milestone_id: task?.milestone_id || defaultMilestoneId || '',
     github_issue_id: githubIssue?.id || task?.github_issue_id || null as string | null,
   });
 
@@ -240,7 +241,7 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
           task_type: 'feature' as TaskType,
           effort: null,
           impact: null,
-          milestone_id: '',
+          milestone_id: defaultMilestoneId || '',
           github_issue_id: null,
         });
         setUsePlanningMode(false);

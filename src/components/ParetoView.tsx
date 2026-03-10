@@ -48,11 +48,16 @@ export function ParetoView({ workspaceId }: ParetoViewProps) {
   const activeEditingTask = editingTask || linkedTask;
   const handleTaskClick = (task: Task) => { setEditingTask(task); openTask(task); };
 
+  const visibleTasks = useMemo(
+    () => tasks.filter((task) => task.workspace_id === workspaceId && task.status !== 'done'),
+    [tasks, workspaceId],
+  );
+
   const { scoredTasks, unscoredTasks, quickWinsCount } = useMemo(() => {
-    const scored = tasks.filter(
+    const scored = visibleTasks.filter(
       (task) => task.effort !== null && task.effort !== undefined && task.impact !== null && task.impact !== undefined
     );
-    const unscored = tasks.filter(
+    const unscored = visibleTasks.filter(
       (task) => task.effort === null || task.effort === undefined || task.impact === null || task.impact === undefined
     );
     const quickWins = scored.filter(
@@ -64,7 +69,7 @@ export function ParetoView({ workspaceId }: ParetoViewProps) {
       unscoredTasks: unscored,
       quickWinsCount: quickWins.length,
     };
-  }, [tasks]);
+  }, [visibleTasks]);
 
   const tasksWithPosition = useMemo((): TaskWithPosition[] => {
     return scoredTasks.map((task) => {
@@ -90,7 +95,7 @@ export function ParetoView({ workspaceId }: ParetoViewProps) {
       <div className="p-3 border-b border-mc-border bg-mc-bg-secondary flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-2">
           <span className="font-medium">Pareto</span>
-          <span className="text-sm text-mc-text-secondary">{scoredTasks.length} scored, {tasks.length} total</span>
+          <span className="text-sm text-mc-text-secondary">{scoredTasks.length} scored, {visibleTasks.length} total</span>
         </div>
       </div>
 
@@ -99,7 +104,7 @@ export function ParetoView({ workspaceId }: ParetoViewProps) {
           <section className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <div className="bg-mc-bg-secondary border border-mc-border rounded-xl p-4">
             <div className="text-xs uppercase text-mc-text-secondary">Total Tasks</div>
-            <div className="text-2xl font-semibold mt-1">{tasks.length}</div>
+            <div className="text-2xl font-semibold mt-1">{visibleTasks.length}</div>
           </div>
           <div className="bg-mc-accent-green/10 border border-mc-accent-green/30 rounded-xl p-4">
             <div className="text-xs uppercase text-mc-accent-green">Quick Wins</div>

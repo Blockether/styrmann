@@ -120,6 +120,10 @@ Milestones are the primary grouping unit for tasks. Each milestone optionally be
 
 **In ActiveSprint list view**: Tasks are grouped by milestone. Each group shows milestone name, coordinator initials, and a progress bar (done/total). Ungrouped tasks appear at the bottom.
 
+**Empty milestone visibility**: Sprint milestones remain visible even when they have zero tasks. Empty groups show a "No tasks yet in this milestone." placeholder with an inline Create Task action.
+
+**Milestone-scoped task creation**: ActiveSprint milestone groups include a New Task button that opens TaskModal with that milestone pre-selected.
+
 Cannot delete a milestone that has tasks.
 
 ### Milestone Dependencies
@@ -145,6 +149,8 @@ Backlog = tasks with `milestone_id IS NULL` and status != `done`. The BacklogVie
 ## Pareto View
 
 Effort/impact matrix. Tasks plotted by their effort (1-5) and impact (1-5) scores. High-impact/low-effort tasks surface to the top.
+
+Pareto excludes tasks with `status = 'done'` and only evaluates active tasks in the current workspace.
 
 ---
 

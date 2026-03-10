@@ -65,6 +65,7 @@ export function ActiveSprint({ workspaceId, mobileMode = false, isPortrait = tru
   const [loading, setLoading] = useState(true);
   const [showSprintDropdown, setShowSprintDropdown] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [createTaskMilestoneId, setCreateTaskMilestoneId] = useState<string | undefined>(undefined);
   const [showCreateMilestoneModal, setShowCreateMilestoneModal] = useState(false);
   const { linkedTask, initialTab, openTask, closeTask, updateTab } = useTaskDeepLink();
   const [editingTask, setEditingTask] = useState<Task | null>(null);
@@ -77,6 +78,11 @@ export function ActiveSprint({ workspaceId, mobileMode = false, isPortrait = tru
   const [selectedBoardStatus, setSelectedBoardStatus] = useState<TaskStatus>('planning');
   const [draggedTask, setDraggedTask] = useState<Task | null>(null);
   const [expandedMilestones, setExpandedMilestones] = useState<Set<string>>(new Set());
+
+  const openCreateTaskModal = (milestoneId?: string) => {
+    setCreateTaskMilestoneId(milestoneId);
+    setShowCreateModal(true);
+  };
 
   // Sync store-selected sprint to local state (from sidebar history navigation)
   useEffect(() => {
@@ -169,17 +175,15 @@ export function ActiveSprint({ workspaceId, mobileMode = false, isPortrait = tru
     return groups;
   }, [sprintTasks]);
 
-  // Milestones sorted by priority, filtered to those with tasks
   const milestoneOrder = useMemo(() => {
     return milestones
-      .filter((m) => tasksByMilestone[m.id]?.length > 0)
       .sort((a, b) => {
         const orderA = PRIORITY_ORDER[a.priority || 'normal'] ?? 2;
         const orderB = PRIORITY_ORDER[b.priority || 'normal'] ?? 2;
         return orderA - orderB;
       })
       .map((m) => m.id);
-  }, [milestones, tasksByMilestone]);
+  }, [milestones]);
 
   const hasUngrouped = tasksByMilestone['ungrouped'].length > 0;
 
@@ -459,7 +463,7 @@ export function ActiveSprint({ workspaceId, mobileMode = false, isPortrait = tru
             <span className="hidden sm:inline">New Milestone</span>
           </button>
           <button
-            onClick={() => setShowCreateModal(true)}
+            onClick={() => openCreateTaskModal(undefined)}
             aria-label="Create new task"
             className="flex items-center gap-2 px-4 min-h-11 bg-mc-accent text-white rounded text-sm font-medium hover:bg-mc-accent/90"
           >
@@ -470,7 +474,7 @@ export function ActiveSprint({ workspaceId, mobileMode = false, isPortrait = tru
       </div>
 
       <div className={`flex-1 overflow-y-auto ${viewMode === 'board' ? 'overflow-hidden' : ''} ${isPortrait && viewMode === 'list' ? 'p-3 pb-[calc(1rem+env(safe-area-inset-bottom))]' : viewMode === 'list' ? 'p-3' : ''}`}>
-        {sprintTasks.length === 0 ? (
+        {viewMode === 'list' && sprintTasks.length === 0 && milestoneOrder.length === 0 ? (
           <div className="text-center py-12">
             <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-mc-bg-tertiary flex items-center justify-center">
               <Flag className="w-6 h-6 text-mc-text-secondary" />
@@ -502,6 +506,7 @@ export function ActiveSprint({ workspaceId, mobileMode = false, isPortrait = tru
                   onToggle={() => toggleMilestone(milestoneId)}
                   onTaskClick={handleTaskClick}
                   onMoveStatus={setStatusMoveTask}
+                  onCreateTask={openCreateTaskModal}
                   mobileMode={mobileMode}
                 />
               );
@@ -520,6 +525,7 @@ export function ActiveSprint({ workspaceId, mobileMode = false, isPortrait = tru
                 onToggle={() => toggleMilestone('ungrouped')}
                 onTaskClick={handleTaskClick}
                 onMoveStatus={setStatusMoveTask}
+                onCreateTask={openCreateTaskModal}
                 mobileMode={mobileMode}
               />
             )}
@@ -606,9 +612,13 @@ export function ActiveSprint({ workspaceId, mobileMode = false, isPortrait = tru
 
       {showCreateModal && (
         <TaskModal
-          onClose={() => setShowCreateModal(false)}
+          onClose={() => {
+            setShowCreateModal(false);
+            setCreateTaskMilestoneId(undefined);
+          }}
           workspaceId={workspaceId}
           defaultSprintId={selectedSprintId || undefined}
+          defaultMilestoneId={createTaskMilestoneId}
         />
       )}
       {activeEditingTask && (
@@ -686,6 +696,7 @@ interface MilestoneGroupProps {
   onToggle: () => void;
   onTaskClick: (task: Task) => void;
   onMoveStatus: (task: Task) => void;
+  onCreateTask: (milestoneId?: string) => void;
   mobileMode: boolean;
 }
 
@@ -701,6 +712,7 @@ function MilestoneGroup({
   onToggle,
   onTaskClick,
   onMoveStatus,
+  onCreateTask,
   mobileMode,
 }: MilestoneGroupProps) {
   const sortedTasks = [...tasks].sort((a, b) => {
@@ -755,6 +767,17 @@ function MilestoneGroup({
             )}
           </div>
           <div className="flex items-center gap-3 flex-shrink-0">
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                onCreateTask(milestone?.id);
+              }}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs border border-mc-border rounded text-mc-text-secondary hover:text-mc-text hover:bg-mc-bg"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">New Task</span>
+            </button>
             <span className={`text-sm font-medium ${done === total && total > 0 ? 'text-mc-accent-green' : 'text-mc-text-secondary'}`}>
               {done}/{total}
             </span>
@@ -770,16 +793,30 @@ function MilestoneGroup({
 
       {isExpanded && (
         <div className="divide-y divide-mc-border">
-          {sortedTasks.map((task) => (
-            <TaskRow
-              key={task.id}
-              task={task}
-              isPortrait={isPortrait}
-              onClick={() => onTaskClick(task)}
-              onMoveStatus={() => onMoveStatus(task)}
-              mobileMode={mobileMode}
-            />
-          ))}
+          {sortedTasks.length === 0 ? (
+            <div className="px-4 py-4 text-sm text-mc-text-secondary flex items-center justify-between gap-3 flex-wrap">
+              <span>No tasks yet in this milestone.</span>
+              <button
+                type="button"
+                onClick={() => onCreateTask(milestone?.id)}
+                className="inline-flex items-center gap-2 px-3 py-2 text-xs border border-mc-border rounded text-mc-text-secondary hover:text-mc-text hover:bg-mc-bg"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Create Task
+              </button>
+            </div>
+          ) : (
+            sortedTasks.map((task) => (
+              <TaskRow
+                key={task.id}
+                task={task}
+                isPortrait={isPortrait}
+                onClick={() => onTaskClick(task)}
+                onMoveStatus={() => onMoveStatus(task)}
+                mobileMode={mobileMode}
+              />
+            ))
+          )}
         </div>
       )}
     </section>
