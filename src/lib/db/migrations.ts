@@ -1795,6 +1795,147 @@ const migrations: Migration[] = [
       console.log(`[Migration 037] Meta repository: ${metaWorkspaceId} -> system-openclaw`);
       console.log(`[Migration 037] Mission Control workspace: ${resolvedMissionControlWorkspaceId} -> ${missionControlSlug}`);
     }
+  },
+  {
+    id: '038',
+    name: 'add_memory_pipeline_and_vector_index',
+    up: (db) => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS knowledge_vectors (
+          knowledge_id TEXT PRIMARY KEY REFERENCES knowledge_entries(id) ON DELETE CASCADE,
+          workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+          agent_id TEXT REFERENCES agents(id) ON DELETE SET NULL,
+          model TEXT NOT NULL DEFAULT 'hash96-v1',
+          dimension INTEGER NOT NULL DEFAULT 96,
+          vector_json TEXT NOT NULL,
+          updated_at TEXT DEFAULT (datetime('now'))
+        )
+      `);
+
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS memory_pipeline_config (
+          id TEXT PRIMARY KEY,
+          enabled INTEGER DEFAULT 1,
+          llm_enabled INTEGER DEFAULT 1,
+          schedule_cron TEXT DEFAULT '0 * * * *',
+          top_k INTEGER DEFAULT 24,
+          llm_model TEXT DEFAULT 'gpt-4o-mini',
+          llm_base_url TEXT DEFAULT 'https://api.openai.com/v1',
+          summary_prompt TEXT,
+          updated_at TEXT DEFAULT (datetime('now'))
+        )
+      `);
+
+      db.exec('CREATE INDEX IF NOT EXISTS idx_knowledge_vectors_workspace ON knowledge_vectors(workspace_id)');
+      db.exec('CREATE INDEX IF NOT EXISTS idx_knowledge_vectors_agent ON knowledge_vectors(agent_id)');
+
+      db.prepare(
+        `INSERT INTO memory_pipeline_config (id, enabled, llm_enabled, schedule_cron, top_k, llm_model, llm_base_url, summary_prompt, updated_at)
+         VALUES ('default', 1, 1, '0 * * * *', 24, 'gpt-4o-mini', 'https://api.openai.com/v1',
+                 'Summarize durable learnings into concise operational rules for MEMORY, SOUL, AGENTS, and USER artifacts. Keep output factual and directly actionable.', datetime('now'))
+         ON CONFLICT(id) DO NOTHING`
+      ).run();
+
+      const dimension = 96;
+      const tokenize = (text: string): string[] => text
+        .toLowerCase()
+        .split(/[^a-z0-9]+/)
+        .filter((token) => token.length >= 2)
+        .slice(0, 800);
+
+      const hashToken = (token: string): number => {
+        let hash = 2166136261;
+        for (let i = 0; i < token.length; i += 1) {
+          hash ^= token.charCodeAt(i);
+          hash = Math.imul(hash, 16777619);
+        }
+        return Math.abs(hash >>> 0);
+      };
+
+      const normalize = (vector: number[]): number[] => {
+        const norm = Math.sqrt(vector.reduce((sum, value) => sum + value * value, 0));
+        if (!norm) return vector;
+        return vector.map((value) => value / norm);
+      };
+
+      const vectorize = (text: string): number[] => {
+        const vector = new Array<number>(dimension).fill(0);
+        for (const token of tokenize(text)) {
+          const index = hashToken(token) % dimension;
+          vector[index] += 1;
+        }
+        return normalize(vector);
+      };
+
+      const entries = db.prepare(
+        `SELECT id, workspace_id, agent_id, category, title, content, tags
+         FROM knowledge_entries`
+      ).all() as Array<{
+        id: string;
+        workspace_id: string;
+        agent_id?: string | null;
+        category: string;
+        title: string;
+        content: string;
+        tags?: string | null;
+      }>;
+
+      const upsert = db.prepare(
+        `INSERT INTO knowledge_vectors (knowledge_id, workspace_id, agent_id, model, dimension, vector_json, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+         ON CONFLICT(knowledge_id) DO UPDATE SET
+           workspace_id = excluded.workspace_id,
+           agent_id = excluded.agent_id,
+           model = excluded.model,
+           dimension = excluded.dimension,
+           vector_json = excluded.vector_json,
+           updated_at = excluded.updated_at`
+      );
+
+      for (const entry of entries) {
+        const text = `${entry.category} ${entry.title} ${entry.content} ${entry.tags || ''}`;
+        upsert.run(entry.id, entry.workspace_id, entry.agent_id || null, 'hash96-v1', dimension, JSON.stringify(vectorize(text)));
+      }
+    }
+  },
+  {
+    id: '039',
+    name: 'add_knowledge_attachments_and_routing_decisions',
+    up: (db) => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS knowledge_attachments (
+          id TEXT PRIMARY KEY,
+          knowledge_id TEXT NOT NULL REFERENCES knowledge_entries(id) ON DELETE CASCADE,
+          workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+          file_name TEXT NOT NULL,
+          mime_type TEXT,
+          size_bytes INTEGER,
+          content_text TEXT,
+          content_base64 TEXT,
+          source_url TEXT,
+          created_at TEXT DEFAULT (datetime('now')),
+          updated_at TEXT DEFAULT (datetime('now'))
+        )
+      `);
+
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS knowledge_routing_decisions (
+          id TEXT PRIMARY KEY,
+          knowledge_id TEXT NOT NULL REFERENCES knowledge_entries(id) ON DELETE CASCADE,
+          workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+          agent_id TEXT REFERENCES agents(id) ON DELETE SET NULL,
+          score REAL NOT NULL,
+          selected INTEGER DEFAULT 0,
+          reasons TEXT NOT NULL DEFAULT '[]',
+          created_at TEXT DEFAULT (datetime('now'))
+        )
+      `);
+
+      db.exec('CREATE INDEX IF NOT EXISTS idx_knowledge_attachments_knowledge ON knowledge_attachments(knowledge_id, created_at DESC)');
+      db.exec('CREATE INDEX IF NOT EXISTS idx_knowledge_attachments_workspace ON knowledge_attachments(workspace_id, created_at DESC)');
+      db.exec('CREATE INDEX IF NOT EXISTS idx_knowledge_routing_decisions_knowledge ON knowledge_routing_decisions(knowledge_id, created_at DESC)');
+      db.exec('CREATE INDEX IF NOT EXISTS idx_knowledge_routing_decisions_agent ON knowledge_routing_decisions(agent_id, created_at DESC)');
+    }
   }
 ];
 

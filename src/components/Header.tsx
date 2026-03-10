@@ -18,7 +18,7 @@ import { useMissionControl } from '@/lib/store';
 import { format } from 'date-fns';
 import type { Workspace } from '@/lib/types';
 
-export type DashboardView = 'sprint' | 'backlog' | 'pareto' | 'activity' | 'issues';
+export type DashboardView = 'sprint' | 'backlog' | 'pareto' | 'activity' | 'issues' | 'knowledge';
 
 interface HeaderProps {
   workspace?: Workspace;

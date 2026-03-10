@@ -349,6 +349,53 @@ CREATE TABLE IF NOT EXISTS knowledge_entries (
   created_at TEXT DEFAULT (datetime('now'))
 );
 
+CREATE TABLE IF NOT EXISTS knowledge_attachments (
+  id TEXT PRIMARY KEY,
+  knowledge_id TEXT NOT NULL REFERENCES knowledge_entries(id) ON DELETE CASCADE,
+  workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  file_name TEXT NOT NULL,
+  mime_type TEXT,
+  size_bytes INTEGER,
+  content_text TEXT,
+  content_base64 TEXT,
+  source_url TEXT,
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS knowledge_routing_decisions (
+  id TEXT PRIMARY KEY,
+  knowledge_id TEXT NOT NULL REFERENCES knowledge_entries(id) ON DELETE CASCADE,
+  workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  agent_id TEXT REFERENCES agents(id) ON DELETE SET NULL,
+  score REAL NOT NULL,
+  selected INTEGER DEFAULT 0,
+  reasons TEXT NOT NULL DEFAULT '[]',
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS knowledge_vectors (
+  knowledge_id TEXT PRIMARY KEY REFERENCES knowledge_entries(id) ON DELETE CASCADE,
+  workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  agent_id TEXT REFERENCES agents(id) ON DELETE SET NULL,
+  model TEXT NOT NULL DEFAULT 'hash96-v1',
+  dimension INTEGER NOT NULL DEFAULT 96,
+  vector_json TEXT NOT NULL,
+  updated_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS memory_pipeline_config (
+  id TEXT PRIMARY KEY,
+  enabled INTEGER DEFAULT 1,
+  llm_enabled INTEGER DEFAULT 1,
+  schedule_cron TEXT DEFAULT '0 * * * *',
+  top_k INTEGER DEFAULT 24,
+  llm_model TEXT DEFAULT 'gpt-4o-mini',
+  llm_base_url TEXT DEFAULT 'https://api.openai.com/v1',
+  summary_prompt TEXT,
+  updated_at TEXT DEFAULT (datetime('now'))
+);
+
 -- Task activities table (for real-time activity log)
 CREATE TABLE IF NOT EXISTS task_activities (
   id TEXT PRIMARY KEY,
@@ -442,6 +489,10 @@ CREATE INDEX IF NOT EXISTS idx_task_roles_task ON task_roles(task_id);
 CREATE INDEX IF NOT EXISTS idx_knowledge_entries_workspace ON knowledge_entries(workspace_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_knowledge_entries_task ON knowledge_entries(task_id);
 CREATE INDEX IF NOT EXISTS idx_knowledge_entries_agent ON knowledge_entries(agent_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_knowledge_attachments_knowledge ON knowledge_attachments(knowledge_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_knowledge_attachments_workspace ON knowledge_attachments(workspace_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_knowledge_routing_decisions_knowledge ON knowledge_routing_decisions(knowledge_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_knowledge_routing_decisions_agent ON knowledge_routing_decisions(agent_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_milestones_sprint ON milestones(sprint_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_milestone ON tasks(milestone_id);
 CREATE INDEX IF NOT EXISTS idx_milestone_deps_milestone ON milestone_dependencies(milestone_id);
@@ -461,6 +512,8 @@ CREATE INDEX IF NOT EXISTS idx_acp_bindings_status ON acp_bindings(status);
 CREATE INDEX IF NOT EXISTS idx_acp_bindings_thread ON acp_bindings(discord_thread_id);
 CREATE INDEX IF NOT EXISTS idx_task_provenance_task ON task_provenance(task_id);
 CREATE INDEX IF NOT EXISTS idx_task_provenance_session ON task_provenance(session_id);
+CREATE INDEX IF NOT EXISTS idx_knowledge_vectors_workspace ON knowledge_vectors(workspace_id);
+CREATE INDEX IF NOT EXISTS idx_knowledge_vectors_agent ON knowledge_vectors(agent_id);
 -- Daemon tables
 CREATE TABLE IF NOT EXISTS agent_heartbeats (
   id TEXT PRIMARY KEY,

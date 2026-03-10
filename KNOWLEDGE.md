@@ -209,6 +209,12 @@ The Strict template is the default. The `review` stage is labeled "Human Verifie
 
 **Global visibility**: Synced agents live in the meta repository (`workspace_id='default'`). Agent queries return both workspace-local agents AND all synced agents (`WHERE workspace_id = ? OR source = 'synced'`).
 
+**Always-on per-agent memory consolidation**: Mission Control maintains OpenClaw memory natively in JavaScript and writes only to per-agent workspaces (`agent_workspace_path`). There is no shared global memory digest.
+
+**Responsibility-based routing**: Knowledge entries without explicit `agent_id` are routed to target agents by responsibility scoring (role/name/description plus category/content matching), with workspace-scoped entries and global (`workspace_id='default'`) entries both considered.
+
+**Daemon memory job**: The daemon ensures a consolidator agent (`arch-consolidator`) exists, runs one consolidation pass at startup, and schedules `openclaw-memory-consolidation` hourly (`0 * * * *`).
+
 **Agent fields**: name, role, description, status (standby/working/offline), model, source (local/gateway/synced), gateway_agent_id, session_key_prefix, agent_dir, agent_workspace_path, soul_md, user_md, agents_md. **API enrichment**: `GET /api/agents` returns `active_task_count` (number of active tasks) and `current_task_title` (title of in-progress task, if any) for each agent.
 
 **Prompts stored in files**: soul_md, user_md, agents_md are read from OpenClaw agent workspace directories on disk. Double binding -- files are the source of truth, DB reflects them.

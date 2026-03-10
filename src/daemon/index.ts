@@ -8,6 +8,8 @@ import { startRouter } from './router';
 import { startLogPoller } from './logs';
 import { startReporter } from './reporter';
 import { startRecovery } from './recovery';
+import { registerJob } from './scheduler';
+import { ensureConsolidatorAgent, getMemoryPipelineConfig, runOpenClawMemoryConsolidation } from '@/lib/openclaw-memory';
 import type { DaemonStats } from './types';
 
 const log = createLogger('daemon');
@@ -47,6 +49,19 @@ async function main() {
     recoveryIntervalMs: 60_000,
   };
 
+  const memoryPipelineConfig = getMemoryPipelineConfig();
+
+  registerJob({
+    id: 'openclaw-memory-consolidation',
+    name: 'OpenClaw Memory Consolidation',
+    cron: memoryPipelineConfig.schedule_cron || '0 * * * *',
+    enabled: true,
+    handler: async () => {
+      const result = await runOpenClawMemoryConsolidation();
+      log.info(`Memory consolidation complete: agents=${result.syncedAgents} memory=${result.memoryUpdated} soul=${result.soulUpdated} agents=${result.agentsUpdated} user=${result.userUpdated}`);
+    },
+  });
+
   // Start all modules
   const stopHealth = startHealthCheck(config, stats);
   const stopHeartbeat = startHeartbeat(config, stats);
@@ -56,6 +71,24 @@ async function main() {
   const stopLogPoller = startLogPoller(config, stats);
   const stopRecovery = startRecovery(config, stats);
   const stopReporter = startReporter(config, stats);
+
+  try {
+    const consolidator = await ensureConsolidatorAgent();
+    if (consolidator.created) {
+      log.info(`Consolidator agent ensured: created (${consolidator.agentId || 'unknown'})`);
+    } else {
+      log.info(`Consolidator agent ensured: existing (${consolidator.agentId || consolidator.reason || 'unknown'})`);
+    }
+  } catch (err) {
+    log.warn('Failed to ensure consolidator agent:', err);
+  }
+
+  try {
+    const result = await runOpenClawMemoryConsolidation();
+    log.info(`Initial memory consolidation complete: agents=${result.syncedAgents} memory=${result.memoryUpdated} soul=${result.soulUpdated} agents=${result.agentsUpdated} user=${result.userUpdated}`);
+  } catch (err) {
+    log.warn('Initial memory consolidation failed:', err);
+  }
 
   // Clean shutdown
   const shutdown = () => {

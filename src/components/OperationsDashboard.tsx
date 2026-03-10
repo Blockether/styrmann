@@ -1,13 +1,14 @@
 'use client';
 
 import { useCallback, useEffect, useState, type KeyboardEvent } from 'react';
-import { Activity, Bot, Cpu, Mail } from 'lucide-react';
+import { Activity, Bot, Brain, Cpu, Mail } from 'lucide-react';
 import { OpenClawPanel } from './OpenClawPanel';
 import { HumanManagementPanel } from './HumanManagementPanel';
 import { SystemPanel } from './SystemPanel';
+import { MemoryPipelinePanel } from './MemoryPipelinePanel';
 
-type OperationsTab = 'system' | 'gateway' | 'agents' | 'humans';
-const TAB_ORDER: OperationsTab[] = ['system', 'gateway', 'agents', 'humans'];
+type OperationsTab = 'system' | 'gateway' | 'agents' | 'memory' | 'humans';
+const TAB_ORDER: OperationsTab[] = ['system', 'gateway', 'agents', 'memory', 'humans'];
 
 function resolveOperationsTabFromHash(hash: string): OperationsTab | null {
   const normalized = hash.replace(/^#/, '').toLowerCase();
@@ -15,6 +16,7 @@ function resolveOperationsTabFromHash(hash: string): OperationsTab | null {
   if (normalized === 'system' || normalized === 'system-runtime') return 'system';
   if (normalized === 'gateway' || normalized === 'openclaw') return 'gateway';
   if (normalized === 'agents') return 'agents';
+  if (normalized === 'memory' || normalized === 'knowledge') return 'memory';
   if (normalized === 'humans') return 'humans';
   return null;
 }
@@ -119,6 +121,17 @@ export function OperationsDashboard() {
               </button>
               <button
                 role="tab"
+                aria-selected={activeTab === 'memory'}
+                aria-controls="operations-panel-memory"
+                id="operations-tab-memory"
+                onClick={() => switchTab('memory')}
+                className={`inline-flex items-center justify-center gap-2 px-3 min-h-11 border-b-2 transition-colors whitespace-nowrap ${activeTab === 'memory' ? 'border-mc-accent text-mc-text' : 'border-transparent text-mc-text-secondary hover:text-mc-text'}`}
+              >
+                <Brain className="h-4 w-4" />
+                <span>Memory</span>
+              </button>
+              <button
+                role="tab"
                 aria-selected={activeTab === 'humans'}
                 aria-controls="operations-panel-humans"
                 id="operations-tab-humans"
@@ -172,6 +185,17 @@ export function OperationsDashboard() {
             aria-labelledby="operations-tab-humans"
           >
             <HumanManagementPanel />
+          </section>
+        )}
+
+        {activeTab === 'memory' && (
+          <section
+            id="operations-panel-memory"
+            role="tabpanel"
+            aria-labelledby="operations-tab-memory"
+            className="rounded-xl border border-mc-border bg-mc-bg overflow-hidden"
+          >
+            <MemoryPipelinePanel />
           </section>
         )}
       </main>

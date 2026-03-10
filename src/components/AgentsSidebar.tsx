@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { ChevronRight, ChevronLeft, ChevronDown, ListTodo, Inbox, BarChart3, Activity, X, CircleDot, Clock, Cpu, Bot } from 'lucide-react';
+import { ChevronRight, ChevronLeft, ChevronDown, ListTodo, Inbox, BarChart3, Activity, X, CircleDot, Clock, Cpu, Bot, Route } from 'lucide-react';
 import { useMissionControl } from '@/lib/store';
 import type { Sprint } from '@/lib/types';
 import type { DashboardView } from './Header';
@@ -21,6 +21,7 @@ const NAV_ITEMS = [
   { label: 'Pareto', view: 'pareto' as DashboardView, icon: <BarChart3 className="w-4 h-4" /> },
   { label: 'Activity', view: 'activity' as DashboardView, icon: <Activity className="w-4 h-4" /> },
   { label: 'Issues', view: 'issues' as DashboardView, icon: <CircleDot className="w-4 h-4" /> },
+  { label: 'Knowledge', view: 'knowledge' as DashboardView, icon: <Route className="w-4 h-4" /> },
 ];
 
 interface AgentSummary {
