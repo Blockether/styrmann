@@ -221,12 +221,6 @@ export function OpenClawPanel({ embedded = false, focusArea = 'gateway' }: OpenC
         )}
 
         <div className="space-y-6">
-          {isAgentsFocus && (
-            <div className="rounded-lg border border-mc-border bg-mc-bg-secondary p-3 text-sm text-mc-text-secondary">
-              Use <span className="font-medium text-mc-text">Create Agent</span> for new entries, then open the <span className="font-medium text-mc-text">link icon</span> on synced agents to manage shared skill links in the workspace tab.
-            </div>
-          )}
-
           {/* Card 1: Gateway Status (Full Width) */}
           {!isAgentsFocus && <div className="rounded-lg border border-mc-border bg-mc-bg overflow-hidden">
             <div className="p-3 border-b border-mc-border bg-mc-bg-secondary flex items-center gap-2">
