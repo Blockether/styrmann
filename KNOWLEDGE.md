@@ -205,7 +205,9 @@ The Strict template is the default. The `review` stage is labeled "Human Verifie
 
 **Sync from OpenClaw Gateway**: Agents are defined in OpenClaw gateway config files. `ensureSynced()` runs lazily on first agent query. Reads config, upserts agents in DB with `source='synced'`. Agents removed from config are deleted from DB.
 
-**Global visibility**: Synced agents have `workspace_id='default'`. Agent queries return both workspace-local agents AND all synced agents (`WHERE workspace_id = ? OR source = 'synced'`).
+**Meta repository**: Workspace `id='default'` is the internal `System / OpenClaw` meta repository. It has `repo_kind='meta'`, `is_internal=1`, no GitHub link, and `local_path='/root/.openclaw'`.
+
+**Global visibility**: Synced agents live in the meta repository (`workspace_id='default'`). Agent queries return both workspace-local agents AND all synced agents (`WHERE workspace_id = ? OR source = 'synced'`).
 
 **Agent fields**: name, role, description, status (standby/working/offline), model, source (local/gateway/synced), gateway_agent_id, session_key_prefix, agent_dir, agent_workspace_path, soul_md, user_md, agents_md. **API enrichment**: `GET /api/agents` returns `active_task_count` (number of active tasks) and `current_task_title` (title of in-progress task, if any) for each agent.
 
@@ -307,8 +309,8 @@ Fallback: Task polling every 60s, event polling every 30s.
 ### Workspaces
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
-| GET/POST | `/api/workspaces` | List (optional stats=true) / create workspace |
-| GET/PATCH/DELETE | `/api/workspaces/{id}` | Workspace CRUD (lookup by ID or slug) |
+| GET/POST | `/api/workspaces` | List (optional stats=true) / create repository/workspace |
+| GET/PATCH/DELETE | `/api/workspaces/{id}` | Workspace CRUD (lookup by ID or slug); internal meta repository cannot be linked to GitHub |
 | GET/POST | `/api/workspaces/{id}/knowledge` | Knowledge entries (list/create) |
 | GET/PATCH/DELETE | `/api/workspaces/{id}/knowledge/{entryId}` | Single knowledge entry (read/update/delete) |
 | GET/POST | `/api/workspaces/{id}/workflows` | Workflow templates |
@@ -501,7 +503,7 @@ Agents without direct filesystem access use upload/download endpoints:
 10. **Story points computed, not stored**: `story_points` on a milestone is computed at read time via `SUM(task.effort)`. It is never persisted in the database.
 11. **Milestone dependencies are informational in v1**: The `milestone_dependencies` table exists and is queryable, but no blocking behavior is enforced. Dependencies are for planning visibility only.
 
-12. **Repo-driven workspaces**: Workspaces auto-discover from git repos at `/root/repos/{org}/{repo}`. On DB init, `discoverRepoWorkspaces()` scans for org directories containing git repos and creates/syncs a workspace per repo. Slug format: `{org}-{repo}` (e.g., `blockether-mission-control`). The `default` workspace (id='default') maps to `blockether/mission-control`. All workspaces are peers. Workspaces are grouped by organization in the UI.
+12. **Repo-driven workspaces**: Standard repositories auto-discover from git repos at `/root/repos/{org}/{repo}`. On DB init, `discoverRepoWorkspaces()` scans for org directories containing git repos and creates/syncs a workspace per repo. Slug format: `{org}-{repo}` (e.g., `blockether-mission-control`). Mission Control is treated like any other discovered repository. The `default` workspace is reserved for the internal OpenClaw meta repository rooted at `/root/.openclaw`. Repositories are grouped by organization in the UI, with the meta repository under `System`.
 13. **Workflow templates in code, not DB-cloned**: Template definitions (Simple, Standard, Strict) live in `src/lib/workflow-templates.ts` as TypeScript constants. New workspaces get templates provisioned from code, not cloned from another workspace's DB rows.
 ---
 

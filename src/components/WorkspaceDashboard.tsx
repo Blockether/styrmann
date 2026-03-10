@@ -49,9 +49,9 @@ export function WorkspaceDashboard() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         <div className="flex items-center justify-between gap-4 mb-8 flex-wrap">
           <div>
-            <h2 className="text-2xl font-bold mb-1">All Workspaces</h2>
+            <h2 className="text-2xl font-bold mb-1">Repositories</h2>
             <p className="text-mc-text-secondary text-sm">
-              Select a workspace to view its mission queue and agents
+              System and project repositories live here. Open a repository to view its mission queue and agents.
             </p>
           </div>
           <div className="flex items-center gap-2 w-full sm:w-auto">
@@ -60,7 +60,7 @@ export function WorkspaceDashboard() {
               className="flex items-center gap-2 px-4 py-2 bg-mc-bg-secondary border border-mc-border rounded-lg text-sm font-medium hover:bg-mc-bg-tertiary flex-shrink-0"
             >
               <Plus className="w-4 h-4" />
-              <span className="hidden sm:inline">Create Workspace</span>
+              <span className="hidden sm:inline">Create Repository</span>
             </button>
             <button
               onClick={() => setShowCloneModal(true)}
@@ -77,14 +77,14 @@ export function WorkspaceDashboard() {
             <GitBranch className="w-16 h-16 mx-auto text-mc-text-secondary mb-4" />
             <h3 className="text-lg font-medium mb-2">No repositories yet</h3>
             <p className="text-mc-text-secondary mb-6">
-              Create a local workspace or clone a GitHub repo to get started
+              Create a local repository or clone a GitHub repo to get started
             </p>
             <div className="flex items-center justify-center gap-2 flex-wrap">
               <button
                 onClick={() => setShowCreateWorkspaceModal(true)}
                 className="px-6 py-3 border border-mc-border rounded-lg font-medium hover:bg-mc-bg-tertiary"
               >
-                Create local workspace
+                Create local repository
               </button>
               <button
                 onClick={() => setShowCloneModal(true)}
@@ -98,13 +98,15 @@ export function WorkspaceDashboard() {
           <>
             {(() => {
               const grouped = workspaces.reduce<Record<string, WorkspaceStats[]>>((acc, ws) => {
-                const org = ws.organization || 'Other';
+                const org = ws.is_internal ? 'System' : (ws.organization || 'Other');
                 if (!acc[org]) acc[org] = [];
                 acc[org].push(ws);
                 return acc;
               }, {});
 
               const orgOrder = Object.keys(grouped).sort((a, b) => {
+                if (a === 'System') return -1;
+                if (b === 'System') return 1;
                 if (a === 'Other') return 1;
                 if (b === 'Other') return -1;
                 return a.localeCompare(b);
@@ -240,9 +242,30 @@ function WorkspaceCard({ workspace, onDelete, onEdit }: { workspace: WorkspaceSt
           <p className="text-xs text-mc-text-secondary line-clamp-2 mb-3">{workspace.description}</p>
         )}
 
-        {!workspace.github_repo && (
-          <div className="inline-flex items-center rounded border border-mc-border bg-mc-bg px-2 py-0.5 text-[11px] text-mc-text-secondary mb-3">
-            Local workspace
+        <div className="flex items-center gap-2 flex-wrap mb-3">
+          {workspace.is_internal ? (
+            <div className="inline-flex items-center rounded border border-mc-accent bg-mc-accent/10 px-2 py-0.5 text-[11px] text-mc-accent font-medium">
+              System / OpenClaw repository
+            </div>
+          ) : !workspace.github_repo ? (
+            <div className="inline-flex items-center rounded border border-mc-border bg-mc-bg px-2 py-0.5 text-[11px] text-mc-text-secondary">
+              Local repository
+            </div>
+          ) : (
+            <div className="inline-flex items-center rounded border border-mc-border bg-mc-bg px-2 py-0.5 text-[11px] text-mc-text-secondary">
+              GitHub linked
+            </div>
+          )}
+          {workspace.is_internal ? (
+            <div className="inline-flex items-center rounded border border-mc-border bg-mc-bg px-2 py-0.5 text-[11px] text-mc-text-secondary">
+              Internal
+            </div>
+          ) : null}
+        </div>
+
+        {workspace.local_path && (
+          <div className="text-[11px] text-mc-text-secondary mb-3 font-mono truncate">
+            {workspace.local_path}
           </div>
         )}
 
@@ -360,10 +383,16 @@ function EditWorkspaceModal({ workspace, onClose, onSaved }: { workspace: Worksp
     <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-3 sm:p-4" onClick={onClose}>
       <div className="bg-mc-bg-secondary border border-mc-border rounded-t-xl sm:rounded-xl w-full max-w-md pb-[env(safe-area-inset-bottom)] sm:pb-0" onClick={e => e.stopPropagation()}>
         <div className="p-6 border-b border-mc-border">
-          <h2 className="text-lg font-semibold">Edit Workspace</h2>
+          <h2 className="text-lg font-semibold">Edit Repository</h2>
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          {workspace.is_internal ? (
+            <div className="rounded-lg border border-mc-accent bg-mc-accent/10 px-3 py-2 text-sm text-mc-text-secondary">
+              This is the internal OpenClaw meta repository. GitHub linking is disabled here.
+            </div>
+          ) : null}
+
           <div>
             <label className="block text-sm font-medium mb-2">Name</label>
             <input
@@ -392,10 +421,23 @@ function EditWorkspaceModal({ workspace, onClose, onSaved }: { workspace: Worksp
               type="text"
               value={githubRepo}
               onChange={(e) => setGithubRepo(e.target.value)}
+              disabled={Boolean(workspace.is_internal)}
               placeholder="https://github.com/org/repo"
-              className="w-full bg-mc-bg border border-mc-border rounded-lg px-4 py-2 focus:outline-none focus:border-mc-accent"
+              className="w-full bg-mc-bg border border-mc-border rounded-lg px-4 py-2 focus:outline-none focus:border-mc-accent disabled:opacity-50 disabled:cursor-not-allowed"
             />
           </div>
+
+          {workspace.local_path ? (
+            <div>
+              <label className="block text-sm font-medium mb-2">Repository Path</label>
+              <input
+                type="text"
+                value={workspace.local_path}
+                readOnly
+                className="w-full bg-mc-bg border border-mc-border rounded-lg px-4 py-2 text-mc-text-secondary font-mono"
+              />
+            </div>
+          ) : null}
 
           <div>
             <label className="block text-sm font-medium mb-2">Owner Email</label>
@@ -502,13 +544,13 @@ function CreateWorkspaceModal({ onClose, onCreated }: { onClose: () => void; onC
     <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-3 sm:p-4" onClick={onClose}>
       <div className="bg-mc-bg-secondary border border-mc-border rounded-t-xl sm:rounded-xl w-full max-w-md pb-[env(safe-area-inset-bottom)] sm:pb-0" onClick={e => e.stopPropagation()}>
         <div className="p-6 border-b border-mc-border">
-          <h2 className="text-lg font-semibold">Create Workspace</h2>
+          <h2 className="text-lg font-semibold">Create Repository</h2>
           <p className="text-xs text-mc-text-secondary mt-1">No GitHub repository required. You can connect or back up later.</p>
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div>
-            <label className="block text-sm font-medium mb-2">Workspace Name</label>
+            <label className="block text-sm font-medium mb-2">Repository Name</label>
             <input
               type="text"
               value={name}
@@ -524,7 +566,7 @@ function CreateWorkspaceModal({ onClose, onCreated }: { onClose: () => void; onC
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="What this workspace is for"
+              placeholder="What this repository is for"
               rows={3}
               className="w-full bg-mc-bg border border-mc-border rounded-lg px-4 py-2 focus:outline-none focus:border-mc-accent resize-y"
             />
@@ -545,7 +587,7 @@ function CreateWorkspaceModal({ onClose, onCreated }: { onClose: () => void; onC
               disabled={!name.trim() || isSubmitting}
               className="px-6 py-2 bg-mc-accent text-white rounded-lg font-medium hover:bg-mc-accent/90 disabled:opacity-50"
             >
-              {isSubmitting ? 'Creating...' : 'Create Workspace'}
+              {isSubmitting ? 'Creating...' : 'Create Repository'}
             </button>
           </div>
         </form>
