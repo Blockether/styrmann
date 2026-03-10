@@ -4,7 +4,7 @@ import { existsSync, readFileSync } from 'fs';
 import { getOpenClawClient, sendMessageWithProvenance } from '@/lib/openclaw/client';
 import { broadcast } from '@/lib/events';
 import { getMissionControlUrl } from '@/lib/config';
-import { getWorkspaceRepoPath, getTaskPipelineDir, isGitWorkTree } from '@/lib/git-repo';
+import { ensureTaskWorktree, getTaskPipelineDir, getWorkspaceRepoPath, isGitWorkTree } from '@/lib/git-repo';
 import { getRelevantKnowledge, formatKnowledgeForDispatch } from '@/lib/learner';
 import { getTaskWorkflow } from '@/lib/workflow-engine';
 import type { Task, Agent, OpenClawSession, WorkflowStage } from '@/lib/types';
@@ -201,7 +201,8 @@ export async function dispatchTaskToAgent(taskId: string): Promise<DispatchResul
         error: `Workspace repo is not a valid git worktree: ${workspace?.github_repo || 'missing github_repo'}`,
       };
     }
-    const taskProjectDir = getTaskPipelineDir(repoPath, task.id);
+    const worktree = ensureTaskWorktree(repoPath, task.id, task.title);
+    const taskProjectDir = getTaskPipelineDir(worktree.worktreePath, task.id);
     const missionControlUrl = getMissionControlUrl();
     const activeAcpBinding = queryOne<{
       acp_session_key: string;
@@ -306,7 +307,8 @@ export async function dispatchTaskToAgent(taskId: string): Promise<DispatchResul
    Body: {"status": "${nextStatus}"}
 
 Branch rule:
-- Do all git work on a task branch (for example: task/${task.id})
+- Work only in this directory: ${worktree.worktreePath}
+- Use branch: ${worktree.branchName}
 - Commit freely on that branch and include the branch in activity metadata above
 
 When complete, reply with:
@@ -369,7 +371,7 @@ If you need help or clarification, ask the orchestrator.`;
       const traceUrl = `/api/tasks/${task.id}/sessions/${encodeURIComponent(session.openclaw_session_id)}/trace`;
       // Send dispatch via ACP bridge with provenance (falls back to direct RPC)
       const { provenance } = await sendMessageWithProvenance(sessionKey, taskMessage, {
-        cwd: repoPath,
+        cwd: worktree.worktreePath,
         timeoutMs: 30000,
       });
 
@@ -387,7 +389,9 @@ If you need help or clarification, ask the orchestrator.`;
             session_key: sessionKey,
             trace_url: traceUrl,
             output_directory: taskProjectDir,
-            branch: `task/${task.id}`,
+            branch: worktree.branchName,
+            worktree_path: worktree.worktreePath,
+            base_branch: worktree.defaultBranch,
             provenance,
             invocation: taskMessage,
           }),

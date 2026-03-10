@@ -19,6 +19,30 @@ interface BranchDetail {
   remote: boolean;
 }
 
+function extractWorktreePath(metadataRaw: string | null | undefined): string[] {
+  if (!metadataRaw) return [];
+  try {
+    const metadata = JSON.parse(metadataRaw) as { worktree_path?: unknown; cwd?: unknown; output_directory?: unknown };
+    const values = [metadata.worktree_path, metadata.cwd]
+      .filter((value): value is string => typeof value === 'string')
+      .map((value) => value.trim())
+      .filter(Boolean);
+
+    const outputPath = typeof metadata.output_directory === 'string' ? metadata.output_directory.trim() : '';
+    if (outputPath) {
+      const marker = `${path.sep}.mission-control${path.sep}tasks${path.sep}`;
+      const idx = outputPath.indexOf(marker);
+      if (idx > 0) {
+        values.push(outputPath.slice(0, idx));
+      }
+    }
+
+    return Array.from(new Set(values));
+  } catch {
+    return [];
+  }
+}
+
 function extractBranchNames(metadataRaw: string | null | undefined): string[] {
   if (!metadataRaw) return [];
   try {
@@ -150,8 +174,17 @@ export async function GET(
       ),
     );
 
-    const repoPath = getWorkspaceRepoPath(task.workspace_repo || null);
-    const hasRepo = Boolean(repoPath && isGitWorkTree(repoPath));
+    const workspaceRepoPath = getWorkspaceRepoPath(task.workspace_repo || null);
+
+    const candidateRepoPaths = Array.from(
+      new Set([
+        ...branchMetadataRows.flatMap((row) => extractWorktreePath(row.metadata)),
+        workspaceRepoPath,
+      ].filter((value): value is string => typeof value === 'string' && value.trim().length > 0)),
+    );
+
+    const repoPath = candidateRepoPaths.find((candidate) => isGitWorkTree(candidate)) || null;
+    const hasRepo = Boolean(repoPath);
 
     const changedFiles = Array.from(
       new Set(
@@ -174,7 +207,7 @@ export async function GET(
     let commits: CommitInfo[] = [];
     const diagnostics: {
       branch_source: 'metadata' | 'git_discovery' | 'none';
-      files_source: 'deliverables' | 'git_diff' | 'none';
+      files_source: 'deliverables' | 'git_diff' | 'git_status' | 'none';
       commits_source: 'task_since' | 'branch_scoped' | 'none';
       repo_found: boolean;
     } = {
@@ -203,7 +236,7 @@ export async function GET(
         try {
           const raw = execFileSync(
             'git',
-            ['branch', '--list', `task/${task.id}*`, `mc/${task.id}*`, '--format=%(refname:short)'],
+            ['branch', '--list', `task/${task.id}*`, `task/*-${task.id.slice(0, 8).toLowerCase()}`, '--format=%(refname:short)'],
             { cwd: repoPath, encoding: 'utf8', timeout: 5000 },
           );
           const discovered = raw
@@ -216,6 +249,19 @@ export async function GET(
           }
         } catch {
         }
+      }
+
+      try {
+        const currentBranch = execFileSync(
+          'git',
+          ['branch', '--show-current'],
+          { cwd: repoPath, encoding: 'utf8', timeout: 3000 },
+        ).trim();
+        if (currentBranch && !branches.includes(currentBranch)) {
+          branches.push(currentBranch);
+          if (diagnostics.branch_source === 'none') diagnostics.branch_source = 'git_discovery';
+        }
+      } catch {
       }
 
       for (const branch of branches) {
@@ -254,6 +300,31 @@ export async function GET(
           } catch {
           }
         }
+      }
+
+      try {
+        const rawStatus = execFileSync(
+          'git',
+          ['status', '--porcelain'],
+          { cwd: repoPath, encoding: 'utf8', timeout: 5000 },
+        );
+        const statusFiles = rawStatus
+          .split('\n')
+          .map((line) => line.trim())
+          .filter(Boolean)
+          .map((line) => {
+            const fileSegment = line.slice(3).trim();
+            if (fileSegment.includes(' -> ')) {
+              return fileSegment.split(' -> ')[1].trim();
+            }
+            return fileSegment;
+          })
+          .filter(Boolean);
+        if (statusFiles.length > 0) {
+          changedFiles.push(...statusFiles);
+          diagnostics.files_source = 'git_status';
+        }
+      } catch {
       }
 
       try {
