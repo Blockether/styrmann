@@ -718,32 +718,11 @@ export function OpenClawPanel({ embedded = false, focusArea = 'gateway' }: OpenC
           {/* Card: Live Agent Logs */}
           {!isAgentsFocus && <div className="rounded-lg border border-mc-border bg-mc-bg overflow-hidden">
             <div className="h-[600px] flex flex-col">
-              <div className="p-3 border-b border-mc-border bg-mc-bg-secondary flex items-center justify-between gap-2 flex-wrap">
-                <div>
-                  <div className="flex items-center gap-2 text-sm font-medium text-mc-text">
-                    <ScrollText className="w-4 h-4 text-mc-text-secondary" />
-                    <span>OpenClaw Logs</span>
-                  </div>
-                  <p className="mt-1 text-xs text-mc-text-secondary">
-                    Switch between session transcripts and gateway runtime logs.
-                  </p>
-                </div>
-                <div className="inline-flex items-center rounded border border-mc-border overflow-hidden min-h-11">
-                  <button
-                    onClick={() => setLogsView('sessions')}
-                    className={`px-3 min-h-11 text-sm transition-colors ${logsView === 'sessions' ? 'bg-mc-accent text-white' : 'bg-mc-bg hover:bg-mc-bg-tertiary text-mc-text-secondary'}`}
-                  >
-                    Sessions
-                  </button>
-                  <button
-                    onClick={() => setLogsView('gateway')}
-                    className={`px-3 min-h-11 text-sm transition-colors ${logsView === 'gateway' ? 'bg-mc-accent text-white' : 'bg-mc-bg hover:bg-mc-bg-tertiary text-mc-text-secondary'}`}
-                  >
-                    Gateway
-                  </button>
-                </div>
-              </div>
-              {logsView === 'sessions' ? <AgentLogsView /> : <GatewayLogsView />}
+              {logsView === 'sessions' ? (
+                <AgentLogsView logsView={logsView} onLogsViewChange={setLogsView} />
+              ) : (
+                <GatewayLogsView logsView={logsView} onLogsViewChange={setLogsView} />
+              )}
             </div>
           </div>}
         </div>

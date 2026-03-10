@@ -3,9 +3,9 @@
 import { useEffect, useCallback, useRef, useState } from 'react';
 import type { Task } from '@/lib/types';
 
-type TabType = 'overview' | 'planning' | 'team' | 'activity' | 'deliverables' | 'sessions';
+type TabType = 'overview' | 'planning' | 'proposals' | 'activity' | 'deliverables' | 'sessions';
 
-const VALID_TABS: TabType[] = ['overview', 'planning', 'team', 'activity', 'deliverables', 'sessions'];
+const VALID_TABS: TabType[] = ['overview', 'planning', 'proposals', 'activity', 'deliverables', 'sessions'];
 
 function isValidTab(value: string | null): value is TabType {
   return value !== null && (VALID_TABS as string[]).includes(value);

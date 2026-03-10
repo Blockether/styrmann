@@ -1,18 +1,17 @@
 'use client';
 
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { X, Save, Trash2, Activity, Package, Bot, ClipboardList, Plus, Users } from 'lucide-react';
+import { X, Save, Trash2, Activity, Package, Bot, ClipboardList, Plus, Lightbulb } from 'lucide-react';
 import { useMissionControl } from '@/lib/store';
-import { triggerAutoDispatch, shouldTriggerAutoDispatch } from '@/lib/auto-dispatch';
-import { ActivityLog } from './ActivityLog';
 import { DeliverablesList } from './DeliverablesList';
 import { SessionsList } from './SessionsList';
 import { PlanningTab } from './PlanningTab';
-import { TeamTab } from './TeamTab';
+import { ProposalsTab } from './ProposalsTab';
+import { TaskActivityExecutionView } from './TaskActivityExecutionView';
 import { CreateMilestoneModal } from './CreateMilestoneModal';
 import type { Task, TaskPriority, TaskStatus, TaskType, GitHubIssue, Human, HimalayaStatus } from '@/lib/types';
 
-type TabType = 'overview' | 'planning' | 'team' | 'activity' | 'deliverables' | 'sessions';
+type TabType = 'overview' | 'planning' | 'proposals' | 'activity' | 'deliverables' | 'sessions';
 
 interface TaskModalProps {
   task?: Task;
@@ -30,9 +29,7 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isProcessingAcceptance, setIsProcessingAcceptance] = useState(false);
   const [showMilestoneModal, setShowMilestoneModal] = useState(false);
-  const [usePlanningMode, setUsePlanningMode] = useState(false);
-  // Auto-switch to planning tab if task is in planning status
-  const [activeTab, setActiveTab] = useState<TabType>(defaultTab || (task?.status === 'planning' ? 'planning' : 'overview'));
+  const [activeTab, setActiveTab] = useState<TabType>(defaultTab || 'overview');
   const contentRef = useRef<HTMLDivElement>(null);
 
   const handleTabChange = useCallback((tab: TabType) => {
@@ -45,11 +42,6 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
       contentRef.current.scrollTop = 0;
     }
   }, [activeTab]);
-
-  // Stable callback for when spec is locked - use window.location.reload() to refresh data
-  const handleSpecLocked = useCallback(() => {
-    window.location.reload();
-  }, []);
 
   const [form, setForm] = useState({
     title: githubIssue?.title || task?.title || '',
@@ -98,8 +90,6 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
   }, []);
 
   const resolveStatus = (): TaskStatus => {
-    // Planning mode overrides everything
-    if (!task && usePlanningMode) return 'planning';
     if (!task) {
       if (form.assignee_type === 'human' && form.assigned_human_id) return 'assigned';
       return 'inbox';
@@ -169,18 +159,6 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
         // Editing existing task
         updateTask(savedTask);
 
-        // Note: dispatch for existing tasks is handled server-side by the PATCH route.
-        // Only trigger client-side dispatch for drag-to-in_progress (legacy flow).
-        if (shouldTriggerAutoDispatch(task.status, savedTask.status, savedTask.assigned_agent_id)) {
-          triggerAutoDispatch({
-            taskId: savedTask.id,
-            taskTitle: savedTask.title,
-            agentId: savedTask.assigned_agent_id,
-            agentName: savedTask.assigned_agent?.name || 'Unknown Agent',
-            workspaceId: savedTask.workspace_id
-          }).catch((err) => console.error('Auto-dispatch failed:', err));
-        }
-
         onClose();
         return;
       }
@@ -209,26 +187,6 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
 
       await uploadAttachedFiles(savedTask.id);
 
-      if (usePlanningMode) {
-        // Start planning session (fire-and-forget), then close modal.
-        // User reopens the task from the board to see the planning tab.
-        fetch(`/api/tasks/${savedTask.id}/planning`, { method: 'POST' })
-          .catch((error) => console.error('Failed to start planning:', error));
-        onClose();
-        return;
-      }
-
-      // Auto-dispatch if agent assigned (fire-and-forget)
-      if (savedTask.assigned_agent_id && savedTask.status === 'assigned') {
-        triggerAutoDispatch({
-          taskId: savedTask.id,
-          taskTitle: savedTask.title,
-          agentId: savedTask.assigned_agent_id,
-          agentName: savedTask.assigned_agent?.name || 'Unknown Agent',
-          workspaceId: savedTask.workspace_id
-        }).catch((err) => console.error('Auto-dispatch failed:', err));
-      }
-
       if (keepOpen) {
         setForm({
           title: '',
@@ -244,7 +202,6 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
           milestone_id: defaultMilestoneId || '',
           github_issue_id: null,
         });
-        setUsePlanningMode(false);
         setAcceptanceCriteria([]);
         setNewCriteriaInput('');
         setAttachedFiles([]);
@@ -344,7 +301,7 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
   const tabs = [
     { id: 'overview' as TabType, label: 'Overview', icon: null },
     { id: 'planning' as TabType, label: 'Planning', icon: <ClipboardList className="w-4 h-4" /> },
-    { id: 'team' as TabType, label: 'Team', icon: <Users className="w-4 h-4" /> },
+    { id: 'proposals' as TabType, label: 'Proposals', icon: <Lightbulb className="w-4 h-4" /> },
     { id: 'activity' as TabType, label: 'Activity', icon: <Activity className="w-4 h-4" /> },
     { id: 'deliverables' as TabType, label: 'Deliverables', icon: <Package className="w-4 h-4" /> },
     { id: 'sessions' as TabType, label: 'Sessions', icon: <Bot className="w-4 h-4" /> },
@@ -508,31 +465,6 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
             </div>
           )}
 
-          {/* Planning Mode Toggle - only for new tasks */}
-          {!task && (
-            <div className="p-3 bg-mc-bg rounded-lg border border-mc-border">
-              <label className="flex items-start gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={usePlanningMode}
-                  onChange={(e) => setUsePlanningMode(e.target.checked)}
-                  className="w-4 h-4 mt-0.5 rounded border-mc-border"
-                />
-                <div>
-                  <span className="font-medium text-sm flex items-center gap-2">
-                    <ClipboardList className="w-4 h-4 text-mc-accent" />
-                    Enable Planning Mode
-                  </span>
-                  <p className="text-xs text-mc-text-secondary mt-1">
-                    Best for complex projects that need detailed requirements. 
-                    You&apos;ll answer a few questions to define scope, goals, and constraints 
-                    before work begins. Skip this for quick, straightforward tasks.
-                  </p>
-                </div>
-              </label>
-            </div>
-          )}
-
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium mb-1">Task Type</label>
@@ -642,7 +574,7 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
                 </div>
               ) : (
                 <div className="text-xs text-mc-text-secondary bg-mc-bg border border-mc-border rounded px-3 py-2">
-                  AI tasks are routed through workflow roles in the Team tab. Direct agent picking is removed from the overview form.
+                  AI tasks are planned by the orchestrator from existing agents and shared skills. Direct agent picking is removed from the overview form.
                 </div>
               )}
             </div>
@@ -675,7 +607,7 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
 
           {!task && form.assignee_type === 'ai' && (
             <div className="text-xs text-mc-text-secondary bg-mc-bg border border-mc-border rounded px-3 py-2">
-              AI tasks are created without a direct agent. Configure workflow roles after creation in the task&apos;s Team tab.
+              AI tasks are planned automatically by the orchestrator using existing agents and linked skills. Manual workflow configuration is disabled.
             </div>
           )}
 
@@ -689,20 +621,16 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
 
           {/* Planning Tab */}
           {activeTab === 'planning' && task && (
-            <PlanningTab
-              taskId={task.id}
-              onSpecLocked={handleSpecLocked}
-            />
+            <PlanningTab taskId={task.id} />
           )}
 
-          {/* Team Tab */}
-          {activeTab === 'team' && task && (
-            <TeamTab taskId={task.id} workspaceId={workspaceId || task.workspace_id || 'default'} />
+          {activeTab === 'proposals' && task && (
+            <ProposalsTab taskId={task.id} />
           )}
 
           {/* Activity Tab */}
           {activeTab === 'activity' && task && (
-            <ActivityLog taskId={task.id} />
+            <TaskActivityExecutionView taskId={task.id} />
           )}
 
           {/* Deliverables Tab */}

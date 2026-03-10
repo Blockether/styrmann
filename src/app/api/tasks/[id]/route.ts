@@ -4,11 +4,12 @@ import { queryOne, run } from '@/lib/db';
 import { broadcast } from '@/lib/events';
 import { getMissionControlUrl } from '@/lib/config';
 import { getHimalayaStatus, sendHumanAssignmentEmail } from '@/lib/himalaya';
-import { handleStageTransition, getTaskWorkflow, drainQueue, populateTaskRolesFromAgents } from '@/lib/workflow-engine';
+import { handleStageTransition, getTaskWorkflow, drainQueue } from '@/lib/workflow-engine';
 import { notifyLearner } from '@/lib/learner';
 import { captureTaskRunResult } from '@/lib/task-run-results';
 import { checkBuilderEvidence } from '@/lib/builder-evidence';
 import { UpdateTaskSchema } from '@/lib/validation';
+import { generateTaskWorkflowPlan } from '@/lib/workflow-planning';
 import type { Task, UpdateTaskRequest, Agent, Human } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
@@ -87,6 +88,7 @@ export async function PATCH(
     const updates: string[] = [];
     const values: unknown[] = [];
     const now = new Date().toISOString();
+    let shouldRegeneratePlan = false;
 
     if (validatedData.status === 'done' && validatedData.updated_by_agent_id) {
       return NextResponse.json(
@@ -98,26 +100,32 @@ export async function PATCH(
     if (validatedData.title !== undefined) {
       updates.push('title = ?');
       values.push(validatedData.title);
+      shouldRegeneratePlan = true;
     }
     if (validatedData.description !== undefined) {
       updates.push('description = ?');
       values.push(validatedData.description);
+      shouldRegeneratePlan = true;
     }
     if (validatedData.priority !== undefined) {
       updates.push('priority = ?');
       values.push(validatedData.priority);
+      shouldRegeneratePlan = true;
     }
     if (validatedData.task_type !== undefined) {
       updates.push('task_type = ?');
       values.push(validatedData.task_type);
+      shouldRegeneratePlan = true;
     }
     if (validatedData.effort !== undefined) {
       updates.push('effort = ?');
       values.push(validatedData.effort);
+      shouldRegeneratePlan = true;
     }
     if (validatedData.impact !== undefined) {
       updates.push('impact = ?');
       values.push(validatedData.impact);
+      shouldRegeneratePlan = true;
     }
     if (validatedData.milestone_id !== undefined) {
       updates.push('milestone_id = ?');
@@ -127,19 +135,9 @@ export async function PATCH(
       updates.push('due_date = ?');
       values.push(validatedData.due_date);
     }
-    if (validatedData.workflow_template_id !== undefined) {
-      updates.push('workflow_template_id = ?');
-      values.push(validatedData.workflow_template_id);
-    }
 
     // Track if we need to dispatch task
     let shouldDispatch = false;
-    let shouldDispatchWorkflowStage = false;
-
-    const effectiveAssignedAgentId =
-      validatedData.assigned_agent_id !== undefined
-        ? validatedData.assigned_agent_id
-        : existing.assigned_agent_id;
     const effectiveAssigneeType = validatedData.assignee_type !== undefined
       ? validatedData.assignee_type
       : (existing.assignee_type || 'ai');
@@ -148,40 +146,12 @@ export async function PATCH(
       : (existing.assigned_human_id || null);
 
     const readinessIssues: string[] = [];
-    if (effectiveAssigneeType === 'ai' && !effectiveAssignedAgentId) readinessIssues.push('No agent assigned');
     if (effectiveAssigneeType === 'human' && !effectiveAssignedHumanId) readinessIssues.push('No human assigned');
 
     // If task came from planning mode, require planning to be complete before auto-start
     const planningComplete = Number((existing as any).planning_complete || 0) === 1;
     if (existing.status === 'planning' && !planningComplete) {
       readinessIssues.push('Planning not complete');
-    }
-
-    // Auto-assign default workflow template if task has none
-    if (!existing.workflow_template_id && validatedData.assigned_agent_id && effectiveAssigneeType === 'ai') {
-      const defaultTpl = queryOne<{ id: string }>(
-        'SELECT id FROM workflow_templates WHERE workspace_id = ? AND is_default = 1 LIMIT 1',
-        [existing.workspace_id]
-      );
-      if (defaultTpl) {
-        updates.push('workflow_template_id = ?');
-        values.push(defaultTpl.id);
-        // Also populate task_roles now that we have a template
-        run('UPDATE tasks SET workflow_template_id = ? WHERE id = ?', [defaultTpl.id, id]);
-        populateTaskRolesFromAgents(id, existing.workspace_id);
-      }
-    }
-
-    // Auto-promote INBOX -> ASSIGNED when an agent is assigned while task is still in inbox.
-    // TaskModal always sends status, so handle both undefined and explicit inbox.
-    if (
-      (nextStatus === undefined || nextStatus === 'inbox') &&
-      effectiveAssigneeType === 'ai' &&
-      validatedData.assigned_agent_id !== undefined &&
-      validatedData.assigned_agent_id &&
-      existing.status === 'inbox'
-    ) {
-      nextStatus = 'assigned';
     }
 
     if (
@@ -201,12 +171,7 @@ export async function PATCH(
           ? workflow?.stages.find((stage) => stage.role === 'builder')
           : undefined);
 
-      const assignedRole = queryOne<{ role: string }>(
-        'SELECT role FROM agents WHERE id = ?',
-        [effectiveAssignedAgentId || existing.assigned_agent_id || ''],
-      )?.role;
-
-      const currentRole = currentStage?.role || assignedRole;
+      const currentRole = currentStage?.role || undefined;
       const isForwardBuilderMove =
         currentRole === 'builder' &&
         ['testing', 'review', 'verification', 'done'].includes(nextStatus);
@@ -228,7 +193,7 @@ export async function PATCH(
       values.push(nextStatus);
 
       // Auto-dispatch when moving to assigned (if we have a valid assignee)
-      if (nextStatus === 'assigned' && effectiveAssignedAgentId && effectiveAssigneeType === 'ai') {
+      if (nextStatus === 'assigned' && effectiveAssigneeType === 'ai') {
         shouldDispatch = true;
       }
 
@@ -241,31 +206,6 @@ export async function PATCH(
       );
     }
 
-    // Handle assignment change
-    if (validatedData.assigned_agent_id !== undefined && validatedData.assigned_agent_id !== existing.assigned_agent_id) {
-      updates.push('assigned_agent_id = ?');
-      values.push(effectiveAssigneeType === 'ai' ? validatedData.assigned_agent_id : null);
-
-      if (validatedData.assigned_agent_id) {
-        const agent = queryOne<Agent>('SELECT name FROM agents WHERE id = ?', [validatedData.assigned_agent_id]);
-        if (agent) {
-          run(
-            `INSERT INTO events (id, type, agent_id, task_id, message, created_at)
-             VALUES (?, ?, ?, ?, ?, ?)`,
-            [uuidv4(), 'task_assigned', validatedData.assigned_agent_id, id, `"${existing.title}" assigned to ${agent.name}`, now]
-          );
-
-          // Auto-dispatch if already in assigned status or being assigned now
-          if ((existing.status === 'assigned' || nextStatus === 'assigned') && effectiveAssigneeType === 'ai') {
-            shouldDispatch = true;
-          } else if (['testing', 'review', 'verification'].includes(nextStatus || existing.status) && effectiveAssigneeType === 'ai') {
-            // Agent manually assigned to a task in a workflow stage — dispatch directly
-            shouldDispatchWorkflowStage = true;
-          }
-        }
-      }
-    }
-
     if (validatedData.assignee_type !== undefined && validatedData.assignee_type !== existing.assignee_type) {
       updates.push('assignee_type = ?');
       values.push(validatedData.assignee_type);
@@ -273,12 +213,12 @@ export async function PATCH(
         updates.push('assigned_agent_id = ?');
         values.push(null);
         shouldDispatch = false;
-        shouldDispatchWorkflowStage = false;
         nextStatus = nextStatus || 'assigned';
       }
       if (validatedData.assignee_type === 'ai') {
         updates.push('assigned_human_id = ?');
         values.push(null);
+        shouldRegeneratePlan = true;
       }
     }
 
@@ -295,7 +235,6 @@ export async function PATCH(
         values.push(null);
         nextStatus = nextStatus || 'assigned';
         shouldDispatch = false;
-        shouldDispatchWorkflowStage = false;
       }
     }
 
@@ -317,6 +256,10 @@ export async function PATCH(
     values.push(id);
 
     run(`UPDATE tasks SET ${updates.join(', ')} WHERE id = ?`, values);
+
+    if (effectiveAssigneeType === 'ai' && shouldRegeneratePlan) {
+      generateTaskWorkflowPlan(id);
+    }
 
     // Fetch updated task with all joined fields
     const task = queryOne<Task>(
@@ -387,37 +330,9 @@ export async function PATCH(
 
     // Trigger workflow-aware dispatch if needed
     if (shouldDispatch && readinessIssues.length === 0 && effectiveAssigneeType === 'ai') {
-      // Try the workflow engine first — it handles role-based handoffs
-      const workflowResult = await handleStageTransition(id, nextStatus || 'assigned', {
+      await handleStageTransition(id, nextStatus || 'assigned', {
         previousStatus: existing.status,
       });
-
-      if (!workflowResult.handedOff) {
-        // No workflow template or no role for this stage — fall back to legacy dispatch
-        const missionControlUrl = getMissionControlUrl();
-        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-        if (process.env.MC_API_TOKEN) {
-          headers['Authorization'] = `Bearer ${process.env.MC_API_TOKEN}`;
-        }
-
-        try {
-          const dispatchRes = await fetch(`${missionControlUrl}/api/tasks/${id}/dispatch`, {
-            method: 'POST',
-            headers,
-          });
-
-          if (!dispatchRes.ok) {
-            const errorText = await dispatchRes.text();
-            const dispatchError = `Auto-dispatch failed (${dispatchRes.status}): ${errorText}`;
-            console.error(dispatchError);
-            run('UPDATE tasks SET planning_dispatch_error = ?, updated_at = ? WHERE id = ?', [dispatchError, now, id]);
-          }
-        } catch (err) {
-          const dispatchError = `Auto-dispatch error: ${(err as Error).message}`;
-          console.error(dispatchError);
-          run('UPDATE tasks SET planning_dispatch_error = ?, updated_at = ? WHERE id = ?', [dispatchError, now, id]);
-        }
-      }
     }
 
     // Trigger workflow handoff for forward stage transitions (testing, review, verification)
@@ -448,41 +363,6 @@ export async function PATCH(
         const refreshed = queryOne<Task>('SELECT * FROM tasks WHERE id = ?', [id]);
         if (refreshed) broadcast({ type: 'task_updated', payload: refreshed });
       }
-    }
-
-    // Agent manually assigned to a task already in a workflow stage — dispatch directly
-    if (shouldDispatchWorkflowStage && effectiveAssignedAgentId && effectiveAssigneeType === 'ai') {
-      const currentStatus = nextStatus || existing.status;
-      console.log(`[PATCH] Agent assigned in workflow stage "${currentStatus}" — dispatching`);
-      // Clear any previous dispatch error
-      run('UPDATE tasks SET planning_dispatch_error = NULL, updated_at = ? WHERE id = ?', [now, id]);
-
-      const missionControlUrl = getMissionControlUrl();
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (process.env.MC_API_TOKEN) {
-        headers['Authorization'] = `Bearer ${process.env.MC_API_TOKEN}`;
-      }
-      try {
-        const dispatchRes = await fetch(`${missionControlUrl}/api/tasks/${id}/dispatch`, {
-          method: 'POST',
-          headers,
-        });
-        if (!dispatchRes.ok) {
-          const errorText = await dispatchRes.text();
-          console.error(`[PATCH] Workflow stage dispatch failed: ${errorText}`);
-          run('UPDATE tasks SET planning_dispatch_error = ?, updated_at = ? WHERE id = ?', [`Dispatch failed (${dispatchRes.status}): ${errorText}`, now, id]);
-        }
-      } catch (err) {
-        console.error('[PATCH] Workflow stage dispatch error:', err);
-        run('UPDATE tasks SET planning_dispatch_error = ?, updated_at = ? WHERE id = ?', [`Dispatch error: ${(err as Error).message}`, now, id]);
-      }
-      // Re-broadcast with latest state
-      const refreshed = queryOne<Task>(
-        `SELECT t.*, aa.name as assigned_agent_name
-         FROM tasks t LEFT JOIN agents aa ON t.assigned_agent_id = aa.id WHERE t.id = ?`,
-        [id]
-      );
-      if (refreshed) broadcast({ type: 'task_updated', payload: refreshed });
     }
 
     // Notify learner on stage transitions (non-blocking)

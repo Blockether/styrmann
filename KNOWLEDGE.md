@@ -1,6 +1,6 @@
 # KNOWLEDGE.md -- Mission Control
 
-Last updated: 2026-03-09
+Last updated: 2026-03-10
 
 ---
 
@@ -63,9 +63,9 @@ Also: `pending_dispatch` (transient, pre-dispatch state).
 
 **Fail-loopback**: Testing or verification failure returns task to `in_progress` and re-dispatches the builder.
 
-**Task creation behavior**: New tasks choose an assignee type. `ai` tasks are created without direct agent picking and stay in `inbox` (or `planning` when planning mode is enabled), with workflow role mapping handled later in the task's Team tab. `human` tasks require a selected human and move to `assigned`, which triggers an email through Himalaya.
+**Task creation behavior**: New AI tasks no longer expose manual loop, template, or per-task execution controls. The orchestrator generates a workflow plan immediately from existing agents and linked skills only, stores it on the task, and leaves the task in `inbox` until execution begins. Human tasks still require a selected human and move to `assigned`, which triggers an email through Himalaya.
 
-**Task fields**: title, description, status, priority (low/normal/high/urgent), task_type (bug/feature/chore/documentation/research), effort (1-5), impact (1-5), assignee_type (`ai` | `human`), assigned_agent_id, assigned_human_id, milestone_id, workflow_template_id, due_date, tags.
+**Task fields**: title, description, status, priority (low/normal/high/urgent), task_type (bug/feature/chore/documentation/research), effort (1-5), impact (1-5), assignee_type (`ai` | `human`), assigned_agent_id, assigned_human_id, milestone_id, workflow_template_id, workflow_plan_id, due_date, tags.
 
 Tasks get sprint context via `milestone.sprint_id`. There is no direct `sprint_id` on tasks.
 
@@ -162,22 +162,23 @@ Workspace-scoped. Many-to-many with tasks via `task_tags` junction table. Each t
 
 ## Workflow Engine
 
-Four workflow templates: Simple, Standard, Strict, Auto-Train.
+Workflow planning is now orchestrator-owned. The system chooses among the existing template shapes (Simple, Standard, Strict, Auto-Train where applicable), persists a concrete plan per task, and never creates new agents dynamically.
 
 | Template | Pipeline | Default |
 |----------|----------|---------|
-| Simple | Builder -> Done | No |
+| Simple | Builder -> Reviewer -> Done | No |
 | Standard | Builder -> Tester -> Reviewer -> Done | No |
-| Strict | Builder -> Tester -> Human Verifier (queue) -> Reviewer (verification) -> Done | Yes |
+| Strict | Builder -> Tester -> Verify -> Review -> Done | Yes |
 | Auto-Train | Builder -> Loop Complete | No |
 
-The Strict template is the default. The `review` stage is labeled "Human Verifier" -- it is a queue stage (role=null, no dispatch). Verification is active QC by the `reviewer` role.
+The Strict template is the default. Per-task workflow plans persist selected participants, per-step skills, loopback targets, findings, and learner proposals.
 
-**Workflow engine** (`src/lib/workflow-engine.ts`):
-- `handleStageTransition()` -- Triggered on status changes to testing, review, or verification. Looks up role agent from `task_roles` table, assigns, dispatches.
-- If no agent for a role: sets `planning_dispatch_error` on the task (shown as red banner on task card).
+**Workflow engine** (`src/lib/workflow-engine.ts` + `src/lib/workflow-planning.ts`):
+- `generateTaskWorkflowPlan()` selects existing agents only, derives per-step skills from linked shared skills, and stores the plan in `task_workflow_plans`.
+- Missing capability creates a `task_findings` record and optional learner `capability_proposals` entry pointing to the meta repository. No dynamic agent creation is allowed.
+- `handleStageTransition()` uses orchestrator-populated `task_roles` to assign and dispatch the correct existing agent for the active step.
 - Fail-loopback: `POST /api/tasks/{id}/fail` routes task back to `in_progress` and re-dispatches builder.
-- **Orchestrator guard**: `populateTaskRolesFromAgents()` skips agents with `role = 'orchestrator'`. Orchestrators are not auto-assigned to workflow stages.
+- Orchestrators are planners/supervisors only. They are not auto-assigned to workflow execution stages.
 
 **Builder hard gate (server-side):**
 - Builder-owned tasks cannot move forward (`testing`/`review`/`verification`/`done`) without implementation evidence.
@@ -185,7 +186,7 @@ The Strict template is the default. The `review` stage is labeled "Human Verifie
 - Evidence rule: at least one file deliverable OR at least one git commit in workspace repo since task creation.
 - Violations return `409` and task status is not advanced.
 
-**Template definitions are hardcoded** in `src/lib/workflow-templates.ts`. New workspaces get templates provisioned from these code constants via `provisionWorkflowTemplates()`. The legacy `cloneWorkflowTemplates()` in `bootstrap-agents.ts` delegates to the same function for backward compatibility.
+**Template definitions are hardcoded** in `src/lib/workflow-templates.ts`. New workspaces get templates provisioned from these code constants via `provisionWorkflowTemplates()`. The orchestrator then picks among these shapes and persists the selected plan to the task.
 
 **Auto-Train loop:**
 - `task_type='autotrain'` marks a task as a continuous repo-improvement loop.
@@ -223,7 +224,7 @@ The Strict template is the default. The `review` stage is labeled "Human Verifie
 
 **OpenClaw modal policy**: Synced OpenClaw agents are inspected read-only in the Agent modal. The Operations/OpenClaw view is now a management entrypoint, not a direct prompt editor for synced agents.
 
-**Skill linking policy**: Main OpenClaw agent skills are treated as the shared source. Sub-agents link skills via symlinks into their workspace `skills/` directories (no copy). Mission Control exposes `/api/agents/{id}/skills` for listing and link/unlink/sync actions.
+**Skill linking policy**: Main OpenClaw agent skills are treated as the shared source. Sub-agents link skills via symlinks into their workspace `skills/` directories (no copy). Mission Control exposes `/api/agents/{id}/skills` for listing and link/unlink/sync actions. Workflow planning reads these linked skills when choosing which existing agent should run each step.
 
 ### Human Assignments & Himalaya
 
@@ -349,7 +350,7 @@ Fallback: Task polling every 60s, event polling every 30s.
 ### Core Tables
 - **workspaces** -- slug (`{org}-{repo}` format), name, description, icon, github_repo, owner_email, coordinator_email, logo_url, organization
 - **agents** -- name, role, status, model, source, gateway_agent_id, session_key_prefix, agent_dir, agent_workspace_path, soul_md, user_md, agents_md. No `is_master` column.
-- **tasks** -- title, description, status, priority, task_type, effort, impact, assigned_agent_id, milestone_id, workflow_template_id, due_date, github_issue_id (nullable FK to github_issues), planning fields. No `sprint_id`. No `parent_task_id`.
+- **tasks** -- title, description, status, priority, task_type, effort, impact, assigned_agent_id, milestone_id, workflow_template_id, workflow_plan_id, due_date, github_issue_id (nullable FK to github_issues), planning fields. No `sprint_id`. No `parent_task_id`.
 - **sprints** -- workspace_id, name, goal, sprint_number, start_date, end_date, status
 - **milestones** -- workspace_id, name, description, due_date, status, coordinator_agent_id, sprint_id (FK nullable), priority ('low'|'normal'|'high'|'urgent')
 - **milestone_dependencies** -- id, milestone_id, depends_on_milestone_id (nullable), depends_on_task_id (nullable), dependency_type ('finish_to_start'|'blocks')
@@ -363,6 +364,9 @@ Fallback: Task polling every 60s, event polling every 30s.
 - **task_activities** -- activity_type, message, agent_id, metadata (JSON)
 - **task_deliverables** -- deliverable_type (file/url/artifact), title, path, description
 - **task_roles** -- role, agent_id (unique per task+role)
+- **task_workflow_plans** -- orchestrator_agent_id, workflow_template_id, workflow_name, summary, participants_json, steps_json
+- **task_findings** -- finding_type, severity, title, detail, metadata
+- **capability_proposals** -- learner_agent_id, proposal_type, title, detail, target_name, meta_workspace_id, meta_workspace_slug, status
 
 ### Workflow and Knowledge Tables
 - **workflow_templates** -- stages (JSON array), fail_targets (JSON), is_default
@@ -372,7 +376,7 @@ Fallback: Task polling every 60s, event polling every 30s.
 - **openclaw_sessions** -- agent_id, openclaw_session_id, channel, status, session_type (persistent/subagent), task_id, ended_at
 - **events** -- type, agent_id, task_id, message, metadata
 - **conversations** / **messages** / **conversation_participants** -- agent-to-agent messaging
-- **planning_questions** / **planning_specs** -- AI planning Q&A flow
+- **planning_questions** / **planning_specs** -- legacy AI planning Q&A flow metadata still present; execution planning now comes from persisted orchestrator workflow plans
 - **businesses** -- legacy table, kept for compatibility
 - **github_issues** -- workspace_id, github_id (integer), issue_number, title, body, state ('open'|'closed'), state_reason, labels (JSON string), assignees (JSON string), github_url, author, created_at_github, updated_at_github, synced_at, task_id (nullable FK to tasks). Unique constraint on (workspace_id, issue_number). Indexes on workspace_id and (workspace_id, state).
 - **task_provenance** -- task_id, session_id, kind ('external_user'|'inter_session'|'internal_system'), origin_session_id, source_session_key, source_channel, source_tool, receipt_text, receipt_data (JSON). Stores ACP provenance metadata and Source Receipt blocks parsed from OpenClaw session history.

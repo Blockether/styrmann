@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Loader2, Paperclip, Pencil, Plus, Route, Search, Trash2, Upload } from 'lucide-react';
 import type { Agent, KnowledgeAttachment, KnowledgeEntry, KnowledgeRoutingDecision } from '@/lib/types';
 
@@ -23,6 +23,15 @@ const DEFAULT_FORM: EntryForm = {
   tags: '',
   confidence: 0.7,
 };
+
+const KNOWLEDGE_CATEGORIES = [
+  { value: 'pattern', label: 'Pattern', description: 'Reusable implementation or workflow pattern.' },
+  { value: 'fix', label: 'Fix', description: 'Known issue and the working fix for it.' },
+  { value: 'checklist', label: 'Checklist', description: 'Step-by-step operational or verification checklist.' },
+  { value: 'failure', label: 'Failure', description: 'Failure mode, root cause, and how to avoid it.' },
+  { value: 'research', label: 'Research', description: 'Validated discovery or external reference insight.' },
+  { value: 'guideline', label: 'Guideline', description: 'Durable rule or guardrail for future work.' },
+] as const;
 
 function toArrayTags(raw: string): string[] {
   return raw
@@ -52,7 +61,7 @@ export function KnowledgeView({ workspaceId }: KnowledgeViewProps) {
   const [routeDrafts, setRouteDrafts] = useState<Record<string, string[]>>({});
   const [savingRouteEntryId, setSavingRouteEntryId] = useState<string | null>(null);
 
-  const loadAgents = async () => {
+  const loadAgents = useCallback(async () => {
     try {
       const res = await fetch(`/api/agents?workspace_id=${encodeURIComponent(workspaceId)}`);
       if (!res.ok) throw new Error('Failed to load agents');
@@ -62,9 +71,9 @@ export function KnowledgeView({ workspaceId }: KnowledgeViewProps) {
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Failed to load agents');
     }
-  };
+  }, [workspaceId]);
 
-  const loadEntries = async (agentIdFilter: string) => {
+  const loadEntries = useCallback(async (agentIdFilter: string) => {
     setLoading(true);
     try {
       const url = new URL(`/api/workspaces/${workspaceId}/knowledge`, window.location.origin);
@@ -92,15 +101,15 @@ export function KnowledgeView({ workspaceId }: KnowledgeViewProps) {
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    loadAgents();
   }, [workspaceId]);
 
   useEffect(() => {
+    loadAgents();
+  }, [loadAgents]);
+
+  useEffect(() => {
     loadEntries(selectedAgentId);
-  }, [workspaceId, selectedAgentId]);
+  }, [loadEntries, selectedAgentId]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -336,12 +345,15 @@ export function KnowledgeView({ workspaceId }: KnowledgeViewProps) {
       <div className="border border-mc-border rounded-lg p-4 space-y-3">
         <h3 className="text-sm font-medium">Create Knowledge Entry</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <input
+          <select
             value={form.category}
             onChange={(event) => setForm({ ...form, category: event.target.value })}
-            placeholder="Category"
             className="min-h-11 bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm"
-          />
+          >
+            {KNOWLEDGE_CATEGORIES.map((category) => (
+              <option key={category.value} value={category.value}>{category.label}</option>
+            ))}
+          </select>
           <input
             type="number"
             step="0.05"
@@ -351,6 +363,9 @@ export function KnowledgeView({ workspaceId }: KnowledgeViewProps) {
             onChange={(event) => setForm({ ...form, confidence: Number(event.target.value) || 0.7 })}
             className="min-h-11 bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm"
           />
+        </div>
+        <div className="text-xs text-mc-text-secondary">
+          {KNOWLEDGE_CATEGORIES.find((category) => category.value === form.category)?.description}
         </div>
         <input
           value={form.title}
@@ -414,11 +429,15 @@ export function KnowledgeView({ workspaceId }: KnowledgeViewProps) {
               {inEdit ? (
                 <div className="space-y-2 border border-mc-border/70 rounded p-3">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    <input
+                    <select
                       value={editForm.category}
                       onChange={(event) => setEditForm({ ...editForm, category: event.target.value })}
                       className="min-h-11 bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm"
-                    />
+                    >
+                      {KNOWLEDGE_CATEGORIES.map((category) => (
+                        <option key={`edit-${category.value}`} value={category.value}>{category.label}</option>
+                      ))}
+                    </select>
                     <input
                       type="number"
                       step="0.05"

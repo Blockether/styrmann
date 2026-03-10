@@ -1936,6 +1936,67 @@ const migrations: Migration[] = [
       db.exec('CREATE INDEX IF NOT EXISTS idx_knowledge_routing_decisions_knowledge ON knowledge_routing_decisions(knowledge_id, created_at DESC)');
       db.exec('CREATE INDEX IF NOT EXISTS idx_knowledge_routing_decisions_agent ON knowledge_routing_decisions(agent_id, created_at DESC)');
     }
+  },
+  {
+    id: '040',
+    name: 'add_orchestrator_workflow_plans_and_proposals',
+    up: (db) => {
+      const tasksInfo = db.prepare(`PRAGMA table_info(tasks)`).all() as Array<{ name: string }>;
+      if (!tasksInfo.some((column) => column.name === 'workflow_plan_id')) {
+        db.exec(`ALTER TABLE tasks ADD COLUMN workflow_plan_id TEXT`);
+      }
+
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS task_workflow_plans (
+          id TEXT PRIMARY KEY,
+          task_id TEXT NOT NULL UNIQUE REFERENCES tasks(id) ON DELETE CASCADE,
+          workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+          orchestrator_agent_id TEXT REFERENCES agents(id) ON DELETE SET NULL,
+          workflow_template_id TEXT REFERENCES workflow_templates(id) ON DELETE SET NULL,
+          workflow_name TEXT NOT NULL,
+          summary TEXT NOT NULL,
+          participants_json TEXT NOT NULL,
+          steps_json TEXT NOT NULL,
+          created_at TEXT DEFAULT (datetime('now')),
+          updated_at TEXT DEFAULT (datetime('now'))
+        )
+      `);
+
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS task_findings (
+          id TEXT PRIMARY KEY,
+          task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+          workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+          finding_type TEXT NOT NULL,
+          severity TEXT NOT NULL,
+          title TEXT NOT NULL,
+          detail TEXT NOT NULL,
+          metadata TEXT,
+          created_at TEXT DEFAULT (datetime('now'))
+        )
+      `);
+
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS capability_proposals (
+          id TEXT PRIMARY KEY,
+          task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+          workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+          learner_agent_id TEXT REFERENCES agents(id) ON DELETE SET NULL,
+          proposal_type TEXT NOT NULL,
+          title TEXT NOT NULL,
+          detail TEXT NOT NULL,
+          target_name TEXT NOT NULL,
+          meta_workspace_id TEXT REFERENCES workspaces(id) ON DELETE SET NULL,
+          meta_workspace_slug TEXT,
+          status TEXT DEFAULT 'open',
+          created_at TEXT DEFAULT (datetime('now'))
+        )
+      `);
+
+      db.exec('CREATE INDEX IF NOT EXISTS idx_task_workflow_plans_task ON task_workflow_plans(task_id)');
+      db.exec('CREATE INDEX IF NOT EXISTS idx_task_findings_task ON task_findings(task_id, created_at DESC)');
+      db.exec('CREATE INDEX IF NOT EXISTS idx_capability_proposals_task ON capability_proposals(task_id, created_at DESC)');
+    }
   }
 ];
 

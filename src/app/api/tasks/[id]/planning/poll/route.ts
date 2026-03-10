@@ -4,6 +4,7 @@ import { getOpenClawClient } from '@/lib/openclaw/client';
 import { broadcast } from '@/lib/events';
 import { getMissionControlUrl } from '@/lib/config';
 import { extractJSON, getMessagesFromOpenClaw } from '@/lib/planning-utils';
+import { generateTaskWorkflowPlan } from '@/lib/workflow-planning';
 import { Task } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
@@ -21,140 +22,22 @@ if (isNaN(PLANNING_POLL_INTERVAL_MS) || PLANNING_POLL_INTERVAL_MS < 100) {
 
 // Helper to handle planning completion with proper error handling
 async function handlePlanningCompletion(taskId: string, parsed: any, messages: any[]) {
-  const db = getDb();
-  let dispatchError: string | null = null;
-  let firstAgentId: string | null = null;
+  const dispatchError: string | null = null;
+  run(
+    `UPDATE tasks
+     SET planning_messages = ?,
+         planning_spec = ?,
+         planning_agents = ?,
+         planning_complete = 1,
+         assigned_agent_id = NULL,
+         status = 'inbox',
+         planning_dispatch_error = NULL,
+         updated_at = datetime('now')
+     WHERE id = ?`,
+    [JSON.stringify(messages), JSON.stringify(parsed.spec || null), JSON.stringify(parsed.agents || []), taskId],
+  );
 
-  // Transaction 1: Save planning data, create agents, AND assign agent to task
-  // (Assigning before dispatch fixes the chicken-and-egg bug where dispatch
-  // checks assigned_agent_id and fails because it wasn't set yet)
-  const transaction = db.transaction(() => {
-    const allowDynamicAgents = process.env.ALLOW_DYNAMIC_AGENTS !== 'false';
-
-    if (allowDynamicAgents && parsed.agents && parsed.agents.length > 0) {
-      const insertAgent = db.prepare(`
-        INSERT INTO agents (id, workspace_id, name, role, description, status, soul_md, created_at, updated_at)
-        VALUES (?, (SELECT workspace_id FROM tasks WHERE id = ?), ?, ?, ?, 'standby', ?, datetime('now'), datetime('now'))
-      `);
-
-      for (const agent of parsed.agents) {
-        const agentId = crypto.randomUUID();
-        if (!firstAgentId) firstAgentId = agentId;
-
-        insertAgent.run(
-          agentId,
-          taskId,
-          agent.name,
-          agent.role,
-          agent.instructions || '',
-          agent.soul_md || ''
-        );
-      }
-    } else if (!allowDynamicAgents && parsed.agents && parsed.agents.length > 0) {
-      console.log(`[Planning Poll] Dynamic agent generation disabled (ALLOW_DYNAMIC_AGENTS=false), skipping creation of ${parsed.agents.length} agent(s)`);
-    }
-
-    // Save planning data + assign the first agent + mark complete in one atomic step
-    db.prepare(`
-      UPDATE tasks
-      SET planning_messages = ?,
-          planning_spec = ?,
-          planning_agents = ?,
-          planning_complete = 1,
-          assigned_agent_id = ?,
-          status = 'assigned',
-          planning_dispatch_error = NULL,
-          updated_at = datetime('now')
-      WHERE id = ?
-    `).run(
-      JSON.stringify(messages),
-      JSON.stringify(parsed.spec),
-      JSON.stringify(parsed.agents),
-      firstAgentId,
-      taskId
-    );
-
-    return firstAgentId;
-  });
-
-  firstAgentId = transaction();
-
-  // Re-check for other orchestrators before dispatching
-  if (firstAgentId) {
-    const task = queryOne<{ workspace_id: string }>('SELECT workspace_id FROM tasks WHERE id = ?', [taskId]);
-    if (task) {
-      const defaultMaster = queryOne<{ id: string }>(
-        `SELECT id FROM agents WHERE role = 'orchestrator' AND workspace_id = ? ORDER BY created_at ASC LIMIT 1`,
-        [task.workspace_id]
-      );
-      const otherOrchestrators = queryAll<{ id: string; name: string }>(
-        `SELECT id, name FROM agents WHERE role = 'orchestrator' AND id != ? AND workspace_id = ? AND status != 'offline'`,
-        [defaultMaster?.id ?? '', task.workspace_id]
-      );
-
-      if (otherOrchestrators.length > 0) {
-        dispatchError = `Cannot auto-dispatch: ${otherOrchestrators.length} other orchestrator(s) available in workspace`;
-        console.warn(`[Planning Poll] ${dispatchError}:`, otherOrchestrators.map(o => o.name).join(', '));
-        firstAgentId = null;
-      }
-    }
-  }
-
-  // Idempotency check
-  let skipDispatch = false;
-  if (firstAgentId) {
-    const currentTask = queryOne<{ status: string }>('SELECT status FROM tasks WHERE id = ?', [taskId]);
-    if (currentTask?.status === 'in_progress') {
-      console.log('[Planning Poll] Task already in progress, skipping dispatch');
-      skipDispatch = true;
-    }
-  }
-
-  // Trigger dispatch using proper URL resolution
-  if (firstAgentId && !skipDispatch) {
-    const missionControlUrl = getMissionControlUrl();
-    const dispatchUrl = `${missionControlUrl}/api/tasks/${taskId}/dispatch`;
-    console.log(`[Planning Poll] Triggering dispatch: ${dispatchUrl}`);
-
-    try {
-      const dispatchHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (process.env.MC_API_TOKEN) {
-        dispatchHeaders['Authorization'] = `Bearer ${process.env.MC_API_TOKEN}`;
-      }
-
-      const dispatchRes = await fetch(dispatchUrl, {
-        method: 'POST',
-        headers: dispatchHeaders,
-      });
-
-      if (dispatchRes.ok) {
-        console.log(`[Planning Poll] Dispatch successful`);
-      } else {
-        const errorText = await dispatchRes.text();
-        dispatchError = `Dispatch failed (${dispatchRes.status}): ${errorText}`;
-        console.error(`[Planning Poll] ${dispatchError}`);
-      }
-    } catch (err) {
-      dispatchError = `Dispatch error: ${(err as Error).message}`;
-      console.error(`[Planning Poll] ${dispatchError}`);
-    }
-  }
-
-  // On dispatch failure: keep planning data intact, just record the error.
-  // Task stays in 'assigned' so user can retry dispatch without re-planning.
-  if (dispatchError) {
-    run(
-      `UPDATE tasks SET planning_dispatch_error = ?, status_reason = ?, updated_at = datetime('now') WHERE id = ?`,
-      [dispatchError, 'Dispatch failed: ' + dispatchError, taskId]
-    );
-    console.log(`[Planning Poll] Dispatch failed for task ${taskId}, planning data preserved: ${dispatchError}`);
-  } else if (!firstAgentId) {
-    // No agent created — move to inbox for manual assignment
-    run(
-      `UPDATE tasks SET status = 'inbox', planning_dispatch_error = NULL, updated_at = datetime('now') WHERE id = ?`,
-      [taskId]
-    );
-  }
+  generateTaskWorkflowPlan(taskId);
 
   // Broadcast task update
   const updatedTask = queryOne<Task>('SELECT * FROM tasks WHERE id = ?', [taskId]);
@@ -162,7 +45,7 @@ async function handlePlanningCompletion(taskId: string, parsed: any, messages: a
     broadcast({ type: 'task_updated', payload: updatedTask });
   }
 
-  return { firstAgentId, parsed, dispatchError };
+  return { firstAgentId: null, parsed, dispatchError };
 }
 
 // GET /api/tasks/[id]/planning/poll - Check for new messages from OpenClaw

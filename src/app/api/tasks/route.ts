@@ -5,6 +5,7 @@ import { broadcast } from '@/lib/events';
 import { getMissionControlUrl } from '@/lib/config';
 import { getHimalayaStatus, sendHumanAssignmentEmail } from '@/lib/himalaya';
 import { CreateTaskSchema } from '@/lib/validation';
+import { generateTaskWorkflowPlan } from '@/lib/workflow-planning';
 import type { Task, CreateTaskRequest, Agent, Human } from '@/lib/types';
 
 // GET /api/tasks - List all tasks with optional filters
@@ -138,15 +139,8 @@ export async function POST(request: NextRequest) {
     const assigneeType = validatedData.assignee_type || 'ai';
     const status = validatedData.status || (assigneeType === 'human' ? 'assigned' : 'inbox');
 
-    // Auto-assign the workspace's default workflow template
-    const defaultTemplate = queryOne<{ id: string }>(
-      'SELECT id FROM workflow_templates WHERE workspace_id = ? AND is_default = 1 LIMIT 1',
-      [workspaceId]
-    );
-    const workflowTemplateId = defaultTemplate?.id || null;
-
     const { github_issue_id } = validatedData;
-    const assignedAgentId = assigneeType === 'ai' ? null : null;
+    const assignedAgentId = null;
     const assignedHumanId = assigneeType === 'human' ? (validatedData.assigned_human_id || null) : null;
 
     if (assigneeType === 'human' && !assignedHumanId) {
@@ -181,11 +175,16 @@ export async function POST(request: NextRequest) {
         validatedData.milestone_id || null,
         validatedData.business_id || 'default',
         validatedData.due_date || null,
-        workflowTemplateId,
+        null,
         github_issue_id || null,
+        now,
         now,
       ]
     );
+
+    if (assigneeType === 'ai') {
+      generateTaskWorkflowPlan(id);
+    }
 
     // Link github issue to this task if provided
     if (github_issue_id) {

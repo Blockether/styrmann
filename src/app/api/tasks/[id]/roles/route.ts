@@ -47,68 +47,14 @@ export async function PUT(
   const { id: taskId } = await params;
 
   try {
-    const body = await request.json();
-    const { roles } = body;
-
-    if (!Array.isArray(roles)) {
-      return NextResponse.json(
-        { error: 'roles must be an array of { role, agent_id }' },
-        { status: 400 }
-      );
-    }
-
     const task = queryOne<Task>('SELECT * FROM tasks WHERE id = ?', [taskId]);
     if (!task) {
       return NextResponse.json({ error: 'Task not found' }, { status: 404 });
     }
-
-    const db = getDb();
-    db.transaction(() => {
-      // Clear existing roles
-      db.prepare('DELETE FROM task_roles WHERE task_id = ?').run(taskId);
-
-      // Insert new roles
-      const insert = db.prepare(
-        `INSERT INTO task_roles (id, task_id, role, agent_id, created_at)
-         VALUES (?, ?, ?, ?, datetime('now'))`
-      );
-
-      for (const { role, agent_id } of roles) {
-        if (role && agent_id) {
-          insert.run(crypto.randomUUID(), taskId, role, agent_id);
-        }
-      }
-
-      // Also set the primary assigned_agent_id to the builder (first role) if not set
-      if (roles.length > 0 && !task.assigned_agent_id && (task.assignee_type || 'ai') === 'ai') {
-        const builderRole = roles.find((r: { role: string }) => r.role === 'builder') || roles[0];
-        if (builderRole) {
-          db.prepare('UPDATE tasks SET assignee_type = ?, assigned_human_id = NULL, assigned_agent_id = ?, updated_at = datetime(\'now\') WHERE id = ?')
-            .run('ai', builderRole.agent_id, taskId);
-        }
-      }
-    })();
-
-    // Fetch and return updated roles
-    const updatedRoles = queryAll(
-      `SELECT tr.*, a.name as agent_name
-       FROM task_roles tr
-       JOIN agents a ON tr.agent_id = a.id
-       WHERE tr.task_id = ?
-       ORDER BY tr.created_at ASC`,
-      [taskId]
+    return NextResponse.json(
+      { error: 'Task role assignments are orchestrator-managed and cannot be edited manually.' },
+      { status: 403 },
     );
-
-    const updatedTask = queryOne<Task>(
-      `SELECT t.*, aa.name as assigned_agent_name
-       FROM tasks t LEFT JOIN agents aa ON t.assigned_agent_id = aa.id WHERE t.id = ?`,
-      [taskId]
-    );
-    if (updatedTask) {
-      broadcast({ type: 'task_updated', payload: updatedTask });
-    }
-
-    return NextResponse.json(updatedRoles);
   } catch (error) {
     console.error('Failed to update task roles:', error);
     return NextResponse.json({ error: 'Failed to update roles' }, { status: 500 });

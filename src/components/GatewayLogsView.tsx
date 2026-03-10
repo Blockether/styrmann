@@ -23,7 +23,12 @@ interface GatewayLogsResponse {
   entries: GatewayLogEntry[];
 }
 
-export function GatewayLogsView() {
+interface GatewayLogsViewProps {
+  logsView?: 'sessions' | 'gateway';
+  onLogsViewChange?: (view: 'sessions' | 'gateway') => void;
+}
+
+export function GatewayLogsView({ logsView = 'gateway', onLogsViewChange }: GatewayLogsViewProps) {
   const [logs, setLogs] = useState<GatewayLogEntry[]>([]);
   const [source, setSource] = useState('unknown');
   const [total, setTotal] = useState(0);
@@ -116,12 +121,28 @@ export function GatewayLogsView() {
     <div data-component="src/components/GatewayLogsView" className="flex-1 flex flex-col overflow-hidden">
       <div className="p-3 border-b border-mc-border bg-mc-bg-secondary flex items-center justify-between gap-2 flex-wrap">
         <div>
-          <p className="text-sm font-medium text-mc-text">OpenClaw Gateway Runtime Logs</p>
+          <p className="text-sm font-medium text-mc-text">OpenClaw Logs</p>
           <p className="text-xs text-mc-text-secondary">
-            Source: <span className="font-mono">{source}</span> · Unit: <span className="font-mono">{unit}</span> · Timezone: <span className="font-mono">{OPENCLAW_TIMEZONE}</span>
+            Switch between session transcripts and gateway runtime logs. Source: <span className="font-mono">{source}</span> · Unit: <span className="font-mono">{unit}</span> · Timezone: <span className="font-mono">{OPENCLAW_TIMEZONE}</span>
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap justify-end">
+          {onLogsViewChange && (
+            <div className="inline-flex items-center rounded border border-mc-border overflow-hidden min-h-11">
+              <button
+                onClick={() => onLogsViewChange('sessions')}
+                className={`px-3 min-h-11 text-sm transition-colors ${logsView === 'sessions' ? 'bg-mc-accent text-white' : 'bg-mc-bg hover:bg-mc-bg-tertiary text-mc-text-secondary'}`}
+              >
+                Sessions
+              </button>
+              <button
+                onClick={() => onLogsViewChange('gateway')}
+                className={`px-3 min-h-11 text-sm transition-colors ${logsView === 'gateway' ? 'bg-mc-accent text-white' : 'bg-mc-bg hover:bg-mc-bg-tertiary text-mc-text-secondary'}`}
+              >
+                Gateway
+              </button>
+            </div>
+          )}
           <button
             onClick={() => setShowFilters((prev) => !prev)}
             className={`flex items-center gap-2 px-3 min-h-11 border rounded text-sm transition-colors ${

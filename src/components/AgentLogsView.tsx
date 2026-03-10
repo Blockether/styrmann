@@ -20,6 +20,8 @@ import { AgentInitials } from './AgentInitials';
 
 interface AgentLogsViewProps {
   workspaceId?: string;
+  logsView?: 'sessions' | 'gateway';
+  onLogsViewChange?: (view: 'sessions' | 'gateway') => void;
 }
 
 type RoleFilter = 'all' | 'user' | 'assistant' | 'system';
@@ -47,7 +49,7 @@ interface LogsResponse {
   hasMore: boolean;
 }
 
-export function AgentLogsView({ workspaceId }: AgentLogsViewProps) {
+export function AgentLogsView({ workspaceId, logsView = 'sessions', onLogsViewChange }: AgentLogsViewProps) {
   const [logs, setLogs] = useState<AgentLog[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -258,8 +260,31 @@ export function AgentLogsView({ workspaceId }: AgentLogsViewProps) {
       className="flex-1 flex flex-col overflow-hidden"
     >
       {/* Toolbar */}
-      <div className="p-3 border-b border-mc-border bg-mc-bg-secondary flex items-center justify-end gap-2 flex-wrap">
-        <div className="flex items-center gap-2">
+      <div className="p-3 border-b border-mc-border bg-mc-bg-secondary flex items-center justify-between gap-2 flex-wrap">
+        <div>
+          <div className="flex items-center gap-2 text-sm font-medium text-mc-text">
+            <MessageSquare className="w-4 h-4 text-mc-text-secondary" />
+            <span>OpenClaw Logs</span>
+          </div>
+          <p className="mt-1 text-xs text-mc-text-secondary">Switch between session transcripts and gateway runtime logs.</p>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap justify-end">
+          {onLogsViewChange && (
+            <div className="inline-flex items-center rounded border border-mc-border overflow-hidden min-h-11">
+              <button
+                onClick={() => onLogsViewChange('sessions')}
+                className={`px-3 min-h-11 text-sm transition-colors ${logsView === 'sessions' ? 'bg-mc-accent text-white' : 'bg-mc-bg hover:bg-mc-bg-tertiary text-mc-text-secondary'}`}
+              >
+                Sessions
+              </button>
+              <button
+                onClick={() => onLogsViewChange('gateway')}
+                className={`px-3 min-h-11 text-sm transition-colors ${logsView === 'gateway' ? 'bg-mc-accent text-white' : 'bg-mc-bg hover:bg-mc-bg-tertiary text-mc-text-secondary'}`}
+              >
+                Gateway
+              </button>
+            </div>
+          )}
           <button
             onClick={() => setShowFilters(!showFilters)}
             className={`flex items-center gap-2 px-3 min-h-11 border rounded text-sm transition-colors ${

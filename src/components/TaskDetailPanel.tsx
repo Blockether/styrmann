@@ -681,7 +681,7 @@ export function TaskDetailPanel({ taskId, onClose }: TaskDetailPanelProps) {
                     </select>
                   ) : (
                     <div className="text-xs text-mc-text-secondary bg-mc-bg border border-mc-border rounded px-3 py-2">
-                      AI tasks use workflow role mapping in the Team tab. Direct agent selection is removed here.
+                      AI tasks use orchestrator-owned workflow planning. Direct agent selection is removed here.
                     </div>
                   )}
                 </div>

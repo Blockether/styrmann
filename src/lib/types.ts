@@ -197,6 +197,7 @@ export interface Task {
   planning_complete?: number;
   planning_dispatch_error?: string;
   planning_session_key?: string;
+  workflow_plan_id?: string | null;
   created_at: string;
   updated_at: string;
   assigned_agent?: Agent;
@@ -309,6 +310,69 @@ export interface WorkflowStage {
   label: string;
   role: string | null;
   status: TaskStatus;
+}
+
+export interface WorkflowPlanStep {
+  id: string;
+  label: string;
+  role: string | null;
+  status: TaskStatus;
+  kind: 'execution' | 'verification' | 'queue';
+  sequence: number;
+  agent_id?: string | null;
+  agent_name?: string | null;
+  agent_role?: string | null;
+  skills: string[];
+  loop_target_status?: string | null;
+}
+
+export interface WorkflowPlanParticipant {
+  agent_id: string;
+  agent_name: string;
+  agent_role: string;
+  skills: string[];
+  planner?: boolean;
+}
+
+export interface TaskWorkflowPlan {
+  id: string;
+  task_id: string;
+  workspace_id: string;
+  orchestrator_agent_id?: string | null;
+  workflow_template_id?: string | null;
+  workflow_name: string;
+  summary: string;
+  participants: WorkflowPlanParticipant[];
+  steps: WorkflowPlanStep[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TaskFinding {
+  id: string;
+  task_id: string;
+  workspace_id: string;
+  finding_type: 'missing_agent' | 'missing_skill' | 'planning_note';
+  severity: 'info' | 'warn' | 'critical';
+  title: string;
+  detail: string;
+  metadata?: string;
+  created_at: string;
+}
+
+export interface CapabilityProposal {
+  id: string;
+  task_id: string;
+  workspace_id: string;
+  learner_agent_id?: string | null;
+  proposal_type: 'agent' | 'skill';
+  title: string;
+  detail: string;
+  target_name: string;
+  meta_workspace_id?: string | null;
+  meta_workspace_slug?: string | null;
+  status: 'open' | 'accepted' | 'rejected';
+  created_at: string;
 }
 
 export interface WorkflowTemplate {
@@ -491,7 +555,6 @@ export interface CreateTaskRequest {
   effort?: number;
   impact?: number;
   assignee_type?: 'ai' | 'human';
-  assigned_agent_id?: string;
   assigned_human_id?: string;
   created_by_agent_id?: string;
   workspace_id?: string;

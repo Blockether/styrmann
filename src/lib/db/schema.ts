@@ -132,6 +132,7 @@ CREATE TABLE IF NOT EXISTS tasks (
   business_id TEXT DEFAULT 'default',
   due_date TEXT,
   workflow_template_id TEXT REFERENCES workflow_templates(id),
+  workflow_plan_id TEXT,
   planning_session_key TEXT,
   planning_messages TEXT,
   planning_complete INTEGER DEFAULT 0,
@@ -176,6 +177,47 @@ CREATE TABLE IF NOT EXISTS task_comments (
   content TEXT NOT NULL,
   created_at TEXT DEFAULT (datetime('now')),
   updated_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS task_workflow_plans (
+  id TEXT PRIMARY KEY,
+  task_id TEXT NOT NULL UNIQUE REFERENCES tasks(id) ON DELETE CASCADE,
+  workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  orchestrator_agent_id TEXT REFERENCES agents(id) ON DELETE SET NULL,
+  workflow_template_id TEXT REFERENCES workflow_templates(id) ON DELETE SET NULL,
+  workflow_name TEXT NOT NULL,
+  summary TEXT NOT NULL,
+  participants_json TEXT NOT NULL,
+  steps_json TEXT NOT NULL,
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS task_findings (
+  id TEXT PRIMARY KEY,
+  task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  finding_type TEXT NOT NULL,
+  severity TEXT NOT NULL,
+  title TEXT NOT NULL,
+  detail TEXT NOT NULL,
+  metadata TEXT,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS capability_proposals (
+  id TEXT PRIMARY KEY,
+  task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  learner_agent_id TEXT REFERENCES agents(id) ON DELETE SET NULL,
+  proposal_type TEXT NOT NULL,
+  title TEXT NOT NULL,
+  detail TEXT NOT NULL,
+  target_name TEXT NOT NULL,
+  meta_workspace_id TEXT REFERENCES workspaces(id) ON DELETE SET NULL,
+  meta_workspace_slug TEXT,
+  status TEXT DEFAULT 'open',
+  created_at TEXT DEFAULT (datetime('now'))
 );
 
 -- Task blockers
@@ -486,6 +528,9 @@ CREATE INDEX IF NOT EXISTS idx_openclaw_sessions_task ON openclaw_sessions(task_
 CREATE INDEX IF NOT EXISTS idx_planning_questions_task ON planning_questions(task_id, sort_order);
 CREATE INDEX IF NOT EXISTS idx_workflow_templates_workspace ON workflow_templates(workspace_id);
 CREATE INDEX IF NOT EXISTS idx_task_roles_task ON task_roles(task_id);
+CREATE INDEX IF NOT EXISTS idx_task_workflow_plans_task ON task_workflow_plans(task_id);
+CREATE INDEX IF NOT EXISTS idx_task_findings_task ON task_findings(task_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_capability_proposals_task ON capability_proposals(task_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_knowledge_entries_workspace ON knowledge_entries(workspace_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_knowledge_entries_task ON knowledge_entries(task_id);
 CREATE INDEX IF NOT EXISTS idx_knowledge_entries_agent ON knowledge_entries(agent_id, created_at DESC);
