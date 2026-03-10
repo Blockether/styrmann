@@ -78,6 +78,21 @@ export function OperationsDashboard() {
     return () => clearInterval(interval);
   }, [fetchSummary]);
 
+  useEffect(() => {
+    if (typeof window === 'undefined' || window.location.hash) return;
+
+    const openClawSection = document.getElementById('openclaw');
+    if (!openClawSection) return;
+
+    const url = new URL(window.location.href);
+    url.hash = 'openclaw';
+    window.history.replaceState({}, '', url.toString());
+
+    requestAnimationFrame(() => {
+      openClawSection.scrollIntoView({ block: 'start' });
+    });
+  }, []);
+
   const statusTone = (ok: boolean | null) => {
     if (ok === null) return 'border-mc-border text-mc-text-secondary bg-mc-bg';
     return ok
