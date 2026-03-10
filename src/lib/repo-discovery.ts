@@ -9,8 +9,8 @@
  *   - Display name: {Org}/{Repo} (e.g., Blockether/Mission Control)
  *   - Organization stored in workspace.organization column
  *
- * The 'default' workspace (id='default') maps to blockether/mission-control
- * for FK stability. All other repos get new workspaces.
+ * Mission Control is discovered like any other repository.
+ * The internal OpenClaw meta repository is modeled separately in the DB.
  *
  * Flat repos (no org parent) are ignored — only org/repo structure is discovered.
  * Templates are provisioned from code constants, not cloned from another workspace.
@@ -92,32 +92,17 @@ export function discoverRepoWorkspaces(db: Database.Database): void {
   for (const discovered of repos) {
     const { org, repo, slug, displayName, githubRepo } = discovered;
 
-    // Special case: blockether/mission-control maps to the 'default' workspace
-    if (org === 'blockether' && repo === 'mission-control') {
-      db.prepare(`
-        UPDATE workspaces
-        SET name = ?, slug = ?, github_repo = ?, organization = ?, updated_at = datetime('now')
-        WHERE id = 'default'
-      `).run(displayName, slug, githubRepo, org);
-
-      provisionWorkflowTemplates(db, 'default');
-      console.log(`[RepoDiscovery] Updated default workspace → ${slug}`);
-      continue;
-    }
-
-    // Check if workspace already exists — match by new slug, old slug (repo-only), or github_repo
     const oldSlug = repo; // backward compat: previous discovery used repo name only
     const existing = db.prepare(
-      'SELECT id, slug FROM workspaces WHERE slug = ? OR slug = ? OR github_repo = ? LIMIT 1',
-    ).get(slug, oldSlug, githubRepo) as { id: string; slug: string } | undefined;
+      'SELECT id, slug FROM workspaces WHERE slug = ? OR slug = ? OR github_repo = ? OR local_path = ? LIMIT 1',
+    ).get(slug, oldSlug, githubRepo, discovered.repoPath) as { id: string; slug: string } | undefined;
 
     if (existing) {
-      // Normalize: update slug, name, org, github_repo
       db.prepare(`
         UPDATE workspaces
-        SET slug = ?, name = ?, github_repo = ?, organization = ?, updated_at = datetime('now')
+        SET slug = ?, name = ?, github_repo = ?, organization = ?, is_internal = 0, repo_kind = 'standard', local_path = ?, updated_at = datetime('now')
         WHERE id = ?
-      `).run(slug, displayName, githubRepo, org, existing.id);
+      `).run(slug, displayName, githubRepo, org, discovered.repoPath, existing.id);
 
       if (existing.slug !== slug) {
         console.log(`[RepoDiscovery] Renamed workspace '${existing.slug}' → '${slug}'`);
@@ -132,9 +117,9 @@ export function discoverRepoWorkspaces(db: Database.Database): void {
     // Create new workspace
     const id = crypto.randomUUID();
     db.prepare(`
-      INSERT INTO workspaces (id, name, slug, description, icon, github_repo, organization)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(id, displayName, slug, null, 'BL', githubRepo, org);
+      INSERT INTO workspaces (id, name, slug, description, icon, github_repo, is_internal, repo_kind, local_path, organization)
+      VALUES (?, ?, ?, ?, ?, ?, 0, 'standard', ?, ?)
+    `).run(id, displayName, slug, null, 'BL', githubRepo, discovered.repoPath, org);
 
     provisionWorkflowTemplates(db, id);
     console.log(`[RepoDiscovery] Created workspace '${slug}' for ${org}/${repo}`);

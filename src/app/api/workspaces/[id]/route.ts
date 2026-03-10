@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { fetchRepoDescription } from '@/lib/github';
+import type { Workspace } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
 // GET /api/workspaces/[id] - Get a single workspace
@@ -43,7 +44,7 @@ export async function PATCH(
     const db = getDb();
     
     // Check workspace exists
-    const existing = db.prepare('SELECT * FROM workspaces WHERE id = ?').get(id);
+    const existing = db.prepare('SELECT * FROM workspaces WHERE id = ?').get(id) as Workspace | undefined;
     if (!existing) {
       return NextResponse.json({ error: 'Workspace not found' }, { status: 404 });
     }
@@ -65,6 +66,9 @@ export async function PATCH(
       values.push(icon);
     }
     if (github_repo !== undefined) {
+      if (existing.is_internal) {
+        return NextResponse.json({ error: 'Internal system repositories cannot be linked to GitHub' }, { status: 403 });
+      }
       updates.push('github_repo = ?');
       values.push(github_repo);
 
