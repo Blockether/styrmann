@@ -1,8 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import Link from 'next/link';
-import { Activity, ArrowDown, Bot, CheckCircle2, Cpu, Mail, RefreshCw, ShieldCheck, Wrench, XCircle } from 'lucide-react';
+import { Activity, Bot, CheckCircle2, Cpu, Mail, RefreshCw, ShieldCheck, XCircle } from 'lucide-react';
 import { OpenClawPanel } from './OpenClawPanel';
 import { HumanManagementPanel } from './HumanManagementPanel';
 import { SystemPanel } from './SystemPanel';
@@ -26,12 +25,25 @@ interface AgentSummary {
   status?: string;
 }
 
+type OperationsTab = 'system' | 'gateway' | 'agents' | 'humans';
+
+function resolveOperationsTabFromHash(hash: string): OperationsTab | null {
+  const normalized = hash.replace(/^#/, '').toLowerCase();
+  if (!normalized) return null;
+  if (normalized === 'system' || normalized === 'system-runtime') return 'system';
+  if (normalized === 'gateway' || normalized === 'openclaw') return 'gateway';
+  if (normalized === 'agents') return 'agents';
+  if (normalized === 'humans') return 'humans';
+  return null;
+}
+
 export function OperationsDashboard() {
   const [loadingSummary, setLoadingSummary] = useState(true);
   const [openClawConnected, setOpenClawConnected] = useState<boolean | null>(null);
   const [daemonFresh, setDaemonFresh] = useState<boolean | null>(null);
   const [servicesHealthy, setServicesHealthy] = useState<boolean | null>(null);
   const [workingAgents, setWorkingAgents] = useState<number | null>(null);
+  const [activeTab, setActiveTab] = useState<OperationsTab>('gateway');
 
   const fetchSummary = useCallback(async () => {
     try {
@@ -79,18 +91,36 @@ export function OperationsDashboard() {
   }, [fetchSummary]);
 
   useEffect(() => {
-    if (typeof window === 'undefined' || window.location.hash) return;
+    if (typeof window === 'undefined') return;
 
-    const openClawSection = document.getElementById('openclaw');
-    if (!openClawSection) return;
+    const updateFromHash = (replaceIfMissing: boolean) => {
+      const resolved = resolveOperationsTabFromHash(window.location.hash);
+      if (resolved) {
+        setActiveTab(resolved);
+        return;
+      }
 
+      setActiveTab('gateway');
+      if (replaceIfMissing) {
+        const url = new URL(window.location.href);
+        url.hash = 'gateway';
+        window.history.replaceState({}, '', url.toString());
+      }
+    };
+
+    updateFromHash(true);
+
+    const onHashChange = () => updateFromHash(false);
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, []);
+
+  const switchTab = useCallback((tab: OperationsTab) => {
+    setActiveTab(tab);
+    if (typeof window === 'undefined') return;
     const url = new URL(window.location.href);
-    url.hash = 'openclaw';
-    window.history.replaceState({}, '', url.toString());
-
-    requestAnimationFrame(() => {
-      openClawSection.scrollIntoView({ block: 'start' });
-    });
+    url.hash = tab;
+    window.history.pushState({}, '', url.toString());
   }, []);
 
   const statusTone = (ok: boolean | null) => {
@@ -117,19 +147,51 @@ export function OperationsDashboard() {
                 Start with runtime validation, then move into gateway control and agent activity. This keeps incident triage and routine monitoring in one coherent lane.
               </p>
             </div>
-            <div className="w-full sm:w-auto grid grid-cols-2 gap-2 sm:gap-3 text-sm">
-              <Link href="#system-runtime" className="inline-flex items-center justify-center gap-2 px-3 min-h-11 border border-mc-border rounded bg-mc-bg hover:bg-mc-bg-tertiary transition-colors text-mc-text">
-                <Activity className="h-4 w-4 text-mc-accent" />
+            <div role="tablist" aria-label="Operations sections" className="w-full sm:w-auto grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 text-sm">
+              <button
+                role="tab"
+                aria-selected={activeTab === 'system'}
+                aria-controls="operations-panel-system"
+                id="operations-tab-system"
+                onClick={() => switchTab('system')}
+                className={`inline-flex items-center justify-center gap-2 px-3 min-h-11 border rounded transition-colors ${activeTab === 'system' ? 'border-mc-accent bg-mc-accent/10 text-mc-accent' : 'border-mc-border bg-mc-bg hover:bg-mc-bg-tertiary text-mc-text'}`}
+              >
+                <Activity className="h-4 w-4" />
                 <span>System</span>
-              </Link>
-              <Link href="#openclaw" className="inline-flex items-center justify-center gap-2 px-3 min-h-11 border border-mc-border rounded bg-mc-bg hover:bg-mc-bg-tertiary transition-colors text-mc-text">
-                <Cpu className="h-4 w-4 text-mc-accent" />
-                <span>OpenClaw</span>
-              </Link>
-              <Link href="#humans" className="inline-flex items-center justify-center gap-2 px-3 min-h-11 border border-mc-border rounded bg-mc-bg hover:bg-mc-bg-tertiary transition-colors text-mc-text">
-                <Mail className="h-4 w-4 text-mc-accent" />
+              </button>
+              <button
+                role="tab"
+                aria-selected={activeTab === 'gateway'}
+                aria-controls="operations-panel-gateway"
+                id="operations-tab-gateway"
+                onClick={() => switchTab('gateway')}
+                className={`inline-flex items-center justify-center gap-2 px-3 min-h-11 border rounded transition-colors ${activeTab === 'gateway' ? 'border-mc-accent bg-mc-accent/10 text-mc-accent' : 'border-mc-border bg-mc-bg hover:bg-mc-bg-tertiary text-mc-text'}`}
+              >
+                <Cpu className="h-4 w-4" />
+                <span>Gateway</span>
+              </button>
+              <button
+                role="tab"
+                aria-selected={activeTab === 'agents'}
+                aria-controls="operations-panel-agents"
+                id="operations-tab-agents"
+                onClick={() => switchTab('agents')}
+                className={`inline-flex items-center justify-center gap-2 px-3 min-h-11 border rounded transition-colors ${activeTab === 'agents' ? 'border-mc-accent bg-mc-accent/10 text-mc-accent' : 'border-mc-border bg-mc-bg hover:bg-mc-bg-tertiary text-mc-text'}`}
+              >
+                <Bot className="h-4 w-4" />
+                <span>Agents</span>
+              </button>
+              <button
+                role="tab"
+                aria-selected={activeTab === 'humans'}
+                aria-controls="operations-panel-humans"
+                id="operations-tab-humans"
+                onClick={() => switchTab('humans')}
+                className={`inline-flex items-center justify-center gap-2 px-3 min-h-11 border rounded transition-colors ${activeTab === 'humans' ? 'border-mc-accent bg-mc-accent/10 text-mc-accent' : 'border-mc-border bg-mc-bg hover:bg-mc-bg-tertiary text-mc-text'}`}
+              >
+                <Mail className="h-4 w-4" />
                 <span>Humans</span>
-              </Link>
+              </button>
             </div>
           </div>
 
@@ -181,47 +243,81 @@ export function OperationsDashboard() {
           </div>
         </section>
 
-        <section id="system-runtime" className="rounded-xl border border-mc-border bg-mc-bg overflow-hidden">
-          <div className="p-4 border-b border-mc-border bg-mc-bg-secondary flex items-start justify-between gap-3 flex-wrap">
-            <div>
-              <div className="flex items-center gap-2 text-sm font-medium text-mc-text">
-                <Activity className="w-4 h-4 text-mc-text-secondary" />
-                <span>System Runtime</span>
+        {activeTab === 'system' && (
+          <section
+            id="operations-panel-system"
+            role="tabpanel"
+            aria-labelledby="operations-tab-system"
+            className="rounded-xl border border-mc-border bg-mc-bg overflow-hidden"
+          >
+            <div className="p-4 border-b border-mc-border bg-mc-bg-secondary flex items-start justify-between gap-3 flex-wrap">
+              <div>
+                <div className="flex items-center gap-2 text-sm font-medium text-mc-text">
+                  <Activity className="w-4 h-4 text-mc-text-secondary" />
+                  <span>System Runtime</span>
+                </div>
+                <p className="mt-1 text-sm text-mc-text-secondary">
+                  Monitor the host, daemon, scheduler, and configuration health before drilling into agent traffic.
+                </p>
               </div>
-              <p className="mt-1 text-sm text-mc-text-secondary">
-                Monitor the host, daemon, scheduler, and configuration health before drilling into agent traffic.
-              </p>
             </div>
-          </div>
-          <SystemPanel embedded />
-        </section>
+            <SystemPanel embedded />
+          </section>
+        )}
 
-        <div className="flex items-center justify-center">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-mc-border bg-mc-bg-secondary text-xs text-mc-text-secondary">
-            <Wrench className="w-3.5 h-3.5" />
-            <span>After runtime checks, continue into OpenClaw control and logs</span>
-            <ArrowDown className="w-3.5 h-3.5" />
-          </div>
-        </div>
-
-        <section id="openclaw" className="rounded-xl border border-mc-border bg-mc-bg overflow-hidden">
-          <div className="p-4 border-b border-mc-border bg-mc-bg-secondary flex items-start justify-between gap-3 flex-wrap">
-            <div>
-              <div className="flex items-center gap-2 text-sm font-medium text-mc-text">
-                <Cpu className="w-4 h-4 text-mc-text-secondary" />
-                <span>OpenClaw Control Plane</span>
+        {activeTab === 'gateway' && (
+          <section
+            id="operations-panel-gateway"
+            role="tabpanel"
+            aria-labelledby="operations-tab-gateway"
+            className="rounded-xl border border-mc-border bg-mc-bg overflow-hidden"
+          >
+            <div className="p-4 border-b border-mc-border bg-mc-bg-secondary flex items-start justify-between gap-3 flex-wrap">
+              <div>
+                <div className="flex items-center gap-2 text-sm font-medium text-mc-text">
+                  <Cpu className="w-4 h-4 text-mc-text-secondary" />
+                  <span>OpenClaw Gateway</span>
+                </div>
+                <p className="mt-1 text-sm text-mc-text-secondary">
+                  Gateway connectivity, models, security posture, and runtime logs.
+                </p>
               </div>
-              <p className="mt-1 text-sm text-mc-text-secondary">
-                Track gateway connectivity, active agents, model defaults, security posture, and live session output in one place.
-              </p>
             </div>
-          </div>
-          <OpenClawPanel embedded />
-        </section>
+            <OpenClawPanel embedded focusArea="gateway" />
+          </section>
+        )}
 
-        <section id="humans">
-          <HumanManagementPanel />
-        </section>
+        {activeTab === 'agents' && (
+          <section
+            id="operations-panel-agents"
+            role="tabpanel"
+            aria-labelledby="operations-tab-agents"
+            className="rounded-xl border border-mc-border bg-mc-bg overflow-hidden"
+          >
+            <div className="p-4 border-b border-mc-border bg-mc-bg-secondary flex items-start justify-between gap-3 flex-wrap">
+              <div>
+                <div className="flex items-center gap-2 text-sm font-medium text-mc-text">
+                  <Bot className="w-4 h-4 text-mc-text-secondary" />
+                  <span>Agent Management</span>
+                </div>
+                <p className="mt-1 text-sm text-mc-text-secondary">
+                  Create agents, open agent settings, and jump directly to skill link configuration.
+                </p>
+              </div>
+            </div>
+            <OpenClawPanel embedded focusArea="agents" />
+          </section>
+        )}
+
+        {activeTab === 'humans' && (
+          <section
+            id="operations-panel-humans"
+            role="tabpanel"
+            aria-labelledby="operations-tab-humans"
+          >
+            <HumanManagementPanel />
+          </section>
+        )}
       </main>
     </div>
   );

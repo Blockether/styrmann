@@ -205,7 +205,7 @@ export function Header({ workspace, isPortrait = true, onMenuToggle, sidebarOpen
             {workspace && (
               <div className="flex items-center gap-2">
                 <Link
-                  href="/operations#openclaw"
+                  href="/operations#agents"
                   className="inline-flex items-center gap-2 px-2.5 py-1.5 border border-mc-border rounded bg-mc-bg hover:bg-mc-bg-tertiary transition-colors text-sm text-mc-text"
                 >
                   <Bot className="w-4 h-4 text-mc-accent" />

@@ -12,6 +12,8 @@ import {
   Power,
   Save,
   CheckCircle2,
+  Plus,
+  Link2,
   ChevronDown,
   ChevronRight,
   ScrollText,
@@ -72,9 +74,10 @@ interface AuditResult {
 
 interface OpenClawPanelProps {
   embedded?: boolean;
+  focusArea?: 'gateway' | 'agents';
 }
 
-export function OpenClawPanel({ embedded = false }: OpenClawPanelProps) {
+export function OpenClawPanel({ embedded = false, focusArea = 'gateway' }: OpenClawPanelProps) {
   const [status, setStatus] = useState<OpenClawStatus | null>(null);
   const [models, setModels] = useState<OpenClawModels | null>(null);
   const [agents, setAgents] = useState<Agent[]>([]);
@@ -91,6 +94,10 @@ export function OpenClawPanel({ embedded = false }: OpenClawPanelProps) {
   const [auditing, setAuditing] = useState<'idle' | 'deep' | 'fix'>('idle');
   const [expandedFindings, setExpandedFindings] = useState<Set<string>>(new Set());
   const [logsView, setLogsView] = useState<'sessions' | 'gateway'>('sessions');
+  const [creatingAgent, setCreatingAgent] = useState(false);
+  const [modalInitialTab, setModalInitialTab] = useState<'info' | 'workspace' | 'soul' | 'user' | 'agents'>('info');
+
+  const isAgentsFocus = focusArea === 'agents';
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -161,6 +168,18 @@ export function OpenClawPanel({ embedded = false }: OpenClawPanelProps) {
       <div className="border-b border-mc-border bg-mc-bg-secondary">
         <div className={toolbarInnerClass}>
           <div className="flex items-center gap-2">
+            {isAgentsFocus && (
+              <button
+                onClick={() => {
+                  setModalInitialTab('info');
+                  setCreatingAgent(true);
+                }}
+                className="flex items-center gap-2 px-3 min-h-11 border border-mc-border rounded text-sm hover:bg-mc-bg-tertiary transition-colors"
+              >
+                <Plus className="w-4 h-4" />
+                <span className="hidden sm:inline">Create Agent</span>
+              </button>
+            )}
             <button
               onClick={async () => {
                 setRestarting(true);
@@ -208,8 +227,14 @@ export function OpenClawPanel({ embedded = false }: OpenClawPanelProps) {
         )}
 
         <div className="space-y-6">
+          {isAgentsFocus && (
+            <div className="rounded-lg border border-mc-border bg-mc-bg-secondary p-3 text-sm text-mc-text-secondary">
+              Use <span className="font-medium text-mc-text">Create Agent</span> for new entries, then open the <span className="font-medium text-mc-text">link icon</span> on synced agents to manage shared skill links in the workspace tab.
+            </div>
+          )}
+
           {/* Card 1: Gateway Status (Full Width) */}
-          <div className="rounded-lg border border-mc-border bg-mc-bg overflow-hidden">
+          {!isAgentsFocus && <div className="rounded-lg border border-mc-border bg-mc-bg overflow-hidden">
             <div className="p-3 border-b border-mc-border bg-mc-bg-secondary flex items-center gap-2">
               <Wifi className="w-4 h-4 text-mc-text-secondary" />
               <h3 className="text-sm font-medium">Gateway Status</h3>
@@ -261,10 +286,10 @@ export function OpenClawPanel({ embedded = false }: OpenClawPanelProps) {
                 </div>
               )}
             </div>
-          </div>
+          </div>}
 
           {/* Bottom Row: Agent Occupation + Models */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className={`grid grid-cols-1 ${isAgentsFocus ? '' : 'lg:grid-cols-2'} gap-6`}>
             {/* Card 2: Agent Occupation */}
             <div className="rounded-lg border border-mc-border bg-mc-bg overflow-hidden">
               <div className="p-3 border-b border-mc-border bg-mc-bg-secondary flex items-center justify-between gap-2">
@@ -324,9 +349,25 @@ export function OpenClawPanel({ embedded = false }: OpenClawPanelProps) {
                               )}
 
                               {/* Edit button */}
+                              {agent.source === 'synced' && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setModalInitialTab('workspace');
+                                    setEditingAgent(agent);
+                                  }}
+                                  className="p-1 rounded hover:bg-mc-bg-tertiary text-mc-text-secondary hover:text-mc-text transition-colors flex-shrink-0"
+                                  title={`Configure skills for ${agent.name}`}
+                                >
+                                  <Link2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+
+                              {/* Edit button */}
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
+                                  setModalInitialTab('info');
                                   setEditingAgent(agent);
                                 }}
                                 className="p-1 rounded hover:bg-mc-bg-tertiary text-mc-text-secondary hover:text-mc-text transition-colors flex-shrink-0"
@@ -413,7 +454,7 @@ export function OpenClawPanel({ embedded = false }: OpenClawPanelProps) {
             </div>
 
             {/* Card 3: Models + Default Model Selector */}
-            <div className="rounded-lg border border-mc-border bg-mc-bg overflow-hidden">
+            {!isAgentsFocus && <div className="rounded-lg border border-mc-border bg-mc-bg overflow-hidden">
               <div className="p-3 border-b border-mc-border bg-mc-bg-secondary flex items-center gap-2">
                 <Cpu className="w-4 h-4 text-mc-text-secondary" />
                 <h3 className="text-sm font-medium">Models</h3>
@@ -514,11 +555,11 @@ export function OpenClawPanel({ embedded = false }: OpenClawPanelProps) {
                   </div>
                 )}
               </div>
-            </div>
+            </div>}
 
           </div>
           {/* Card: Security Audit */}
-          <div className="rounded-lg border border-mc-border bg-mc-bg overflow-hidden">
+          {!isAgentsFocus && <div className="rounded-lg border border-mc-border bg-mc-bg overflow-hidden">
             <div className="p-3 border-b border-mc-border bg-mc-bg-secondary flex items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <Shield className="w-4 h-4 text-mc-text-secondary" />
@@ -674,10 +715,10 @@ export function OpenClawPanel({ embedded = false }: OpenClawPanelProps) {
                 </div>
               )}
             </div>
-          </div>
+          </div>}
 
           {/* Card: Live Agent Logs */}
-          <div className="rounded-lg border border-mc-border bg-mc-bg overflow-hidden">
+          {!isAgentsFocus && <div className="rounded-lg border border-mc-border bg-mc-bg overflow-hidden">
             <div className="h-[600px] flex flex-col">
               <div className="p-3 border-b border-mc-border bg-mc-bg-secondary flex items-center justify-between gap-2 flex-wrap">
                 <div>
@@ -706,14 +747,20 @@ export function OpenClawPanel({ embedded = false }: OpenClawPanelProps) {
               </div>
               {logsView === 'sessions' ? <AgentLogsView /> : <GatewayLogsView />}
             </div>
-          </div>
+          </div>}
         </div>
       </div>
 
-      {editingAgent && (
+      {(editingAgent || creatingAgent) && (
         <AgentModal
-          agent={editingAgent}
-          onClose={() => { setEditingAgent(null); fetchData(); }}
+          agent={editingAgent || undefined}
+          initialTab={modalInitialTab}
+          onClose={() => {
+            setEditingAgent(null);
+            setCreatingAgent(false);
+            setModalInitialTab('info');
+            fetchData();
+          }}
         />
       )}
     </div>

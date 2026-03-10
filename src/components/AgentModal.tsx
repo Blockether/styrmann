@@ -10,6 +10,7 @@ interface AgentModalProps {
   onClose: () => void;
   workspaceId?: string;
   onAgentCreated?: (agentId: string) => void;
+  initialTab?: 'info' | 'workspace' | 'soul' | 'user' | 'agents';
 }
 
 interface BrowserEntry {
@@ -46,9 +47,9 @@ function parentPath(path: string): string {
   return parts.length <= 1 ? '.' : parts.slice(0, -1).join('/');
 }
 
-export function AgentModal({ agent, onClose, workspaceId, onAgentCreated }: AgentModalProps) {
+export function AgentModal({ agent, onClose, workspaceId, onAgentCreated, initialTab = 'info' }: AgentModalProps) {
   const { addAgent, updateAgent, agents } = useMissionControl();
-  const [activeTab, setActiveTab] = useState<'info' | 'workspace' | 'soul' | 'user' | 'agents'>('info');
+  const [activeTab, setActiveTab] = useState<'info' | 'workspace' | 'soul' | 'user' | 'agents'>(initialTab);
   const contentRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
@@ -56,6 +57,10 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated }: Agen
       contentRef.current.scrollTop = 0;
     }
   }, [activeTab]);
+
+  useEffect(() => {
+    setActiveTab(initialTab);
+  }, [initialTab]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [availableModels, setAvailableModels] = useState<string[]>([]);
   const [defaultModel, setDefaultModel] = useState<string>('');
