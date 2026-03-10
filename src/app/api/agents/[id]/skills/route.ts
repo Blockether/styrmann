@@ -171,7 +171,7 @@ export async function POST(
     }
     mkdirSync(agentSkillsRoot, { recursive: true });
 
-    const linkOne = (name: string, replaceLocal: boolean) => {
+    const linkOne = (name: string, replaceLocal: boolean): 'linked' | 'already_linked' => {
       const source = join(sharedRoot, name);
       if (!existsSync(source) || !statSync(source).isDirectory()) {
         throw new Error(`Shared skill not found: ${name}`);
@@ -181,7 +181,7 @@ export async function POST(
         const dstLstat = lstatSync(dest);
         if (dstLstat.isSymbolicLink()) {
           const currentTarget = resolve(agentSkillsRoot, readlinkSync(dest));
-          if (currentTarget === source) return;
+          if (currentTarget === source) return 'already_linked';
           if (!replaceLocal) throw new Error(`Skill ${name} already linked to another target`);
           rmSync(dest, { recursive: true, force: true });
         } else {
@@ -190,37 +190,84 @@ export async function POST(
         }
       }
       symlinkSync(source, dest, 'dir');
+      return 'linked';
     };
+
+    let message: string | null = null;
+    let syncResult: {
+      linked: number;
+      already_linked: number;
+      skipped_local_copy: number;
+      skipped_conflict: number;
+      skipped_missing_shared: number;
+      skipped_other: number;
+    } | null = null;
 
     if (action === 'link') {
       if (!skillName) return NextResponse.json({ error: 'skill_name is required for link' }, { status: 400 });
       linkOne(skillName, false);
+      message = `Linked shared skill: ${skillName}`;
     } else if (action === 'replace_with_link') {
       if (!skillName) return NextResponse.json({ error: 'skill_name is required for replace_with_link' }, { status: 400 });
       linkOne(skillName, true);
+      message = `Replaced local skill with shared link: ${skillName}`;
     } else if (action === 'unlink') {
       if (!skillName) return NextResponse.json({ error: 'skill_name is required for unlink' }, { status: 400 });
       const dest = join(agentSkillsRoot, skillName);
-      if (!existsSync(dest)) return NextResponse.json({ ok: true, message: 'Skill not linked', data: inspectSkills(agent) });
+      if (!existsSync(dest)) {
+        return NextResponse.json({ ok: true, message: `Skill was not linked: ${skillName}`, data: inspectSkills(agent) });
+      }
       const dstLstat = lstatSync(dest);
       if (!dstLstat.isSymbolicLink()) {
         return NextResponse.json({ error: `Skill ${skillName} exists as local copy; use replace_with_link to convert` }, { status: 409 });
       }
       rmSync(dest, { recursive: true, force: true });
+      message = `Unlinked skill: ${skillName}`;
     } else if (action === 'sync_all') {
       const available = listSkillDirs(sharedRoot);
+      let linked = 0;
+      let alreadyLinked = 0;
+      let skippedLocalCopy = 0;
+      let skippedConflict = 0;
+      let skippedMissingShared = 0;
+      let skippedOther = 0;
+
       for (const name of available) {
         try {
-          linkOne(name, false);
-        } catch {
-          continue;
+          const result = linkOne(name, false);
+          if (result === 'already_linked') {
+            alreadyLinked += 1;
+          } else {
+            linked += 1;
+          }
+        } catch (error) {
+          const errMessage = error instanceof Error ? error.message : 'Unknown error';
+          if (errMessage.includes('already exists as local copy')) {
+            skippedLocalCopy += 1;
+          } else if (errMessage.includes('already linked to another target')) {
+            skippedConflict += 1;
+          } else if (errMessage.includes('Shared skill not found')) {
+            skippedMissingShared += 1;
+          } else {
+            skippedOther += 1;
+          }
         }
       }
+
+      syncResult = {
+        linked,
+        already_linked: alreadyLinked,
+        skipped_local_copy: skippedLocalCopy,
+        skipped_conflict: skippedConflict,
+        skipped_missing_shared: skippedMissingShared,
+        skipped_other: skippedOther,
+      };
+      message = `Synced links: ${linked} linked, ${alreadyLinked} already linked, ${skippedLocalCopy} local copies skipped, ${skippedConflict} conflicts skipped, ${skippedMissingShared} missing shared, ${skippedOther} other skipped`;
     } else {
       return NextResponse.json({ error: 'Unsupported action. Use link, unlink, replace_with_link, or sync_all' }, { status: 400 });
     }
 
-    return NextResponse.json({ ok: true, data: inspectSkills(agent) });
+    return NextResponse.json({ ok: true, message, sync_result: syncResult, data: inspectSkills(agent) });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : 'Failed to manage skills' }, { status: 500 });
   }

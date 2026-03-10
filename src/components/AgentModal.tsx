@@ -68,6 +68,7 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated }: Agen
   const [skillsInfo, setSkillsInfo] = useState<SkillsPayload | null>(null);
   const [workspaceLoading, setWorkspaceLoading] = useState(false);
   const [workspaceError, setWorkspaceError] = useState<string | null>(null);
+  const [skillsActionNotice, setSkillsActionNotice] = useState<string | null>(null);
   const [skillsActionLoading, setSkillsActionLoading] = useState<string | null>(null);
   const isReadOnlySyncedAgent = Boolean(agent && agent.source === 'synced');
 
@@ -163,6 +164,7 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated }: Agen
     const key = `${action}:${skillName || '*'}`;
     setSkillsActionLoading(key);
     setWorkspaceError(null);
+    setSkillsActionNotice(null);
     try {
       const res = await fetch(`/api/agents/${agent.id}/skills`, {
         method: 'POST',
@@ -173,12 +175,44 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated }: Agen
       if (!res.ok) {
         throw new Error(payload.error || 'Skill action failed');
       }
+
+      const messageFromApi = typeof payload.message === 'string' ? payload.message : null;
+      const syncResult = payload.sync_result && typeof payload.sync_result === 'object'
+        ? payload.sync_result as {
+          linked?: number;
+          already_linked?: number;
+          skipped_local_copy?: number;
+          skipped_conflict?: number;
+          skipped_missing_shared?: number;
+          skipped_other?: number;
+        }
+        : null;
+
+      if (action === 'sync_all' && syncResult) {
+        const linked = Number(syncResult.linked || 0);
+        const alreadyLinked = Number(syncResult.already_linked || 0);
+        const skippedLocalCopy = Number(syncResult.skipped_local_copy || 0);
+        const skippedConflict = Number(syncResult.skipped_conflict || 0);
+        const skippedMissingShared = Number(syncResult.skipped_missing_shared || 0);
+        const skippedOther = Number(syncResult.skipped_other || 0);
+        setSkillsActionNotice(
+          `Sync finished: ${linked} linked, ${alreadyLinked} already linked, ${skippedLocalCopy} local copies skipped, ${skippedConflict} conflicts skipped, ${skippedMissingShared} missing shared, ${skippedOther} other skipped.`,
+        );
+      } else if (messageFromApi) {
+        setSkillsActionNotice(messageFromApi);
+      } else {
+        setSkillsActionNotice('Skill action completed.');
+      }
+
       setSkillsInfo(payload.data || null);
       const refreshed = await fetch(`/api/agents/${agent.id}/workspace?scope=workspace&path=skills`);
       if (refreshed.ok) {
         setSkillsBrowser(await refreshed.json());
+      } else {
+        setWorkspaceError('Skill action succeeded, but skill folder refresh failed. Use Refresh to reload workspace files.');
       }
     } catch (error) {
+      setSkillsActionNotice(null);
       setWorkspaceError(error instanceof Error ? error.message : 'Skill action failed');
     } finally {
       setSkillsActionLoading(null);
@@ -487,6 +521,12 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated }: Agen
                   {workspaceError && (
                     <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-400">
                       {workspaceError}
+                    </div>
+                  )}
+
+                  {skillsActionNotice && (
+                    <div className="rounded-lg border border-mc-accent-green/30 bg-mc-accent-green/10 px-3 py-2 text-sm text-mc-accent-green">
+                      {skillsActionNotice}
                     </div>
                   )}
 
