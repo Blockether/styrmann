@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
+import { createTaskActivity } from '@/lib/task-activity';
 import type { PlanningQuestion, PlanningCategory } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
@@ -121,11 +122,16 @@ export async function POST(
     `).run(specMarkdown, taskId);
 
     // Log activity
-    const activityId = crypto.randomUUID();
-    getDb().prepare(`
-      INSERT INTO task_activities (id, task_id, activity_type, message)
-      VALUES (?, ?, 'status_changed', 'Planning complete - spec locked and moved to inbox')
-    `).run(activityId, taskId);
+    createTaskActivity({
+      taskId,
+      activityType: 'status_changed',
+      message: 'Planning complete - spec locked and moved to inbox',
+      metadata: {
+        workflow_step: 'planning',
+        decision_event: true,
+        spec_locked: true,
+      },
+    });
 
     // Get the created spec
     const spec = getDb().prepare(

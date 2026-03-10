@@ -65,11 +65,15 @@ Also: `pending_dispatch` (transient, pre-dispatch state).
 
 **Task creation behavior**: New AI tasks no longer expose manual loop, template, or per-task execution controls. The orchestrator generates a workflow plan immediately from existing agents and linked skills only, stores it on the task, and leaves the task in `inbox` until execution begins. Human tasks still require a selected human and move to `assigned`, which triggers an email through Himalaya.
 
+**Task creation UI**: Manual agent loop configuration, task-level template picking, and direct execution settings are removed. The task modal now shows Planning, Proposals, Activity, Deliverables, and Sessions tabs.
+
 **Task fields**: title, description, status, priority (low/normal/high/urgent), task_type (bug/feature/chore/documentation/research), effort (1-5), impact (1-5), assignee_type (`ai` | `human`), assigned_agent_id, assigned_human_id, milestone_id, workflow_template_id, workflow_plan_id, due_date, tags.
 
 Tasks get sprint context via `milestone.sprint_id`. There is no direct `sprint_id` on tasks.
 
 **Task sub-resources**: comments, blockers (with blocked_by_task_id), resources (links/docs/designs), acceptance criteria (with is_met flag), activities (audit log), deliverables (file/url/artifact), task sessions and traces.
+
+**Workflow plan persistence**: Each AI task can store `workflow_plan_id`, pointing to a persisted orchestrator plan in `task_workflow_plans` with participants, per-step skills, and step order.
 
 ---
 
@@ -226,6 +230,15 @@ The Strict template is the default. Per-task workflow plans persist selected par
 
 **Skill linking policy**: Main OpenClaw agent skills are treated as the shared source. Sub-agents link skills via symlinks into their workspace `skills/` directories (no copy). Mission Control exposes `/api/agents/{id}/skills` for listing and link/unlink/sync actions. Workflow planning reads these linked skills when choosing which existing agent should run each step.
 
+### Presenter Role
+
+The Presenter is a core role that interprets technical execution data without changing execution.
+
+- Presenter summarizes task activity in real time from raw `task_activities`
+- Presenter does not dispatch work, change statuses, or create capabilities
+- Presenter output keeps full raw metadata and traces accessible via expansion
+- Activity filtering supports agent, workflow step, and decision-event views while task-level activity remains scoped to the current task
+
 ### Human Assignments & Himalaya
 
 - `humans` table stores assignable humans with `name`, `email`, and `is_active`.
@@ -362,6 +375,7 @@ Fallback: Task polling every 60s, event polling every 30s.
 - **task_resources** -- title, url, resource_type (link/document/design/api/reference)
 - **task_acceptance_criteria** -- description, is_met, sort_order
 - **task_activities** -- activity_type, message, agent_id, metadata (JSON)
+- **task_activities metadata** -- presenter-friendly fields such as `workflow_step`, `decision_event`, trace/session context, and tool-call details are stored in metadata JSON; presenter summaries are computed from these raw events
 - **task_deliverables** -- deliverable_type (file/url/artifact), title, path, description
 - **task_roles** -- role, agent_id (unique per task+role)
 - **task_workflow_plans** -- orchestrator_agent_id, workflow_template_id, workflow_name, summary, participants_json, steps_json

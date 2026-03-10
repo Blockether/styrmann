@@ -17,6 +17,7 @@ import {
 import { AgentInitials } from './AgentInitials';
 import { TraceViewerModal } from './TraceViewerModal';
 import { useTraceDeepLink } from '@/hooks/useTraceDeepLink';
+import { summarizeFeedItem } from '@/lib/activity-presentation';
 
 interface ActivityFeedProps {
   workspaceId: string;
@@ -45,7 +46,7 @@ interface FeedItem {
   activity_type: string | null;
   message: string;
   role: string | null;
-  metadata: Record<string, unknown> | null;
+  metadata: string | null;
   trace_url: string | null;
   created_at: string;
 }
@@ -94,7 +95,43 @@ export function ActivityFeed({ workspaceId, sprintId }: ActivityFeedProps) {
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
   const [expandedMessages, setExpandedMessages] = useState<Set<string>>(new Set());
   const [milestones, setMilestones] = useState<Milestone[]>([]);
+  const [taskFilter, setTaskFilter] = useState('');
+  const [agentFilter, setAgentFilter] = useState('all');
+  const [workflowStepFilter, setWorkflowStepFilter] = useState('all');
+  const [decisionOnly, setDecisionOnly] = useState(false);
   const { traceSessionId, traceTaskId, openTrace, closeTrace } = useTraceDeepLink();
+
+  const parseMetadata = useCallback((metadata: string | null): Record<string, unknown> | null => {
+    if (!metadata) return null;
+    try {
+      const parsed = JSON.parse(metadata);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        return parsed as Record<string, unknown>;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const inferWorkflowStep = useCallback((item: FeedItem): string | null => {
+    const metadata = parseMetadata(item.metadata);
+    if (typeof metadata?.workflow_step === 'string' && metadata.workflow_step) return metadata.workflow_step;
+    const lower = `${item.activity_type || ''} ${item.message}`.toLowerCase();
+    if (lower.includes('verification')) return 'verification';
+    if (lower.includes('review')) return 'review';
+    if (lower.includes('test')) return 'testing';
+    if (lower.includes('assigned')) return 'assigned';
+    if (lower.includes('dispatch') || lower.includes('build')) return 'in_progress';
+    return item.task_status;
+  }, [parseMetadata]);
+
+  const isDecisionEvent = useCallback((item: FeedItem): boolean => {
+    const metadata = parseMetadata(item.metadata);
+    if (typeof metadata?.decision_event === 'boolean') return metadata.decision_event;
+    const lower = `${item.activity_type || ''} ${item.message}`.toLowerCase();
+    return lower.includes('dispatch') || lower.includes('handoff') || lower.includes('fail') || lower.includes('accept') || lower.includes('review');
+  }, [parseMetadata]);
 
   // Fetch milestones for filter dropdown
   useEffect(() => {
@@ -170,11 +207,32 @@ export function ActivityFeed({ workspaceId, sprintId }: ActivityFeedProps) {
     fetchFeed(0, false);
   }, [fetchFeed]);
 
+  useEffect(() => {
+    const refresh = () => fetchFeed(0, false);
+    window.addEventListener('mc:activity-logged', refresh);
+    window.addEventListener('mc:task-updated', refresh);
+    return () => {
+      window.removeEventListener('mc:activity-logged', refresh);
+      window.removeEventListener('mc:task-updated', refresh);
+    };
+  }, [fetchFeed]);
+
   // Group items by task_id
   const groupedItems = useMemo(() => {
     const groups: Record<string, { task: { id: string; title: string; status: string } | null; milestone: { id: string; name: string } | null; items: FeedItem[] }> = {};
 
-    items.forEach((item) => {
+    items
+      .filter((item) => {
+        if (taskFilter.trim()) {
+          const q = taskFilter.trim().toLowerCase();
+          if (!`${item.task_title || ''} ${item.task_id || ''}`.toLowerCase().includes(q)) return false;
+        }
+        if (agentFilter !== 'all' && item.agent_id !== agentFilter) return false;
+        if (workflowStepFilter !== 'all' && inferWorkflowStep(item) !== workflowStepFilter) return false;
+        if (decisionOnly && !isDecisionEvent(item)) return false;
+        return true;
+      })
+      .forEach((item) => {
       const groupKey = item.task_id || '__unlinked__';
 
       if (!groups[groupKey]) {
@@ -190,7 +248,7 @@ export function ActivityFeed({ workspaceId, sprintId }: ActivityFeedProps) {
       }
 
       groups[groupKey].items.push(item);
-    });
+      });
 
     // Sort items within each group by created_at descending
     Object.values(groups).forEach((group) => {
@@ -198,7 +256,13 @@ export function ActivityFeed({ workspaceId, sprintId }: ActivityFeedProps) {
     });
 
     return groups;
-  }, [items]);
+  }, [agentFilter, decisionOnly, inferWorkflowStep, isDecisionEvent, items, taskFilter, workflowStepFilter]);
+
+  const agentOptions = useMemo(() => Array.from(new Map(items
+    .filter((item) => item.agent_id && item.agent_name)
+    .map((item) => [item.agent_id as string, { id: item.agent_id as string, name: item.agent_name as string }])).values()), [items]);
+
+  const workflowStepOptions = useMemo(() => Array.from(new Set(items.map((item) => inferWorkflowStep(item)).filter((step): step is string => Boolean(step)))), [inferWorkflowStep, items]);
 
   // Ordered group keys (tasks first, unlinked last)
   const groupOrder = useMemo(() => {
@@ -277,7 +341,37 @@ export function ActivityFeed({ workspaceId, sprintId }: ActivityFeedProps) {
             {total > 0 ? `${total} total` : ''}
           </span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap justify-end">
+          <input
+            value={taskFilter}
+            onChange={(e) => setTaskFilter(e.target.value)}
+            placeholder="Filter task"
+            className="min-h-11 px-3 py-2 bg-mc-bg border border-mc-border rounded text-sm"
+          />
+          <select
+            value={agentFilter}
+            onChange={(e) => setAgentFilter(e.target.value)}
+            className="min-h-11 px-2 py-2 bg-mc-bg border border-mc-border rounded text-sm focus:outline-none focus:border-mc-accent"
+          >
+            <option value="all">All Agents</option>
+            {agentOptions.map((agent) => (
+              <option key={agent.id} value={agent.id}>{agent.name}</option>
+            ))}
+          </select>
+          <select
+            value={workflowStepFilter}
+            onChange={(e) => setWorkflowStepFilter(e.target.value)}
+            className="min-h-11 px-2 py-2 bg-mc-bg border border-mc-border rounded text-sm focus:outline-none focus:border-mc-accent"
+          >
+            <option value="all">All Steps</option>
+            {workflowStepOptions.map((step) => (
+              <option key={step} value={step}>{step}</option>
+            ))}
+          </select>
+          <label className="inline-flex items-center gap-2 min-h-11 px-3 py-2 border border-mc-border rounded text-sm bg-mc-bg">
+            <input type="checkbox" checked={decisionOnly} onChange={(e) => setDecisionOnly(e.target.checked)} />
+            Decisions
+          </label>
           {/* Milestone Filter */}
           <select
             value={milestoneFilter}
@@ -403,6 +497,10 @@ export function ActivityFeed({ workspaceId, sprintId }: ActivityFeedProps) {
                         <div key={item.id} className="p-3 hover:bg-mc-bg-tertiary/30 transition-colors">
                           {(() => {
                             const messageText = typeof item.message === 'string' ? item.message : '';
+                            const metadata = parseMetadata(item.metadata);
+                            const summarizedMessage = summarizeFeedItem(messageText, metadata, item.source, item.activity_type);
+                            const workflowStep = inferWorkflowStep(item);
+                            const decisionEvent = isDecisionEvent(item);
                             return (
                           <div className="flex gap-3">
                             {/* Agent Avatar */}
@@ -434,6 +532,16 @@ export function ActivityFeed({ workspaceId, sprintId }: ActivityFeedProps) {
                                     {item.role || 'system'}
                                   </span>
                                 )}
+                                {workflowStep && (
+                                  <span className="px-2 py-0.5 rounded text-xs font-medium border border-mc-border text-mc-text-secondary">
+                                    {workflowStep}
+                                  </span>
+                                )}
+                                {decisionEvent && (
+                                  <span className="px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-700">
+                                    decision
+                                  </span>
+                                )}
                                 {item.agent_name && (
                                   <span className="text-xs text-mc-text-secondary">{item.agent_name}</span>
                                 )}
@@ -444,26 +552,23 @@ export function ActivityFeed({ workspaceId, sprintId }: ActivityFeedProps) {
                               </div>
 
                               {/* Message Content */}
-                              {item.source === 'activity' ? (
-                                <p className="text-sm text-mc-text">{messageText}</p>
-                              ) : (
-                                <div
-                                  className={`text-sm text-mc-text font-mono whitespace-pre-wrap break-words bg-mc-bg-tertiary rounded p-2 ${
-                                    expandedMessages.has(item.id) ? '' : 'line-clamp-4'
-                                  }`}
-                                >
-                                  {messageText}
-                                </div>
-                              )}
+                              <p className="text-sm text-mc-text">{summarizedMessage}</p>
 
                               {/* Expand/Collapse for long agent logs */}
-                              {item.source === 'agent_log' && messageText.split('\n').length > 4 && (
+                              {(item.source === 'agent_log' || metadata) && (
                                 <button
                                   onClick={() => toggleMessageExpand(item.id)}
                                   className="mt-2 text-xs text-mc-accent hover:underline"
                                 >
-                                  {expandedMessages.has(item.id) ? 'Show less' : 'Show more'}
+                                  {expandedMessages.has(item.id) ? 'Hide raw details' : 'Show raw details'}
                                 </button>
+                              )}
+
+                              {expandedMessages.has(item.id) && (
+                                <div className="mt-2 p-2 bg-mc-bg-tertiary rounded text-[11px] font-mono whitespace-pre-wrap break-words">
+                                  <div>{messageText}</div>
+                                  {metadata && <pre className="mt-2 overflow-x-auto whitespace-pre-wrap">{JSON.stringify(metadata, null, 2)}</pre>}
+                                </div>
                               )}
 
                               {getTraceSessionId(item.trace_url) && item.task_id && (

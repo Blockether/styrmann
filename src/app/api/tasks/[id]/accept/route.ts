@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { execFileSync } from 'child_process';
 import { queryOne, run } from '@/lib/db';
 import { getWorkspaceRepoPath, isGitWorkTree } from '@/lib/git-repo';
+import { createTaskActivity } from '@/lib/task-activity';
 import { handleStageFailure, drainQueue } from '@/lib/workflow-engine';
 import { captureTaskRunResult } from '@/lib/task-run-results';
 import type { Task } from '@/lib/types';
@@ -141,18 +142,18 @@ export async function POST(
       ['done', `Accepted by human and merged: ${branch} -> ${defaultBranch}`, now, taskId],
     );
 
-    run(
-      `INSERT INTO task_activities (id, task_id, activity_type, message, metadata, created_at)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [
-        crypto.randomUUID(),
-        taskId,
-        'status_changed',
-        `Human acceptance merged ${branch} into ${defaultBranch}`,
-        JSON.stringify({ branch, base_branch: defaultBranch, action: 'accept_merge' }),
-        now,
-      ],
-    );
+    createTaskActivity({
+      taskId,
+      activityType: 'status_changed',
+      message: `Human acceptance merged ${branch} into ${defaultBranch}`,
+      metadata: {
+        branch,
+        base_branch: defaultBranch,
+        action: 'accept_merge',
+        workflow_step: task.status,
+        decision_event: true,
+      },
+    });
 
     try {
       captureTaskRunResult(taskId);

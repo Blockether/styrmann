@@ -4,10 +4,8 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getDb } from '@/lib/db';
-import { broadcast } from '@/lib/events';
 import { CreateActivitySchema } from '@/lib/validation';
-import type { TaskActivity } from '@/lib/types';
+import { buildPresentedTaskActivities, createTaskActivity } from '@/lib/task-activity';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,60 +23,21 @@ export async function GET(
 ) {
   try {
     const { id: taskId } = await params;
-    const db = getDb();
 
-    // Parse pagination params
     const { searchParams } = new URL(request.url);
     const limit = Math.min(parseInt(searchParams.get('limit') || '50', 10) || 50, 200);
     const offset = parseInt(searchParams.get('offset') || '0', 10) || 0;
-
-    // Get total count for pagination
-    const countRow = db.prepare(`
-      SELECT COUNT(*) as total FROM task_activities WHERE task_id = ?
-    `).get(taskId) as { total: number };
-    const total = countRow?.total || 0;
-
-    // Get activities with agent info (paginated)
-    const activities = db.prepare(`
-      SELECT 
-        a.*,
-        ag.id as agent_id,
-        ag.name as agent_name
-      FROM task_activities a
-      LEFT JOIN agents ag ON a.agent_id = ag.id
-      WHERE a.task_id = ?
-      ORDER BY a.created_at DESC
-      LIMIT ? OFFSET ?
-    `).all(taskId, limit, offset) as any[];
-
-    const result: TaskActivity[] = activities.map(row => ({
-      id: row.id,
-      task_id: row.task_id,
-      agent_id: row.agent_id,
-      activity_type: row.activity_type,
-      message: row.message,
-      metadata: row.metadata,
-      created_at: row.created_at,
-      agent: row.agent_id ? {
-        id: row.agent_id,
-        name: row.agent_name,
-        role: '',
-        status: 'working' as const,
-        workspace_id: 'default',
-        source: 'local' as const,
-        description: '',
-        created_at: '',
-        updated_at: '',
-      } : undefined,
-    }));
+    const presented = buildPresentedTaskActivities(taskId, limit, offset);
 
     return NextResponse.json({
-      activities: result,
+      activities: presented.activities,
+      raw_activities: presented.raw_activities,
+      filters: presented.filters,
       pagination: {
-        total,
+        total: presented.total,
         limit,
         offset,
-        has_more: offset + result.length < total,
+        has_more: offset + presented.activities.length < presented.total,
       },
     });
   } catch (error) {
@@ -112,62 +71,12 @@ export async function POST(
     }
 
     const { activity_type, message, agent_id, metadata } = validation.data;
-    const metadataValue = typeof metadata === 'string'
-      ? metadata
-      : (metadata ? JSON.stringify(metadata) : null);
-
-    const db = getDb();
-    const id = crypto.randomUUID();
-
-    // Insert activity
-    db.prepare(`
-      INSERT INTO task_activities (id, task_id, agent_id, activity_type, message, metadata)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).run(
-      id,
+    const result = createTaskActivity({
       taskId,
-      agent_id || null,
-      activity_type,
+      activityType: activity_type,
       message,
-      metadataValue
-    );
-
-    // Get the created activity with agent info
-    const activity = db.prepare(`
-      SELECT 
-        a.*,
-        ag.id as agent_id,
-        ag.name as agent_name
-      FROM task_activities a
-      LEFT JOIN agents ag ON a.agent_id = ag.id
-      WHERE a.id = ?
-    `).get(id) as any;
-
-    const result: TaskActivity = {
-      id: activity.id,
-      task_id: activity.task_id,
-      agent_id: activity.agent_id,
-      activity_type: activity.activity_type,
-      message: activity.message,
-      metadata: activity.metadata,
-      created_at: activity.created_at,
-      agent: activity.agent_id ? {
-        id: activity.agent_id,
-        name: activity.agent_name,
-        role: '',
-        status: 'working' as const,
-        workspace_id: 'default',
-        source: 'local' as const,
-        description: '',
-        created_at: '',
-        updated_at: '',
-      } : undefined,
-    };
-
-    // Broadcast to SSE clients
-    broadcast({
-      type: 'activity_logged',
-      payload: result,
+      agentId: agent_id,
+      metadata,
     });
 
     return NextResponse.json(result, { status: 201 });

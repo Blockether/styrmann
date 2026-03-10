@@ -84,6 +84,7 @@ export function useSSE() {
                 debug.sse('Also updating selectedTask for modal');
                 setSelectedTask(incomingTask);
               }
+              window.dispatchEvent(new CustomEvent('mc:task-updated', { detail: incomingTask }));
               break;
 
             case 'task_deleted':
@@ -95,7 +96,12 @@ export function useSSE() {
 
             case 'activity_logged':
               debug.sse('Activity logged', sseEvent.payload);
-              // Activities are fetched when task detail is opened
+              window.dispatchEvent(new CustomEvent('mc:activity-logged', { detail: sseEvent.payload }));
+              break;
+
+            case 'activity_presented':
+              debug.sse('Activity presented', sseEvent.payload);
+              window.dispatchEvent(new CustomEvent('mc:activity-presented', { detail: sseEvent.payload }));
               break;
 
             case 'deliverable_added':

@@ -13,10 +13,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { chromium } from 'playwright';
 import { queryOne, queryAll, run } from '@/lib/db';
-import { v4 as uuidv4 } from 'uuid';
 import { existsSync, mkdirSync, readFileSync } from 'fs';
 import path from 'path';
 import * as csstree from 'css-tree';
+import { createTaskActivity } from '@/lib/task-activity';
 import type { Task, TaskDeliverable } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
@@ -142,26 +142,24 @@ export async function POST(
       ? `Automated test passed - ${results.length} deliverable(s) verified, no issues found`
       : `Automated test failed - ${summary}`;
 
-    run(
-      `INSERT INTO task_activities (id, task_id, activity_type, message, metadata, created_at)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [
-        uuidv4(),
-        taskId,
-        passed ? 'test_passed' : 'test_failed',
-        activityMessage,
-        JSON.stringify({ results: results.map(r => ({
-          deliverable: r.deliverable.title,
-          type: r.deliverable.type,
-          passed: r.passed,
-          consoleErrors: r.consoleErrors.length,
-          cssErrors: r.cssErrors.length,
-          resourceErrors: r.resourceErrors.length,
-          screenshot: r.screenshotPath
-        })) }),
-        new Date().toISOString()
-      ]
-    );
+    createTaskActivity({
+      taskId,
+      activityType: passed ? 'test_passed' : 'test_failed',
+      message: activityMessage,
+      metadata: {
+        workflow_step: 'testing',
+        decision_event: true,
+        results: results.map((result) => ({
+          deliverable: result.deliverable.title,
+          type: result.deliverable.type,
+          passed: result.passed,
+          consoleErrors: result.consoleErrors.length,
+          cssErrors: result.cssErrors.length,
+          resourceErrors: result.resourceErrors.length,
+          screenshot: result.screenshotPath,
+        })),
+      },
+    });
 
     // Update task status based on results
     const now = new Date().toISOString();
@@ -175,17 +173,15 @@ export async function POST(
       );
       newStatus = 'review';
 
-      run(
-        `INSERT INTO task_activities (id, task_id, activity_type, message, created_at)
-         VALUES (?, ?, ?, ?, ?)`,
-        [
-          uuidv4(),
-          taskId,
-          'status_changed',
-          'Task moved to REVIEW - automated tests passed, awaiting human approval',
-          now
-        ]
-      );
+      createTaskActivity({
+        taskId,
+        activityType: 'status_changed',
+        message: 'Task moved to REVIEW - automated tests passed, awaiting human approval',
+        metadata: {
+          workflow_step: 'review',
+          decision_event: true,
+        },
+      });
     } else {
       // Tests failed -> move back to assigned for agent to fix
       run(
@@ -194,17 +190,15 @@ export async function POST(
       );
       newStatus = 'assigned';
 
-      run(
-        `INSERT INTO task_activities (id, task_id, activity_type, message, created_at)
-         VALUES (?, ?, ?, ?, ?)`,
-        [
-          uuidv4(),
-          taskId,
-          'status_changed',
-          'Task moved back to ASSIGNED due to failed automated tests - agent needs to fix issues',
-          now
-        ]
-      );
+      createTaskActivity({
+        taskId,
+        activityType: 'status_changed',
+        message: 'Task moved back to ASSIGNED due to failed automated tests - agent needs to fix issues',
+        metadata: {
+          workflow_step: 'assigned',
+          decision_event: true,
+        },
+      });
     }
 
     const response: TestResponse = {

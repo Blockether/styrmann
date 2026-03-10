@@ -6,6 +6,7 @@ import { broadcast } from '@/lib/events';
 import { getMissionControlUrl } from '@/lib/config';
 import { ensureTaskWorktree, getTaskPipelineDir, getWorkspaceRepoPath, isGitWorkTree } from '@/lib/git-repo';
 import { getRelevantKnowledge, formatKnowledgeForDispatch } from '@/lib/learner';
+import { createTaskActivity } from '@/lib/task-activity';
 import { getTaskWorkflow } from '@/lib/workflow-engine';
 import type { Task, Agent, OpenClawSession, WorkflowStage } from '@/lib/types';
 
@@ -385,29 +386,25 @@ If you need help or clarification, ask the orchestrator.`;
         timeoutMs: 30000,
       });
 
-      run(
-        `INSERT INTO task_activities (id, task_id, agent_id, activity_type, message, metadata, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [
-          crypto.randomUUID(),
-          task.id,
-          agent.id,
-          'dispatch_invocation',
-          `Dispatch invocation sent to ${agent.name}`,
-          JSON.stringify({
-            openclaw_session_id: session.openclaw_session_id,
-            session_key: sessionKey,
-            trace_url: traceUrl,
-            output_directory: taskProjectDir,
-            branch: worktree.branchName,
-            worktree_path: worktree.worktreePath,
-            base_branch: worktree.defaultBranch,
-            provenance,
-            invocation: taskMessage,
-          }),
-          now,
-        ],
-      );
+      createTaskActivity({
+        taskId: task.id,
+        activityType: 'dispatch_invocation',
+        message: `Dispatch invocation sent to ${agent.name}`,
+        agentId: agent.id,
+        metadata: {
+          openclaw_session_id: session.openclaw_session_id,
+          session_key: sessionKey,
+          trace_url: traceUrl,
+          output_directory: taskProjectDir,
+          branch: worktree.branchName,
+          worktree_path: worktree.worktreePath,
+          base_branch: worktree.defaultBranch,
+          provenance,
+          invocation: taskMessage,
+          workflow_step: task.status === 'assigned' ? 'in_progress' : task.status,
+          decision_event: true,
+        },
+      });
 
       if (task.status === 'assigned') {
         run('UPDATE tasks SET status = ?, updated_at = ? WHERE id = ?', ['in_progress', now, taskId]);
@@ -438,12 +435,16 @@ If you need help or clarification, ask the orchestrator.`;
         [eventId, 'task_dispatched', agent.id, task.id, `Task "${task.title}" dispatched to ${agent.name}`, now]
       );
 
-      const activityId = crypto.randomUUID();
-      run(
-        `INSERT INTO task_activities (id, task_id, agent_id, activity_type, message, created_at)
-         VALUES (?, ?, ?, ?, ?, ?)`,
-        [activityId, task.id, agent.id, 'status_changed', `Task dispatched to ${agent.name} - Agent is now working on this task`, now]
-      );
+      createTaskActivity({
+        taskId: task.id,
+        activityType: 'status_changed',
+        message: `Task dispatched to ${agent.name} - Agent is now working on this task`,
+        agentId: agent.id,
+        metadata: {
+          workflow_step: 'in_progress',
+          decision_event: true,
+        },
+      });
 
       return {
         success: true,

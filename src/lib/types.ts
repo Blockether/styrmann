@@ -453,7 +453,23 @@ export interface OpenClawSession {
   updated_at: string;
 }
 
-export type ActivityType = 'spawned' | 'updated' | 'completed' | 'file_created' | 'status_changed' | 'dispatch_invocation';
+export type ActivityType = 'spawned' | 'updated' | 'completed' | 'file_created' | 'status_changed' | 'dispatch_invocation' | 'test_passed' | 'test_failed' | 'activity_summary';
+
+export interface PresentedTaskActivity {
+  id: string;
+  task_id: string;
+  activity_type: ActivityType | string;
+  summary_role: 'presenter' | 'system';
+  summary_kind: 'live' | 'post_step' | 'raw';
+  message: string;
+  created_at: string;
+  workflow_step: string | null;
+  decision_event: boolean;
+  technical_details: Record<string, unknown> | null;
+  agent_id?: string;
+  agent?: Agent;
+  raw_activities: TaskActivity[];
+}
 
 export interface TaskActivity {
   id: string;
@@ -463,6 +479,11 @@ export interface TaskActivity {
   message: string;
   metadata?: string;
   created_at: string;
+  workflow_step?: string | null;
+  decision_event?: boolean;
+  summary_role?: 'presenter' | 'system';
+  summary_kind?: 'live' | 'post_step' | 'raw';
+  technical_details?: Record<string, unknown> | null;
   // Joined fields
   agent?: Agent;
 }
@@ -647,6 +668,7 @@ export type SSEEventType =
   | 'task_created'
   | 'task_deleted'
   | 'activity_logged'
+  | 'activity_presented'
   | 'deliverable_added'
   | 'deliverable_deleted'
   | 'agent_spawned'
@@ -657,7 +679,7 @@ export type SSEEventType =
 
 export interface SSEEvent {
   type: SSEEventType;
-  payload: Task | Agent | TaskActivity | TaskDeliverable | {
+  payload: Task | Agent | TaskActivity | PresentedTaskActivity | TaskDeliverable | {
     taskId: string;
     sessionId: string;
     agentName?: string;

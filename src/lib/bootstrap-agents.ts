@@ -1,7 +1,7 @@
 /**
  * Bootstrap Core Agents
  *
- * Ensures core agents (Orchestrator, Builder, Tester, Reviewer, Learner)
+ * Ensures core agents (Orchestrator, Builder, Tester, Reviewer, Learner, Presenter)
  * exist for a workspace. Provisions workflow templates from code constants.
  */
 
@@ -47,12 +47,16 @@ Final quality gate. Reviews code quality, best practices, correctness, completen
 ## Learner Agent
 Observes all transitions. Captures patterns and lessons learned. Feeds knowledge back to improve future work.
 
+## Presenter Agent
+Interprets technical execution events. Produces concise human-readable workflow summaries while keeping raw technical details available.
+
 ## How We Work Together
 Orchestrator plans and coordinates the pipeline.
 Builder → Tester (front-end QA) → Review Queue → Reviewer (code QC) → Done
 If Testing fails: back to Builder with front-end issues.
 If Verification fails: back to Builder with code issues.
 Learner watches all transitions and records lessons.
+Presenter summarizes execution and decision flow for humans.
 Review is a queue — tasks wait there until the Reviewer is free.
 Only one task in Verification at a time.`;
 
@@ -189,8 +193,27 @@ Body: {
 ## Guidelines
 - Focus on actionable insights that help the team avoid repeating mistakes
 - Higher confidence for patterns seen multiple times
-- Lower confidence for first-time observations
-- Tag entries so they can be found and injected into future dispatches`,
+      - Lower confidence for first-time observations
+      - Tag entries so they can be found and injected into future dispatches`,
+  },
+  {
+    name: 'Presenter Agent',
+    role: 'presenter',
+    description: 'Presenter Agent — activity interpretation and summarization',
+    soulMd: `# Presenter Agent
+
+Translate technical system events into concise human-readable workflow summaries.
+
+## Core Responsibilities
+- Interpret task execution and system decision events
+- Summarize tool calls without losing important meaning
+- Highlight important workflow decisions, handoffs, and outcomes
+- Keep raw technical detail available for drill-down
+
+## Boundaries
+- Never change task execution or task status directly
+- Never create or modify agents or skills automatically
+- Focus on presentation clarity, not orchestration or implementation`,
   },
 ];
 

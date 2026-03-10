@@ -1,6 +1,7 @@
 import { existsSync, lstatSync, readdirSync, statSync } from 'fs';
 import { join } from 'path';
 import { getDb, queryAll, queryOne, run } from '@/lib/db';
+import { createTaskActivity } from '@/lib/task-activity';
 import { WORKFLOW_TEMPLATES, ensureWorkflowTemplate } from '@/lib/workflow-templates';
 import type {
   Agent,
@@ -200,6 +201,7 @@ export function generateTaskWorkflowPlan(taskId: string): { plan: TaskWorkflowPl
     `SELECT * FROM agents
      WHERE status != 'offline'
        AND role != 'orchestrator'
+       AND role != 'presenter'
        AND (workspace_id = ? OR workspace_id = 'default' OR source = 'synced')
      ORDER BY CASE WHEN workspace_id = ? THEN 0 ELSE 1 END, updated_at DESC`,
     [task.workspace_id, task.workspace_id],
@@ -432,18 +434,19 @@ export function generateTaskWorkflowPlan(taskId: string): { plan: TaskWorkflowPl
       ],
     );
 
-    run(
-      `INSERT INTO task_activities (id, task_id, agent_id, activity_type, message, metadata, created_at)
-       VALUES (?, ?, ?, 'updated', ?, ?, ?)`,
-      [
-        crypto.randomUUID(),
-        task.id,
-        orchestrator?.id || null,
-        `Orchestrator planned ${workflowName} workflow with ${steps.length} step(s).`,
-        JSON.stringify({ workflow_plan_id: planId, findings: findings.length, proposals: proposals.length }),
-        now,
-      ],
-    );
+    createTaskActivity({
+      taskId: task.id,
+      activityType: 'updated',
+      message: `Orchestrator planned ${workflowName} workflow with ${steps.length} step(s).`,
+      agentId: orchestrator?.id || null,
+      metadata: {
+        workflow_plan_id: planId,
+        findings: findings.length,
+        proposals: proposals.length,
+        workflow_step: 'planning',
+        decision_event: true,
+      },
+    });
   })();
 
   const persisted = readPlan(task.id);

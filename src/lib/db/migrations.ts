@@ -1997,6 +1997,17 @@ const migrations: Migration[] = [
       db.exec('CREATE INDEX IF NOT EXISTS idx_task_findings_task ON task_findings(task_id, created_at DESC)');
       db.exec('CREATE INDEX IF NOT EXISTS idx_capability_proposals_task ON capability_proposals(task_id, created_at DESC)');
     }
+  },
+  {
+    id: '041',
+    name: 'bootstrap_presenter_agent',
+    up: (db) => {
+      const missionControlUrl = process.env.MISSION_CONTROL_URL || 'http://localhost:4000';
+      const workspaces = db.prepare('SELECT id FROM workspaces').all() as Array<{ id: string }>;
+      for (const workspace of workspaces) {
+        bootstrapCoreAgentsRaw(db, workspace.id, missionControlUrl);
+      }
+    }
   }
 ];
 

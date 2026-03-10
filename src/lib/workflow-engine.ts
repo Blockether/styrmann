@@ -8,6 +8,7 @@
 import { queryOne, queryAll, run } from '@/lib/db';
 import { getMissionControlUrl } from '@/lib/config';
 import { broadcast } from '@/lib/events';
+import { createTaskActivity } from '@/lib/task-activity';
 import type { Task, WorkflowTemplate, WorkflowStage, TaskRole } from '@/lib/types';
 
 interface StageTransitionResult {
@@ -171,15 +172,17 @@ export async function handleStageTransition(
   );
 
   // Log the handoff
-  run(
-    `INSERT INTO task_activities (id, task_id, agent_id, activity_type, message, created_at)
-     VALUES (?, ?, ?, 'status_changed', ?, ?)`,
-    [
-      crypto.randomUUID(), taskId, roleAgent.id,
-      `Stage handoff: ${targetStage.label} → ${roleAgent.name}${options?.failReason ? ` (reason: ${options.failReason})` : ''}`,
-      now
-    ]
-  );
+  createTaskActivity({
+    taskId,
+    activityType: 'status_changed',
+    message: `Stage handoff: ${targetStage.label} -> ${roleAgent.name}${options?.failReason ? ` (reason: ${options.failReason})` : ''}`,
+    agentId: roleAgent.id,
+    metadata: {
+      workflow_step: targetStage.status,
+      decision_event: true,
+      handoff_role: targetStage.role,
+    },
+  });
 
   if (options?.skipDispatch) {
     return { success: true, handedOff: true, newAgentId: roleAgent.id, newAgentName: roleAgent.name };
@@ -238,11 +241,17 @@ export async function handleStageFailure(
   const now = new Date().toISOString();
 
   // Log the failure
-  run(
-    `INSERT INTO task_activities (id, task_id, activity_type, message, created_at)
-     VALUES (?, ?, 'status_changed', ?, ?)`,
-    [crypto.randomUUID(), taskId, `Stage failed: ${currentStatus} → ${targetStatus} (reason: ${failReason})`, now]
-  );
+  createTaskActivity({
+    taskId,
+    activityType: 'status_changed',
+    message: `Stage failed: ${currentStatus} -> ${targetStatus} (reason: ${failReason})`,
+    metadata: {
+      workflow_step: currentStatus,
+      decision_event: true,
+      fail_target: targetStatus,
+      fail_reason: failReason,
+    },
+  });
 
   // Update task status to the fail target
   run(
