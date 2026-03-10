@@ -149,8 +149,10 @@ export function OpenClawPanel({ embedded = false, focusArea = 'gateway' }: OpenC
   };
 
   const toolbarInnerClass = embedded
-    ? 'px-4 sm:px-6 py-3 flex items-center justify-end gap-2 flex-wrap'
-    : 'max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-end gap-2 flex-wrap';
+    ? 'px-4 sm:px-6 py-3 flex items-center justify-between gap-2 flex-wrap'
+    : 'max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-2 flex-wrap';
+
+  const panelTitle = isAgentsFocus ? 'Agent Management' : 'OpenClaw Gateway';
 
   const contentClass = embedded
     ? 'px-4 sm:px-6 py-6'
@@ -161,6 +163,14 @@ export function OpenClawPanel({ embedded = false, focusArea = 'gateway' }: OpenC
       {/* Toolbar */}
       <div className="border-b border-mc-border bg-mc-bg-secondary">
         <div className={toolbarInnerClass}>
+          <div className="flex items-center gap-2 text-sm font-medium text-mc-text">
+            {isAgentsFocus ? (
+              <Bot className="w-4 h-4 text-mc-text-secondary" />
+            ) : (
+              <Cpu className="w-4 h-4 text-mc-text-secondary" />
+            )}
+            <span>{panelTitle}</span>
+          </div>
           <div className="flex items-center gap-2">
             {isAgentsFocus && (
               <button

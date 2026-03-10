@@ -158,14 +158,6 @@ export function OperationsDashboard() {
             aria-labelledby="operations-tab-gateway"
             className="rounded-xl border border-mc-border bg-mc-bg overflow-hidden"
           >
-            <div className="p-4 border-b border-mc-border bg-mc-bg-secondary flex items-start justify-between gap-3 flex-wrap">
-              <div>
-                <div className="flex items-center gap-2 text-sm font-medium text-mc-text">
-                  <Cpu className="w-4 h-4 text-mc-text-secondary" />
-                  <span>OpenClaw Gateway</span>
-                </div>
-              </div>
-            </div>
             <OpenClawPanel embedded focusArea="gateway" />
           </section>
         )}
@@ -177,14 +169,6 @@ export function OperationsDashboard() {
             aria-labelledby="operations-tab-agents"
             className="rounded-xl border border-mc-border bg-mc-bg overflow-hidden"
           >
-            <div className="p-4 border-b border-mc-border bg-mc-bg-secondary flex items-start justify-between gap-3 flex-wrap">
-              <div>
-                <div className="flex items-center gap-2 text-sm font-medium text-mc-text">
-                  <Bot className="w-4 h-4 text-mc-text-secondary" />
-                  <span>Agent Management</span>
-                </div>
-              </div>
-            </div>
             <OpenClawPanel embedded focusArea="agents" />
           </section>
         )}
