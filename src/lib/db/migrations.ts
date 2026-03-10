@@ -9,6 +9,7 @@
 
 import Database from 'better-sqlite3';
 import { bootstrapCoreAgentsRaw } from '@/lib/bootstrap-agents';
+import { provisionWorkflowTemplates } from '@/lib/workflow-templates';
 
 interface Migration {
   id: string;
@@ -1679,6 +1680,120 @@ const migrations: Migration[] = [
       db.exec('CREATE INDEX IF NOT EXISTS idx_tasks_assigned_human ON tasks(assigned_human_id)');
 
       console.log('[Migration 036] Human assignment support ready');
+    }
+  },
+  {
+    id: '037',
+    name: 'create_openclaw_meta_repository',
+    up: (db) => {
+      console.log('[Migration 037] Creating OpenClaw meta repository and decoupling Mission Control...');
+
+      const workspaceInfo = db.prepare("PRAGMA table_info(workspaces)").all() as { name: string }[];
+      const workspaceCols = new Set(workspaceInfo.map((col) => col.name));
+
+      if (!workspaceCols.has('is_internal')) {
+        db.exec(`ALTER TABLE workspaces ADD COLUMN is_internal INTEGER DEFAULT 0`);
+      }
+      if (!workspaceCols.has('repo_kind')) {
+        db.exec(`ALTER TABLE workspaces ADD COLUMN repo_kind TEXT DEFAULT 'standard' CHECK (repo_kind IN ('standard', 'meta'))`);
+      }
+      if (!workspaceCols.has('local_path')) {
+        db.exec(`ALTER TABLE workspaces ADD COLUMN local_path TEXT`);
+      }
+
+      const metaWorkspaceId = 'default';
+      const missionControlWorkspaceId = 'workspace-mission-control';
+      const missionControlRepo = 'https://github.com/Blockether/mission-control';
+      const missionControlSlug = 'blockether-mission-control';
+      const missionControlPath = '/root/repos/blockether/mission-control';
+      const now = new Date().toISOString();
+
+      db.prepare(`
+        UPDATE workspaces
+        SET name = ?,
+            slug = ?,
+            description = ?,
+            icon = ?,
+            github_repo = NULL,
+            is_internal = 1,
+            repo_kind = 'meta',
+            local_path = ?,
+            organization = ?,
+            updated_at = datetime('now')
+        WHERE id = ?
+      `).run(
+        'System / OpenClaw',
+        'system-openclaw',
+        'Internal OpenClaw meta repository for system skills, .openclaw configuration, and meta-programming artifacts.',
+        'OC',
+        '/root/.openclaw',
+        'System',
+        metaWorkspaceId,
+      );
+
+      const existingMissionControl = db.prepare(
+        `SELECT id FROM workspaces WHERE id = ? OR github_repo = ? OR slug = ? OR local_path = ? LIMIT 1`
+      ).get(missionControlWorkspaceId, missionControlRepo, missionControlSlug, missionControlPath) as { id: string } | undefined;
+
+      const resolvedMissionControlWorkspaceId = existingMissionControl?.id || missionControlWorkspaceId;
+
+      if (existingMissionControl) {
+        db.prepare(`
+          UPDATE workspaces
+          SET name = ?,
+              slug = ?,
+              description = COALESCE(description, ?),
+              icon = COALESCE(icon, 'BL'),
+              github_repo = ?,
+              is_internal = 0,
+              repo_kind = 'standard',
+              local_path = ?,
+              organization = ?,
+              updated_at = datetime('now')
+          WHERE id = ?
+        `).run(
+          'Mission Control',
+          missionControlSlug,
+          'Mission Control product repository.',
+          missionControlRepo,
+          missionControlPath,
+          'blockether',
+          resolvedMissionControlWorkspaceId,
+        );
+      } else {
+        db.prepare(`
+          INSERT INTO workspaces (
+            id, name, slug, description, icon, github_repo, is_internal, repo_kind, local_path, organization, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, 0, 'standard', ?, ?, ?, ?)
+        `).run(
+          resolvedMissionControlWorkspaceId,
+          'Mission Control',
+          missionControlSlug,
+          'Mission Control product repository.',
+          'BL',
+          missionControlRepo,
+          missionControlPath,
+          'blockether',
+          now,
+          now,
+        );
+      }
+
+      db.prepare(`UPDATE tasks SET workspace_id = ? WHERE workspace_id = ?`).run(resolvedMissionControlWorkspaceId, metaWorkspaceId);
+      db.prepare(`UPDATE sprints SET workspace_id = ? WHERE workspace_id = ?`).run(resolvedMissionControlWorkspaceId, metaWorkspaceId);
+      db.prepare(`UPDATE milestones SET workspace_id = ? WHERE workspace_id = ?`).run(resolvedMissionControlWorkspaceId, metaWorkspaceId);
+      db.prepare(`UPDATE github_issues SET workspace_id = ? WHERE workspace_id = ?`).run(resolvedMissionControlWorkspaceId, metaWorkspaceId);
+      db.prepare(`UPDATE tags SET workspace_id = ? WHERE workspace_id = ?`).run(resolvedMissionControlWorkspaceId, metaWorkspaceId);
+      db.prepare(`UPDATE workflow_templates SET workspace_id = ? WHERE workspace_id = ?`).run(resolvedMissionControlWorkspaceId, metaWorkspaceId);
+      db.prepare(`UPDATE knowledge_entries SET workspace_id = ? WHERE workspace_id = ?`).run(resolvedMissionControlWorkspaceId, metaWorkspaceId);
+      db.prepare(`UPDATE acp_bindings SET workspace_id = ? WHERE workspace_id = ?`).run(resolvedMissionControlWorkspaceId, metaWorkspaceId);
+      db.prepare(`UPDATE agent_logs SET workspace_id = ? WHERE workspace_id = ?`).run(resolvedMissionControlWorkspaceId, metaWorkspaceId);
+      db.prepare(`UPDATE agents SET workspace_id = ? WHERE workspace_id = ? AND COALESCE(source, 'local') NOT IN ('synced', 'gateway')`).run(resolvedMissionControlWorkspaceId, metaWorkspaceId);
+
+      provisionWorkflowTemplates(db, metaWorkspaceId);
+
+      console.log(`[Migration 037] Meta repository: ${metaWorkspaceId} -> system-openclaw`);
+      console.log(`[Migration 037] Mission Control workspace: ${resolvedMissionControlWorkspaceId} -> ${missionControlSlug}`);
     }
   }
 ];

@@ -262,6 +262,9 @@ export interface Workspace {
   description?: string;
   icon: string;
   github_repo?: string;
+  is_internal?: number;
+  repo_kind?: 'standard' | 'meta';
+  local_path?: string;
   owner_email?: string;
   coordinator_email?: string;
   himalaya_account?: string;
@@ -278,6 +281,9 @@ export interface WorkspaceStats {
   description?: string;
   icon: string;
   github_repo?: string;
+  is_internal?: number;
+  repo_kind?: 'standard' | 'meta';
+  local_path?: string;
   owner_email?: string;
   coordinator_email?: string;
   himalaya_account?: string;
