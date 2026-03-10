@@ -4,14 +4,18 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { exec } from 'child_process';
+import { execFile } from 'child_process';
 import { promisify } from 'util';
-import { existsSync } from 'fs';
+import { existsSync, realpathSync } from 'fs';
 import path from 'path';
 
 export const dynamic = 'force-dynamic';
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
+
+function isPathInside(basePath: string, targetPath: string): boolean {
+  return targetPath === basePath || targetPath.startsWith(`${basePath}${path.sep}`);
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -31,8 +35,10 @@ export async function POST(request: NextRequest) {
     ].filter(Boolean) as string[];
 
     const normalizedPath = path.normalize(expandedPath);
-    const isAllowed = allowedPaths.some(allowed =>
-      normalizedPath.startsWith(path.normalize(allowed))
+    const normalizedAllowedPaths = allowedPaths.map((allowed) => path.normalize(allowed));
+
+    const isAllowed = normalizedAllowedPaths.some((allowed) =>
+      isPathInside(allowed, normalizedPath)
     );
 
     if (!isAllowed) {
@@ -51,23 +57,41 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Open in Finder (macOS) - reveal the file
-    const platform = process.platform;
-    let command: string;
+    const resolvedPath = realpathSync(normalizedPath);
+    const resolvedAllowedPaths = normalizedAllowedPaths.map((allowed) => {
+      try {
+        return realpathSync(allowed);
+      } catch {
+        return allowed;
+      }
+    });
 
-    if (platform === 'darwin') {
-      command = `open -R "${normalizedPath}"`;
-    } else if (platform === 'win32') {
-      command = `explorer /select,"${normalizedPath}"`;
-    } else {
-      // Linux - open containing folder
-      command = `xdg-open "${path.dirname(normalizedPath)}"`;
+    const isResolvedAllowed = resolvedAllowedPaths.some((allowed) =>
+      isPathInside(allowed, resolvedPath)
+    );
+
+    if (!isResolvedAllowed) {
+      console.warn(`[FILE] Blocked symlink escape for: ${filePath}`);
+      return NextResponse.json(
+        { error: 'Path not in allowed directories' },
+        { status: 403 }
+      );
     }
 
-    await execAsync(command);
+    // Open in Finder (macOS) - reveal the file
+    const platform = process.platform;
 
-    console.log(`[FILE] Revealed: ${normalizedPath}`);
-    return NextResponse.json({ success: true, path: normalizedPath });
+    if (platform === 'darwin') {
+      await execFileAsync('open', ['-R', resolvedPath]);
+    } else if (platform === 'win32') {
+      await execFileAsync('explorer', [`/select,${resolvedPath}`]);
+    } else {
+      // Linux - open containing folder
+      await execFileAsync('xdg-open', [path.dirname(resolvedPath)]);
+    }
+
+    console.log(`[FILE] Revealed: ${resolvedPath}`);
+    return NextResponse.json({ success: true, path: resolvedPath });
   } catch (error) {
     console.error('[FILE] Error revealing file:', error);
     return NextResponse.json(

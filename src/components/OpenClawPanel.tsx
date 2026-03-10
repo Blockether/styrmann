@@ -27,7 +27,7 @@ import {
 import { AgentModal } from './AgentModal';
 import { AgentLogsView } from './AgentLogsView';
 import { GatewayLogsView } from './GatewayLogsView';
-import type { Agent, AgentTask } from '@/lib/types';
+import type { Agent } from '@/lib/types';
 
 interface OpenClawSession {
   id: string;
@@ -146,12 +146,6 @@ export function OpenClawPanel({ embedded = false, focusArea = 'gateway' }: OpenC
     standby: agents.filter((a) => a.status === 'standby').length,
     offline: agents.filter((a) => a.status === 'offline').length,
     total: agents.length,
-  };
-
-  const occupationBarWidths = {
-    working: agentCounts.total > 0 ? (agentCounts.working / agentCounts.total) * 100 : 0,
-    standby: agentCounts.total > 0 ? (agentCounts.standby / agentCounts.total) * 100 : 0,
-    offline: agentCounts.total > 0 ? (agentCounts.offline / agentCounts.total) * 100 : 0,
   };
 
   const toolbarInnerClass = embedded
@@ -289,9 +283,9 @@ export function OpenClawPanel({ embedded = false, focusArea = 'gateway' }: OpenC
           </div>}
 
           {/* Bottom Row: Agent Occupation + Models */}
-          <div className={`grid grid-cols-1 ${isAgentsFocus ? '' : 'lg:grid-cols-2'} gap-6`}>
+          <div className="grid grid-cols-1 gap-6">
             {/* Card 2: Agent Occupation */}
-            <div className="rounded-lg border border-mc-border bg-mc-bg overflow-hidden">
+            {isAgentsFocus && <div className="rounded-lg border border-mc-border bg-mc-bg overflow-hidden">
               <div className="p-3 border-b border-mc-border bg-mc-bg-secondary flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
                   <Bot className="w-4 h-4 text-mc-text-secondary" />
@@ -415,7 +409,7 @@ export function OpenClawPanel({ embedded = false, focusArea = 'gateway' }: OpenC
                                     </div>
                                     <div className="flex items-center gap-1.5 flex-shrink-0">
                                       <a
-                                        href="/operations#openclaw"
+                                        href="/operations#gateway"
                                         onClick={(e) => e.stopPropagation()}
                                         className="flex items-center gap-1 px-2 py-1 rounded text-xs border border-mc-border hover:bg-mc-bg-tertiary transition-colors text-mc-text-secondary hover:text-mc-text"
                                         title="View logs"
@@ -451,7 +445,7 @@ export function OpenClawPanel({ embedded = false, focusArea = 'gateway' }: OpenC
                   </div>
                 )}
               </div>
-            </div>
+            </div>}
 
             {/* Card 3: Models + Default Model Selector */}
             {!isAgentsFocus && <div className="rounded-lg border border-mc-border bg-mc-bg overflow-hidden">

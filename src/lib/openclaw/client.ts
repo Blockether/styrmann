@@ -201,7 +201,7 @@ export class OpenClawClient extends EventEmitter {
         if (this.token) {
           wsUrl.searchParams.set('token', this.token);
         }
-        console.log('[OpenClaw] Connecting to:', wsUrl.toString().replace(/token=[^&]+/, 'token=***'));
+        console.log('[OpenClaw] Connecting to:', wsUrl.toString().replace(/token=[^&]+/g, 'token=***'));
         console.log('[OpenClaw] Token in URL:', wsUrl.searchParams.has('token'));
         this.ws = new WebSocket(wsUrl.toString());
 

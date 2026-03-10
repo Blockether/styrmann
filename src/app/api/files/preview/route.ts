@@ -1,12 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { readFileSync, existsSync, statSync } from 'fs';
+import { readFileSync, existsSync, statSync, realpathSync } from 'fs';
 import path from 'path';
-import { marked } from 'marked';
 import { getStoredArtifactByPath } from '@/lib/task-run-results';
 
 export const dynamic = 'force-dynamic';
 
 const MAX_PREVIEW_SIZE = 1024 * 1024;
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function isPathInside(basePath: string, targetPath: string): boolean {
+  return targetPath === basePath || targetPath.startsWith(`${basePath}${path.sep}`);
+}
 
 const TEXT_EXTENSIONS = new Set([
   '.md', '.markdown', '.txt', '.csv', '.log', '.json', '.xml', '.yaml', '.yml',
@@ -102,11 +114,22 @@ export async function GET(request: NextRequest) {
     process.env.PROJECTS_PATH?.replace(/^~/, process.env.HOME || ''),
   ].filter(Boolean) as string[];
 
-  const isAllowed = allowedPaths.length === 0 || allowedPaths.some(allowed =>
-    normalizedPath.startsWith(path.normalize(allowed))
+  let pathToRead = normalizedPath;
+
+  const normalizedAllowedPaths = allowedPaths.map((allowed) => path.normalize(allowed));
+  const resolvedAllowedPaths = normalizedAllowedPaths.map((allowed) => {
+    try {
+      return realpathSync(allowed);
+    } catch {
+      return allowed;
+    }
+  });
+
+  const initialAllowed = normalizedAllowedPaths.length > 0 && normalizedAllowedPaths.some((allowed) =>
+    isPathInside(allowed, normalizedPath)
   );
 
-  if (!isAllowed) {
+  if (!initialAllowed) {
     return NextResponse.json({ error: 'Path not allowed' }, { status: 403 });
   }
 
@@ -115,7 +138,22 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'File not found' }, { status: 404 });
   }
 
-  const stats = existsSync(normalizedPath) ? statSync(normalizedPath) : null;
+  if (existsSync(normalizedPath)) {
+    try {
+      const resolvedPath = realpathSync(normalizedPath);
+      const resolvedAllowed = resolvedAllowedPaths.length > 0 && resolvedAllowedPaths.some((allowed) =>
+        isPathInside(allowed, resolvedPath)
+      );
+      if (!resolvedAllowed) {
+        return NextResponse.json({ error: 'Path not allowed' }, { status: 403 });
+      }
+      pathToRead = resolvedPath;
+    } catch {
+      return NextResponse.json({ error: 'Path not allowed' }, { status: 403 });
+    }
+  }
+
+  const stats = existsSync(pathToRead) ? statSync(pathToRead) : null;
   if (stats && stats.size > MAX_PREVIEW_SIZE) {
     return NextResponse.json(
       { error: `File too large for preview (${(stats.size / 1024).toFixed(0)}KB, max ${MAX_PREVIEW_SIZE / 1024}KB)` },
@@ -126,38 +164,26 @@ export async function GET(request: NextRequest) {
   try {
     const content = storedArtifact
       ? storedArtifact.content_text
-      : readFileSync(normalizedPath, 'utf-8');
+      : readFileSync(pathToRead, 'utf-8');
     if (typeof content !== 'string') {
       return NextResponse.json({ error: 'Stored preview is not available for this file type' }, { status: 404 });
     }
 
-    const fileName = path.basename(normalizedPath);
-
-    if (isHtml) {
-      return new NextResponse(content, {
-        headers: { 'Content-Type': 'text/html' },
-      });
-    }
-
-    let bodyContent: string;
-    if (isMarkdown) {
-      const rendered = marked(content, { gfm: true, breaks: true });
-      bodyContent = `<div class="content">${rendered}</div>`;
-    } else {
-      const escaped = content.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-      bodyContent = `<pre class="raw">${escaped}</pre>`;
-    }
+    const fileName = path.basename(pathToRead);
+    const escapedFileName = escapeHtml(fileName);
+    const escapedContent = escapeHtml(content);
+    const bodyContent = `<pre class="raw">${escapedContent}</pre>`;
 
     const html = `<!DOCTYPE html>
 <html lang="en"><head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>${fileName} — Blockether Preview</title>
+  <title>${escapedFileName} — Blockether Preview</title>
   <style>${LIGHT_THEME_CSS}</style>
 </head><body>
   <div class="header">
     <div class="file-info">
-      <span class="filename">${fileName}</span>
+      <span class="filename">${escapedFileName}</span>
       <span class="size">${(((storedArtifact?.size_bytes ?? stats?.size) || 0) / 1024).toFixed(1)}KB</span>
     </div>
   </div>

@@ -50,6 +50,25 @@ function isSameOriginRequest(request: NextRequest): boolean {
   return false;
 }
 
+function isLocalhostRequest(request: NextRequest): boolean {
+  const forwardedFor = (request.headers.get('x-forwarded-for') || '').trim();
+  const realIp = (request.headers.get('x-real-ip') || '').trim();
+
+  const isLocal = (value: string): boolean =>
+    value === '127.0.0.1' || value === '::1' || value.startsWith('127.');
+
+  if (forwardedFor) {
+    const firstHop = forwardedFor.split(',')[0]?.trim() || '';
+    if (isLocal(firstHop)) return true;
+  }
+
+  if (realIp && isLocal(realIp)) {
+    return true;
+  }
+
+  return !forwardedFor && !realIp;
+}
+
 // Demo mode — read-only, blocks all mutations
 const DEMO_MODE = process.env.DEMO_MODE === 'true';
 if (DEMO_MODE) {
@@ -89,6 +108,11 @@ export function proxy(request: NextRequest) {
 
   // Allow same-origin browser requests (UI fetching its own API)
   if (isSameOriginRequest(request)) {
+    return NextResponse.next();
+  }
+
+  // Allow local machine service-to-service traffic (daemon/agents)
+  if (isLocalhostRequest(request)) {
     return NextResponse.next();
   }
 
