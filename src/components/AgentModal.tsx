@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { X, Save, Trash2, Folder, FileText, RefreshCw, ChevronRight, Link2, Link2Off } from 'lucide-react';
 import { useMissionControl } from '@/lib/store';
-import type { Agent, AgentStatus } from '@/lib/types';
+import type { Agent } from '@/lib/types';
 
 interface AgentModalProps {
   agent?: Agent;
@@ -81,7 +81,6 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated, initia
     name: agent?.name || '',
     role: agent?.role || '',
     description: agent?.description || '',
-    status: agent?.status || 'standby' as AgentStatus,
     // is_master removed - orchestrator role determined by backend
     soul_md: agent?.soul_md || '',
     user_md: agent?.user_md || '',
@@ -425,23 +424,6 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated, initia
                   placeholder="What does this agent do?"
                 />
               </div>
-
-              {/* Status */}
-              <div>
-                <label className="block text-sm font-medium mb-1">Status</label>
-                <select
-                  value={form.status}
-                  onChange={(e) => setForm({ ...form, status: e.target.value as AgentStatus })}
-                  disabled={isReadOnlySyncedAgent}
-                  className="w-full min-h-11 bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent"
-                >
-                  <option value="standby">Standby</option>
-                  <option value="working">Working</option>
-                  <option value="offline">Offline</option>
-                </select>
-              </div>
-
-
 
               {/* Model Selection */}
               <div>

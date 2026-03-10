@@ -43,6 +43,7 @@ export async function PATCH(
   try {
     const { id } = await params;
     const body: UpdateAgentRequest = await request.json();
+    const isSystemStatusUpdate = request.headers.get('x-mc-system') === 'daemon';
 
     const existing = queryOne<Agent>('SELECT * FROM agents WHERE id = ?', [id]);
     if (!existing) {
@@ -87,6 +88,13 @@ export async function PATCH(
       values.push(body.description);
     }
     if (body.status !== undefined) {
+      if (!isSystemStatusUpdate) {
+        return NextResponse.json(
+          { error: 'Agent status is system-managed and cannot be updated manually' },
+          { status: 403 },
+        );
+      }
+
       updates.push('status = ?');
       values.push(body.status);
 

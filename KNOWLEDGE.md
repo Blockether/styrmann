@@ -231,6 +231,10 @@ One agent per workspace may have `role = 'orchestrator'`. This is the Product Ow
 
 **Demotion blocked**: `PATCH /api/agents/{id}` cannot change an orchestrator's role. Returns `400 Bad Request`. To change the orchestrator, delete the agent and recreate with a different role.
 
+**Status is system-managed**: `PATCH /api/agents/{id}` rejects manual `status` updates with `403` (`Agent status is system-managed and cannot be updated manually`) unless the request carries internal daemon header `x-mc-system: daemon`.
+
+**Agent modal policy**: The Agent modal no longer exposes a manual status selector; status transitions are driven by dispatch/completion/heartbeat automation only.
+
 **Not a worker**: Orchestrators are excluded from workflow stage auto-assignment. They manage the project but do not execute tasks.
 
 **UI**: Orchestrator agents display a Crown icon and "Product Owner" subtitle in AgentsSidebar.
@@ -286,7 +290,7 @@ Fallback: Task polling every 60s, event polling every 30s.
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
 | GET | `/api/agents` | List agents (triggers ensureSynced); enriches each agent with `active_task_count` and `current_task_title` from tasks table |
-| GET/PATCH/DELETE | `/api/agents/{id}` | Agent CRUD (PATCH writes back to OpenClaw config; cannot demote orchestrator) |
+| GET/PATCH/DELETE | `/api/agents/{id}` | Agent CRUD (PATCH writes back to OpenClaw config; cannot demote orchestrator; manual `status` updates forbidden unless internal daemon call) |
 | GET | `/api/agents/{id}/workspace` | Read-only browser for synced agent workspace/config roots (`scope=workspace|agent`, `path=...`) |
 | GET/POST | `/api/agents/{id}/skills` | Inspect and manage shared skill links for synced agents (`link`, `unlink`, `replace_with_link`, `sync_all`) |
 | POST | `/api/agents/sync` | Manual sync from gateway config |
@@ -547,7 +551,7 @@ The daemon is a standalone Node.js process with nine modules:
 
 | Module | Interval | Purpose |
 |--------|----------|---------|
-| **heartbeat** | 30s | Polls `/api/agents`, detects stale working agents (>60 min without activity), sets them to standby |
+| **heartbeat** | 30s | Polls `/api/agents`, detects stale working agents (>60 min without activity), sets them to standby via internal daemon PATCH (`x-mc-system: daemon`) |
 | **dispatcher** | 10s | Polls `/api/tasks?status=assigned`, auto-dispatches each via `POST /api/tasks/{id}/dispatch` |
 | **scheduler** | 10s | Runs registered `ScheduledJob` entries on interval. Job registry starts empty — no hardcoded jobs |
 | **recovery** | 60s | Polls `in_progress` tasks, detects stale work (default >30m without updates), and performs auto-recovery (re-dispatch to assignee or reassign to fallback orchestrator) |

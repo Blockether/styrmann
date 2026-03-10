@@ -144,8 +144,8 @@ export function SystemPanel({ embedded = false }: SystemPanelProps) {
   };
 
   const toolbarInnerClass = embedded
-    ? 'px-4 sm:px-6 py-3 flex items-center justify-end gap-2 flex-wrap'
-    : 'max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-end gap-2 flex-wrap';
+    ? 'p-3 flex items-center justify-between gap-2 flex-wrap'
+    : 'max-w-7xl mx-auto p-3 flex items-center justify-between gap-2 flex-wrap';
 
   const contentClass = embedded
     ? 'px-4 sm:px-6 py-6'
@@ -156,10 +156,14 @@ export function SystemPanel({ embedded = false }: SystemPanelProps) {
       {/* Toolbar */}
       <div className="border-b border-mc-border bg-mc-bg-secondary">
         <div className={toolbarInnerClass}>
+          <div className="flex items-center gap-2 min-w-0">
+            <Activity className="w-4 h-4 text-mc-text-secondary" />
+            <h2 className="text-sm font-medium text-mc-text truncate">System Runtime</h2>
+          </div>
           <button
             onClick={fetchData}
             disabled={loading}
-            className="flex items-center gap-2 px-3 min-h-11 border border-mc-border rounded text-sm hover:bg-mc-bg-tertiary disabled:opacity-50 transition-colors"
+            className="inline-flex items-center gap-2 px-3 py-2 border border-mc-border rounded text-sm hover:bg-mc-bg-tertiary disabled:opacity-50 transition-colors"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             <span className="hidden sm:inline">{loading ? 'Refreshing...' : 'Refresh'}</span>

@@ -558,6 +558,13 @@ export function getOpenClawClient(): OpenClawClient {
   return clientInstance;
 }
 
+export function resetOpenClawClient(): void {
+  if (clientInstance) {
+    clientInstance.disconnect();
+    clientInstance = null;
+  }
+}
+
 /**
  * Send a message to a Gateway session with ACP provenance (meta+receipt).
  *

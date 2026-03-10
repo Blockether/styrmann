@@ -41,6 +41,7 @@ export function startHeartbeat(config: DaemonConfig, stats: DaemonStats): () => 
           try {
             await mcFetch(`/api/agents/${agent.id}`, {
               method: 'PATCH',
+              headers: { 'x-mc-system': 'daemon' },
               body: JSON.stringify({ status: 'standby' }),
             });
             stats.staleRecoveredCount++;
