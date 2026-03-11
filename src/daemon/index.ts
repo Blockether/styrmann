@@ -1,5 +1,5 @@
 import { createLogger } from './logger';
-import { getConfig } from './bridge';
+import { getConfig, shouldUseMissionControlToken } from './bridge';
 import { startHeartbeat } from './heartbeat';
 import { startDispatcher } from './dispatcher';
 import { startScheduler } from './scheduler';
@@ -15,7 +15,7 @@ const log = createLogger('daemon');
 async function main() {
   const { mcUrl, mcToken } = getConfig();
 
-  if (!mcToken) {
+  if (shouldUseMissionControlToken(mcUrl) && !mcToken) {
     log.error('MC_API_TOKEN (or MC_TOKEN) is required. Set it as an environment variable.');
     process.exit(1);
   }

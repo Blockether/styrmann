@@ -1,5 +1,5 @@
 import { createLogger } from './logger';
-import { getConfig } from './bridge';
+import { getConfig, shouldUseMissionControlToken } from './bridge';
 import type { DaemonConfig, DaemonStats } from './types';
 
 const log = createLogger('router');
@@ -15,7 +15,7 @@ export function startRouter(config: DaemonConfig, stats: DaemonStats): () => voi
     if (stopped) return;
 
     const { mcUrl, mcToken } = getConfig();
-    const url = `${mcUrl}/api/events/stream${mcToken ? `?token=${mcToken}` : ''}`;
+    const url = `${mcUrl}/api/events/stream${mcToken && shouldUseMissionControlToken(mcUrl) ? `?token=${mcToken}` : ''}`;
 
     abortController = new AbortController();
 
@@ -33,6 +33,7 @@ export function startRouter(config: DaemonConfig, stats: DaemonStats): () => voi
       }
 
       log.info('SSE stream connected');
+      stats.lastRouterTick = new Date().toISOString();
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
@@ -82,6 +83,7 @@ export function startRouter(config: DaemonConfig, stats: DaemonStats): () => voi
   function handleEvent(event: { type?: string; payload?: Record<string, unknown> }, s: DaemonStats) {
     if (!event.type) return;
     s.routedEventCount++;
+    s.lastRouterTick = new Date().toISOString();
 
     switch (event.type) {
       case 'task_updated': {
