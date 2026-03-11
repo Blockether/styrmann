@@ -616,9 +616,9 @@ const migrations: Migration[] = [
 
       console.log('[Migration 013] Strict template is now default with reviewer role');
 
-      // 4. Bootstrap 4 core agents for the default workspace
+      // 4. Bootstrap core agents globally (default workspace)
       const missionControlUrl = process.env.MISSION_CONTROL_URL || 'http://localhost:4000';
-      bootstrapCoreAgentsRaw(db, 'default', missionControlUrl);
+      bootstrapCoreAgentsRaw(db, missionControlUrl);
 
       console.log('[Migration 013] Fresh start complete');
     }
@@ -2002,11 +2002,9 @@ const migrations: Migration[] = [
     id: '041',
     name: 'bootstrap_presenter_agent',
     up: (db) => {
+      // Agents are global — bootstrap once into 'default', not per-workspace.
       const missionControlUrl = process.env.MISSION_CONTROL_URL || 'http://localhost:4000';
-      const workspaces = db.prepare('SELECT id FROM workspaces').all() as Array<{ id: string }>;
-      for (const workspace of workspaces) {
-        bootstrapCoreAgentsRaw(db, workspace.id, missionControlUrl);
-      }
+      bootstrapCoreAgentsRaw(db, missionControlUrl);
     }
   }
 ];

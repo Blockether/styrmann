@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { broadcast } from '@/lib/events';
+import { resolveDefaultAcpAgent } from '@/lib/openclaw/config';
 
 export const dynamic = 'force-dynamic';
 
@@ -108,7 +109,7 @@ export async function POST(request: NextRequest) {
       body.acp_session_key.trim(),
       typeof body.acp_agent_id === 'string' && body.acp_agent_id.trim().length > 0
         ? body.acp_agent_id.trim()
-        : 'opencode',
+        : resolveDefaultAcpAgent(),
       typeof body.agent_id === 'string' && body.agent_id.trim().length > 0
         ? body.agent_id.trim()
         : null,

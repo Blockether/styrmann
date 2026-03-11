@@ -220,24 +220,43 @@ Translate technical system events into concise human-readable workflow summaries
 // ── Public API ──────────────────────────────────────────────────────
 
 /**
- * Bootstrap core agents for a workspace using the normal getDb() accessor.
+ * Bootstrap core agents GLOBALLY in the default workspace.
  * Safe to call from API routes (NOT from migrations — use bootstrapCoreAgentsRaw).
  */
-export function bootstrapCoreAgents(workspaceId: string): void {
+export function bootstrapCoreAgents(): void {
   const db = getDb();
   const missionControlUrl = getMissionControlUrl();
-  bootstrapCoreAgentsRaw(db, workspaceId, missionControlUrl);
+  bootstrapCoreAgentsRaw(db, missionControlUrl);
 }
 
 /**
  * Bootstrap core agents using a raw db handle.
  * Use this inside migrations to avoid getDb() recursion.
+ *
+ * Agents are ALWAYS global — created in workspace_id='default' and
+ * visible everywhere via `source = 'synced'` or `workspace_id = 'default'`
+ * queries. NEVER create per-workspace agent copies.
+ *
+ * If OpenClaw-synced agents already exist, bootstrap is skipped entirely.
+ * Synced agents ARE the real team.
  */
 export function bootstrapCoreAgentsRaw(
   db: Database.Database,
-  workspaceId: string,
   missionControlUrl: string,
 ): void {
+  // If OpenClaw-synced agents exist, skip bootstrap entirely.
+  // Synced agents ARE the real team — bootstrap is only a fallback
+  // for fresh installs without an OpenClaw gateway.
+  const syncedCount = (db.prepare(
+    "SELECT COUNT(*) as cnt FROM agents WHERE source = 'synced'"
+  ).get() as { cnt: number }).cnt;
+
+  if (syncedCount > 0) {
+    return;
+  }
+
+  // Bootstrap fallback: create agents in the global 'default' workspace only.
+  const GLOBAL_WORKSPACE = 'default';
   const userMd = sharedUserMd(missionControlUrl);
   const now = new Date().toISOString();
 
@@ -247,13 +266,12 @@ export function bootstrapCoreAgentsRaw(
   `);
 
   const findByRole = db.prepare(
-    'SELECT id FROM agents WHERE workspace_id = ? AND role = ? LIMIT 1'
+    'SELECT id FROM agents WHERE role = ? LIMIT 1'
   );
 
   for (const agent of CORE_AGENTS) {
-    const existing = findByRole.get(workspaceId, agent.role) as { id: string } | undefined;
+    const existing = findByRole.get(agent.role) as { id: string } | undefined;
     if (existing) {
-      console.warn(`[Bootstrap] ${agent.role} already exists for workspace ${workspaceId} — skipping`);
       continue;
     }
 
@@ -263,14 +281,13 @@ export function bootstrapCoreAgentsRaw(
       agent.name,
       agent.role,
       agent.description,
-      workspaceId,
+      GLOBAL_WORKSPACE,
       agent.soulMd,
       userMd,
       SHARED_AGENTS_MD,
       now,
       now,
     );
-    console.warn(`[Bootstrap] Created ${agent.name} (${agent.role}) for workspace ${workspaceId}`);
   }
 }
 

@@ -212,8 +212,11 @@ The Strict template is the default. Per-task workflow plans persist selected par
 
 **Meta repository**: Workspace `id='default'` is the internal `System / OpenClaw` meta repository. It has `repo_kind='meta'`, `is_internal=1`, no GitHub link, and `local_path='/root/.openclaw'`.
 
-**Global visibility**: Synced agents live in the meta repository (`workspace_id='default'`). Agent queries return both workspace-local agents AND all synced agents (`WHERE workspace_id = ? OR source = 'synced'`).
+**Global visibility**: Agents are ALWAYS global. Synced agents live in the meta repository (`workspace_id='default'`). Agent queries return both workspace-local agents AND all synced agents (`WHERE workspace_id = ? OR source = 'synced'`). No per-workspace agent copies are ever created.
 
+**Bootstrap policy**: `bootstrapCoreAgentsRaw()` is a fallback for fresh installs without an OpenClaw gateway. It creates agents in `workspace_id='default'` only (never per-workspace). If any synced agents exist, bootstrap is skipped entirely — synced agents ARE the real team. Workflow planning handles missing roles via `task_findings` and `capability_proposals` rather than creating new agents.
+
+**Agent system.md frontmatter**: Every OpenClaw agent's `system.md` (in `/root/.openclaw/agents/{id}/agent/system.md`) MUST have YAML frontmatter with a `role:` field. The sync process (`extractRoleFromSystemMd()`) reads `role:` first, then falls back to `description:`, then the first H1 heading, then the agent name. Short, lowercase role names (e.g. `builder`, `orchestrator`, `product_owner`, `explorer`) — never long descriptions. When creating new agents via Mission Control, the `role:` field is auto-generated in the system.md frontmatter.
 **Always-on per-agent memory consolidation**: Mission Control maintains OpenClaw memory natively in JavaScript and writes only to per-agent workspaces (`agent_workspace_path`). There is no shared global memory digest.
 
 **Responsibility-based routing**: Knowledge entries without explicit `agent_id` are routed to target agents by responsibility scoring (role/name/description plus category/content matching), with workspace-scoped entries and global (`workspace_id='default'`) entries both considered.

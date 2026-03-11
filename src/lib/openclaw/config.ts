@@ -44,6 +44,9 @@ export interface OpenClawFullConfig {
     };
     list?: OpenClawAgentConfig[];
   };
+  acp?: {
+    defaultAgent?: string;
+  };
   [key: string]: unknown;
 }
 
@@ -90,6 +93,19 @@ export function readOpenClawConfig(): OpenClawFullConfig | null {
   }
 }
 
+const DEFAULT_ACP_AGENT = 'opencode';
+
+/**
+ * Resolve the default ACP agent id.
+ * Priority: ACP_DEFAULT_AGENT env var > openclaw.json acp.defaultAgent > 'opencode'
+ */
+export function resolveDefaultAcpAgent(): string {
+  const fromEnv = process.env.ACP_DEFAULT_AGENT?.trim();
+  if (fromEnv) return fromEnv;
+  const config = readOpenClawConfig();
+  return config?.acp?.defaultAgent?.trim() || DEFAULT_ACP_AGENT;
+}
+
 function resolveWorkspacePath(agent: OpenClawAgentConfig, defaults: OpenClawFullConfig['agents']): string | null {
   if (agent.workspace) return agent.workspace;
   if (agent.id === 'main') {
@@ -107,6 +123,8 @@ function extractRoleFromSystemMd(systemMd: string | null, agentName: string): st
   if (!systemMd) return agentName;
   const frontmatterMatch = systemMd.match(/^---\s*\n([\s\S]*?)\n---/);
   if (frontmatterMatch) {
+    const roleMatch = frontmatterMatch[1].match(/role:\s*"?([^"\n]+)"?/);
+    if (roleMatch) return roleMatch[1].trim();
     const descMatch = frontmatterMatch[1].match(/description:\s*"?([^"\n]+)"?/);
     if (descMatch) return descMatch[1].trim();
   }
@@ -269,7 +287,7 @@ export function createAgentInOpenClawConfig(input: CreateOpenClawAgentInput): {
     const userMd = input.userMd || '# USER\n\nContext about the human operator.';
     const agentsMd = input.agentsMd || '# AGENTS\n\nTeam coordination notes.';
     const memoryMd = input.memoryMd || '# MEMORY\n\nDurable lessons learned and stable operating preferences.';
-    const systemMd = input.systemMd || `---\ndescription: ${input.role}\n---\n\n# ${input.role}\n\nYou are ${input.name}. Execute tasks accurately and report verifiable outcomes.`;
+    const systemMd = input.systemMd || `---\nrole: ${input.role}\n---\n\n# ${input.role}\n\nYou are ${input.name}. Execute tasks accurately and report verifiable outcomes.`;
 
     writeFileSync(join(workspacePath, 'SOUL.md'), soulMd, 'utf-8');
     writeFileSync(join(workspacePath, 'USER.md'), userMd, 'utf-8');

@@ -344,7 +344,7 @@ CREATE TABLE IF NOT EXISTS acp_bindings (
   discord_channel_id TEXT,
   discord_guild_id TEXT DEFAULT '1406182923563958352',
   acp_session_key TEXT NOT NULL,
-  acp_agent_id TEXT DEFAULT 'opencode',
+  acp_agent_id TEXT,
   agent_id TEXT REFERENCES agents(id),
   task_id TEXT REFERENCES tasks(id),
   status TEXT DEFAULT 'active' CHECK(status IN ('active','paused','closed')),
