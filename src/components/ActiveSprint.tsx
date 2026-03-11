@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { Plus, ChevronDown, CheckCircle2, Loader2, Flag, Users, Calendar, ChevronRight, ArrowRightLeft, LayoutList, Columns3, GripVertical, Target, AlertCircle, Crown, Bug, Lightbulb, Wrench, BookOpen, FlaskConical } from 'lucide-react';
+import { Plus, ChevronDown, CheckCircle2, Loader2, Flag, Calendar, ChevronRight, ArrowRightLeft, LayoutList, Columns3, GripVertical, Target, AlertCircle, Crown, Bug, Lightbulb, Wrench, BookOpen, FlaskConical } from 'lucide-react';
 import { useMissionControl } from '@/lib/store';
 import { triggerAutoDispatch, shouldTriggerAutoDispatch } from '@/lib/auto-dispatch';
 import type { Task, TaskStatus, TaskType, Sprint, Milestone, Agent } from '@/lib/types';
@@ -63,6 +63,19 @@ const TASK_TYPE_CONFIG: Record<TaskType, { icon: typeof Bug; color: string }> = 
   documentation: { icon: BookOpen, color: 'text-green-500' },
   research: { icon: FlaskConical, color: 'text-purple-500' },
 };
+
+function getTaskAssigneePresentation(task: Task): { badge: string; name: string | null } | null {
+  if (task.assignee_type === 'human') {
+    const humanName = task.assigned_human?.name || task.assignee_display_name || null;
+    return humanName ? { badge: 'HUMAN', name: humanName } : { badge: 'HUMAN', name: null };
+  }
+
+  if (task.assignee_type === 'ai' || task.assigned_agent_id) {
+    return { badge: 'AI', name: null };
+  }
+
+  return null;
+}
 
 export function ActiveSprint({ workspaceId, mobileMode = false, isPortrait = true }: ActiveSprintProps) {
   const { tasks: storeTasks, updateTaskStatus, addEvent, selectedSprintId: storeSelectedSprintId, setSelectedSprintId: setStoreSelectedSprintId } = useMissionControl();
@@ -541,7 +554,7 @@ export function ActiveSprint({ workspaceId, mobileMode = false, isPortrait = tru
         ) : mobileMode ? (
           <div className="flex flex-col h-full">
             <div className="flex gap-2 p-3 overflow-x-auto border-b border-mc-border flex-shrink-0">
-              {BOARD_COLUMN_CONFIG.map(({ status, borderColor }) => {
+              {BOARD_COLUMN_CONFIG.map(({ status }) => {
                 const count = sprintTasks.filter((t) => t.status === status).length;
                 const config = STATUS_CONFIG[status];
                 const isSelected = selectedBoardStatus === status;
@@ -566,6 +579,9 @@ export function ActiveSprint({ workspaceId, mobileMode = false, isPortrait = tru
               {sprintTasks
                 .filter((t) => t.status === selectedBoardStatus)
                 .map((task) => (
+                  (() => {
+                    const assignee = getTaskAssigneePresentation(task);
+                    return (
                   <div
                     key={task.id}
                     onClick={() => handleTaskClick(task)}
@@ -576,10 +592,11 @@ export function ActiveSprint({ workspaceId, mobileMode = false, isPortrait = tru
                       <h4 className="font-medium text-sm line-clamp-2 flex-1">{task.title}</h4>
                     </div>
                     <div className="flex items-center gap-3 text-xs text-mc-text-secondary mb-3">
-                      {task.assignee_display_name && (
+                      {assignee && (
                         <div className="flex items-center gap-1.5">
-                          <AgentInitials name={task.assignee_display_name} size="xs" />
-                          <span className="truncate">{task.assignee_display_name}</span>
+                          <AgentInitials name={assignee.badge} size="xs" />
+                          <span className="font-medium">{assignee.badge}</span>
+                          {assignee.name ? <span className="truncate">{assignee.name}</span> : null}
                         </div>
                       )}
                       <span className="capitalize">{task.priority}</span>
@@ -595,6 +612,8 @@ export function ActiveSprint({ workspaceId, mobileMode = false, isPortrait = tru
                       Move Status
                     </button>
                   </div>
+                    );
+                  })()
                 ))}
               {sprintTasks.filter((t) => t.status === selectedBoardStatus).length === 0 && (
                 <div className="text-center py-8 text-mc-text-secondary text-sm">
@@ -939,7 +958,7 @@ function MilestoneBoard({
               </div>
 
               {/* Status columns within swimlane */}
-              {BOARD_COLUMN_CONFIG.map(({ status, borderColor }) => {
+              {BOARD_COLUMN_CONFIG.map(({ status }) => {
                 const columnTasks = lane.tasks.filter((t) => t.status === status);
                 return (
                   <div
@@ -965,6 +984,9 @@ function MilestoneBoard({
                   >
                     <div className="space-y-1.5">
                       {columnTasks.map((task) => (
+                        (() => {
+                          const assignee = getTaskAssigneePresentation(task);
+                          return (
                         <div
                           key={task.id}
                           draggable
@@ -984,11 +1006,13 @@ function MilestoneBoard({
                           </div>
                           <div className="flex items-center gap-1.5 pl-3">
                             <span className={`w-1.5 h-1.5 rounded-full ${task.priority === 'urgent' ? 'bg-red-500' : task.priority === 'high' ? 'bg-orange-500' : task.priority === 'normal' ? 'bg-yellow-500' : 'bg-gray-400'}`} />
-                            {task.assignee_display_name && (
-                              <AgentInitials name={task.assignee_display_name} size="xs" />
+                            {assignee && (
+                              <AgentInitials name={assignee.badge} size="xs" />
                             )}
                           </div>
                         </div>
+                          );
+                        })()
                       ))}
                     </div>
                   </div>
@@ -1018,6 +1042,7 @@ function TaskRow({ task, isPortrait, onClick, onMoveStatus, mobileMode }: TaskRo
   const dispatchError = task.planning_dispatch_error;
   const TypeIcon = TASK_TYPE_CONFIG[task.task_type]?.icon;
   const typeColor = TASK_TYPE_CONFIG[task.task_type]?.color;
+  const assignee = getTaskAssigneePresentation(task);
 
   return (
     <div
@@ -1056,10 +1081,11 @@ function TaskRow({ task, isPortrait, onClick, onMoveStatus, mobileMode }: TaskRo
           )}
 
           <div className="flex items-center gap-3 text-xs text-mc-text-secondary">
-            {task.assignee_display_name && (
+            {assignee && (
               <div className="flex items-center gap-1.5">
-                <AgentInitials name={task.assignee_display_name} size="xs" />
-                <span className="truncate">{task.assignee_display_name}</span>
+                <AgentInitials name={assignee.badge} size="xs" />
+                <span className="font-medium">{assignee.badge}</span>
+                {assignee.name ? <span className="truncate">{assignee.name}</span> : null}
               </div>
             )}
             <span className="capitalize">{task.priority}</span>
