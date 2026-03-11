@@ -65,7 +65,7 @@ Also: `pending_dispatch` (transient, pre-dispatch state).
 
 **Task creation behavior**: New AI tasks no longer expose manual loop, template, or per-task execution controls. The orchestrator generates a workflow plan immediately from existing agents and linked skills only, stores it on the task, and leaves the task in `inbox` until execution begins. Human tasks still require a selected human and move to `assigned`, which triggers an email through Himalaya.
 
-**Task creation UI**: Manual agent loop configuration, task-level template picking, and direct execution settings are removed. The task modal now shows Overview, Activity, Deliverables, and Sessions tabs. Planning is merged into Activity: the workflow blueprint and runtime activity timeline are presented together, including current step and iteration context. The former Proposals tab is merged into this Activity view (learner proposals remain inline below the workflow plan diagram).
+**Task creation UI**: Manual agent loop configuration, task-level template picking, and direct execution settings are removed. The task modal now shows Overview, Activity, Sessions, and Deliverables tabs. Planning is merged into Activity: the workflow blueprint and runtime activity timeline are presented together, including current step and iteration context. The former Proposals tab is merged into this Activity view (learner proposals remain inline below the workflow plan diagram).
 
 **Task fields**: title, description, status, priority (low/normal/high/urgent), task_type (bug/feature/chore/documentation/research), effort (1-5), impact (1-5), assignee_type (`ai` | `human`), assigned_agent_id, assigned_human_id, milestone_id, workflow_template_id, workflow_plan_id, due_date, tags.
 
@@ -312,7 +312,7 @@ Fallback: Agent Activity Dashboard polls every 20s; task-specific views use SSE 
 | GET/POST | `/api/tasks/{id}/subagent` | Legacy session registration endpoint (compatibility) |
 | GET | `/api/tasks/{id}/sessions` | Task session list (session-centric) |
 | GET | `/api/tasks/{id}/sessions/{sessionId}/trace` | Full session trace (dispatch invocation + OpenClaw history) |
-| GET | `/api/tasks/{id}/changes` | Task changes summary (workspace, files, commits, sessions) |
+| GET | `/api/tasks/{id}/changes` | Task changes summary (workspace, task-scoped files/commits, sessions with interruption/stale/finished breakdown, worktree metadata) |
 | GET/PUT | `/api/tasks/{id}/roles` | Role-to-agent assignments |
 
 ### Sprints and Milestones

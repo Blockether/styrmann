@@ -23,9 +23,15 @@ interface TaskChangesPayload {
     organization: string | null;
     repo: string | null;
     repo_path: string | null;
+    worktree_name?: string | null;
+    worktree_branch?: string | null;
   };
   summary: {
     sessions_count: number;
+    interruptions_count?: number;
+    stales_count?: number;
+    finished_count?: number;
+    unfinished_count?: number;
     deliverables_count: number;
     changed_files_count: number;
     commits_count: number;
@@ -339,12 +345,21 @@ export function DeliverablesList({ taskId }: DeliverablesListProps) {
               Workspace: {changes.workspace.name || 'Unknown'}
               {changes.workspace.repo ? ` (${changes.workspace.repo})` : ''}
             </p>
+            {(changes.workspace.worktree_name || changes.workspace.worktree_branch) && (
+              <p className="text-xs text-mc-text-secondary mt-1">
+                Worktree: {changes.workspace.worktree_name || 'n/a'}
+                {changes.workspace.worktree_branch ? ` (${changes.workspace.worktree_branch})` : ''}
+              </p>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-2 text-xs">
             <div className="p-2 rounded bg-mc-bg-tertiary">
               <div className="text-mc-text-secondary">Sessions</div>
               <div className="font-medium text-mc-text mt-0.5">{changes.summary.sessions_count}</div>
+              <div className="text-[11px] text-mc-text-secondary mt-1">
+                interrupted {changes.summary.interruptions_count || 0} • stale {changes.summary.stales_count || 0} • finished {changes.summary.finished_count || 0} • unfinished {changes.summary.unfinished_count || 0}
+              </div>
             </div>
             <div className="p-2 rounded bg-mc-bg-tertiary">
               <div className="text-mc-text-secondary">Changed Files</div>

@@ -125,6 +125,10 @@ export function SessionsList({ taskId }: SessionsListProps) {
 
   const activeCount = sessions.filter((session) => session.is_active).length;
   const inactiveCount = sessions.length - activeCount;
+  const interruptedCount = sessions.filter((session) => session.status === 'interrupted').length;
+  const staleCount = sessions.filter((session) => session.status === 'stale').length;
+  const finishedCount = sessions.filter((session) => session.status === 'completed' || Boolean(session.ended_at)).length;
+  const unfinishedCount = sessions.length - finishedCount;
 
   const formatDuration = (start: string, end?: string | null) => {
     const startTime = new Date(start).getTime();
@@ -218,6 +222,10 @@ export function SessionsList({ taskId }: SessionsListProps) {
         <div className="flex items-center gap-2">
           <span className="px-2 py-0.5 rounded border border-green-200 bg-green-50 text-green-700">Active: {activeCount}</span>
           <span className="px-2 py-0.5 rounded border border-mc-border bg-mc-bg text-mc-text-secondary">Inactive: {inactiveCount}</span>
+          <span className="px-2 py-0.5 rounded border border-orange-200 bg-orange-50 text-orange-700">Interrupted: {interruptedCount}</span>
+          <span className="px-2 py-0.5 rounded border border-yellow-200 bg-yellow-50 text-yellow-700">Stale: {staleCount}</span>
+          <span className="px-2 py-0.5 rounded border border-mc-border bg-mc-bg text-mc-text-secondary">Finished: {finishedCount}</span>
+          <span className="px-2 py-0.5 rounded border border-mc-border bg-mc-bg text-mc-text-secondary">Unfinished: {unfinishedCount}</span>
         </div>
       </div>
 

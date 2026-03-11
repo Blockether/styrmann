@@ -300,8 +300,8 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
   const tabs = [
     { id: 'overview' as TabType, label: 'Overview', icon: null },
     { id: 'activity' as TabType, label: 'Activity', icon: <Activity className="w-4 h-4" /> },
-    { id: 'deliverables' as TabType, label: 'Deliverables', icon: <Package className="w-4 h-4" /> },
     { id: 'sessions' as TabType, label: 'Sessions', icon: <Bot className="w-4 h-4" /> },
+    { id: 'deliverables' as TabType, label: 'Deliverables', icon: <Package className="w-4 h-4" /> },
   ];
 
   return (
@@ -633,14 +633,14 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
             <PlanningTab taskId={task.id} />
           )}
 
-          {/* Deliverables Tab */}
-          {activeTab === 'deliverables' && task && (
-            <DeliverablesList taskId={task.id} />
-          )}
-
           {/* Sessions Tab */}
           {activeTab === 'sessions' && task && (
             <SessionsList taskId={task.id} />
+          )}
+
+          {/* Deliverables Tab */}
+          {activeTab === 'deliverables' && task && (
+            <DeliverablesList taskId={task.id} />
           )}
         </div>
 
