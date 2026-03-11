@@ -74,16 +74,15 @@ export function syncAgentsFromConfig(): { synced: string[]; updated: string[]; r
         run(
           `INSERT INTO agents (
             id, name, role, description,
-            workspace_id, soul_md, user_md, agents_md, model,
+            soul_md, user_md, agents_md, model,
             source, gateway_agent_id, session_key_prefix,
             agent_dir, agent_workspace_path, created_at, updated_at
-          ) VALUES (?, ?, ?, ?, ?, NULL, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          ) VALUES (?, ?, ?, ?, NULL, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             id,
             agent.name,
             agent.role,
             agent.systemMd ? agent.role : `Synced from OpenClaw (${agent.id})`,
-            'default',
             agent.model,
             'synced',
             agent.id,

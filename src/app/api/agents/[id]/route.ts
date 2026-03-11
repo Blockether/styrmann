@@ -61,12 +61,12 @@ export async function PATCH(
     // Block duplicate orchestrator promotion
     if (body.role === 'orchestrator' && existing.role !== 'orchestrator') {
       const existingOrchestrator = queryOne<{ id: string }>(
-        'SELECT id FROM agents WHERE workspace_id = ? AND role = ?',
-        [existing.workspace_id, 'orchestrator']
+        'SELECT id FROM agents WHERE role = ?',
+        ['orchestrator']
       );
       if (existingOrchestrator) {
         return NextResponse.json(
-          { error: 'An Orchestrator already exists for this workspace' },
+          { error: 'An Orchestrator already exists' },
           { status: 409 }
         );
       }

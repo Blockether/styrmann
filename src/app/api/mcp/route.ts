@@ -172,7 +172,7 @@ export async function POST(request: NextRequest) {
 
     if (toolName === 'mc_status') {
       const [agents, tasks, sprints] = await Promise.all([
-        apiCall(request, `/api/agents?workspace_id=${encodeURIComponent(workspaceId)}`),
+        apiCall(request, '/api/agents'),
         apiCall(request, `/api/tasks?workspace_id=${encodeURIComponent(workspaceId)}&status=in_progress,assigned,review,testing`),
         apiCall(request, `/api/sprints?workspace_id=${encodeURIComponent(workspaceId)}`),
       ]);
@@ -221,7 +221,7 @@ export async function POST(request: NextRequest) {
       if (!taskId || !status) return jsonRpcError(id, -32602, 'task_id and status are required');
       result = await apiCall(request, `/api/tasks/${encodeURIComponent(taskId)}`, 'PATCH', { status });
     } else if (toolName === 'mc_agent_list') {
-      result = await apiCall(request, `/api/agents?workspace_id=${encodeURIComponent(workspaceId)}`);
+      result = await apiCall(request, '/api/agents');
     } else if (toolName === 'mc_acp_bindings') {
       const query = new URLSearchParams();
       query.set('workspace_id', workspaceId);

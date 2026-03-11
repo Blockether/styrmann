@@ -70,6 +70,19 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplateDefinition[] = [
     failTargets: {},
     isDefault: false,
   },
+  {
+    name: 'Architecture',
+    description: 'Architecture pipeline: Explorer maps options, Pragmatist reviews simplicity, Guardian reviews correctness, Consolidator synthesizes recommendation.',
+    stages: [
+      { id: 'explore', label: 'Explore', role: 'explorer', status: 'in_progress' },
+      { id: 'simplicity', label: 'Simplicity Review', role: 'pragmatist', status: 'testing' },
+      { id: 'correctness', label: 'Correctness Review', role: 'guardian', status: 'verification' },
+      { id: 'consolidate', label: 'Consolidate', role: 'consolidator', status: 'review' },
+      { id: 'done', label: 'Done', role: null, status: 'done' },
+    ],
+    failTargets: { testing: 'in_progress', verification: 'in_progress', review: 'in_progress' },
+    isDefault: false,
+  },
 ];
 
 /**

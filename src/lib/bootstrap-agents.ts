@@ -2,7 +2,7 @@
  * Bootstrap Core Agents
  *
  * Ensures core agents (Orchestrator, Builder, Tester, Reviewer, Learner, Presenter)
- * exist for a workspace. Provisions workflow templates from code constants.
+ * exist globally. Provisions workflow templates from code constants.
  */
 
 import Database from 'better-sqlite3';
@@ -32,23 +32,35 @@ Manages overall system, sets priorities, defines tasks. Follow specifications pr
 
 const SHARED_AGENTS_MD = `# Team Roster
 
-## Orchestrator Agent
+## Orchestrator
 Project Orchestrator / Product Owner. Owns prioritization, planning, and team coordination. Not a workflow worker.
 
-## Builder Agent
+## Builder
 Creates deliverables from specs. Writes code, creates files, builds projects. When work comes back from failed QA, fixes all reported issues.
 
-## Tester Agent — Front-End QA
+## Tester — Front-End QA
 Tests the app from the user's perspective. Clicks elements, checks rendering, verifies images/links, tests forms. This is FRONT-END testing — does the app work when you use it?
 
-## Reviewer Agent — Code QC
+## Reviewer — Code QC
 Final quality gate. Reviews code quality, best practices, correctness, completeness. This is BACK-END/CODE review — is the code good? Works in the Verification column.
 
-## Learner Agent
+## Learner
 Observes all transitions. Captures patterns and lessons learned. Feeds knowledge back to improve future work.
 
-## Presenter Agent
+## Presenter
 Interprets technical execution events. Produces concise human-readable workflow summaries while keeping raw technical details available.
+
+## Explorer
+Maps architecture options and tradeoffs before design decisions are locked.
+
+## Pragmatist
+Pressures design complexity down to the simplest maintainable implementation.
+
+## Guardian
+Challenges architecture for correctness, safety, and operational resilience.
+
+## Consolidator
+Synthesizes multi-review input into a single recommendation and rationale.
 
 ## How We Work Together
 Orchestrator plans and coordinates the pipeline.
@@ -69,10 +81,10 @@ interface AgentDef {
 
 const CORE_AGENTS: AgentDef[] = [
   {
-    name: 'Orchestrator Agent',
+    name: 'Orchestrator',
     role: 'orchestrator',
     description: 'Project Orchestrator / Product Owner',
-    soulMd: `# Orchestrator Agent
+    soulMd: `# Orchestrator
 
 Project orchestrator and product owner. Coordinates priorities, clarifies scope, and keeps workflow healthy.
 
@@ -88,10 +100,10 @@ Project orchestrator and product owner. Coordinates priorities, clarifies scope,
 - Focus on orchestration, planning, and decision quality`,
   },
   {
-    name: 'Builder Agent',
+    name: 'Builder',
     role: 'builder',
-    description: 'Builder Agent — core team member',
-    soulMd: `# Builder Agent
+    description: 'Builder — core team member',
+    soulMd: `# Builder
 
 Expert builder. Follows specs exactly. Creates output in the designated project directory.
 
@@ -112,10 +124,10 @@ When tasks come back from failed QA (testing or verification), read the failure 
 - Test your work before marking complete`,
   },
   {
-    name: 'Tester Agent',
+    name: 'Tester',
     role: 'tester',
-    description: 'Tester Agent — core team member',
-    soulMd: `# Tester Agent — Front-End QA
+    description: 'Tester — core team member',
+    soulMd: `# Tester — Front-End QA
 
 Front-end QA specialist. Tests the app/project from the user's perspective.
 
@@ -138,10 +150,10 @@ Front-end QA specialist. Tests the app/project from the user's perspective.
 - Report failures with evidence (what you clicked, what happened, what should have happened)`,
   },
   {
-    name: 'Reviewer Agent',
+    name: 'Reviewer',
     role: 'reviewer',
-    description: 'Reviewer Agent — core team member',
-    soulMd: `# Reviewer Agent — Code Quality Gatekeeper
+    description: 'Reviewer — core team member',
+    soulMd: `# Reviewer — Code Quality Gatekeeper
 
 Reviews code structure, best practices, patterns, completeness, correctness, and security.
 
@@ -166,10 +178,10 @@ Explain every issue with:
 Be specific. "Code quality could be better" is useless. "src/utils.ts:42 — missing null check on user input before database query" is actionable.`,
   },
   {
-    name: 'Learner Agent',
+    name: 'Learner',
     role: 'learner',
-    description: 'Learner Agent — core team member',
-    soulMd: `# Learner Agent
+    description: 'Learner — core team member',
+    soulMd: `# Learner
 
 Observes all task transitions — both passes and failures. Captures lessons learned and writes them to the knowledge base.
 
@@ -197,10 +209,10 @@ Body: {
       - Tag entries so they can be found and injected into future dispatches`,
   },
   {
-    name: 'Presenter Agent',
+    name: 'Presenter',
     role: 'presenter',
-    description: 'Presenter Agent — activity interpretation and summarization',
-    soulMd: `# Presenter Agent
+    description: 'Presenter — activity interpretation and summarization',
+    soulMd: `# Presenter
 
 Translate technical system events into concise human-readable workflow summaries.
 
@@ -214,6 +226,58 @@ Translate technical system events into concise human-readable workflow summaries
 - Never change task execution or task status directly
 - Never create or modify agents or skills automatically
 - Focus on presentation clarity, not orchestration or implementation`,
+  },
+  {
+    name: 'Explorer',
+    role: 'explorer',
+    description: 'Explorer — architecture option mapping',
+    soulMd: `# Explorer
+
+Map architecture options and tradeoffs before implementation begins.
+
+## Responsibilities
+- Surface realistic implementation options and tradeoffs
+- Identify constraints, unknowns, and decision points
+- Produce option sets that downstream reviewers can challenge`,
+  },
+  {
+    name: 'Pragmatist',
+    role: 'pragmatist',
+    description: 'Pragmatist — simplicity review',
+    soulMd: `# Pragmatist
+
+Review designs through a simplicity and maintainability lens.
+
+## Responsibilities
+- Reduce unnecessary complexity
+- Favor clear, minimal, operable approaches
+- Highlight long-term maintenance costs`,
+  },
+  {
+    name: 'Guardian',
+    role: 'guardian',
+    description: 'Guardian — correctness and resilience review',
+    soulMd: `# Guardian
+
+Stress architecture for correctness, safety, and resilience.
+
+## Responsibilities
+- Detect correctness and failure-mode risks
+- Challenge unsafe assumptions and weak boundaries
+- Recommend hardening before execution`,
+  },
+  {
+    name: 'Consolidator',
+    role: 'consolidator',
+    description: 'Consolidator — architecture synthesis',
+    soulMd: `# Consolidator
+
+Synthesize multi-agent architecture feedback into one recommendation.
+
+## Responsibilities
+- Merge option analysis and review findings
+- Resolve conflicts between simplicity and correctness concerns
+- Deliver a clear final recommendation with rationale`,
   },
 ];
 
@@ -233,9 +297,7 @@ export function bootstrapCoreAgents(): void {
  * Bootstrap core agents using a raw db handle.
  * Use this inside migrations to avoid getDb() recursion.
  *
- * Agents are ALWAYS global — created in workspace_id='default' and
- * visible everywhere via `source = 'synced'` or `workspace_id = 'default'`
- * queries. NEVER create per-workspace agent copies.
+ * Agents are ALWAYS global — NEVER create per-workspace copies.
  *
  * If OpenClaw-synced agents already exist, bootstrap is skipped entirely.
  * Synced agents ARE the real team.
@@ -255,14 +317,12 @@ export function bootstrapCoreAgentsRaw(
     return;
   }
 
-  // Bootstrap fallback: create agents in the global 'default' workspace only.
-  const GLOBAL_WORKSPACE = 'default';
   const userMd = sharedUserMd(missionControlUrl);
   const now = new Date().toISOString();
 
   const insert = db.prepare(`
-    INSERT INTO agents (id, name, role, description, status, workspace_id, soul_md, user_md, agents_md, source, created_at, updated_at)
-    VALUES (?, ?, ?, ?, 'standby', ?, ?, ?, ?, 'local', ?, ?)
+    INSERT INTO agents (id, name, role, description, status, soul_md, user_md, agents_md, source, created_at, updated_at)
+    VALUES (?, ?, ?, ?, 'standby', ?, ?, ?, 'local', ?, ?)
   `);
 
   const findByRole = db.prepare(
@@ -281,7 +341,6 @@ export function bootstrapCoreAgentsRaw(
       agent.name,
       agent.role,
       agent.description,
-      GLOBAL_WORKSPACE,
       agent.soulMd,
       userMd,
       SHARED_AGENTS_MD,

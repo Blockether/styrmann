@@ -37,7 +37,6 @@ CREATE TABLE IF NOT EXISTS agents (
   role TEXT NOT NULL,
   description TEXT,
   status TEXT DEFAULT 'standby' CHECK (status IN ('standby', 'working', 'offline')),
-  workspace_id TEXT DEFAULT 'default' REFERENCES workspaces(id),
   soul_md TEXT,
   user_md TEXT,
   agents_md TEXT,
@@ -514,7 +513,6 @@ CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
 CREATE INDEX IF NOT EXISTS idx_tasks_assigned ON tasks(assigned_agent_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_assigned_human ON tasks(assigned_human_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_workspace ON tasks(workspace_id);
-CREATE INDEX IF NOT EXISTS idx_agents_workspace ON agents(workspace_id);
 CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id);
 CREATE INDEX IF NOT EXISTS idx_events_created ON events(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_agents_status ON agents(status);

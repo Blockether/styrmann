@@ -2006,6 +2006,18 @@ const migrations: Migration[] = [
       const missionControlUrl = process.env.MISSION_CONTROL_URL || 'http://localhost:4000';
       bootstrapCoreAgentsRaw(db, missionControlUrl);
     }
+  },
+  {
+    id: '042',
+    name: 'drop_agents_workspace_id',
+    up: (db) => {
+      db.exec('DROP INDEX IF EXISTS idx_agents_workspace');
+
+      const agentColumns = (db.prepare(`PRAGMA table_info(agents)`).all() as { name: string }[]).map((column) => column.name);
+      if (agentColumns.includes('workspace_id')) {
+        db.exec('ALTER TABLE agents DROP COLUMN workspace_id');
+      }
+    }
   }
 ];
 

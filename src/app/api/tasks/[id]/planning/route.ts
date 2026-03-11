@@ -98,8 +98,7 @@ export async function POST(
     // Check if there are other orchestrators available before starting planning with the default master agent
     // Get the default master agent for this workspace
     const defaultMaster = queryOne<{ id: string; session_key_prefix?: string }>(
-      `SELECT id, session_key_prefix FROM agents WHERE role = 'orchestrator' AND workspace_id = ? ORDER BY created_at ASC LIMIT 1`,
-      [task.workspace_id]
+      `SELECT id, session_key_prefix FROM agents WHERE role = 'orchestrator' ORDER BY created_at ASC LIMIT 1`,
     );
 
     const otherOrchestrators = queryAll<{
@@ -111,15 +110,14 @@ export async function POST(
        FROM agents
        WHERE role = 'orchestrator'
        AND id != ?
-       AND workspace_id = ?
        AND status != 'offline'`,
-      [defaultMaster?.id ?? '', task.workspace_id]
+      [defaultMaster?.id ?? '']
     );
 
     if (otherOrchestrators.length > 0) {
       return NextResponse.json({
         error: 'Other orchestrators available',
-        message: `There ${otherOrchestrators.length === 1 ? 'is' : 'are'} ${otherOrchestrators.length} other orchestrator${otherOrchestrators.length === 1 ? '' : 's'} available in this workspace: ${otherOrchestrators.map(o => o.name).join(', ')}. Please assign this task to them directly.`,
+        message: `There ${otherOrchestrators.length === 1 ? 'is' : 'are'} ${otherOrchestrators.length} other orchestrator${otherOrchestrators.length === 1 ? '' : 's'} available: ${otherOrchestrators.map(o => o.name).join(', ')}. Please assign this task to them directly.`,
         otherOrchestrators,
       }, { status: 409 }); // 409 Conflict
     }

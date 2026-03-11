@@ -21,7 +21,6 @@ type RawActivityRow = {
   created_at: string;
   agent_name: string | null;
   agent_role: string | null;
-  agent_workspace_id: string | null;
 };
 
 function parseMetadata(metadata: string | null | undefined): Record<string, unknown> | null {
@@ -162,7 +161,6 @@ function rawToTaskActivity(row: RawActivityRow, taskStatus?: string | null): Tas
       name: row.agent_name || 'Unknown Agent',
       role: row.agent_role || '',
       status: 'working',
-      workspace_id: row.agent_workspace_id || 'default',
       source: 'local',
       description: '',
       created_at: '',
@@ -201,7 +199,7 @@ export function createTaskActivity({ taskId, activityType, message, agentId, met
   );
 
   const row = db.prepare(
-    `SELECT a.*, ag.name as agent_name, ag.role as agent_role, ag.workspace_id as agent_workspace_id
+    `SELECT a.*, ag.name as agent_name, ag.role as agent_role
      FROM task_activities a
      LEFT JOIN agents ag ON a.agent_id = ag.id
      WHERE a.id = ?`,
@@ -221,7 +219,7 @@ export function getRawTaskActivities(taskId: string, limit = 200, offset = 0): {
   const countRow = db.prepare('SELECT COUNT(*) as total FROM task_activities WHERE task_id = ?').get(taskId) as { total: number };
   const task = queryOne<Pick<Task, 'status' | 'assigned_agent_id'>>('SELECT status, assigned_agent_id FROM tasks WHERE id = ? LIMIT 1', [taskId]);
   const rows = db.prepare(
-    `SELECT a.*, ag.name as agent_name, ag.role as agent_role, ag.workspace_id as agent_workspace_id
+    `SELECT a.*, ag.name as agent_name, ag.role as agent_role
      FROM task_activities a
      LEFT JOIN agents ag ON a.agent_id = ag.id
      WHERE a.task_id = ?

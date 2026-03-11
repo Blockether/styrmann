@@ -29,22 +29,20 @@ export async function POST(request: NextRequest) {
 
     // Find the "main" agent — try by name first, then fall back to first orchestrator
     let agent = queryOne<Agent>(
-      'SELECT * FROM agents WHERE name = ? AND workspace_id = ? AND status != ?',
-      ['main', workspace_id, 'offline'],
+      'SELECT * FROM agents WHERE name = ? AND status != ?',
+      ['main', 'offline'],
     );
 
     if (!agent) {
       agent = queryOne<Agent>(
-        `SELECT * FROM agents WHERE role = 'orchestrator' AND workspace_id = ? AND status != 'offline' ORDER BY created_at ASC LIMIT 1`,
-        [workspace_id],
+        `SELECT * FROM agents WHERE role = 'orchestrator' AND status != 'offline' ORDER BY created_at ASC LIMIT 1`,
       );
     }
 
     if (!agent) {
       // Last resort: any non-offline agent
       agent = queryOne<Agent>(
-        `SELECT * FROM agents WHERE workspace_id = ? AND status != 'offline' ORDER BY created_at ASC LIMIT 1`,
-        [workspace_id],
+        `SELECT * FROM agents WHERE status != 'offline' ORDER BY created_at ASC LIMIT 1`,
       );
     }
 

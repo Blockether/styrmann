@@ -276,7 +276,7 @@ export async function handleStageFailure(
  * Auto-populate task_roles from planning agents when a workflow template is assigned.
  * Maps agent roles to workflow stage roles using fuzzy matching.
  */
-export function populateTaskRolesFromAgents(taskId: string, workspaceId: string): void {
+export function populateTaskRolesFromAgents(taskId: string, _workspaceId: string): void {
   const workflow = getTaskWorkflow(taskId);
   if (!workflow) return;
 
@@ -285,8 +285,7 @@ export function populateTaskRolesFromAgents(taskId: string, workspaceId: string)
 
   // Get all agents in the workspace
   const agents = queryAll<{ id: string; name: string; role: string }>(
-    "SELECT id, name, role FROM agents WHERE workspace_id = ? AND status != 'offline'",
-    [workspaceId]
+    "SELECT id, name, role FROM agents WHERE status != 'offline'",
   );
 
   // For each stage that requires a role, try to find a matching agent

@@ -143,10 +143,6 @@ function responsibilityAnalysis(agent: Agent, entry: KnowledgeRecord): { score: 
     }
   }
 
-  if (entry.workspace_id === agent.workspace_id) {
-    score += 1;
-    reasons.push('Workspace-specific match with agent workspace.');
-  }
   if (entry.workspace_id === 'default') {
     score += 1;
     reasons.push('Default workspace knowledge is considered globally relevant.');
@@ -264,7 +260,7 @@ function getRelevantEntriesForAgent(agent: Agent, limit: number): KnowledgeRecor
         OR (agent_id IS NULL AND (workspace_id = ? OR workspace_id = 'default'))
      ORDER BY confidence DESC, created_at DESC
      LIMIT 240`,
-    [agent.id, agent.workspace_id],
+    [agent.id, 'default'],
   );
 
   const entryIds = entries
@@ -556,7 +552,6 @@ export function getMemoryPipelineAgentsStatus(): Array<{
   id: string;
   name: string;
   role: string;
-  workspace_id: string;
   memory_items: number;
   soul_items: number;
   agents_items: number;
@@ -585,7 +580,6 @@ export function getMemoryPipelineAgentsStatus(): Array<{
       id: agent.id,
       name: agent.name,
       role: agent.role,
-      workspace_id: agent.workspace_id,
       memory_items: countManagedItems(memory, MEMORY_START_MARKER, MEMORY_END_MARKER),
       soul_items: countManagedItems(soul, SOUL_START_MARKER, SOUL_END_MARKER),
       agents_items: countManagedItems(agentsMd, AGENTS_START_MARKER, AGENTS_END_MARKER),

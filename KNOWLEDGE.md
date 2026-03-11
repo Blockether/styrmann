@@ -174,6 +174,7 @@ Workflow planning is now orchestrator-owned. The system chooses among the existi
 | Standard | Builder -> Tester -> Reviewer -> Done | No |
 | Strict | Builder -> Tester -> Verify -> Review -> Done | Yes |
 | Auto-Train | Builder -> Loop Complete | No |
+| Architecture | Explorer -> Simplicity Review -> Correctness Review -> Consolidate -> Done | No |
 
 The Strict template is the default. Per-task workflow plans persist selected participants, per-step skills, loopback targets, findings, and learner proposals.
 
@@ -212,9 +213,9 @@ The Strict template is the default. Per-task workflow plans persist selected par
 
 **Meta repository**: Workspace `id='default'` is the internal `System / OpenClaw` meta repository. It has `repo_kind='meta'`, `is_internal=1`, no GitHub link, and `local_path='/root/.openclaw'`.
 
-**Global visibility**: Agents are ALWAYS global. Synced agents live in the meta repository (`workspace_id='default'`). Agent queries return both workspace-local agents AND all synced agents (`WHERE workspace_id = ? OR source = 'synced'`). No per-workspace agent copies are ever created.
+**Global visibility**: Agents are ALWAYS global. The `agents` table no longer includes `workspace_id`, and agent APIs/query paths now operate on the full global roster.
 
-**Bootstrap policy**: `bootstrapCoreAgentsRaw()` is a fallback for fresh installs without an OpenClaw gateway. It creates agents in `workspace_id='default'` only (never per-workspace). If any synced agents exist, bootstrap is skipped entirely — synced agents ARE the real team. Workflow planning handles missing roles via `task_findings` and `capability_proposals` rather than creating new agents.
+**Bootstrap policy**: `bootstrapCoreAgentsRaw()` is a fallback for fresh installs without an OpenClaw gateway. It bootstraps 10 local fallback agents globally: Orchestrator, Builder, Tester, Reviewer, Learner, Presenter, Explorer, Pragmatist, Guardian, and Consolidator. If any synced agents exist, bootstrap is skipped entirely — synced agents ARE the real team. Workflow planning handles missing roles via `task_findings` and `capability_proposals` rather than creating new agents.
 
 **Agent system.md frontmatter**: Every OpenClaw agent's `system.md` (in `/root/.openclaw/agents/{id}/agent/system.md`) MUST have YAML frontmatter with a `role:` field. The sync process (`extractRoleFromSystemMd()`) reads `role:` first, then falls back to `description:`, then the first H1 heading, then the agent name. Short, lowercase role names (e.g. `builder`, `orchestrator`, `product_owner`, `explorer`) — never long descriptions. When creating new agents via Mission Control, the `role:` field is auto-generated in the system.md frontmatter.
 **Always-on per-agent memory consolidation**: Mission Control maintains OpenClaw memory natively in JavaScript and writes only to per-agent workspaces (`agent_workspace_path`). There is no shared global memory digest.
@@ -261,9 +262,9 @@ The Presenter is a core role that interprets technical execution data without ch
 
 ### Orchestrator Role
 
-One agent per workspace may have `role = 'orchestrator'`. This is the Product Owner / project manager role.
+One global agent may have `role = 'orchestrator'`. This is the Product Owner / project manager role.
 
-**Single-per-workspace constraint**: Creating a second orchestrator in the same workspace returns `409 Conflict`. Enforced at the API level.
+**Single global orchestrator constraint**: Creating a second orchestrator returns `409 Conflict`. Enforced at the API level.
 
 **Demotion blocked**: `PATCH /api/agents/{id}` cannot change an orchestrator's role. Returns `400 Bad Request`. To change the orchestrator, delete the agent and recreate with a different role.
 
@@ -325,7 +326,7 @@ Fallback: Agent Activity Dashboard polls every 20s; task-specific views use SSE 
 ### Agents
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
-| GET | `/api/agents` | List agents (triggers ensureSynced); enriches each agent with `active_task_count` and `current_task_title` from tasks table |
+| GET | `/api/agents` | List all global agents (triggers ensureSynced); enriches each agent with `active_task_count` and `current_task_title` from tasks table |
 | GET/PATCH/DELETE | `/api/agents/{id}` | Agent CRUD (PATCH writes back to OpenClaw config; cannot demote orchestrator; manual `status` updates forbidden unless internal daemon call) |
 | GET | `/api/agents/{id}/workspace` | Read-only browser for synced agent workspace/config roots (`scope=workspace|agent`, `path=...`) |
 | GET/POST | `/api/agents/{id}/skills` | Inspect and manage shared skill links for synced agents (`link`, `unlink`, `replace_with_link`, `sync_all`) |
@@ -367,7 +368,7 @@ Fallback: Agent Activity Dashboard polls every 20s; task-specific views use SSE 
 
 ## Database Schema
 
-35 migrations (001-035), auto-run on DB connection in `src/lib/db/index.ts`. Schema creation (`schema.ts`) only runs for fresh databases. After migrations, `discoverRepoWorkspaces()` scans `/root/repos/{org}/{repo}` for git repos and creates/syncs workspaces.
+42 migrations (001-042), auto-run on DB connection in `src/lib/db/index.ts`. Schema creation (`schema.ts`) only runs for fresh databases. After migrations, `discoverRepoWorkspaces()` scans `/root/repos/{org}/{repo}` for git repos and creates/syncs workspaces.
 
 ### Core Tables
 - **workspaces** -- slug (`{org}-{repo}` format), name, description, icon, github_repo, owner_email, coordinator_email, logo_url, organization
@@ -532,12 +533,12 @@ Agents without direct filesystem access use upload/download endpoints:
 6. **Migrations auto-run on DB connection**: Schema creation only for fresh databases. `legacy_alter_table = ON` during migrations to prevent FK rewriting bug.
 7. **Component traceability**: Every React component's root DOM element has `data-component="src/path/to/File"` (relative path, no extension). Paste rendered HTML and immediately identify which source file to edit.
 8. **LiveFeed is workspace-scoped**: Events API filters by `workspace_id` via task or agent ownership. System events (no task/agent) appear in all workspaces. AgentActivityDashboard is the global cross-workspace activity view.
-9. **Single orchestrator per workspace**: Only one agent with `role = 'orchestrator'` is allowed per workspace. Enforced at the API level (409 on duplicate). Orchestrators cannot be demoted via PATCH (400) -- delete and recreate to change. Orchestrators are excluded from workflow stage auto-assignment.
+9. **Single global orchestrator**: Only one agent with `role = 'orchestrator'` is allowed globally. Enforced at the API level (409 on duplicate). Orchestrators cannot be demoted via PATCH (400) -- delete and recreate to change. Orchestrators are excluded from workflow stage auto-assignment.
 10. **Story points computed, not stored**: `story_points` on a milestone is computed at read time via `SUM(task.effort)`. It is never persisted in the database.
 11. **Milestone dependencies are informational in v1**: The `milestone_dependencies` table exists and is queryable, but no blocking behavior is enforced. Dependencies are for planning visibility only.
 
 12. **Repo-driven workspaces**: Standard repositories auto-discover from git repos at `/root/repos/{org}/{repo}`. On DB init, `discoverRepoWorkspaces()` scans for org directories containing git repos and creates/syncs a workspace per repo. Slug format: `{org}-{repo}` (e.g., `blockether-mission-control`). Mission Control is treated like any other discovered repository. The `default` workspace is reserved for the internal OpenClaw meta repository rooted at `/root/.openclaw`. Repositories are grouped by organization in the UI, with the meta repository under `System`.
-13. **Workflow templates in code, not DB-cloned**: Template definitions (Simple, Standard, Strict) live in `src/lib/workflow-templates.ts` as TypeScript constants. New workspaces get templates provisioned from code, not cloned from another workspace's DB rows.
+13. **Workflow templates in code, not DB-cloned**: Template definitions (Simple, Standard, Strict, Auto-Train, Architecture) live in `src/lib/workflow-templates.ts` as TypeScript constants. New workspaces get templates provisioned from code, not cloned from another workspace's DB rows.
 ---
 
 ## Environment Variables

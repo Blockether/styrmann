@@ -36,7 +36,7 @@ export interface Agent {
   role: string;
   description?: string;
   status: AgentStatus;
-  workspace_id: string;
+  workspace_id?: string;
   soul_md?: string;
   user_md?: string;
   agents_md?: string;

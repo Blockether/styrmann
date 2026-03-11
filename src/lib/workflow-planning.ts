@@ -37,6 +37,10 @@ const SKILL_FALLBACKS: Record<string, string[]> = {
   reviewer: ['verification', 'quality-gate', 'risk-review'],
   verifier: ['verification', 'acceptance-gate', 'release-check'],
   learner: ['capability-gap-analysis', 'proposal-drafting', 'memory-synthesis'],
+  explorer: ['research-discovery', 'option-mapping', 'tradeoff-analysis'],
+  pragmatist: ['simplicity-review', 'scope-minimization', 'maintenance-lens'],
+  guardian: ['correctness-review', 'risk-assessment', 'safety-check'],
+  consolidator: ['synthesis', 'recommendation-drafting', 'decision-record'],
 };
 
 function normalizeRole(role: string | null | undefined): string {
@@ -71,7 +75,9 @@ function tokenizeTask(task: PlanningTask): string[] {
 function chooseWorkflowName(task: PlanningTask): string {
   const effort = Number(task.effort || 0);
   const impact = Number(task.impact || 0);
-  if (task.priority === 'urgent' || impact >= 4 || effort >= 4 || task.task_type === 'research') return 'Strict';
+  const haystack = `${task.title} ${task.description || ''}`.toLowerCase();
+  if (task.task_type === 'research' || /\b(architect|architecture|rfc|adr)\b/.test(haystack)) return 'Architecture';
+  if (task.priority === 'urgent' || impact >= 4 || effort >= 4) return 'Strict';
   if (impact >= 3 || effort >= 3 || task.task_type === 'bug') return 'Standard';
   return 'Simple';
 }
@@ -184,17 +190,15 @@ export function generateTaskWorkflowPlan(taskId: string): { plan: TaskWorkflowPl
   const taskTokens = tokenizeTask(task);
   const orchestrator = queryOne<Agent>(
     `SELECT * FROM agents
-     WHERE role = 'orchestrator' AND (workspace_id = ? OR workspace_id = 'default' OR source = 'synced')
-     ORDER BY CASE WHEN workspace_id = ? THEN 0 ELSE 1 END, created_at ASC
+     WHERE role = 'orchestrator'
+     ORDER BY created_at ASC
      LIMIT 1`,
-    [task.workspace_id, task.workspace_id],
   );
   const learner = queryOne<Agent>(
     `SELECT * FROM agents
-     WHERE role = 'learner' AND (workspace_id = ? OR workspace_id = 'default' OR source = 'synced')
-     ORDER BY CASE WHEN workspace_id = ? THEN 0 ELSE 1 END, created_at ASC
+     WHERE role = 'learner'
+     ORDER BY created_at ASC
      LIMIT 1`,
-    [task.workspace_id, task.workspace_id],
   );
 
   const candidateAgents = queryAll<Agent>(
@@ -202,9 +206,7 @@ export function generateTaskWorkflowPlan(taskId: string): { plan: TaskWorkflowPl
      WHERE status != 'offline'
        AND role != 'orchestrator'
        AND role != 'presenter'
-       AND (workspace_id = ? OR workspace_id = 'default' OR source = 'synced')
-     ORDER BY CASE WHEN workspace_id = ? THEN 0 ELSE 1 END, updated_at DESC`,
-    [task.workspace_id, task.workspace_id],
+     ORDER BY updated_at DESC`,
   );
 
   const usedAgents = new Set<string>();

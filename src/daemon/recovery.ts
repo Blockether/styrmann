@@ -110,7 +110,6 @@ export function startRecovery(config: DaemonConfig, stats: DaemonStats): () => v
         if (!assignedAgent || assignedAgent.status === 'offline') {
           const fallback = agents.find(
             (agent) =>
-              agent.workspace_id === task.workspace_id &&
               agent.role === 'orchestrator' &&
               agent.status !== 'offline' &&
               agent.id !== task.assigned_agent_id,

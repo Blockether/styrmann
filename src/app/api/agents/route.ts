@@ -8,23 +8,12 @@ import type { Agent, AgentStatus, CreateAgentRequest } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
 // GET /api/agents - List all agents
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
-    const workspaceId = request.nextUrl.searchParams.get('workspace_id');
-
     ensureSynced();
-
-    let agents: Agent[];
-    if (workspaceId) {
-      agents = queryAll<Agent>(`
-        SELECT * FROM agents WHERE workspace_id = ? OR source = 'synced'
-        ORDER BY CASE WHEN role = 'orchestrator' THEN 0 ELSE 1 END, name ASC
-      `, [workspaceId]);
-    } else {
-      agents = queryAll<Agent>(`
-        SELECT * FROM agents ORDER BY CASE WHEN role = 'orchestrator' THEN 0 ELSE 1 END, name ASC
-      `);
-    }
+    const agents = queryAll<Agent>(`
+      SELECT * FROM agents ORDER BY CASE WHEN role = 'orchestrator' THEN 0 ELSE 1 END, name ASC
+    `);
 for (const agent of agents) {
 if (agent.source === 'synced') {
 const mdFiles = readAgentMdFromDisk(agent.agent_workspace_path);
@@ -111,27 +100,24 @@ function nextGatewayAgentId(baseName: string): string {
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json() as (CreateAgentRequest & { workspace_id?: string; source?: string });
+    const body = await request.json() as (CreateAgentRequest & { source?: string });
 
     if (!body.name || !body.role) {
       return NextResponse.json({ error: 'Name and role are required' }, { status: 400 });
     }
 
-    const workspaceId = body.workspace_id || 'default';
-
     if (body.source) {
       return NextResponse.json({ error: 'source cannot be provided by clients' }, { status: 400 });
     }
 
-    // Enforce single orchestrator per workspace
     if (body.role === 'orchestrator') {
       const existingOrchestrator = queryOne<{ id: string }>(
-        'SELECT id FROM agents WHERE workspace_id = ? AND role = ?',
-        [workspaceId, 'orchestrator']
+        'SELECT id FROM agents WHERE role = ?',
+        ['orchestrator']
       );
       if (existingOrchestrator) {
         return NextResponse.json(
-          { error: 'An Orchestrator already exists for this workspace' },
+          { error: 'An Orchestrator already exists' },
           { status: 409 }
         );
       }
@@ -160,9 +146,6 @@ export async function POST(request: NextRequest) {
     if (!agent) {
       return NextResponse.json({ error: 'Agent created in OpenClaw config but not synced to Mission Control' }, { status: 500 });
     }
-
-    run('UPDATE agents SET workspace_id = ?, updated_at = ? WHERE id = ?', [workspaceId, new Date().toISOString(), agent.id]);
-    agent = queryOne<Agent>('SELECT * FROM agents WHERE id = ?', [agent.id]) || agent;
 
     run(
       `INSERT INTO events (id, type, agent_id, message, created_at)
