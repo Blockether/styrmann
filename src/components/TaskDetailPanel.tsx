@@ -28,6 +28,7 @@ import type {
   TaskStatus,
   TaskComment,
   TaskBlocker,
+  TaskDependency,
   TaskResource,
   TaskAcceptanceCriteria,
   Tag,
@@ -155,6 +156,7 @@ export function TaskDetailPanel({ taskId, onClose }: TaskDetailPanelProps) {
 
   const [comments, setComments] = useState<TaskComment[]>([]);
   const [blockers, setBlockers] = useState<TaskBlocker[]>([]);
+  const [dependencies, setDependencies] = useState<TaskDependency[]>([]);
   const [resources, setResources] = useState<TaskResource[]>([]);
   const [acceptanceCriteria, setAcceptanceCriteria] = useState<TaskAcceptanceCriteria[]>([]);
   const [taskTags, setTaskTags] = useState<Tag[]>([]);
@@ -168,6 +170,9 @@ export function TaskDetailPanel({ taskId, onClose }: TaskDetailPanelProps) {
 
   const [newBlockerDesc, setNewBlockerDesc] = useState('');
   const [submittingBlocker, setSubmittingBlocker] = useState(false);
+  const [newDependencyTaskId, setNewDependencyTaskId] = useState('');
+  const [newDependencyStatus, setNewDependencyStatus] = useState<TaskStatus>('done');
+  const [submittingDependency, setSubmittingDependency] = useState(false);
 
   const [newResourceTitle, setNewResourceTitle] = useState('');
   const [newResourceUrl, setNewResourceUrl] = useState('');
@@ -175,6 +180,8 @@ export function TaskDetailPanel({ taskId, onClose }: TaskDetailPanelProps) {
   const [submittingResource, setSubmittingResource] = useState(false);
 
   const [newCriteriaDesc, setNewCriteriaDesc] = useState('');
+  const [newCriteriaStatus, setNewCriteriaStatus] = useState<TaskStatus>('done');
+  const [newCriteriaGateType, setNewCriteriaGateType] = useState<'manual' | 'artifact' | 'test' | 'deploy' | 'verifier'>('manual');
   const [submittingCriteria, setSubmittingCriteria] = useState(false);
 
   const [addingTagId, setAddingTagId] = useState('');
@@ -225,9 +232,10 @@ export function TaskDetailPanel({ taskId, onClose }: TaskDetailPanelProps) {
 
     const loadSubResources = async () => {
       try {
-        const [commentsRes, blockersRes, resourcesRes, criteriaRes, tagsRes] = await Promise.all([
+        const [commentsRes, blockersRes, dependenciesRes, resourcesRes, criteriaRes, tagsRes] = await Promise.all([
           fetch(`/api/tasks/${taskId}/comments`),
           fetch(`/api/tasks/${taskId}/blockers`),
+          fetch(`/api/tasks/${taskId}/dependencies`),
           fetch(`/api/tasks/${taskId}/resources`),
           fetch(`/api/tasks/${taskId}/acceptance-criteria`),
           fetch(`/api/tasks/${taskId}/tags`),
@@ -235,6 +243,7 @@ export function TaskDetailPanel({ taskId, onClose }: TaskDetailPanelProps) {
 
         if (commentsRes.ok) setComments(await commentsRes.json());
         if (blockersRes.ok) setBlockers(await blockersRes.json());
+        if (dependenciesRes.ok) setDependencies(await dependenciesRes.json());
         if (resourcesRes.ok) setResources(await resourcesRes.json());
         if (criteriaRes.ok) setAcceptanceCriteria(await criteriaRes.json());
         if (tagsRes.ok) setTaskTags(await tagsRes.json());
@@ -367,6 +376,44 @@ export function TaskDetailPanel({ taskId, onClose }: TaskDetailPanelProps) {
     }
   };
 
+  const handleAddDependency = async () => {
+    if (!newDependencyTaskId.trim()) return;
+    setSubmittingDependency(true);
+    try {
+      const res = await fetch(`/api/tasks/${taskId}/dependencies`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          depends_on_task_id: newDependencyTaskId.trim(),
+          required_status: newDependencyStatus,
+        }),
+      });
+      if (res.ok) {
+        const dependency = await res.json();
+        setDependencies((prev) => [dependency, ...prev]);
+        setNewDependencyTaskId('');
+        setNewDependencyStatus('done');
+      }
+    } catch (err) {
+      console.error('Failed to add dependency:', err);
+    } finally {
+      setSubmittingDependency(false);
+    }
+  };
+
+  const handleDeleteDependency = async (dependencyId: string) => {
+    try {
+      const res = await fetch(`/api/tasks/${taskId}/dependencies/${dependencyId}`, {
+        method: 'DELETE',
+      });
+      if (res.ok) {
+        setDependencies((prev) => prev.filter((dependency) => dependency.id !== dependencyId));
+      }
+    } catch (err) {
+      console.error('Failed to delete dependency:', err);
+    }
+  };
+
   const handleAddResource = async () => {
     if (!newResourceUrl.trim()) return;
 
@@ -418,13 +465,22 @@ export function TaskDetailPanel({ taskId, onClose }: TaskDetailPanelProps) {
       const res = await fetch(`/api/tasks/${taskId}/acceptance-criteria`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ description: newCriteriaDesc.trim() }),
+        body: JSON.stringify({
+          description: newCriteriaDesc.trim(),
+          required_for_status: newCriteriaStatus,
+          gate_type: newCriteriaGateType,
+          create_subcriteria: true,
+        }),
       });
 
       if (res.ok) {
-        const criteria = await res.json();
-        setAcceptanceCriteria(prev => [...prev, criteria]);
+        const refreshed = await fetch(`/api/tasks/${taskId}/acceptance-criteria`);
+        if (refreshed.ok) {
+          setAcceptanceCriteria(await refreshed.json());
+        }
         setNewCriteriaDesc('');
+        setNewCriteriaGateType('manual');
+        setNewCriteriaStatus('done');
       }
     } catch (err) {
       console.error('Failed to add criteria:', err);
@@ -730,41 +786,88 @@ export function TaskDetailPanel({ taskId, onClose }: TaskDetailPanelProps) {
 
               <CollapsibleSection title="Acceptance Criteria" badge={acceptanceCriteria.length} defaultOpen={acceptanceCriteria.length > 0}>
                 <div className="space-y-3">
-                  {acceptanceCriteria.map(criteria => (
-                    <div
-                      key={criteria.id}
-                      className="flex items-start gap-2 p-2 bg-mc-bg rounded border border-mc-border"
-                    >
-                      <button
-                        onClick={() => handleToggleCriteria(criteria.id, !criteria.is_met)}
-                        className={`w-5 h-5 rounded flex items-center justify-center flex-shrink-0 mt-0.5 ${
-                          criteria.is_met
-                            ? 'bg-mc-accent-green text-white'
-                            : 'bg-mc-bg-tertiary border border-mc-border'
-                        }`}
-                      >
-                        {criteria.is_met && <Check className="w-3 h-3" />}
-                      </button>
-                      <span className={`text-sm ${criteria.is_met ? 'line-through text-mc-text-secondary' : ''}`}>
-                        {criteria.description}
-                      </span>
-                    </div>
-                  ))}
-                  <div className="flex items-center gap-2">
+                  {acceptanceCriteria.filter(c => !c.parent_criteria_id).map(criteria => {
+                    const children = acceptanceCriteria.filter(c => c.parent_criteria_id === criteria.id);
+                    return (
+                      <div key={criteria.id} className="space-y-1">
+                        <div className="flex items-start gap-2 p-2 bg-mc-bg rounded border border-mc-border">
+                          <button
+                            onClick={() => handleToggleCriteria(criteria.id, !criteria.is_met)}
+                            className={`w-5 h-5 rounded flex items-center justify-center flex-shrink-0 mt-0.5 ${
+                              criteria.is_met
+                                ? 'bg-mc-accent-green text-white'
+                                : 'bg-mc-bg-tertiary border border-mc-border'
+                            }`}
+                          >
+                            {criteria.is_met && <Check className="w-3 h-3" />}
+                          </button>
+                          <div className="min-w-0 flex-1">
+                            <span className={`text-sm ${criteria.is_met ? 'line-through text-mc-text-secondary' : ''}`}>
+                              {criteria.description}
+                            </span>
+                            <div className="text-[11px] text-mc-text-secondary mt-0.5">
+                              Gate: {criteria.gate_type || 'manual'} • Required for {(criteria.required_for_status || 'done').replace(/_/g, ' ')}
+                            </div>
+                          </div>
+                        </div>
+                        {children.map(child => (
+                          <div key={child.id} className="ml-6 flex items-start gap-2 p-2 bg-mc-bg-secondary rounded border border-mc-border">
+                            <button
+                              onClick={() => handleToggleCriteria(child.id, !child.is_met)}
+                              className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 mt-0.5 ${
+                                child.is_met
+                                  ? 'bg-mc-accent-green text-white'
+                                  : 'bg-mc-bg-tertiary border border-mc-border'
+                              }`}
+                            >
+                              {child.is_met && <Check className="w-3 h-3" />}
+                            </button>
+                            <div className="min-w-0 flex-1">
+                              <span className={`text-xs ${child.is_met ? 'line-through text-mc-text-secondary' : ''}`}>
+                                {child.description}
+                              </span>
+                              <div className="text-[11px] text-mc-text-secondary mt-0.5">
+                                {child.gate_type || 'manual'}{child.artifact_key ? ` • ${child.artifact_key}` : ''}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })}
+                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
                     <input
                       type="text"
                       value={newCriteriaDesc}
                       onChange={(e) => setNewCriteriaDesc(e.target.value)}
                       placeholder="Add acceptance criteria..."
-                      className="flex-1 min-h-11 bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent"
+                      className="sm:col-span-2 min-h-11 bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent"
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') handleAddCriteria();
                       }}
                     />
+                    <select
+                      value={newCriteriaStatus}
+                      onChange={(e) => setNewCriteriaStatus(e.target.value as TaskStatus)}
+                      className="min-h-11 bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent"
+                    >
+                      {Object.keys(STATUS_COLORS).map(status => (
+                        <option key={`criteria-status-${status}`} value={status}>{status.replace(/_/g, ' ')}</option>
+                      ))}
+                    </select>
+                    <select
+                      value={newCriteriaGateType}
+                      onChange={(e) => setNewCriteriaGateType(e.target.value as 'manual' | 'artifact' | 'test' | 'deploy' | 'verifier')}
+                      className="min-h-11 bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent"
+                    >
+                      {['manual', 'artifact', 'test', 'deploy', 'verifier'].map(kind => (
+                        <option key={`criteria-gate-${kind}`} value={kind}>{kind}</option>
+                      ))}
+                    </select>
                     <button
                       onClick={handleAddCriteria}
                       disabled={!newCriteriaDesc.trim() || submittingCriteria}
-                      className="min-h-11 px-3 bg-mc-accent text-white rounded text-sm hover:bg-mc-accent/90 disabled:opacity-50"
+                      className="sm:col-span-4 min-h-11 px-3 bg-mc-accent text-white rounded text-sm hover:bg-mc-accent/90 disabled:opacity-50"
                     >
                       {submittingCriteria ? (
                         <Loader2 className="w-4 h-4 animate-spin" />
@@ -829,6 +932,71 @@ export function TaskDetailPanel({ taskId, onClose }: TaskDetailPanelProps) {
                       ) : (
                         <Plus className="w-4 h-4" />
                       )}
+                    </button>
+                  </div>
+                </div>
+              </CollapsibleSection>
+
+              <CollapsibleSection title="Dependencies" badge={dependencies.length} defaultOpen={dependencies.length > 0 || Boolean(task?.is_blocked)}>
+                <div className="space-y-3">
+                  {task?.is_blocked && (
+                    <div className="rounded border border-mc-accent-red/30 bg-mc-accent-red/10 px-3 py-2 text-xs text-mc-accent-red">
+                      {task.blocked_reason || 'Task is blocked by unresolved dependencies.'}
+                    </div>
+                  )}
+
+                  {dependencies.map((dependency) => {
+                    const currentStatus = dependency.depends_on_task_status || dependency.depends_on_task?.status || 'unknown';
+                    const resolved = currentStatus === dependency.required_status;
+                    return (
+                      <div
+                        key={dependency.id}
+                        className={`flex items-start gap-2 p-2 rounded border ${resolved ? 'bg-mc-bg border-mc-border' : 'bg-mc-accent-red/10 border-mc-accent-red/30'}`}
+                      >
+                        <div className={`w-5 h-5 rounded flex items-center justify-center flex-shrink-0 mt-0.5 ${resolved ? 'bg-mc-accent-green text-white' : 'bg-mc-accent-red/20 text-mc-accent-red border border-mc-accent-red/30'}`}>
+                          {resolved ? <Check className="w-3 h-3" /> : <AlertTriangle className="w-3 h-3" />}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm">
+                            Depends on task `{dependency.depends_on_task_id}`{dependency.depends_on_task_title ? ` (${dependency.depends_on_task_title})` : ''} to reach `{dependency.required_status}`
+                          </p>
+                          <p className="text-xs text-mc-text-secondary mt-1">
+                            Current: {currentStatus.replace(/_/g, ' ')}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => handleDeleteDependency(dependency.id)}
+                          className="p-1.5 hover:bg-mc-accent-red/10 rounded text-mc-text-secondary hover:text-mc-accent-red"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    );
+                  })}
+
+                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
+                    <input
+                      type="text"
+                      value={newDependencyTaskId}
+                      onChange={(e) => setNewDependencyTaskId(e.target.value)}
+                      placeholder="Depends on task id"
+                      className="sm:col-span-2 min-h-11 bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent"
+                    />
+                    <select
+                      value={newDependencyStatus}
+                      onChange={(e) => setNewDependencyStatus(e.target.value as TaskStatus)}
+                      className="min-h-11 bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent"
+                    >
+                      {Object.keys(STATUS_COLORS).map((status) => (
+                        <option key={`dep-status-${status}`} value={status}>{status.replace(/_/g, ' ')}</option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={handleAddDependency}
+                      disabled={!newDependencyTaskId.trim() || submittingDependency}
+                      className="min-h-11 px-3 bg-mc-accent text-white rounded text-sm hover:bg-mc-accent/90 disabled:opacity-50"
+                    >
+                      {submittingDependency ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'Add'}
                     </button>
                   </div>
                 </div>

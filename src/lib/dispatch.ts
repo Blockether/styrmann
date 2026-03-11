@@ -8,6 +8,7 @@ import { ensureTaskWorktree, getTaskPipelineDir, getWorkspaceRepoPath, isGitWork
 import { getRelevantKnowledge, formatKnowledgeForDispatch } from '@/lib/learner';
 import { createTaskActivity } from '@/lib/task-activity';
 import { getTaskWorkflow } from '@/lib/workflow-engine';
+import { getUnresolvedTaskDependencies } from '@/lib/task-dependencies';
 import type { Task, Agent, OpenClawSession, WorkflowStage } from '@/lib/types';
 
 export interface DispatchResult {
@@ -106,6 +107,17 @@ export async function dispatchTaskToAgent(taskId: string): Promise<DispatchResul
 
     if (!task.assigned_agent_id) {
       return { success: false, error: 'Task has no assigned agent' };
+    }
+
+    const unresolvedDependencies = getUnresolvedTaskDependencies(taskId);
+    if (unresolvedDependencies.length > 0) {
+      const blockedList = unresolvedDependencies
+        .map((item) => `${item.depends_on_task_title || item.depends_on_task_id} -> ${item.required_status}`)
+        .join('; ');
+      return {
+        success: false,
+        error: `Task dependencies unresolved: ${blockedList}`,
+      };
     }
 
     const agent = queryOne<Agent>('SELECT * FROM agents WHERE id = ?', [task.assigned_agent_id]);
@@ -337,10 +349,6 @@ export async function dispatchTaskToAgent(taskId: string): Promise<DispatchResul
     const authHeader = needsAuthHeader
       ? '\n   Headers: {"Authorization": "Bearer $MC_API_TOKEN"} (only when calling Mission Control from another host)'
       : '';
-    const deliverableCurlAuth = needsAuthHeader
-      ? " -H 'Authorization: Bearer $MC_API_TOKEN'"
-      : '';
-
     let completionInstructions: string;
     if (isBuilder) {
       const branchMetadata = worktree
@@ -356,15 +364,7 @@ export async function dispatchTaskToAgent(taskId: string): Promise<DispatchResul
 - This workspace runs without a git worktree branch requirement.
 - Still write deliverables under ${taskProjectDir}`;
 
-      completionInstructions = `**IMPORTANT:** Prefer Mission Control MCP endpoint over raw HTTP.
-Use JSON-RPC on ${missionControlUrl}/api/mcp:
-1. tools/call name=mc_task_log arguments={"task_id":"${task.id}","activity_type":"completed","message":"Description of what was done"}
-2. Register deliverable via API (no MCP tool yet):
-   \
-   curl -sS -X POST ${missionControlUrl}/api/tasks/${task.id}/deliverables -H 'Content-Type: application/json'${deliverableCurlAuth} -d '{"deliverable_type":"file","title":"File name","path":"${taskProjectDir}/filename.html"}'
-3. tools/call name=mc_task_status arguments={"task_id":"${task.id}","status":"${nextStatus}"}
-
-Raw HTTP fallback (only if MCP is unavailable):
+      completionInstructions = `**IMPORTANT:** Use Mission Control direct REST API.
 1. Log activity: POST ${missionControlUrl}/api/tasks/${task.id}/activities${authHeader}
    Body: {"activity_type": "completed", "message": "Description of what was done", "metadata": ${branchMetadata}}
 2. Register deliverable: POST ${missionControlUrl}/api/tasks/${task.id}/deliverables${authHeader}
@@ -382,9 +382,10 @@ When complete, reply with:
 Review the output directory for deliverables and run any applicable tests.
 
 **If tests PASS:**
-1. Prefer MCP endpoint:
-   - tools/call name=mc_task_log arguments={"task_id":"${task.id}","activity_type":"completed","message":"Tests passed: [summary]"}
-   - tools/call name=mc_task_status arguments={"task_id":"${task.id}","status":"${nextStatus}"}
+1. POST ${missionControlUrl}/api/tasks/${task.id}/activities${authHeader}
+   Body: {"activity_type": "completed", "message": "Tests passed: [summary]"}
+2. PATCH ${missionControlUrl}/api/tasks/${task.id}${authHeader}
+   Body: {"status": "${nextStatus}"}
 
 **If tests FAIL:**
 1. ${failEndpoint}${authHeader}
@@ -397,9 +398,10 @@ Reply with: \`TEST_PASS: [summary]\` or \`TEST_FAIL: [what failed]\``;
 Review deliverables, test results, and task requirements.
 
 **If verification PASSES:**
-1. Prefer MCP endpoint:
-   - tools/call name=mc_task_log arguments={"task_id":"${task.id}","activity_type":"completed","message":"Verification passed: [summary]"}
-   - tools/call name=mc_task_status arguments={"task_id":"${task.id}","status":"${nextStatus}"}
+1. POST ${missionControlUrl}/api/tasks/${task.id}/activities${authHeader}
+   Body: {"activity_type": "completed", "message": "Verification passed: [summary]"}
+2. PATCH ${missionControlUrl}/api/tasks/${task.id}${authHeader}
+   Body: {"status": "${nextStatus}"}
 
 **If verification FAILS:**
 1. ${failEndpoint}${authHeader}
@@ -408,10 +410,7 @@ Review deliverables, test results, and task requirements.
 Reply with: \`VERIFY_PASS: [summary]\` or \`VERIFY_FAIL: [what failed]\``;
     } else {
       completionInstructions = `**IMPORTANT:** After completing work:
-1. Prefer MCP endpoint:
-   - tools/call name=mc_task_status arguments={"task_id":"${task.id}","status":"${nextStatus}"}
-2. Raw HTTP fallback:
-   PATCH ${missionControlUrl}/api/tasks/${task.id}${authHeader}
+1. PATCH ${missionControlUrl}/api/tasks/${task.id}${authHeader}
    Body: {"status": "${nextStatus}"}`;
     }
 
@@ -423,7 +422,7 @@ ${task.description ? `**Description:** ${task.description}\n` : ''}
 **Priority:** ${task.priority.toUpperCase()}
 ${task.due_date ? `**Due:** ${task.due_date}\n` : ''}
 **Task ID:** ${task.id}
-**Mission Control MCP endpoint (in Next.js):** ${missionControlUrl}/api/mcp
+**Mission Control API base:** ${missionControlUrl}/api
 ${planningSpecSection}${agentInstructionsSection}${knowledgeSection}${resourceSection}
 ${acpSection}${isBuilder ? `**OUTPUT DIRECTORY:** ${taskProjectDir}\nCreate this directory and save all deliverables there. Do not write outside .mission-control/task pipeline path.\n` : `**OUTPUT DIRECTORY:** ${taskProjectDir}\nRead prior artifacts from this .mission-control path if needed.\n`}
 ${completionInstructions}

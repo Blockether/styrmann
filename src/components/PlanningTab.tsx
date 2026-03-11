@@ -83,9 +83,10 @@ export function PlanningTab({ taskId }: PlanningTabProps) {
         ? activity.workflow_step.trim()
         : null;
       if (!step) continue;
+      const message = typeof activity.message === 'string' ? activity.message : '';
       const isStageIteration = activity.activity_type === 'dispatch_invocation'
-        || (activity.activity_type === 'status_changed' && activity.message.startsWith('Stage handoff:'))
-        || (activity.activity_type === 'status_changed' && activity.message.startsWith('[Auto-Recovery]'));
+        || (activity.activity_type === 'status_changed' && message.startsWith('Stage handoff:'))
+        || (activity.activity_type === 'status_changed' && message.startsWith('[Auto-Recovery]'));
       if (!isStageIteration) continue;
       totals[step] = (totals[step] || 0) + 1;
     }

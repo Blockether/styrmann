@@ -30,6 +30,7 @@ const ActivityType = z.enum([
 ]);
 
 const DeliverableType = z.enum(['file', 'url', 'artifact']);
+const CriteriaGateType = z.enum(['manual', 'artifact', 'test', 'deploy', 'verifier']);
 
 // Task validation schemas
 export const CreateTaskSchema = z.object({
@@ -154,3 +155,27 @@ export type CreateDeliverableInput = z.infer<typeof CreateDeliverableSchema>;
 export type UpdateDeliverableInput = z.infer<typeof UpdateDeliverableSchema>;
 export type CreateHumanInput = z.infer<typeof CreateHumanSchema>;
 export type UpdateHumanInput = z.infer<typeof UpdateHumanSchema>;
+
+export const CreateAcceptanceCriteriaSchema = z.object({
+  description: z.string().min(1).max(2000),
+  is_met: z.boolean().optional(),
+  sort_order: z.number().int().optional(),
+  parent_criteria_id: z.string().uuid().optional().nullable(),
+  required_for_status: TaskStatus.optional().nullable(),
+  gate_type: CriteriaGateType.optional(),
+  artifact_key: z.string().max(200).optional().nullable(),
+  create_subcriteria: z.boolean().optional(),
+});
+
+export const UpdateAcceptanceCriteriaSchema = z.object({
+  description: z.string().min(1).max(2000).optional(),
+  is_met: z.boolean().optional(),
+  sort_order: z.number().int().optional(),
+  parent_criteria_id: z.string().uuid().optional().nullable(),
+  required_for_status: TaskStatus.optional().nullable(),
+  gate_type: CriteriaGateType.optional(),
+  artifact_key: z.string().max(200).optional().nullable(),
+});
+
+export type CreateAcceptanceCriteriaInput = z.infer<typeof CreateAcceptanceCriteriaSchema>;
+export type UpdateAcceptanceCriteriaInput = z.infer<typeof UpdateAcceptanceCriteriaSchema>;

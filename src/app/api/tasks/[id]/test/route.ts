@@ -17,6 +17,7 @@ import { existsSync, mkdirSync, readFileSync } from 'fs';
 import path from 'path';
 import * as csstree from 'css-tree';
 import { createTaskActivity } from '@/lib/task-activity';
+import { checkTransitionEligibility } from '@/lib/workflow-engine';
 import type { Task, TaskDeliverable } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
@@ -166,10 +167,42 @@ export async function POST(
     let newStatus: string | undefined;
 
     if (passed) {
+      const eligibility = checkTransitionEligibility(taskId, 'review');
+      if (!eligibility.ok) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: eligibility.code === 'dependency_blocked'
+              ? 'Dependency gate blocked: task has unresolved dependencies or blockers'
+              : 'Stage gate blocked: required artifacts are missing',
+            code: eligibility.code,
+            blocking: {
+              dependencies: eligibility.unresolved_dependencies || [],
+              blockers: eligibility.unresolved_blockers || [],
+              stage_gate: {
+                target_status: 'review',
+                missing_artifacts: eligibility.missing_artifacts || [],
+                required_artifacts: eligibility.required_artifacts || [],
+                missing_acceptance_criteria: eligibility.missing_acceptance_criteria || [],
+              },
+            },
+          },
+          { status: 409 },
+        );
+      }
+
       // Tests passed -> move to review for human approval
       run(
         'UPDATE tasks SET status = ?, updated_at = ? WHERE id = ?',
         ['review', now, taskId]
+      );
+      run(
+        `UPDATE task_acceptance_criteria
+         SET is_met = 1
+         WHERE task_id = ?
+           AND gate_type = 'test'
+           AND (required_for_status IN ('testing', 'review') OR required_for_status IS NULL)`,
+        [taskId],
       );
       newStatus = 'review';
 

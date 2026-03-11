@@ -174,7 +174,7 @@ function buildTraceSummary(
     ? Array.from(invocation.matchAll(/\*\*([^*\n]{3,120})\*\*/g)).map((match) => match[1].trim())
     : [];
 
-  const stageNoise = /^(title|description|priority|task id|mission control mcp endpoint|planning specification|your instructions|output directory|important|branch rule|workspace rule)$/i;
+  const stageNoise = /^(title|description|priority|task id|planning specification|your instructions|output directory|important|branch rule|workspace rule)$/i;
   const stageSignal = /(stage|phase|step|review|verify|verification|test|testing|build|dispatch|planning|explore|consolidate|done|in_progress|assigned)/i;
   const stageFlow = Array.from(
     new Set(stageMatches

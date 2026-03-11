@@ -247,9 +247,10 @@ export function DeliverablesList({ taskId }: DeliverablesListProps) {
       .map((step) => {
         const activities = (grouped.get(step) || []).slice().sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
         const iterations = activities.reduce((count, activity) => {
+          const message = typeof activity.message === 'string' ? activity.message : '';
           const isIteration = activity.activity_type === 'dispatch_invocation'
-            || (activity.activity_type === 'status_changed' && activity.message.startsWith('Stage handoff:'))
-            || (activity.activity_type === 'status_changed' && activity.message.startsWith('[Auto-Recovery]'));
+            || (activity.activity_type === 'status_changed' && message.startsWith('Stage handoff:'))
+            || (activity.activity_type === 'status_changed' && message.startsWith('[Auto-Recovery]'));
           return isIteration ? count + 1 : count;
         }, 0);
 

@@ -13,6 +13,8 @@ export interface WorkflowStage {
   label: string;
   role: string | null;
   status: string;
+  required_artifacts?: string[];
+  required_fields?: string[];
 }
 
 export interface WorkflowTemplateDefinition {
@@ -79,6 +81,19 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplateDefinition[] = [
       { id: 'correctness', label: 'Correctness Review', role: 'guardian', status: 'verification' },
       { id: 'consolidate', label: 'Consolidate', role: 'consolidator', status: 'review' },
       { id: 'done', label: 'Done', role: null, status: 'done' },
+    ],
+    failTargets: { testing: 'in_progress', verification: 'in_progress', review: 'in_progress' },
+    isDefault: false,
+  },
+  {
+    name: 'Release Gate',
+    description: 'Builder -> tester -> verifier -> reviewer with hard release evidence gates before done.',
+    stages: [
+      { id: 'build', label: 'Build', role: 'builder', status: 'in_progress' },
+      { id: 'test', label: 'Test', role: 'tester', status: 'testing', required_artifacts: ['smoke_test_result'] },
+      { id: 'verify', label: 'Verify Deploy', role: 'reviewer', status: 'verification', required_artifacts: ['deploy_signature', 'program_id', 'slot'] },
+      { id: 'review', label: 'Release Review', role: 'reviewer', status: 'review', required_artifacts: ['commit_sha', 'branch', 'push_confirmed'] },
+      { id: 'done', label: 'Done', role: null, status: 'done', required_artifacts: ['commit_sha', 'branch', 'push_confirmed', 'deploy_signature'] },
     ],
     failTargets: { testing: 'in_progress', verification: 'in_progress', review: 'in_progress' },
     isDefault: false,

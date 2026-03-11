@@ -1,30 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
 import { queryOne, run } from '@/lib/db';
-import { canUseIdentityMd, writeAgentFieldToConfig, writeAgentMdFile, readAgentMdFromDisk, readAgentDescriptionFromDisk } from '@/lib/openclaw/config';
+import { canUseIdentityMd, writeAgentFieldToConfig, writeAgentMdFile, readAgentMdFromDisk } from '@/lib/openclaw/config';
 import type { Agent, UpdateAgentRequest } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
 
-function upsertRoleFrontmatter(systemMd: string, role: string): string {
-  const trimmed = systemMd.trim();
-  const roleLine = `role: ${role}`;
-
-  if (trimmed.startsWith('---')) {
-    const fmMatch = trimmed.match(/^---\n([\s\S]*?)\n---\n?/);
-    if (fmMatch) {
-      const body = fmMatch[1];
-      const hasRole = /^role\s*:/m.test(body);
-      const nextBody = hasRole
-        ? body.replace(/^role\s*:.*$/m, roleLine)
-        : `${roleLine}\n${body}`;
-      const rest = trimmed.slice(fmMatch[0].length);
-      return `---\n${nextBody}\n---\n${rest}`;
-    }
-  }
-
-  return `---\n${roleLine}\n---\n\n${trimmed}`;
-}
 // GET /api/agents/[id] - Get a single agent
 export async function GET(
   _request: NextRequest,
@@ -44,8 +25,6 @@ export async function GET(
       agent.user_md = mdFiles.user_md ?? undefined;
       agent.agents_md = mdFiles.agents_md ?? undefined;
       agent.memory_md = mdFiles.memory_md ?? undefined;
-      const systemMd = readAgentDescriptionFromDisk(agent.agent_dir);
-      if (systemMd) agent.description = systemMd;
     }
 
     return NextResponse.json(agent);
@@ -169,12 +148,12 @@ export async function PATCH(
       }
 
       const workspacePath = existing.agent_workspace_path;
-      const allowIdentityMd = canUseIdentityMd(gatewayId);
+      const allowUserMd = canUseIdentityMd(gatewayId);
       if (workspacePath) {
-        if (allowIdentityMd && body.soul_md !== undefined) {
+        if (body.soul_md !== undefined) {
           writeAgentMdFile(workspacePath, 'SOUL.md', body.soul_md);
         }
-        if (allowIdentityMd && body.user_md !== undefined) {
+        if (allowUserMd && body.user_md !== undefined) {
           writeAgentMdFile(workspacePath, 'USER.md', body.user_md);
         }
         if (body.agents_md !== undefined) {
@@ -183,18 +162,6 @@ export async function PATCH(
         if (body.memory_md !== undefined) {
           writeAgentMdFile(workspacePath, 'MEMORY.md', body.memory_md);
         }
-      }
-
-      if (body.description !== undefined && existing.agent_dir) {
-        let nextSystem = body.description;
-        if (body.role !== undefined) {
-          nextSystem = upsertRoleFrontmatter(nextSystem, body.role);
-        }
-        writeAgentMdFile(existing.agent_dir, 'system.md', nextSystem);
-      } else if (body.role !== undefined && existing.agent_dir) {
-        const currentSystem = readAgentDescriptionFromDisk(existing.agent_dir) || '';
-        const nextSystem = upsertRoleFrontmatter(currentSystem, body.role);
-        writeAgentMdFile(existing.agent_dir, 'system.md', nextSystem);
       }
     }
 
@@ -205,8 +172,6 @@ export async function PATCH(
       agent.user_md = mdFiles.user_md ?? undefined;
       agent.agents_md = mdFiles.agents_md ?? undefined;
       agent.memory_md = mdFiles.memory_md ?? undefined;
-      const systemMd = readAgentDescriptionFromDisk(agent.agent_dir);
-      if (systemMd) agent.description = systemMd;
     }
     return NextResponse.json(agent);
   } catch (error) {

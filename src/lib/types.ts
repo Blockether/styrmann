@@ -45,9 +45,9 @@ export interface Agent {
   source: AgentSource;
   gateway_agent_id?: string;
   session_key_prefix?: string;
-  /** Absolute path to the OpenClaw agent config directory (contains system.md) */
+  /** Absolute path to the OpenClaw agent config directory */
   agent_dir?: string;
-  /** Absolute path to the OpenClaw agent workspace directory (contains SOUL.md, USER.md, AGENTS.md) */
+  /** Absolute path to the OpenClaw agent workspace directory (contains AGENTS.md and optional identity files) */
   agent_workspace_path?: string;
   /** Number of active tasks (assigned, in_progress, testing, review, verification) */
   active_task_count?: number;
@@ -152,6 +152,10 @@ export interface TaskAcceptanceCriteria {
   description: string;
   is_met: boolean;
   sort_order: number;
+  parent_criteria_id?: string | null;
+  required_for_status?: TaskStatus | null;
+  gate_type?: 'manual' | 'artifact' | 'test' | 'deploy' | 'verifier';
+  artifact_key?: string | null;
   created_at: string;
 }
 
@@ -210,6 +214,8 @@ export interface Task {
   blockers?: TaskBlocker[];
   resources?: TaskResource[];
   acceptance_criteria?: TaskAcceptanceCriteria[];
+  is_blocked?: boolean;
+  blocked_reason?: string | null;
 }
 
 export interface Conversation {
@@ -310,6 +316,29 @@ export interface WorkflowStage {
   label: string;
   role: string | null;
   status: TaskStatus;
+  required_artifacts?: string[];
+  required_fields?: string[];
+}
+
+export interface TaskDependency {
+  id: string;
+  task_id: string;
+  depends_on_task_id: string;
+  required_status: TaskStatus;
+  created_at: string;
+  depends_on_task_title?: string | null;
+  depends_on_task_status?: string | null;
+  depends_on_task?: Task;
+}
+
+export interface TaskArtifact {
+  id: string;
+  task_id: string;
+  stage_status?: TaskStatus | null;
+  artifact_key: string;
+  artifact_value: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface WorkflowPlanStep {

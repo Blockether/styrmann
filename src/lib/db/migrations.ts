@@ -2034,6 +2034,63 @@ const migrations: Migration[] = [
         )
       `);
     }
+  },
+  {
+    id: '044',
+    name: 'add_task_dependencies_and_stage_artifacts',
+    up: (db) => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS task_dependencies (
+          id TEXT PRIMARY KEY,
+          task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+          depends_on_task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+          required_status TEXT NOT NULL DEFAULT 'done',
+          created_at TEXT DEFAULT (datetime('now')),
+          UNIQUE(task_id, depends_on_task_id)
+        )
+      `);
+
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS task_artifacts (
+          id TEXT PRIMARY KEY,
+          task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+          stage_status TEXT,
+          artifact_key TEXT NOT NULL,
+          artifact_value TEXT NOT NULL,
+          created_at TEXT DEFAULT (datetime('now')),
+          updated_at TEXT DEFAULT (datetime('now')),
+          UNIQUE(task_id, stage_status, artifact_key)
+        )
+      `);
+
+      db.exec('CREATE INDEX IF NOT EXISTS idx_task_dependencies_task ON task_dependencies(task_id, required_status)');
+      db.exec('CREATE INDEX IF NOT EXISTS idx_task_dependencies_depends ON task_dependencies(depends_on_task_id, required_status)');
+      db.exec('CREATE INDEX IF NOT EXISTS idx_task_artifacts_task ON task_artifacts(task_id, stage_status, artifact_key)');
+    }
+  },
+  {
+    id: '045',
+    name: 'add_acceptance_criteria_gate_fields',
+    up: (db) => {
+      const cols = (db.prepare('PRAGMA table_info(task_acceptance_criteria)').all() as { name: string }[]).map((c) => c.name);
+      if (!cols.includes('parent_criteria_id')) {
+        db.exec('ALTER TABLE task_acceptance_criteria ADD COLUMN parent_criteria_id TEXT REFERENCES task_acceptance_criteria(id) ON DELETE CASCADE');
+      }
+      if (!cols.includes('required_for_status')) {
+        db.exec('ALTER TABLE task_acceptance_criteria ADD COLUMN required_for_status TEXT');
+      }
+      if (!cols.includes('gate_type')) {
+        db.exec('ALTER TABLE task_acceptance_criteria ADD COLUMN gate_type TEXT DEFAULT \'manual\'');
+      }
+      if (!cols.includes('artifact_key')) {
+        db.exec('ALTER TABLE task_acceptance_criteria ADD COLUMN artifact_key TEXT');
+      }
+
+      db.exec("UPDATE task_acceptance_criteria SET required_for_status = COALESCE(required_for_status, 'done')");
+      db.exec("UPDATE task_acceptance_criteria SET gate_type = COALESCE(gate_type, 'manual')");
+      db.exec('CREATE INDEX IF NOT EXISTS idx_task_acceptance_parent ON task_acceptance_criteria(task_id, parent_criteria_id, sort_order)');
+      db.exec('CREATE INDEX IF NOT EXISTS idx_task_acceptance_gate ON task_acceptance_criteria(task_id, required_for_status, gate_type)');
+    }
   }
 ];
 

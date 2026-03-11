@@ -4,7 +4,7 @@ import { queryOne, run } from '@/lib/db';
 import { broadcast } from '@/lib/events';
 import { getMissionControlUrl } from '@/lib/config';
 import { getHimalayaStatus, sendHumanAssignmentEmail } from '@/lib/himalaya';
-import { handleStageTransition, getTaskWorkflow, drainQueue } from '@/lib/workflow-engine';
+import { checkTransitionEligibility, handleStageTransition, getTaskWorkflow, drainQueue } from '@/lib/workflow-engine';
 import { notifyLearner } from '@/lib/learner';
 import { captureTaskRunResult } from '@/lib/task-run-results';
 import { checkBuilderEvidence } from '@/lib/builder-evidence';
@@ -25,7 +25,14 @@ export async function GET(
       `SELECT t.*,
         aa.name as assigned_agent_name,
         h.name as assigned_human_name,
-        h.email as assigned_human_email
+        h.email as assigned_human_email,
+        (
+          SELECT COUNT(*)
+          FROM task_dependencies td
+          JOIN tasks dep ON dep.id = td.depends_on_task_id
+          WHERE td.task_id = t.id
+            AND dep.status != td.required_status
+        ) as unresolved_dependency_count
        FROM tasks t
        LEFT JOIN agents aa ON t.assigned_agent_id = aa.id
        LEFT JOIN humans h ON t.assigned_human_id = h.id
@@ -37,7 +44,7 @@ export async function GET(
       return NextResponse.json({ error: 'Task not found' }, { status: 404 });
     }
 
-    const typedTask = task as Task & { assigned_agent_name?: string; assigned_human_name?: string; assigned_human_email?: string };
+    const typedTask = task as Task & { assigned_agent_name?: string; assigned_human_name?: string; assigned_human_email?: string; unresolved_dependency_count?: number };
     typedTask.assigned_human = task.assigned_human_id
       ? {
           id: task.assigned_human_id,
@@ -51,6 +58,10 @@ export async function GET(
     typedTask.assignee_display_name = task.assignee_type === 'human'
       ? (typedTask.assigned_human_name || typedTask.assigned_human_email || null)
       : (typedTask.assigned_agent_name || null);
+    (typedTask as Task & { is_blocked?: boolean; blocked_reason?: string | null }).is_blocked = Number(typedTask.unresolved_dependency_count || 0) > 0;
+    (typedTask as Task & { is_blocked?: boolean; blocked_reason?: string | null }).blocked_reason = Number(typedTask.unresolved_dependency_count || 0) > 0
+      ? `Blocked by ${typedTask.unresolved_dependency_count} unresolved dependencies`
+      : null;
 
     return NextResponse.json(task);
   } catch (error) {
@@ -94,6 +105,17 @@ export async function PATCH(
       return NextResponse.json(
         { error: 'Forbidden: agents cannot mark tasks done. Use human Accept & Merge action.' },
         { status: 403 }
+      );
+    }
+
+    if (validatedData.status === 'done') {
+      return NextResponse.json(
+        {
+          error: 'Done requires Accept & Merge flow',
+          code: 'done_requires_accept_merge',
+          action: { method: 'POST', url: `/api/tasks/${id}/accept`, body: { action: 'accept' } },
+        },
+        { status: 409 },
       );
     }
 
@@ -165,6 +187,44 @@ export async function PATCH(
 
     // Handle status change
     if (nextStatus !== undefined && nextStatus !== existing.status) {
+      const eligibility = checkTransitionEligibility(id, nextStatus);
+      if (!eligibility.ok) {
+        if (eligibility.code === 'dependency_blocked') {
+          return NextResponse.json(
+            {
+              error: 'Dependency gate blocked: task has unresolved dependencies or blockers',
+              code: eligibility.code,
+              from_status: existing.status,
+              to_status: nextStatus,
+              blocking: {
+                dependencies: eligibility.unresolved_dependencies || [],
+                blockers: eligibility.unresolved_blockers || [],
+              },
+            },
+            { status: 409 },
+          );
+        }
+        if (eligibility.code === 'stage_gate_blocked') {
+          return NextResponse.json(
+            {
+              error: 'Stage gate blocked: required artifacts are missing',
+              code: eligibility.code,
+              from_status: existing.status,
+              to_status: nextStatus,
+              blocking: {
+                stage_gate: {
+                  target_status: nextStatus,
+                  missing_artifacts: eligibility.missing_artifacts || [],
+                  required_artifacts: eligibility.required_artifacts || [],
+                  missing_acceptance_criteria: eligibility.missing_acceptance_criteria || [],
+                },
+              },
+            },
+            { status: 409 },
+          );
+        }
+      }
+
       const workflow = getTaskWorkflow(id);
       const currentStage = workflow?.stages.find((stage) => stage.status === existing.status)
         || ((existing.status === 'assigned' || existing.status === 'in_progress')

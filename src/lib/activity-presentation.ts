@@ -188,6 +188,7 @@ export function summarizeFeedItem(
 export function summarizeTaskActivity(
   activity: Pick<TaskActivity, 'activity_type' | 'message' | 'technical_details' | 'metadata'>,
 ): string {
+  const normalizedMessage = typeof activity.message === 'string' ? activity.message : String(activity.message ?? '');
   const metadata =
     activity.technical_details ||
     (() => {
@@ -202,5 +203,5 @@ export function summarizeTaskActivity(
       }
     })();
 
-  return summarizeTechnicalDetails(activity.activity_type, activity.message, metadata);
+  return summarizeTechnicalDetails(activity.activity_type, normalizedMessage, metadata);
 }

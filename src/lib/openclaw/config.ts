@@ -4,7 +4,7 @@ import { join } from 'path';
 
 const MAX_CONFIG_SIZE_BYTES = 1024 * 1024;
 const MAX_MD_FILE_SIZE_BYTES = 512 * 1024;
-const IDENTITY_MD_ALLOWLIST = new Set(['lidia', 'michal']);
+const USER_MD_ALLOWLIST = new Set(['lidia', 'michal']);
 
 let lastConfigMtimeMs = 0;
 
@@ -61,13 +61,12 @@ export interface ResolvedAgent {
   userMd: string | null;
   agentsMd: string | null;
   memoryMd: string | null;
-  systemMd: string | null;
   role: string;
 }
 
 export function canUseIdentityMd(agentId: string | null | undefined): boolean {
   if (!agentId) return false;
-  return IDENTITY_MD_ALLOWLIST.has(agentId.trim().toLowerCase());
+  return USER_MD_ALLOWLIST.has(agentId.trim().toLowerCase());
 }
 
 function getConfigPath(): string {
@@ -93,15 +92,47 @@ function removeFileIfExists(filePath: string): void {
 }
 
 function enforceWorkspaceMdPolicy(workspacePath: string, agentId: string): void {
-  const allowIdentityMd = canUseIdentityMd(agentId);
+  const allowUserMd = canUseIdentityMd(agentId);
   removeFileIfExists(join(workspacePath, 'BOOTSTRAP.md'));
   removeFileIfExists(join(workspacePath, 'bootstrap.md'));
   removeFileIfExists(join(workspacePath, 'BOOTSTRAP'));
   removeFileIfExists(join(workspacePath, 'bootstrap'));
-  if (!allowIdentityMd) {
-    removeFileIfExists(join(workspacePath, 'SOUL.md'));
+  if (!allowUserMd) {
     removeFileIfExists(join(workspacePath, 'USER.md'));
   }
+}
+
+function migrateLegacySystemPrompt(workspacePath: string | null, agentDir: string | null, agentName: string): void {
+  if (!workspacePath || !agentDir) return;
+  const legacyPath = join(agentDir, 'system.md');
+  const legacy = readFileSafe(legacyPath);
+  if (!legacy || legacy.trim().length === 0) {
+    removeFileIfExists(legacyPath);
+    return;
+  }
+
+  const trimmed = legacy.trim();
+  const withoutFrontmatter = trimmed.startsWith('---')
+    ? trimmed.replace(/^---\n[\s\S]*?\n---\n?/, '').trim()
+    : trimmed;
+
+  const agentsPath = join(workspacePath, 'AGENTS.md');
+  const soulPath = join(workspacePath, 'SOUL.md');
+
+  const currentAgents = readFileSafe(agentsPath);
+  if (!currentAgents || currentAgents.trim().length === 0 || currentAgents.trim() === '# AGENTS\n\nTeam coordination notes.') {
+    writeFileSync(agentsPath, withoutFrontmatter, 'utf-8');
+  }
+
+  const currentSoul = readFileSafe(soulPath);
+  if (!currentSoul || currentSoul.trim().length === 0) {
+    const soulBody = withoutFrontmatter.startsWith('#')
+      ? withoutFrontmatter
+      : `# ${agentName}\n\n${withoutFrontmatter}`;
+    writeFileSync(soulPath, soulBody, 'utf-8');
+  }
+
+  removeFileIfExists(legacyPath);
 }
 
 export function readOpenClawConfig(): OpenClawFullConfig | null {
@@ -144,16 +175,16 @@ function resolveAgentDir(agent: OpenClawAgentConfig): string | null {
   return join(homedir(), '.openclaw', 'agents', agent.id, 'agent');
 }
 
-function extractRoleFromSystemMd(systemMd: string | null, agentName: string): string {
-  if (!systemMd) return agentName;
-  const frontmatterMatch = systemMd.match(/^---\s*\n([\s\S]*?)\n---/);
+function extractRoleFromAgentsMd(agentsMd: string | null, agentName: string): string {
+  if (!agentsMd) return agentName;
+  const frontmatterMatch = agentsMd.match(/^---\s*\n([\s\S]*?)\n---/);
   if (frontmatterMatch) {
     const roleMatch = frontmatterMatch[1].match(/role:\s*"?([^"\n]+)"?/);
     if (roleMatch) return roleMatch[1].trim();
     const descMatch = frontmatterMatch[1].match(/description:\s*"?([^"\n]+)"?/);
     if (descMatch) return descMatch[1].trim();
   }
-  const headingMatch = systemMd.match(/^#\s+(.+)/m);
+  const headingMatch = agentsMd.match(/^#\s+(.+)/m);
   if (headingMatch) return headingMatch[1].trim();
   return agentName;
 }
@@ -167,18 +198,18 @@ export function resolveAgents(config: OpenClawFullConfig): ResolvedAgent[] {
   return agents.map((agent) => {
     const workspacePath = resolveWorkspacePath(agent, config.agents);
     const agentDir = resolveAgentDir(agent);
+    migrateLegacySystemPrompt(workspacePath, agentDir, agent.identity?.name || agent.name || agent.id);
     if (workspacePath) enforceWorkspaceMdPolicy(workspacePath, agent.id);
 
-    const allowIdentityMd = canUseIdentityMd(agent.id);
-    const soulMd = workspacePath && allowIdentityMd ? readFileSafe(join(workspacePath, 'SOUL.md')) : null;
-    const userMd = workspacePath && allowIdentityMd ? readFileSafe(join(workspacePath, 'USER.md')) : null;
+    const allowUserMd = canUseIdentityMd(agent.id);
+    const soulMd = workspacePath ? readFileSafe(join(workspacePath, 'SOUL.md')) : null;
+    const userMd = workspacePath && allowUserMd ? readFileSafe(join(workspacePath, 'USER.md')) : null;
     const agentsMd = workspacePath ? readFileSafe(join(workspacePath, 'AGENTS.md')) : null;
     const memoryMd = workspacePath ? readFileSafe(join(workspacePath, 'MEMORY.md')) : null;
-    const systemMd = agentDir ? readFileSafe(join(agentDir, 'system.md')) : null;
 
     const name = agent.identity?.name || agent.name || agent.id;
     const model = agent.model || defaultModel;
-    const role = agent.id === 'main' ? 'orchestrator' : extractRoleFromSystemMd(systemMd, name);
+    const role = agent.id === 'main' ? 'orchestrator' : extractRoleFromAgentsMd(agentsMd, name);
 
     return {
       id: agent.id,
@@ -190,7 +221,6 @@ export function resolveAgents(config: OpenClawFullConfig): ResolvedAgent[] {
       userMd,
       agentsMd,
       memoryMd,
-      systemMd,
       role,
     };
   });
@@ -203,18 +233,13 @@ export function readAgentMdFromDisk(workspacePath: string | null | undefined, ag
   memory_md: string | null;
 } {
   if (!workspacePath) return { soul_md: null, user_md: null, agents_md: null, memory_md: null };
-  const allowIdentityMd = canUseIdentityMd(agentId);
+  const allowUserMd = canUseIdentityMd(agentId);
   return {
-    soul_md: allowIdentityMd ? readFileSafe(join(workspacePath, 'SOUL.md')) : null,
-    user_md: allowIdentityMd ? readFileSafe(join(workspacePath, 'USER.md')) : null,
+    soul_md: readFileSafe(join(workspacePath, 'SOUL.md')),
+    user_md: allowUserMd ? readFileSafe(join(workspacePath, 'USER.md')) : null,
     agents_md: readFileSafe(join(workspacePath, 'AGENTS.md')),
     memory_md: readFileSafe(join(workspacePath, 'MEMORY.md')),
   };
-}
-
-export function readAgentDescriptionFromDisk(agentDir: string | null | undefined): string | null {
-  if (!agentDir) return null;
-  return readFileSafe(join(agentDir, 'system.md'));
 }
 
 export function writeAgentFieldToConfig(
@@ -269,7 +294,6 @@ interface CreateOpenClawAgentInput {
   userMd?: string;
   agentsMd?: string;
   memoryMd?: string;
-  systemMd?: string;
 }
 
 export function createAgentInOpenClawConfig(input: CreateOpenClawAgentInput): {
@@ -311,21 +335,20 @@ export function createAgentInOpenClawConfig(input: CreateOpenClawAgentInput): {
 
     writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf-8');
 
-    const allowIdentityMd = canUseIdentityMd(input.id);
+    const allowUserMd = canUseIdentityMd(input.id);
     const soulMd = input.soulMd || `# ${input.name}\n\nYou are ${input.name}. Work clearly, safely, and with strong execution discipline.`;
     const userMd = input.userMd || '# USER\n\nContext about the human operator.';
     const agentsMd = input.agentsMd || '# AGENTS\n\nTeam coordination notes.';
     const memoryMd = input.memoryMd || '# MEMORY\n\nDurable lessons learned and stable operating preferences.';
-    const systemMd = input.systemMd || `---\nrole: ${input.role}\n---\n\n# ${input.role}\n\nYou are ${input.name}. Execute tasks accurately and report verifiable outcomes.`;
 
-    if (allowIdentityMd) {
-      writeFileSync(join(workspacePath, 'SOUL.md'), soulMd, 'utf-8');
+    writeFileSync(join(workspacePath, 'SOUL.md'), soulMd, 'utf-8');
+    if (allowUserMd) {
       writeFileSync(join(workspacePath, 'USER.md'), userMd, 'utf-8');
     }
     writeFileSync(join(workspacePath, 'AGENTS.md'), agentsMd, 'utf-8');
     writeFileSync(join(workspacePath, 'MEMORY.md'), memoryMd, 'utf-8');
-    writeFileSync(join(agentDir, 'system.md'), systemMd, 'utf-8');
     enforceWorkspaceMdPolicy(workspacePath, input.id);
+    migrateLegacySystemPrompt(workspacePath, agentDir, input.name);
 
     return { ok: true, workspacePath, agentDir };
   } catch (err) {

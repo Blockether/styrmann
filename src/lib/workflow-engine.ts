@@ -9,7 +9,10 @@ import { queryOne, queryAll, run } from '@/lib/db';
 import { getMissionControlUrl } from '@/lib/config';
 import { broadcast } from '@/lib/events';
 import { createTaskActivity } from '@/lib/task-activity';
-import type { Task, WorkflowTemplate, WorkflowStage, TaskRole } from '@/lib/types';
+import { evaluateAcceptanceGates } from '@/lib/acceptance-gates';
+import { validateStageGates } from '@/lib/stage-gates';
+import { getUnresolvedTaskDependencies } from '@/lib/task-dependencies';
+import type { Task, TaskStatus, WorkflowTemplate, WorkflowStage, TaskRole } from '@/lib/types';
 
 interface StageTransitionResult {
   success: boolean;
@@ -17,6 +20,84 @@ interface StageTransitionResult {
   newAgentId?: string;
   newAgentName?: string;
   error?: string;
+}
+
+export interface TransitionEligibilityResult {
+  ok: boolean;
+  target_status?: string;
+  code?: 'dependency_blocked' | 'stage_gate_blocked';
+  error?: string;
+  unresolved_dependencies?: ReturnType<typeof getUnresolvedTaskDependencies>;
+  unresolved_blockers?: Array<{ id: string; blocked_by_task_id: string | null; description: string | null }>;
+  missing_acceptance_criteria?: Array<{ id: string; description: string; gate_type: string; artifact_key: string | null; parent_criteria_id: string | null }>;
+  missing_artifacts?: string[];
+  required_artifacts?: string[];
+}
+
+export function checkTransitionEligibility(taskId: string, targetStatus: string): TransitionEligibilityResult {
+  const dependencyEnforcedStatuses = new Set(['in_progress', 'testing', 'review', 'verification', 'done']);
+  const shouldEnforceDependency = dependencyEnforcedStatuses.has(targetStatus);
+
+  if (shouldEnforceDependency) {
+    const unresolvedBlockers = queryAll<{ id: string; blocked_by_task_id: string | null; description: string | null }>(
+      `SELECT id, blocked_by_task_id, description
+       FROM task_blockers
+       WHERE task_id = ? AND resolved = 0
+       ORDER BY created_at DESC`,
+      [taskId],
+    );
+    if (unresolvedBlockers.length > 0) {
+      return {
+        ok: false,
+        target_status: targetStatus,
+        code: 'dependency_blocked',
+        error: 'Task has unresolved blockers',
+        unresolved_dependencies: [],
+        unresolved_blockers: unresolvedBlockers,
+      };
+    }
+  }
+
+  if (shouldEnforceDependency) {
+    const unresolved = getUnresolvedTaskDependencies(taskId);
+    if (unresolved.length > 0) {
+      return {
+        ok: false,
+        target_status: targetStatus,
+        code: 'dependency_blocked',
+        error: 'Task has unresolved dependencies',
+        unresolved_dependencies: unresolved,
+        unresolved_blockers: [],
+      };
+    }
+  }
+
+  const gate = validateStageGates(taskId, targetStatus);
+  if (!gate.ok) {
+    return {
+      ok: false,
+      target_status: targetStatus,
+      code: 'stage_gate_blocked',
+      error: 'Required stage artifacts are missing',
+      missing_artifacts: gate.missing_artifacts,
+      required_artifacts: gate.required_artifacts,
+    };
+  }
+
+  const acceptance = evaluateAcceptanceGates(taskId, targetStatus as TaskStatus);
+  if (!acceptance.ok) {
+    return {
+      ok: false,
+      target_status: targetStatus,
+      code: 'stage_gate_blocked',
+      error: 'Required acceptance criteria gates are missing',
+      missing_acceptance_criteria: acceptance.missing,
+      missing_artifacts: [],
+      required_artifacts: [],
+    };
+  }
+
+  return { ok: true, target_status: targetStatus };
 }
 
 /**
@@ -106,6 +187,22 @@ export async function handleStageTransition(
     skipDispatch?: boolean;
   }
 ): Promise<StageTransitionResult> {
+  const eligibility = checkTransitionEligibility(taskId, newStatus);
+  if (!eligibility.ok) {
+    const details = eligibility.code === 'dependency_blocked'
+      ? `${eligibility.unresolved_dependencies?.length || 0} unresolved dependencies`
+      : `missing artifacts: ${(eligibility.missing_artifacts || []).join(', ')}`;
+    run(
+      'UPDATE tasks SET planning_dispatch_error = ?, updated_at = datetime(\'now\') WHERE id = ?',
+      [`Transition blocked (${eligibility.code}): ${details}`, taskId],
+    );
+    return {
+      success: false,
+      handedOff: false,
+      error: eligibility.error || 'Transition blocked',
+    };
+  }
+
   const workflow = getTaskWorkflow(taskId);
   if (!workflow) {
     // No workflow template — fall back to legacy single-agent behavior

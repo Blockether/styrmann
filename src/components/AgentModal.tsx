@@ -132,7 +132,7 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated, initia
     agents_md: agent?.agents_md || '',
     model: agent?.model || '',
   });
-  const identityMdEnabled = canEditIdentityMd(agent);
+  const userMdEnabled = canEditIdentityMd(agent);
 
   // Load available models from OpenClaw config
   useEffect(() => {
@@ -368,7 +368,8 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated, initia
   const tabs = [
     { id: 'info', label: 'Info' },
     { id: 'workspace', label: 'Workspace' },
-    ...(identityMdEnabled ? [{ id: 'soul' as const, label: 'SOUL.md' }, { id: 'user' as const, label: 'USER.md' }] : []),
+    { id: 'soul' as const, label: 'SOUL.md' },
+    ...(userMdEnabled ? [{ id: 'user' as const, label: 'USER.md' }] : []),
     { id: 'agents', label: 'AGENTS.md' },
   ] as const;
 
@@ -513,17 +514,17 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated, initia
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-1">System Prompt (`system.md`)</label>
+                <label className="block text-sm font-medium mb-1">Description</label>
                 <textarea
                   value={form.description}
                   onChange={(e) => setForm({ ...form, description: e.target.value })}
                   rows={8}
                   disabled={isReadOnlySyncedAgent}
                   className="w-full bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent resize-y"
-                  placeholder="Core operating instructions written to system.md"
+                  placeholder="What does this agent do?"
                 />
                 <p className="text-xs text-mc-text-secondary mt-1">
-                  This field directly edits the agent's OpenClaw `system.md` prompt.
+                  For OpenClaw-synced agents, prompts belong in `AGENTS.md` (Agents tab).
                 </p>
               </div>
 

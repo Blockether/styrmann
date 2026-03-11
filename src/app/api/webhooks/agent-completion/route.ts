@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { createHmac } from 'crypto';
 import { queryOne, queryAll, run } from '@/lib/db';
 import { checkBuilderEvidence } from '@/lib/builder-evidence';
+import { checkTransitionEligibility } from '@/lib/workflow-engine';
 import type { Task, Agent, OpenClawSession } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
@@ -83,6 +84,29 @@ export async function POST(request: NextRequest) {
       // Only move to testing if not already in testing, review, or done
       // (Don't overwrite user's approval or testing results)
       if (task.status !== 'testing' && task.status !== 'review' && task.status !== 'done') {
+        const eligibility = checkTransitionEligibility(task.id, 'testing');
+        if (!eligibility.ok) {
+          return NextResponse.json(
+            {
+              error: eligibility.code === 'dependency_blocked'
+                ? 'Dependency gate blocked: task has unresolved dependencies or blockers'
+                : 'Stage gate blocked: required artifacts are missing',
+              code: eligibility.code,
+              blocking: {
+                dependencies: eligibility.unresolved_dependencies || [],
+                blockers: eligibility.unresolved_blockers || [],
+                stage_gate: {
+                  target_status: 'testing',
+                  missing_artifacts: eligibility.missing_artifacts || [],
+                  required_artifacts: eligibility.required_artifacts || [],
+                  missing_acceptance_criteria: eligibility.missing_acceptance_criteria || [],
+                },
+              },
+            },
+            { status: 409 },
+          );
+        }
+
         const agentRole = queryOne<{ role: string }>('SELECT role FROM agents WHERE id = ?', [task.assigned_agent_id || ''])?.role;
         if (agentRole === 'builder') {
           const evidence = checkBuilderEvidence(task.id);
@@ -181,6 +205,29 @@ export async function POST(request: NextRequest) {
       // Only move to testing if not already in testing, review, or done
       // (Don't overwrite user's approval or testing results)
       if (task.status !== 'testing' && task.status !== 'review' && task.status !== 'done') {
+        const eligibility = checkTransitionEligibility(task.id, 'testing');
+        if (!eligibility.ok) {
+          return NextResponse.json(
+            {
+              error: eligibility.code === 'dependency_blocked'
+                ? 'Dependency gate blocked: task has unresolved dependencies or blockers'
+                : 'Stage gate blocked: required artifacts are missing',
+              code: eligibility.code,
+              blocking: {
+                dependencies: eligibility.unresolved_dependencies || [],
+                blockers: eligibility.unresolved_blockers || [],
+                stage_gate: {
+                  target_status: 'testing',
+                  missing_artifacts: eligibility.missing_artifacts || [],
+                  required_artifacts: eligibility.required_artifacts || [],
+                  missing_acceptance_criteria: eligibility.missing_acceptance_criteria || [],
+                },
+              },
+            },
+            { status: 409 },
+          );
+        }
+
         const agentRole = queryOne<{ role: string }>('SELECT role FROM agents WHERE id = ?', [session.agent_id || ''])?.role;
         if (agentRole === 'builder') {
           const evidence = checkBuilderEvidence(task.id);

@@ -6,6 +6,7 @@ import { getMissionControlUrl } from '@/lib/config';
 import { getHimalayaStatus, sendHumanAssignmentEmail } from '@/lib/himalaya';
 import { CreateTaskSchema } from '@/lib/validation';
 import { generateTaskWorkflowPlan } from '@/lib/workflow-planning';
+import { inferEffortImpact } from '@/lib/task-scoring';
 import type { Task, CreateTaskRequest, Agent, Human } from '@/lib/types';
 
 // GET /api/tasks - List all tasks with optional filters
@@ -30,7 +31,14 @@ export async function GET(request: NextRequest) {
         h.name as assigned_human_name,
         h.email as assigned_human_email,
         ca.name as created_by_agent_name,
-        m.name as milestone_name
+        m.name as milestone_name,
+        (
+          SELECT COUNT(*)
+          FROM task_dependencies td
+          JOIN tasks dep ON dep.id = td.depends_on_task_id
+          WHERE td.task_id = t.id
+            AND dep.status != td.required_status
+        ) as unresolved_dependency_count
       FROM tasks t
       LEFT JOIN agents aa ON t.assigned_agent_id = aa.id
       LEFT JOIN humans h ON t.assigned_human_id = h.id
@@ -107,6 +115,10 @@ export async function GET(request: NextRequest) {
       milestone: task.milestone_id
         ? { id: task.milestone_id, name: task.milestone_name }
         : undefined,
+      is_blocked: Number((task as Task & { unresolved_dependency_count?: number }).unresolved_dependency_count || 0) > 0,
+      blocked_reason: Number((task as Task & { unresolved_dependency_count?: number }).unresolved_dependency_count || 0) > 0
+        ? `Blocked by ${(task as Task & { unresolved_dependency_count?: number }).unresolved_dependency_count} unresolved dependencies`
+        : null,
     }));
 
     return NextResponse.json(transformedTasks);
@@ -138,6 +150,9 @@ export async function POST(request: NextRequest) {
     const workspaceId = validatedData.workspace_id || 'default';
     const assigneeType = validatedData.assignee_type || 'ai';
     const status = validatedData.status || (assigneeType === 'human' ? 'assigned' : 'inbox');
+    const inferredScore = inferEffortImpact(validatedData);
+    const effort = validatedData.effort ?? inferredScore.effort;
+    const impact = validatedData.impact ?? inferredScore.impact;
 
     const { github_issue_id } = validatedData;
     const assignedAgentId = null;
@@ -165,8 +180,8 @@ export async function POST(request: NextRequest) {
         status,
         validatedData.priority || 'normal',
         validatedData.task_type || 'feature',
-        validatedData.effort || null,
-        validatedData.impact || null,
+        effort,
+        impact,
         assigneeType,
         assignedAgentId,
         assignedHumanId,

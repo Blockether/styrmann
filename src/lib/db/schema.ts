@@ -229,6 +229,28 @@ CREATE TABLE IF NOT EXISTS task_blockers (
   created_at TEXT DEFAULT (datetime('now'))
 );
 
+-- Task dependencies (hard dispatch/transition blocking)
+CREATE TABLE IF NOT EXISTS task_dependencies (
+  id TEXT PRIMARY KEY,
+  task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  depends_on_task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  required_status TEXT NOT NULL DEFAULT 'done',
+  created_at TEXT DEFAULT (datetime('now')),
+  UNIQUE(task_id, depends_on_task_id)
+);
+
+-- Task artifacts used by stage gate validation
+CREATE TABLE IF NOT EXISTS task_artifacts (
+  id TEXT PRIMARY KEY,
+  task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  stage_status TEXT,
+  artifact_key TEXT NOT NULL,
+  artifact_value TEXT NOT NULL,
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now')),
+  UNIQUE(task_id, stage_status, artifact_key)
+);
+
 -- Task resources
 CREATE TABLE IF NOT EXISTS task_resources (
   id TEXT PRIMARY KEY,
@@ -246,6 +268,10 @@ CREATE TABLE IF NOT EXISTS task_acceptance_criteria (
   description TEXT NOT NULL,
   is_met INTEGER DEFAULT 0,
   sort_order INTEGER DEFAULT 0,
+  parent_criteria_id TEXT REFERENCES task_acceptance_criteria(id) ON DELETE CASCADE,
+  required_for_status TEXT,
+  gate_type TEXT DEFAULT 'manual' CHECK (gate_type IN ('manual', 'artifact', 'test', 'deploy', 'verifier')),
+  artifact_key TEXT,
   created_at TEXT DEFAULT (datetime('now'))
 );
 

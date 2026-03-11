@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
+import { createDefaultSubcriteria } from '@/lib/acceptance-gates';
+import { CreateAcceptanceCriteriaSchema } from '@/lib/validation';
 import type { TaskAcceptanceCriteria } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
@@ -10,6 +12,10 @@ function mapCriteria(row: {
   description: string;
   is_met: number;
   sort_order: number;
+  parent_criteria_id: string | null;
+  required_for_status: string | null;
+  gate_type: string | null;
+  artifact_key: string | null;
   created_at: string;
 }): TaskAcceptanceCriteria {
   return {
@@ -18,6 +24,10 @@ function mapCriteria(row: {
     description: row.description,
     is_met: row.is_met === 1,
     sort_order: row.sort_order,
+    parent_criteria_id: row.parent_criteria_id,
+    required_for_status: row.required_for_status as TaskAcceptanceCriteria['required_for_status'],
+    gate_type: (row.gate_type || 'manual') as TaskAcceptanceCriteria['gate_type'],
+    artifact_key: row.artifact_key,
     created_at: row.created_at,
   };
 }
@@ -36,7 +46,7 @@ export async function GET(
     }
 
     const rows = db.prepare(`
-      SELECT id, task_id, description, is_met, sort_order, created_at
+      SELECT id, task_id, description, is_met, sort_order, parent_criteria_id, required_for_status, gate_type, artifact_key, created_at
       FROM task_acceptance_criteria
       WHERE task_id = ?
       ORDER BY sort_order ASC, created_at ASC
@@ -46,6 +56,10 @@ export async function GET(
       description: string;
       is_met: number;
       sort_order: number;
+      parent_criteria_id: string | null;
+      required_for_status: string | null;
+      gate_type: string | null;
+      artifact_key: string | null;
       created_at: string;
     }[];
 
@@ -63,20 +77,20 @@ export async function POST(
   const { id } = await params;
 
   try {
-    const body = await request.json() as {
-      description?: unknown;
-      is_met?: unknown;
-      sort_order?: unknown;
-    };
-
-    if (typeof body.description !== 'string' || body.description.trim().length === 0) {
-      return NextResponse.json({ error: 'description is required' }, { status: 400 });
+    const body = await request.json();
+    const parsed = CreateAcceptanceCriteriaSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'Validation failed', details: parsed.error.issues }, { status: 400 });
     }
 
-    const isMet = typeof body.is_met === 'boolean' ? body.is_met : false;
-    const sortOrder = typeof body.sort_order === 'number' && Number.isInteger(body.sort_order)
-      ? body.sort_order
-      : 0;
+    const data = parsed.data;
+
+    const isMet = data.is_met ?? false;
+    const sortOrder = data.sort_order ?? 0;
+    const requiredForStatus = data.required_for_status ?? 'done';
+    const gateType = data.gate_type ?? 'manual';
+    const artifactKey = data.artifact_key ? data.artifact_key.trim().toLowerCase() : null;
+    const parentCriteriaId = data.parent_criteria_id ?? null;
 
     const db = getDb();
     const task = db.prepare('SELECT id FROM tasks WHERE id = ?').get(id) as { id: string } | undefined;
@@ -88,12 +102,17 @@ export async function POST(
     const now = new Date().toISOString();
 
     db.prepare(`
-      INSERT INTO task_acceptance_criteria (id, task_id, description, is_met, sort_order, created_at)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).run(criteriaId, id, body.description.trim(), isMet ? 1 : 0, sortOrder, now);
+      INSERT INTO task_acceptance_criteria
+        (id, task_id, description, is_met, sort_order, parent_criteria_id, required_for_status, gate_type, artifact_key, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(criteriaId, id, data.description.trim(), isMet ? 1 : 0, sortOrder, parentCriteriaId, requiredForStatus, gateType, artifactKey, now);
+
+    if ((data.create_subcriteria ?? true) && !parentCriteriaId) {
+      createDefaultSubcriteria(id, criteriaId, data.description.trim(), requiredForStatus);
+    }
 
     const created = db.prepare(`
-      SELECT id, task_id, description, is_met, sort_order, created_at
+      SELECT id, task_id, description, is_met, sort_order, parent_criteria_id, required_for_status, gate_type, artifact_key, created_at
       FROM task_acceptance_criteria
       WHERE id = ?
     `).get(criteriaId) as {
@@ -102,6 +121,10 @@ export async function POST(
       description: string;
       is_met: number;
       sort_order: number;
+      parent_criteria_id: string | null;
+      required_for_status: string | null;
+      gate_type: string | null;
+      artifact_key: string | null;
       created_at: string;
     };
 

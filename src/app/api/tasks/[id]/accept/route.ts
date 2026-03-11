@@ -3,7 +3,7 @@ import { execFileSync } from 'child_process';
 import { queryOne, run } from '@/lib/db';
 import { getWorkspaceRepoPath, isGitWorkTree } from '@/lib/git-repo';
 import { createTaskActivity } from '@/lib/task-activity';
-import { handleStageFailure, drainQueue } from '@/lib/workflow-engine';
+import { checkTransitionEligibility, handleStageFailure, drainQueue } from '@/lib/workflow-engine';
 import { captureTaskRunResult } from '@/lib/task-run-results';
 import type { Task } from '@/lib/types';
 
@@ -67,6 +67,29 @@ export async function POST(
     )?.count || 0;
     if (unmetCount > 0) {
       return NextResponse.json({ error: `Acceptance criteria incomplete (${unmetCount} unmet)` }, { status: 409 });
+    }
+
+    const eligibility = checkTransitionEligibility(taskId, 'done');
+    if (!eligibility.ok) {
+      return NextResponse.json(
+        {
+          error: eligibility.code === 'dependency_blocked'
+            ? 'Dependency gate blocked: task has unresolved dependencies or blockers'
+            : 'Stage gate blocked: required artifacts are missing',
+          code: eligibility.code,
+          blocking: {
+            dependencies: eligibility.unresolved_dependencies || [],
+            blockers: eligibility.unresolved_blockers || [],
+            stage_gate: {
+              target_status: 'done',
+              missing_artifacts: eligibility.missing_artifacts || [],
+              required_artifacts: eligibility.required_artifacts || [],
+              missing_acceptance_criteria: eligibility.missing_acceptance_criteria || [],
+            },
+          },
+        },
+        { status: 409 },
+      );
     }
 
     const workspace = queryOne<{ github_repo?: string | null; workspace_id: string }>(

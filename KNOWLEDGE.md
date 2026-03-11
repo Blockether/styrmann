@@ -140,7 +140,9 @@ The `milestone_dependencies` table tracks ordering relationships between milesto
 
 **Constraint**: at least one of `depends_on_milestone_id` or `depends_on_task_id` must be non-null.
 
-**v1 behavior**: Dependencies are informational only. No blocking behavior is enforced at the API or workflow level. They are displayed in the UI for planning purposes.
+**v1 behavior (milestones only)**: Milestone dependencies are informational only. No milestone-level dispatch blocking is enforced.
+
+**Task-level behavior**: Task dependencies are enforceable via `task_dependencies`. Dispatch and forward stage transitions are hard-blocked when required dependency statuses are unmet.
 
 ---
 
@@ -221,7 +223,7 @@ The Strict template is the default. Per-task workflow plans persist selected par
 
 **Bootstrap policy**: `bootstrapCoreAgentsRaw()` is a fallback for fresh installs without an OpenClaw gateway. It bootstraps 10 local fallback agents globally: Orchestrator, Builder, Tester, Reviewer, Learner, Presenter, Explorer, Pragmatist, Guardian, and Consolidator. If any synced agents exist, bootstrap is skipped entirely — synced agents ARE the real team. Workflow planning handles missing roles via `task_findings` and `capability_proposals` rather than creating new agents.
 
-**Agent system.md frontmatter**: Every OpenClaw agent's `system.md` (in `/root/.openclaw/agents/{id}/agent/system.md`) MUST have YAML frontmatter with a `role:` field. The sync process (`extractRoleFromSystemMd()`) reads `role:` first, then falls back to `description:`, then the first H1 heading, then the agent name. Short, lowercase role names (e.g. `builder`, `orchestrator`, `product_owner`, `explorer`) — never long descriptions. When creating new agents via Mission Control, the `role:` field is auto-generated in the system.md frontmatter.
+**OpenClaw prompt source policy**: Mission Control treats workspace `AGENTS.md` as the canonical agent instruction source and `SOUL.md` as identity/personality context. `system.md` in agent directories is considered legacy and is auto-migrated into workspace `AGENTS.md` + `SOUL.md` when detected, then removed. Framework-level duplicate system prompt injection is intentionally avoided.
 **Memory handling**: Memory is handled natively by OpenClaw's lossless memory system. Mission Control no longer runs its own memory consolidation pipeline, vector search, or agent filesystem sync. The `knowledge_entries` and `knowledge_vectors` tables remain in the schema but are not actively maintained by MC. The `/api/memory/*` endpoints and daemon consolidation job have been removed.
 
 **Agent fields**: name, role, description, status (standby/working/offline), model, source (local/gateway/synced), gateway_agent_id, session_key_prefix, agent_dir, agent_workspace_path, soul_md, user_md, agents_md. **API enrichment**: `GET /api/agents` returns `active_task_count` (number of active tasks) and `current_task_title` (title of in-progress task, if any) for each agent.
@@ -305,6 +307,9 @@ Fallback: Agent Activity Dashboard polls every 20s; task-specific views use SSE 
 | PATCH | `/api/tasks/{id}` | Update task (triggers workflow engine on status changes) |
 | DELETE | `/api/tasks/{id}` | Delete task |
 | POST | `/api/tasks/{id}/dispatch` | Dispatch to agent via OpenClaw |
+| GET/POST | `/api/tasks/{id}/dependencies` | Task dependency list/create (`depends_on_task_id`, `required_status`) |
+| PATCH/DELETE | `/api/tasks/{id}/dependencies/{dependencyId}` | Task dependency update/remove |
+| GET/POST | `/api/tasks/{id}/artifacts` | Stage gate artifact evidence list/upsert (`artifact_key`, `artifact_value`, optional `stage_status`) |
 | POST | `/api/tasks/{id}/fail` | Report stage failure (triggers fail-loopback) |
 | GET/POST | `/api/tasks/{id}/activities` | Activity audit log (supports ?limit&offset pagination) |
 | GET/POST | `/api/tasks/{id}/deliverables` | File/URL/artifact outputs (list/create) |
@@ -382,6 +387,8 @@ Fallback: Agent Activity Dashboard polls every 20s; task-specific views use SSE 
 ### Task Sub-Resource Tables
 - **task_comments** -- author, content
 - **task_blockers** -- blocked_by_task_id, description, resolved flag
+- **task_dependencies** -- hard dependency edges (`task_id`, `depends_on_task_id`, `required_status`)
+- **task_artifacts** -- gate evidence (`artifact_key`, `artifact_value`, optional `stage_status`)
 - **task_resources** -- title, url, resource_type (link/document/design/api/reference)
 - **task_acceptance_criteria** -- description, is_met, sort_order
 - **task_activities** -- activity_type, message, agent_id, metadata (JSON)
@@ -393,7 +400,7 @@ Fallback: Agent Activity Dashboard polls every 20s; task-specific views use SSE 
 - **capability_proposals** -- learner_agent_id, proposal_type, title, detail, target_name, meta_workspace_id, meta_workspace_slug, status
 
 ### Workflow and Knowledge Tables
-- **workflow_templates** -- stages (JSON array), fail_targets (JSON), is_default
+- **workflow_templates** -- stages (JSON array, supports per-stage `required_artifacts`/`required_fields`), fail_targets (JSON), is_default
 - **knowledge_entries** -- category, title, content, tags (JSON), confidence score
 
 ### Session and Event Tables

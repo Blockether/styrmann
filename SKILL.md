@@ -59,6 +59,5 @@ Legacy route `GET/POST /api/tasks/{id}/subagent` remains for compatibility, but 
 
 ## Local Tools to Prefer
 
-- Use in-process MCP endpoint first: `POST /api/mcp` (JSON-RPC methods: `initialize`, `tools/list`, `tools/call`).
-- Use direct REST API calls only as fallback when MCP is unavailable.
+- Use direct REST API calls only.
 - Use `/root/repos/blockether/mission-control/scripts/openclaw-acp` for ACP bridge calls with `--provenance meta+receipt` preconfigured.

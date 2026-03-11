@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
 import { queryAll, queryOne, run } from '@/lib/db';
-import { readAgentMdFromDisk, readAgentDescriptionFromDisk, createAgentInOpenClawConfig, readOpenClawConfig, resolveAgents } from '@/lib/openclaw/config';
+import { readAgentMdFromDisk, createAgentInOpenClawConfig, readOpenClawConfig, resolveAgents } from '@/lib/openclaw/config';
 import { ensureSynced } from '@/lib/openclaw/sync';
 import { syncAgentsWithRpcCheck } from '@/lib/openclaw/sync';
 import type { Agent, AgentStatus, CreateAgentRequest } from '@/lib/types';
@@ -15,14 +15,12 @@ export async function GET(_request: NextRequest) {
       SELECT * FROM agents ORDER BY CASE WHEN role = 'orchestrator' THEN 0 ELSE 1 END, name ASC
     `);
 for (const agent of agents) {
-if (agent.source === 'synced') {
+      if (agent.source === 'synced') {
 const mdFiles = readAgentMdFromDisk(agent.agent_workspace_path, agent.gateway_agent_id);
 agent.soul_md = mdFiles.soul_md ?? undefined;
 agent.user_md = mdFiles.user_md ?? undefined;
 agent.agents_md = mdFiles.agents_md ?? undefined;
 agent.memory_md = mdFiles.memory_md ?? undefined;
-const systemMd = readAgentDescriptionFromDisk(agent.agent_dir);
-if (systemMd) agent.description = systemMd;
       }
       // Get active tasks for this agent (with workspace name + deliverable count)
       const activeTasks = queryAll<{
@@ -133,7 +131,6 @@ export async function POST(request: NextRequest) {
       userMd: body.user_md,
       agentsMd: body.agents_md,
       memoryMd: body.memory_md,
-      systemMd: body.description,
     });
 
     if (!created.ok) {
