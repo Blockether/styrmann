@@ -16,14 +16,13 @@ import {
   Loader2,
   ChevronDown,
   ChevronUp,
-  ChevronRight,
   Eye,
   EyeOff,
   Target,
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { useMissionControl } from '@/lib/store';
-import type { Task, TaskType, TaskPriority, Sprint, Milestone, Agent } from '@/lib/types';
+import type { Task, TaskType, TaskPriority, Milestone } from '@/lib/types';
 import { TaskModal } from '@/components/TaskModal';
 import { useTaskDeepLink } from '@/hooks/useTaskDeepLink';
 import { AgentInitials } from '@/components/AgentInitials';
@@ -46,7 +45,6 @@ export function BacklogView({ workspaceId }: BacklogViewProps) {
   const { tasks } = useMissionControl();
   // Sprints state removed - backlog shows tasks without milestones
   const [milestones, setMilestones] = useState<Milestone[]>([]);
-  const [agents, setAgents] = useState<Agent[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [filterType, setFilterType] = useState<TaskType | 'all'>('all');
@@ -63,17 +61,26 @@ export function BacklogView({ workspaceId }: BacklogViewProps) {
   const handleTaskClick = (task: Task) => { setEditingTask(task); openTask(task); };
   const [assigningMilestone, setAssigningMilestone] = useState<string | null>(null);
 
+  const getTaskAssigneePresentation = (task: Task): { badge: string; name: string | null } | null => {
+    if (task.assignee_type === 'human') {
+      const humanName = task.assigned_human?.name || task.assignee_display_name || null;
+      return humanName ? { badge: 'HUMAN', name: humanName } : { badge: 'HUMAN', name: null };
+    }
+
+    if (task.assignee_type === 'ai' || task.assigned_agent_id) {
+      return { badge: 'AI', name: null };
+    }
+
+    return null;
+  };
+
   useEffect(() => {
     async function loadData() {
       try {
         setLoading(true);
-        const [milestonesRes, agentsRes] = await Promise.all([
-          fetch(`/api/milestones?workspace_id=${workspaceId}`),
-          fetch(`/api/agents?workspace_id=${workspaceId}`),
-        ]);
+        const milestonesRes = await fetch(`/api/milestones?workspace_id=${workspaceId}`);
 
         if (milestonesRes.ok) setMilestones(await milestonesRes.json());
-        if (agentsRes.ok) setAgents(await agentsRes.json());
       } catch (error) {
         // Silent error handling
       } finally {
@@ -119,11 +126,6 @@ export function BacklogView({ workspaceId }: BacklogViewProps) {
     if (!milestoneId) return 'No Milestone';
     const milestone = milestones.find((m) => m.id === milestoneId);
     return milestone?.name || 'Unknown Milestone';
-  };
-
-  const getAgent = (agentId: string | null | undefined): Agent | undefined => {
-    if (!agentId) return undefined;
-    return agents.find((a) => a.id === agentId);
   };
 
   const handleAssignMilestone = async (taskId: string, milestoneId: string) => {
@@ -313,7 +315,7 @@ export function BacklogView({ workspaceId }: BacklogViewProps) {
                 {filteredTasks.map((task) => {
                   const TypeIcon = TASK_TYPE_CONFIG[task.task_type].icon;
                   const typeColor = TASK_TYPE_CONFIG[task.task_type].color;
-                  const assignee = task.assignee_display_name || getAgent(task.assigned_agent_id)?.name || null;
+                  const assignee = getTaskAssigneePresentation(task);
 
                   return (
                     <tr
@@ -356,8 +358,13 @@ export function BacklogView({ workspaceId }: BacklogViewProps) {
                       <td className="px-4 py-3">
                         {assignee ? (
                           <div className="flex items-center gap-1.5">
-                            <AgentInitials name={assignee} size="xs" />
-                            <span className="text-xs truncate max-w-[100px]">{assignee}</span>
+                            <AgentInitials name={assignee.badge} size="xs" />
+                            <div className="min-w-0">
+                              <span className="text-xs font-medium">{assignee.badge}</span>
+                              {assignee.name ? (
+                                <span className="block text-[11px] text-mc-text-secondary truncate max-w-[140px]">{assignee.name}</span>
+                              ) : null}
+                            </div>
                           </div>
                         ) : (
                           <span className="text-xs text-mc-text-secondary">-</span>

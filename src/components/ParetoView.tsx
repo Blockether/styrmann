@@ -8,7 +8,6 @@ import {
   XCircle,
   AlertCircle,
   Target,
-  ChevronRight,
 } from 'lucide-react';
 import { useMissionControl } from '@/lib/store';
 import { TaskModal } from '@/components/TaskModal';
@@ -47,6 +46,19 @@ export function ParetoView({ workspaceId }: ParetoViewProps) {
   const { linkedTask, initialTab, openTask, closeTask, updateTab } = useTaskDeepLink();
   const activeEditingTask = editingTask || linkedTask;
   const handleTaskClick = (task: Task) => { setEditingTask(task); openTask(task); };
+
+  const getTaskAssigneePresentation = (task: Task): string | null => {
+    if (task.assignee_type === 'human') {
+      const humanName = task.assigned_human?.name || task.assignee_display_name || null;
+      return humanName ? `HUMAN — ${humanName}` : 'HUMAN';
+    }
+
+    if (task.assignee_type === 'ai' || task.assigned_agent_id) {
+      return 'AI';
+    }
+
+    return null;
+  };
 
   const visibleTasks = useMemo(
     () => tasks.filter((task) => task.workspace_id === workspaceId && task.status !== 'done'),
@@ -260,8 +272,8 @@ export function ParetoView({ workspaceId }: ParetoViewProps) {
             <div className="font-medium text-sm mb-1 line-clamp-2">{hoveredTask.title}</div>
             <div className="text-xs text-mc-text-secondary space-y-1">
               <div>Impact: {hoveredTask.impact} / Effort: {hoveredTask.effort}</div>
-              {hoveredTask.assignee_display_name && (
-                <div>Assigned: {hoveredTask.assignee_display_name}</div>
+              {getTaskAssigneePresentation(hoveredTask) && (
+                <div>Assigned: {getTaskAssigneePresentation(hoveredTask)}</div>
               )}
               <div className="capitalize">Type: {hoveredTask.task_type}</div>
             </div>
