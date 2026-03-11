@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { validateFileToken } from '@/lib/file-tokens';
 
 // Log warning at startup if auth is disabled
 const MC_API_TOKEN = process.env.MC_API_TOKEN;
@@ -121,6 +122,22 @@ export function proxy(request: NextRequest) {
     const queryToken = request.nextUrl.searchParams.get('token');
     if (queryToken && queryToken === MC_API_TOKEN) {
       return NextResponse.next();
+    }
+    // Fall through to header check below
+  }
+
+  // Special case: workspace file access with signed token
+  const workspaceFileMatch = pathname.match(/^\/api\/agents\/([^/]+)\/workspace\/file$/);
+  if (workspaceFileMatch) {
+    const fileToken = request.nextUrl.searchParams.get('token');
+    const expires = request.nextUrl.searchParams.get('expires');
+    if (fileToken && expires) {
+      const agentId = workspaceFileMatch[1];
+      const scope = request.nextUrl.searchParams.get('scope') || 'workspace';
+      const filePath = request.nextUrl.searchParams.get('path') || '';
+      if (validateFileToken(fileToken, expires, agentId, scope, filePath)) {
+        return NextResponse.next();
+      }
     }
     // Fall through to header check below
   }

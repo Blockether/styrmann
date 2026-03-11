@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { X, Save, Trash2, Folder, FileText, RefreshCw, ChevronRight, Link2, Link2Off } from 'lucide-react';
+import { X, Save, Trash2, Folder, FileText, RefreshCw, ChevronRight, Link2, Link2Off, Eye, ArrowLeft, Download, ExternalLink } from 'lucide-react';
 import { useMissionControl } from '@/lib/store';
 import type { Agent } from '@/lib/types';
 
@@ -47,6 +47,33 @@ function parentPath(path: string): string {
   return parts.length <= 1 ? '.' : parts.slice(0, -1).join('/');
 }
 
+const PREVIEWABLE_EXTENSIONS = new Set([
+  '.html', '.htm', '.pdf',
+  '.txt', '.md', '.json', '.xml', '.yaml', '.yml', '.csv', '.log',
+  '.js', '.ts', '.jsx', '.tsx', '.css', '.scss', '.py', '.rb', '.go', '.rs',
+  '.java', '.c', '.cpp', '.h', '.sh', '.bash', '.toml', '.ini', '.clj', '.edn',
+  '.svg', '.png', '.jpg', '.jpeg', '.gif', '.webp',
+]);
+
+function canPreview(name: string): boolean {
+  const dot = name.lastIndexOf('.');
+  if (dot < 0) return false;
+  return PREVIEWABLE_EXTENSIONS.has(name.slice(dot).toLowerCase());
+}
+
+function isEmbeddable(name: string): boolean {
+  const ext = name.slice(name.lastIndexOf('.')).toLowerCase();
+  return ext === '.html' || ext === '.htm' || ext === '.pdf' || ext === '.svg'
+    || ext === '.png' || ext === '.jpg' || ext === '.jpeg' || ext === '.gif' || ext === '.webp';
+}
+
+interface FilePreview {
+  scope: 'workspace' | 'agent';
+  path: string;
+  name: string;
+  signedUrl: string | null;
+}
+
 export function AgentModal({ agent, onClose, workspaceId, onAgentCreated, initialTab = 'info' }: AgentModalProps) {
   const { addAgent, updateAgent, agents } = useMissionControl();
   const [activeTab, setActiveTab] = useState<'info' | 'workspace' | 'soul' | 'user' | 'agents'>(initialTab);
@@ -75,7 +102,10 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated, initia
   const [workspaceError, setWorkspaceError] = useState<string | null>(null);
   const [skillsActionNotice, setSkillsActionNotice] = useState<string | null>(null);
   const [skillsActionLoading, setSkillsActionLoading] = useState<string | null>(null);
-  const isReadOnlySyncedAgent = Boolean(agent && agent.source === 'synced');
+  const isReadOnlySyncedAgent = false;
+  const [filePreview, setFilePreview] = useState<FilePreview | null>(null);
+  const [filePreviewContent, setFilePreviewContent] = useState<string | null>(null);
+  const [filePreviewLoading, setFilePreviewLoading] = useState(false);
 
   const [form, setForm] = useState({
     name: agent?.name || '',
@@ -223,6 +253,47 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated, initia
     }
   };
 
+  const openFilePreview = async (scope: 'workspace' | 'agent', relativePath: string, name: string) => {
+    if (!agent?.id) return;
+    const baseUrl = `/api/agents/${agent.id}/workspace/file?scope=${scope}&path=${encodeURIComponent(relativePath)}`;
+    setFilePreview({ scope, path: relativePath, name, signedUrl: null });
+
+    // Fetch a signed URL for external access (Open in new tab / Download)
+    fetch(`/api/agents/${agent.id}/workspace/file-token?scope=${scope}&path=${encodeURIComponent(relativePath)}`)
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data?.url) {
+          setFilePreview(prev => prev ? { ...prev, signedUrl: data.url } : prev);
+        }
+      })
+      .catch(() => { /* signed URL is optional — same-origin iframe still works */ });
+
+    const embeddable = isEmbeddable(name);
+    if (embeddable) {
+      // HTML/PDF/images — served via iframe, no need to fetch content
+      setFilePreviewContent(null);
+      setFilePreviewLoading(false);
+    } else {
+      // Text files — fetch content for inline display
+      setFilePreviewLoading(true);
+      setFilePreviewContent(null);
+      try {
+        const res = await fetch(baseUrl);
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          setFilePreviewContent(`Error: ${data.error || res.statusText}`);
+        } else {
+          setFilePreviewContent(await res.text());
+        }
+      } catch (err) {
+        setFilePreviewContent(`Error: ${err instanceof Error ? err.message : 'Failed to load'}`);
+      } finally {
+        setFilePreviewLoading(false);
+      }
+    }
+  };
+
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -291,6 +362,7 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated, initia
     browser: BrowserPayload | null,
     setPath: (path: string) => void,
     emptyMessage: string,
+    scope: 'workspace' | 'agent' = 'workspace',
   ) => (
     <div className="space-y-3 rounded-lg border border-mc-border bg-mc-bg p-3">
       <div>
@@ -314,22 +386,27 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated, initia
 
       {browser && browser.entries.length > 0 ? (
         <div className="space-y-1">
-          {browser.entries.map((entry) => (
+          {browser.entries.map((entry) => {
+            const previewable = entry.type === 'file' && canPreview(entry.name);
+            return (
             <button
               key={`${title}-${entry.relative_path}`}
               type="button"
               onClick={() => {
                 if (entry.type === 'directory') setPath(entry.relative_path);
+                else if (previewable) openFilePreview(scope, entry.relative_path, entry.name);
               }}
-              className={`w-full flex items-center justify-between gap-3 rounded px-2 py-1.5 text-left text-xs ${entry.type === 'directory' ? 'hover:bg-mc-bg-secondary cursor-pointer' : 'cursor-default'}`}
+              className={`w-full flex items-center justify-between gap-3 rounded px-2 py-1.5 text-left text-xs ${entry.type === 'directory' || previewable ? 'hover:bg-mc-bg-secondary cursor-pointer' : 'cursor-default'}`}
             >
               <div className="min-w-0 flex items-center gap-2">
                 {entry.type === 'directory' ? (
                   <Folder className="w-3.5 h-3.5 text-mc-accent flex-shrink-0" />
+                ) : previewable ? (
+                  <Eye className="w-3.5 h-3.5 text-mc-accent flex-shrink-0" />
                 ) : (
                   <FileText className="w-3.5 h-3.5 text-mc-text-secondary flex-shrink-0" />
                 )}
-                <span className="truncate text-mc-text">
+                <span className={`truncate ${previewable ? 'text-mc-accent' : 'text-mc-text'}`}>
                   {entry.name}
                   {entry.is_symlink ? ' [symlink]' : ''}
                 </span>
@@ -337,9 +414,11 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated, initia
               <div className="flex items-center gap-2 text-mc-text-secondary flex-shrink-0">
                 {entry.size !== null && <span>{entry.size}b</span>}
                 {entry.type === 'directory' && <ChevronRight className="w-3.5 h-3.5" />}
+                {previewable && <Eye className="w-3 h-3 text-mc-accent" />}
               </div>
             </button>
-          ))}
+            );
+          })}
         </div>
       ) : (
         <div className="text-xs text-mc-text-secondary">{emptyMessage}</div>
@@ -524,7 +603,7 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated, initia
                     </div>
                   ) : (
                     <div className="space-y-4">
-                      {renderBrowser('Workspace Browser', workspaceBrowser, setWorkspaceBrowserPath, 'No files found in the agent workspace.')}
+                      {renderBrowser('Workspace Browser', workspaceBrowser, setWorkspaceBrowserPath, 'No files found in the agent workspace.', 'workspace')}
 
                       <div className="space-y-3 rounded-lg border border-mc-border bg-mc-bg p-3 sm:p-4">
                         <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -636,7 +715,7 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated, initia
                         )}
                       </div>
 
-                      {renderBrowser('Agent Config Directory', agentDirBrowser, setAgentDirBrowserPath, 'No files found in the agent config directory.')}
+                      {renderBrowser('Agent Config Directory', agentDirBrowser, setAgentDirBrowserPath, 'No files found in the agent config directory.', 'agent')}
                     </div>
                   )}
                 </>
@@ -728,6 +807,75 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated, initia
           </div>
         </div>
       </div>
+
+      {/* File Preview Overlay */}
+      {filePreview && agent && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[60] p-0 sm:p-4">
+          <div className="bg-mc-bg-secondary border border-mc-border rounded-none md:rounded-lg w-full md:w-4/5 xl:w-3/5 h-[95vh] flex flex-col overflow-hidden">
+            {/* Preview Header */}
+            <div className="p-3 border-b border-mc-border flex items-center justify-between gap-2 flex-wrap bg-mc-bg-secondary">
+              <div className="flex items-center gap-2 min-w-0">
+                <button
+                  type="button"
+                  onClick={() => setFilePreview(null)}
+                  className="p-1 hover:bg-mc-bg-tertiary rounded flex-shrink-0"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                </button>
+                <div className="min-w-0">
+                  <div className="text-sm font-medium text-mc-text truncate">{filePreview.name}</div>
+                  <div className="text-[11px] font-mono text-mc-text-secondary truncate">{filePreview.path}</div>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <a
+                  href={filePreview.signedUrl || `/api/agents/${agent.id}/workspace/file?scope=${filePreview.scope}&path=${encodeURIComponent(filePreview.path)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="p-1.5 hover:bg-mc-bg-tertiary rounded text-mc-text-secondary hover:text-mc-text"
+                  title="Open in new tab"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                </a>
+                <a
+                  href={filePreview.signedUrl || `/api/agents/${agent.id}/workspace/file?scope=${filePreview.scope}&path=${encodeURIComponent(filePreview.path)}`}
+                  download={filePreview.name}
+                  className="p-1.5 hover:bg-mc-bg-tertiary rounded text-mc-text-secondary hover:text-mc-text"
+                  title="Download"
+                >
+                  <Download className="w-4 h-4" />
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setFilePreview(null)}
+                  className="p-1.5 hover:bg-mc-bg-tertiary rounded text-mc-text-secondary hover:text-mc-text"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Preview Content */}
+            <div className="flex-1 overflow-hidden bg-mc-bg">
+              {isEmbeddable(filePreview.name) ? (
+                <iframe
+                  src={`/api/agents/${agent.id}/workspace/file?scope=${filePreview.scope}&path=${encodeURIComponent(filePreview.path)}`}
+                  className="w-full h-full border-0"
+                  sandbox="allow-same-origin allow-scripts allow-popups"
+                  title={filePreview.name}
+                />
+              ) : filePreviewLoading ? (
+                <div className="flex items-center justify-center h-full">
+                  <RefreshCw className="w-5 h-5 animate-spin text-mc-text-secondary" />
+                </div>
+              ) : (
+                <pre className="p-4 text-xs font-mono text-mc-text overflow-auto h-full whitespace-pre-wrap break-words">{filePreviewContent}</pre>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
