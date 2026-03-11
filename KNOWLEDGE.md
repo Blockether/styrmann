@@ -148,6 +148,8 @@ The `milestone_dependencies` table tracks ordering relationships between milesto
 
 Backlog = tasks with `milestone_id IS NULL` and status != `done`. The BacklogView shows these tasks in a sortable table with filters for priority, type, and tags. Tasks can be assigned to a milestone directly from the backlog card.
 
+**Assignee display rule**: task cards and hover summaries no longer expose AI agent names as the assignee label. AI-owned tasks display `AI`. Human-owned tasks display `HUMAN` plus the selected human's full name.
+
 ---
 
 ## Pareto View
@@ -447,8 +449,9 @@ When a task is created from a GitHub issue:
 ## Authentication
 
 When `MC_API_TOKEN` is set in `.env.local`:
-- External API calls require `Authorization: Bearer <token>` header.
+- External or cross-host API calls require `Authorization: Bearer <token>` header.
 - Same-origin browser requests bypass auth.
+- Localhost service-to-service traffic (for example the daemon calling Mission Control on the same machine) also bypasses token auth; daemon and agent-facing fallback instructions should only include `MC_API_TOKEN` when Mission Control is being reached from another host.
 - SSE streams accept token as query parameter.
 - Implemented in `src/proxy.ts` (Next.js 16 proxy, formerly middleware).
 
