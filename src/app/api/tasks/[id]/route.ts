@@ -168,7 +168,7 @@ export async function PATCH(
       const workflow = getTaskWorkflow(id);
       const currentStage = workflow?.stages.find((stage) => stage.status === existing.status)
         || ((existing.status === 'assigned' || existing.status === 'in_progress')
-          ? workflow?.stages.find((stage) => stage.role === 'builder')
+          ? workflow?.stages.find((stage) => Boolean(stage.role))
           : undefined);
 
       const currentRole = currentStage?.role || undefined;

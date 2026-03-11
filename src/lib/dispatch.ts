@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import { queryOne, queryAll, run } from '@/lib/db';
-import { existsSync, readFileSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync } from 'fs';
 import { getOpenClawClient, sendMessageWithProvenance } from '@/lib/openclaw/client';
 import { broadcast } from '@/lib/events';
 import { getMissionControlUrl } from '@/lib/config';
@@ -190,19 +190,22 @@ export async function dispatchTaskToAgent(taskId: string): Promise<DispatchResul
       urgent: 'URGENT',
     }[task.priority] || 'NORMAL';
 
-    const workspace = queryOne<{ github_repo?: string | null; name?: string | null }>(
-      'SELECT github_repo, name FROM workspaces WHERE id = ?',
+    const workspace = queryOne<{ github_repo?: string | null; local_path?: string | null; name?: string | null }>(
+      'SELECT github_repo, local_path, name FROM workspaces WHERE id = ?',
       [task.workspace_id],
     );
-    const repoPath = getWorkspaceRepoPath(workspace?.github_repo || null);
-    if (!repoPath || !isGitWorkTree(repoPath)) {
+    const workspaceRepo = workspace?.local_path || workspace?.github_repo || null;
+    const repoPath = getWorkspaceRepoPath(workspaceRepo);
+    if (!repoPath || !existsSync(repoPath)) {
       return {
         success: false,
-        error: `Workspace repo is not a valid git worktree: ${workspace?.github_repo || 'missing github_repo'}`,
+        error: `Workspace repo path is unavailable: ${workspaceRepo || 'missing workspace repo path'}`,
       };
     }
-    const worktree = ensureTaskWorktree(repoPath, task.id, task.title);
-    const taskProjectDir = getTaskPipelineDir(worktree.worktreePath, task.id);
+    const hasGitWorktree = isGitWorkTree(repoPath);
+    const worktree = hasGitWorktree ? ensureTaskWorktree(repoPath, task.id, task.title) : null;
+    const taskProjectDir = getTaskPipelineDir(worktree?.worktreePath || repoPath, task.id);
+    mkdirSync(taskProjectDir, { recursive: true });
     const missionControlUrl = getMissionControlUrl();
     const activeAcpBinding = queryOne<{
       acp_session_key: string;
@@ -276,7 +279,7 @@ export async function dispatchTaskToAgent(taskId: string): Promise<DispatchResul
     if (workflow) {
       let stageIndex = workflow.stages.findIndex((stage) => stage.status === task.status);
       if (stageIndex < 0 && (task.status === 'assigned' || task.status === 'inbox')) {
-        stageIndex = workflow.stages.findIndex((stage) => stage.role === 'builder');
+        stageIndex = workflow.stages.findIndex((stage) => Boolean(stage.role));
       }
       if (stageIndex >= 0) {
         currentStage = workflow.stages[stageIndex];
@@ -284,7 +287,7 @@ export async function dispatchTaskToAgent(taskId: string): Promise<DispatchResul
       }
     }
 
-    const isBuilder = !currentStage || currentStage.role === 'builder' || task.status === 'assigned';
+    const isBuilder = currentStage?.role === 'builder' || (!currentStage && task.status === 'assigned');
     const isTester = currentStage?.role === 'tester';
     const isVerifier = currentStage?.role === 'verifier' || currentStage?.role === 'reviewer';
     const nextStatus = nextStage?.status || 'review';
@@ -298,6 +301,19 @@ export async function dispatchTaskToAgent(taskId: string): Promise<DispatchResul
 
     let completionInstructions: string;
     if (isBuilder) {
+      const branchMetadata = worktree
+        ? `{"branch": "${worktree.branchName}"}`
+        : '{}';
+      const branchRule = worktree
+        ? `Branch rule:
+- Work only in this directory: ${worktree.worktreePath}
+- Use branch: ${worktree.branchName}
+- Commit freely on that branch and include the branch in activity metadata above`
+        : `Workspace rule:
+- Work in this directory: ${repoPath}
+- This workspace runs without a git worktree branch requirement.
+- Still write deliverables under ${taskProjectDir}`;
+
       completionInstructions = `**IMPORTANT:** Prefer Mission Control MCP endpoint over raw HTTP.
 Use JSON-RPC on ${missionControlUrl}/api/mcp:
 1. tools/call name=mc_task_log arguments={"task_id":"${task.id}","activity_type":"completed","message":"Description of what was done"}
@@ -308,16 +324,13 @@ Use JSON-RPC on ${missionControlUrl}/api/mcp:
 
 Raw HTTP fallback (only if MCP is unavailable):
 1. Log activity: POST ${missionControlUrl}/api/tasks/${task.id}/activities${authHeader}
-   Body: {"activity_type": "completed", "message": "Description of what was done", "metadata": {"branch": "${worktree.branchName}"}}
+   Body: {"activity_type": "completed", "message": "Description of what was done", "metadata": ${branchMetadata}}
 2. Register deliverable: POST ${missionControlUrl}/api/tasks/${task.id}/deliverables${authHeader}
    Body: {"deliverable_type": "file", "title": "File name", "path": "${taskProjectDir}/filename.html"}
 3. Update status: PATCH ${missionControlUrl}/api/tasks/${task.id}${authHeader}
    Body: {"status": "${nextStatus}"}
 
-Branch rule:
-- Work only in this directory: ${worktree.worktreePath}
-- Use branch: ${worktree.branchName}
-- Commit freely on that branch and include the branch in activity metadata above
+${branchRule}
 
 When complete, reply with:
 \`TASK_COMPLETE: [brief summary of what you did]\``;
@@ -381,7 +394,7 @@ If you need help or clarification, ask the orchestrator.`;
       const traceUrl = `/api/tasks/${task.id}/sessions/${encodeURIComponent(session.openclaw_session_id)}/trace`;
       // Send dispatch via ACP bridge with provenance (falls back to direct RPC)
       const { provenance } = await sendMessageWithProvenance(sessionKey, taskMessage, {
-        cwd: worktree.worktreePath,
+        cwd: worktree?.worktreePath || repoPath,
         timeoutMs: 30000,
       });
 
@@ -395,9 +408,9 @@ If you need help or clarification, ask the orchestrator.`;
           session_key: sessionKey,
           trace_url: traceUrl,
           output_directory: taskProjectDir,
-          branch: worktree.branchName,
-          worktree_path: worktree.worktreePath,
-          base_branch: worktree.defaultBranch,
+          branch: worktree?.branchName || null,
+          worktree_path: worktree?.worktreePath || null,
+          base_branch: worktree?.defaultBranch || null,
           provenance,
           invocation: taskMessage,
           workflow_step: task.status === 'assigned' ? 'in_progress' : task.status,

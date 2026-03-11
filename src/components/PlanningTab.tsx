@@ -2,11 +2,12 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { AlertCircle, Lightbulb, Loader2 } from 'lucide-react';
-import type { CapabilityProposal, Task, TaskFinding, TaskWorkflowPlan } from '@/lib/types';
+import type { CapabilityProposal, Task, TaskActivity, TaskFinding, TaskWorkflowPlan } from '@/lib/types';
 import { WorkflowPlanDiagram } from './WorkflowPlanDiagram';
 
 interface PlanningTabProps {
   taskId: string;
+  onFailureClick?: (agentId: string, step: string | null) => void;
 }
 
 interface WorkflowPlanResponse {
@@ -16,19 +17,31 @@ interface WorkflowPlanResponse {
   proposals: CapabilityProposal[];
 }
 
-export function PlanningTab({ taskId }: PlanningTabProps) {
+interface ActivitiesResponse {
+  raw_activities: TaskActivity[];
+}
+
+export function PlanningTab({ taskId, onFailureClick }: PlanningTabProps) {
   const [data, setData] = useState<WorkflowPlanResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [regenerating, setRegenerating] = useState(false);
+  const [promptDrafts, setPromptDrafts] = useState<Record<string, string>>({});
+  const [savingPromptStepId, setSavingPromptStepId] = useState<string | null>(null);
+  const [failureCounts, setFailureCounts] = useState<Record<string, number>>({});
+
+  const hydratePromptDrafts = (payload: WorkflowPlanResponse) => {
+    setPromptDrafts(Object.fromEntries((payload.plan.steps || []).map((step) => [step.id, step.prompt || ''])));
+  };
 
   const loadPlan = useCallback(async (showLoading = true) => {
     if (showLoading) setLoading(true);
     try {
       const res = await fetch(`/api/tasks/${taskId}/workflow-plan`);
-      const payload = await res.json();
-      if (!res.ok) throw new Error(payload.error || 'Failed to load workflow plan');
+      const payload = await res.json() as WorkflowPlanResponse;
+      if (!res.ok) throw new Error((payload as { error?: string }).error || 'Failed to load workflow plan');
       setData(payload);
+      hydratePromptDrafts(payload);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load workflow plan');
@@ -37,10 +50,40 @@ export function PlanningTab({ taskId }: PlanningTabProps) {
     }
   }, [taskId]);
 
+  const loadFailureStats = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/tasks/${taskId}/activities?limit=200`);
+      const payload = await res.json() as ActivitiesResponse;
+      if (!res.ok || !Array.isArray(payload.raw_activities)) return;
+
+      const counts: Record<string, number> = {};
+      for (const activity of payload.raw_activities) {
+        const details = activity.technical_details && typeof activity.technical_details === 'object'
+          ? activity.technical_details as Record<string, unknown>
+          : null;
+        const lower = `${activity.activity_type} ${activity.message}`.toLowerCase();
+        const isFailure = lower.includes('fail')
+          || lower.includes('error')
+          || Boolean(details?.fail_reason)
+          || Boolean(details?.retry_error)
+          || Boolean(details?.dispatch_error)
+          || Boolean(details?.planning_dispatch_error);
+        if (!isFailure || !activity.agent_id) continue;
+        counts[activity.agent_id] = (counts[activity.agent_id] || 0) + 1;
+      }
+
+      setFailureCounts(counts);
+    } catch {
+    }
+  }, [taskId]);
+
   useEffect(() => {
     loadPlan(true);
-    // SSE-driven: re-fetch on task updates or new activities instead of polling
-    const onUpdate = () => loadPlan(false);
+    loadFailureStats();
+    const onUpdate = () => {
+      loadPlan(false);
+      loadFailureStats();
+    };
     window.addEventListener('mc:task-updated', onUpdate);
     window.addEventListener('mc:activity-logged', onUpdate);
     window.addEventListener('mc:activity-presented', onUpdate);
@@ -49,20 +92,43 @@ export function PlanningTab({ taskId }: PlanningTabProps) {
       window.removeEventListener('mc:activity-logged', onUpdate);
       window.removeEventListener('mc:activity-presented', onUpdate);
     };
-  }, [loadPlan]);
+  }, [loadPlan, loadFailureStats]);
 
   const regenerate = async () => {
     setRegenerating(true);
     try {
       const res = await fetch(`/api/tasks/${taskId}/workflow-plan`, { method: 'POST' });
-      const payload = await res.json();
-      if (!res.ok) throw new Error(payload.error || 'Failed to regenerate workflow plan');
+      const payload = await res.json() as WorkflowPlanResponse;
+      if (!res.ok) throw new Error((payload as { error?: string }).error || 'Failed to regenerate workflow plan');
       setData(payload);
+      hydratePromptDrafts(payload);
       setError(null);
+      await loadFailureStats();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to regenerate workflow plan');
     } finally {
       setRegenerating(false);
+    }
+  };
+
+  const savePrompt = async (stepId: string) => {
+    const prompt = promptDrafts[stepId] ?? '';
+    setSavingPromptStepId(stepId);
+    try {
+      const res = await fetch(`/api/tasks/${taskId}/workflow-plan`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ step_id: stepId, prompt }),
+      });
+      const payload = await res.json() as WorkflowPlanResponse;
+      if (!res.ok) throw new Error((payload as { error?: string }).error || 'Failed to save prompt');
+      setData(payload);
+      hydratePromptDrafts(payload);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save prompt');
+    } finally {
+      setSavingPromptStepId(null);
     }
   };
 
@@ -87,8 +153,19 @@ export function PlanningTab({ taskId }: PlanningTabProps) {
   }
 
   return (
-    <div data-component="src/components/PlanningTab" className="p-4 space-y-4">
-      <WorkflowPlanDiagram task={data.task} plan={data.plan} regenerating={regenerating} onRegenerate={regenerate} />
+    <div data-component="src/components/PlanningTab" className="p-2 sm:p-4 space-y-4">
+      <WorkflowPlanDiagram
+        task={data.task}
+        plan={data.plan}
+        regenerating={regenerating}
+        onRegenerate={regenerate}
+        failureCounts={failureCounts}
+        promptDrafts={promptDrafts}
+        onPromptChange={(stepId, value) => setPromptDrafts((prev) => ({ ...prev, [stepId]: value }))}
+        onPromptSave={savePrompt}
+        savingPromptStepId={savingPromptStepId}
+        onFailureClick={onFailureClick}
+      />
 
       {data.findings.length > 0 && (
         <div className="rounded-lg border border-mc-border bg-mc-bg overflow-hidden">

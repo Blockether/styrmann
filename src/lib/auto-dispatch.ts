@@ -20,8 +20,15 @@ export async function triggerAutoDispatch(options: AutoDispatchOptions): Promise
   }
 
   try {
-    const dispatchRes = await fetch(`/api/tasks/${taskId}/dispatch`, {
+    const missionControlUrl = getMissionControlUrl();
+    const headers: Record<string, string> = {};
+    if (process.env.MC_API_TOKEN) {
+      headers.Authorization = `Bearer ${process.env.MC_API_TOKEN}`;
+    }
+
+    const dispatchRes = await fetch(`${missionControlUrl}/api/tasks/${taskId}/dispatch`, {
       method: 'POST',
+      headers,
     });
 
     if (dispatchRes.ok) {
@@ -54,3 +61,4 @@ export function shouldTriggerAutoDispatch(
 
   return wasNotInProgress && isNowInProgress && hasAssignedAgent;
 }
+import { getMissionControlUrl } from '@/lib/config';

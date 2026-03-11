@@ -139,7 +139,16 @@ function extractSessionMetadata(taskId: string, sessionId: string): {
     .find((row) => row && row.session_id === sessionId) || null;
 }
 
-function buildTraceSummary(history: TraceMessage[], invocation: string | null) {
+function buildTraceSummary(
+  history: TraceMessage[],
+  invocation: string | null,
+  opts?: {
+    fallbackStartedAt?: string | null;
+    fallbackEndedAt?: string | null;
+    liveWhenActive?: boolean;
+    emptyHighlights?: string[];
+  },
+) {
   const roleCounts = history.reduce<Record<string, number>>((acc, item) => {
     acc[item.role] = (acc[item.role] || 0) + 1;
     return acc;
@@ -151,8 +160,12 @@ function buildTraceSummary(history: TraceMessage[], invocation: string | null) {
     .map((value) => new Date(value).getTime())
     .filter((value) => Number.isFinite(value));
 
-  const startedAt = timestamps.length > 0 ? new Date(Math.min(...timestamps)).toISOString() : null;
-  const endedAt = timestamps.length > 0 ? new Date(Math.max(...timestamps)).toISOString() : null;
+  const startedAtFromHistory = timestamps.length > 0 ? new Date(Math.min(...timestamps)).toISOString() : null;
+  const endedAtFromHistory = timestamps.length > 0 ? new Date(Math.max(...timestamps)).toISOString() : null;
+  const startedAt = startedAtFromHistory || opts?.fallbackStartedAt || null;
+  const endedAt = endedAtFromHistory
+    || opts?.fallbackEndedAt
+    || (opts?.liveWhenActive && startedAt ? new Date().toISOString() : null);
   const durationSeconds = startedAt && endedAt
     ? Math.max(0, Math.round((new Date(endedAt).getTime() - new Date(startedAt).getTime()) / 1000))
     : null;
@@ -161,16 +174,24 @@ function buildTraceSummary(history: TraceMessage[], invocation: string | null) {
     ? Array.from(invocation.matchAll(/\*\*([^*\n]{3,120})\*\*/g)).map((match) => match[1].trim())
     : [];
 
+  const stageNoise = /^(title|description|priority|task id|mission control mcp endpoint|planning specification|your instructions|output directory|important|branch rule|workspace rule)$/i;
+  const stageSignal = /(stage|phase|step|review|verify|verification|test|testing|build|dispatch|planning|explore|consolidate|done|in_progress|assigned)/i;
   const stageFlow = Array.from(
-    new Set(stageMatches.filter((item) => item.length > 0).slice(0, 12)),
+    new Set(stageMatches
+      .map((item) => item.replace(/[\s:.-]+$/g, '').trim())
+      .filter((item) => item.length > 0 && !stageNoise.test(item) && stageSignal.test(item))
+      .slice(0, 12)),
   );
 
-  const highlights = history
+  const assistantHighlights = history
     .filter((item) => item.role === 'assistant')
     .map((item) => item.content.replace(/\s+/g, ' ').trim())
     .filter(Boolean)
     .slice(0, 4)
     .map((item) => (item.length > 180 ? `${item.slice(0, 180)}...` : item));
+  const highlights = assistantHighlights.length > 0
+    ? assistantHighlights
+    : (opts?.emptyHighlights || []);
 
   return {
     message_count: history.length,
@@ -194,8 +215,14 @@ export async function GET(request: Request, { params }: Params) {
       task_id?: string | null;
       agent_name?: string;
       session_key_prefix?: string;
+      status?: string | null;
+      session_type?: string | null;
+      channel?: string | null;
+      created_at?: string | null;
+      ended_at?: string | null;
     }>(
-      `SELECT s.id, s.openclaw_session_id, s.task_id, a.name as agent_name, a.session_key_prefix
+      `SELECT s.id, s.openclaw_session_id, s.task_id, s.status, s.session_type, s.channel, s.created_at, s.ended_at,
+              a.name as agent_name, a.session_key_prefix
        FROM openclaw_sessions s
        LEFT JOIN agents a ON s.agent_id = a.id
        WHERE s.task_id = ? AND (s.openclaw_session_id = ? OR s.id = ?)
@@ -212,8 +239,14 @@ export async function GET(request: Request, { params }: Params) {
         task_id?: string | null;
         agent_name?: string;
         session_key_prefix?: string;
+        status?: string | null;
+        session_type?: string | null;
+        channel?: string | null;
+        created_at?: string | null;
+        ended_at?: string | null;
       }>(
-        `SELECT s.id, s.openclaw_session_id, s.task_id, a.name as agent_name, a.session_key_prefix
+        `SELECT s.id, s.openclaw_session_id, s.task_id, s.status, s.session_type, s.channel, s.created_at, s.ended_at,
+                a.name as agent_name, a.session_key_prefix
          FROM openclaw_sessions s
          LEFT JOIN agents a ON s.agent_id = a.id
          WHERE s.openclaw_session_id = ? OR s.id = ?
@@ -266,6 +299,15 @@ export async function GET(request: Request, { params }: Params) {
       } catch {
         // Key not found in gateway, try next
       }
+    }
+
+    const emptyHighlights: string[] = [];
+    if (history.length === 0) {
+      emptyHighlights.push('No messages were returned from OpenClaw history for this session key.');
+      if (!invocation) {
+        emptyHighlights.push('No dispatch invocation record exists for this task/session pair.');
+      }
+      emptyHighlights.push(`Session row exists (${session.status || 'unknown'} / ${session.session_type || 'unknown'}) via ${session.channel || 'unknown'} channel.`);
     }
 
     // Post-process: correlate toolResult messages with preceding tool_call blocks
@@ -327,8 +369,26 @@ export async function GET(request: Request, { params }: Params) {
       openclaw_session_id: session.openclaw_session_id,
       agent_name: session.agent_name || null,
       session_key: resolvedSessionKey,
+      session: {
+        id: session.id,
+        status: session.status || null,
+        session_type: session.session_type || null,
+        channel: session.channel || null,
+        created_at: session.created_at || null,
+        ended_at: session.ended_at || null,
+      },
+      diagnostics: {
+        candidate_session_keys: candidateKeys,
+        resolved_session_key: resolvedSessionKey,
+        history_source: history.length > 0 ? 'gateway' : 'none',
+      },
       invocation,
-      summary: buildTraceSummary(history, invocation?.invocation || null),
+      summary: buildTraceSummary(history, invocation?.invocation || null, {
+        fallbackStartedAt: invocation?.created_at || session.created_at || null,
+        fallbackEndedAt: session.ended_at || null,
+        liveWhenActive: session.status === 'active',
+        emptyHighlights,
+      }),
       provenance: provenanceEntries.map(({ msg, idx }) => ({
         kind: msg.provenance?.kind || 'external_user',
         origin_session_id: msg.provenance?.originSessionId || msg.receipt?.originSessionId || null,

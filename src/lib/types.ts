@@ -323,6 +323,7 @@ export interface WorkflowPlanStep {
   agent_name?: string | null;
   agent_role?: string | null;
   skills: string[];
+  prompt: string;
   loop_target_status?: string | null;
 }
 

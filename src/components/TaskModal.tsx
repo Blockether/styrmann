@@ -37,6 +37,19 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
     onTabChange?.(tab);
   }, [onTabChange]);
 
+  const handleFailureDrilldown = useCallback((agentId: string, step: string | null) => {
+    if (!task?.id) return;
+    handleTabChange('activity');
+    window.dispatchEvent(new CustomEvent('mc:activity-focus', {
+      detail: {
+        taskId: task.id,
+        agentId,
+        step,
+        decisionOnly: true,
+      },
+    }));
+  }, [handleTabChange, task?.id]);
+
   useEffect(() => {
     if (contentRef.current) {
       contentRef.current.scrollTop = 0;
@@ -343,7 +356,7 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
         )}
 
         {/* Content Area */}
-        <div ref={contentRef} className="flex-1 overflow-y-auto p-4">
+        <div ref={contentRef} className="flex-1 overflow-y-auto p-2 sm:p-4">
           {/* Overview Tab */}
           {activeTab === 'overview' && (
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -633,7 +646,7 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
 
           {/* Planning Tab */}
           {activeTab === 'planning' && task && (
-            <PlanningTab taskId={task.id} />
+            <PlanningTab taskId={task.id} onFailureClick={handleFailureDrilldown} />
           )}
 
 

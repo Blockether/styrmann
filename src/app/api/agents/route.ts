@@ -142,7 +142,7 @@ export async function POST(request: NextRequest) {
 
     await syncAgentsWithRpcCheck();
 
-    let agent = queryOne<Agent>('SELECT * FROM agents WHERE gateway_agent_id = ?', [gatewayAgentId]);
+    const agent = queryOne<Agent>('SELECT * FROM agents WHERE gateway_agent_id = ?', [gatewayAgentId]);
     if (!agent) {
       return NextResponse.json({ error: 'Agent created in OpenClaw config but not synced to Mission Control' }, { status: 500 });
     }

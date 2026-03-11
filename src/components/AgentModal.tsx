@@ -526,53 +526,68 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated, initia
                     <div className="space-y-4">
                       {renderBrowser('Workspace Browser', workspaceBrowser, setWorkspaceBrowserPath, 'No files found in the agent workspace.')}
 
-                      <div className="space-y-3 rounded-lg border border-mc-border bg-mc-bg p-3">
+                      <div className="space-y-3 rounded-lg border border-mc-border bg-mc-bg p-3 sm:p-4">
                         <div className="flex items-center justify-between gap-2 flex-wrap">
-                          <div className="text-sm font-medium text-mc-text">Skill Links</div>
+                          <div>
+                            <div className="text-sm font-medium text-mc-text">Skill Links</div>
+                            <div className="text-xs text-mc-text-secondary mt-0.5">Shared skills are managed from the main agent and linked into sub-agent workspaces.</div>
+                          </div>
                           {skillsInfo && !skillsInfo.agent.is_main && (
                             <button
                               type="button"
                               onClick={() => runSkillsAction('sync_all')}
                               disabled={skillsActionLoading === 'sync_all:*'}
-                              className="min-h-11 px-3 py-2 border border-mc-border rounded text-xs hover:bg-mc-bg-secondary disabled:opacity-50"
+                              className="min-h-11 px-3 py-2 border border-mc-border rounded text-xs font-medium hover:bg-mc-bg-secondary disabled:opacity-50"
                             >
                               {skillsActionLoading === 'sync_all:*' ? 'Syncing...' : 'Sync all links'}
                             </button>
                           )}
                         </div>
-                        <div className="text-xs text-mc-text-secondary">
-                          Main agent skills are the shared source. Sub-agents link shared skills by symlink (no copying).
-                        </div>
                         {skillsInfo?.agent.is_main && (
-                          <div className="text-xs text-mc-text-secondary bg-mc-bg-secondary border border-mc-border rounded px-2 py-2">
+                          <div className="text-xs text-mc-text-secondary bg-mc-bg-secondary border border-mc-border rounded-lg px-3 py-2">
                             This is the main shared skill source.
                           </div>
                         )}
                         {skillsInfo && skillsInfo.available_shared.length > 0 ? (
-                          <div className="space-y-1">
+                          <div className="space-y-2">
                             {skillsInfo.available_shared.map((skillName) => {
                               const installedSkill = skillsInfo.installed.find((entry) => entry.name === skillName);
                               const state = installedSkill ? installedSkill.source : 'missing';
+                              const stateLabel = state === 'shared'
+                                ? 'Shared Source'
+                                : state === 'linked'
+                                  ? 'Linked'
+                                  : state === 'local'
+                                    ? 'Local Copy'
+                                    : 'Not Linked';
+                              const stateClass = state === 'shared'
+                                ? 'bg-blue-100 text-blue-700 border-blue-200'
+                                : state === 'linked'
+                                  ? 'bg-emerald-100 text-emerald-700 border-emerald-200'
+                                  : state === 'local'
+                                    ? 'bg-amber-100 text-amber-700 border-amber-200'
+                                    : 'bg-mc-bg text-mc-text-secondary border-mc-border';
                               return (
-                              <div key={`skill-${skillName}`} className="flex items-center justify-between gap-2 rounded px-2 py-1.5 text-xs border border-mc-border bg-mc-bg-secondary">
-                                <div className="min-w-0 flex items-center gap-2">
-                                  <Folder className="w-3.5 h-3.5 text-mc-accent flex-shrink-0" />
-                                  <span className="text-mc-text truncate">{skillName}</span>
-                                  <span className="text-mc-text-secondary">
-                                    {state === 'shared' ? '[shared]'
-                                      : state === 'linked' ? '[linked]'
-                                      : state === 'local' ? '[local copy]'
-                                      : '[not linked]'}
-                                  </span>
+                              <div key={`skill-${skillName}`} className="flex items-center justify-between gap-3 rounded-lg px-3 py-2 text-xs border border-mc-border bg-mc-bg-secondary">
+                                <div className="min-w-0 flex items-center gap-2.5">
+                                  <div className="w-8 h-8 rounded-md border border-mc-border bg-mc-bg flex items-center justify-center flex-shrink-0">
+                                    <Folder className="w-4 h-4 text-mc-accent" />
+                                  </div>
+                                  <div className="min-w-0">
+                                    <div className="text-sm text-mc-text truncate font-medium">{skillName}</div>
+                                    <div className={`inline-flex items-center mt-1 px-2 py-0.5 rounded border text-[11px] ${stateClass}`}>
+                                      {stateLabel}
+                                    </div>
+                                  </div>
                                 </div>
                                 {!skillsInfo.agent.is_main && (
-                                  <div className="flex items-center gap-1.5">
+                                  <div className="flex items-center gap-2">
                                     {state === 'linked' ? (
                                       <button
                                         type="button"
                                         onClick={() => runSkillsAction('unlink', skillName)}
                                         disabled={skillsActionLoading === `unlink:${skillName}`}
-                                        className="min-h-11 px-2 py-1 border border-mc-border rounded hover:bg-mc-bg text-mc-text-secondary disabled:opacity-50"
+                                        className="min-h-11 px-3 py-2 border border-mc-border rounded text-sm hover:bg-mc-bg text-mc-text-secondary disabled:opacity-50"
                                       >
                                         <span className="inline-flex items-center gap-1"><Link2Off className="w-3 h-3" />Unlink</span>
                                       </button>
@@ -581,7 +596,7 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated, initia
                                         type="button"
                                         onClick={() => runSkillsAction('replace_with_link', skillName)}
                                         disabled={skillsActionLoading === `replace_with_link:${skillName}`}
-                                        className="min-h-11 px-2 py-1 border border-mc-accent rounded text-mc-accent hover:bg-mc-accent/10 disabled:opacity-50"
+                                        className="min-h-11 px-3 py-2 border border-mc-accent rounded text-sm text-mc-accent hover:bg-mc-accent/10 disabled:opacity-50"
                                       >
                                         {skillsActionLoading === `replace_with_link:${skillName}` ? 'Converting...' : 'Replace with link'}
                                       </button>
@@ -590,7 +605,7 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated, initia
                                         type="button"
                                         onClick={() => runSkillsAction('link', skillName)}
                                         disabled={skillsActionLoading === `link:${skillName}`}
-                                        className="min-h-11 px-2 py-1 border border-mc-border rounded hover:bg-mc-bg text-mc-text-secondary disabled:opacity-50"
+                                        className="min-h-11 px-3 py-2 border border-mc-border rounded text-sm hover:bg-mc-bg text-mc-text-secondary disabled:opacity-50"
                                       >
                                         <span className="inline-flex items-center gap-1"><Link2 className="w-3 h-3" />Link</span>
                                       </button>
@@ -606,13 +621,15 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated, initia
                         )}
 
                         {skillsInfo && !skillsInfo.agent.is_main && skillsInfo.installed.filter((entry) => !skillsInfo.available_shared.includes(entry.name)).length > 0 && (
-                          <div className="space-y-1">
+                          <div className="space-y-2">
                             <div className="text-xs text-mc-text-secondary">Non-shared local skills in this agent workspace</div>
                             {skillsInfo.installed
                               .filter((entry) => !skillsInfo.available_shared.includes(entry.name))
                               .map((entry) => (
-                                <div key={`local-skill-${entry.name}`} className="text-xs rounded px-2 py-1 border border-mc-border bg-mc-bg-secondary text-mc-text-secondary">
-                                  {entry.name} {entry.is_symlink ? '[custom symlink]' : '[local copy]'}
+                                <div key={`local-skill-${entry.name}`} className="text-xs rounded-lg px-3 py-2 border border-mc-border bg-mc-bg-secondary text-mc-text-secondary inline-flex items-center gap-2">
+                                  <Folder className="w-3.5 h-3.5 text-mc-text-secondary" />
+                                  <span>{entry.name}</span>
+                                  <span className="px-2 py-0.5 rounded border border-mc-border bg-mc-bg">{entry.is_symlink ? 'custom symlink' : 'local copy'}</span>
                                 </div>
                               ))}
                           </div>

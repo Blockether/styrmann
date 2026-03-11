@@ -2,9 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { formatDistanceToNow } from 'date-fns';
-import { Activity, ChevronDown, ChevronRight, Filter, Loader2 } from 'lucide-react';
+import { Activity, Bot, ChevronDown, ChevronRight, Filter, Loader2 } from 'lucide-react';
 import type { PresentedTaskActivity, TaskActivity } from '@/lib/types';
-import { AgentInitials } from './AgentInitials';
 import { TraceViewerModal } from './TraceViewerModal';
 import { useTraceDeepLink } from '@/hooks/useTraceDeepLink';
 
@@ -55,7 +54,23 @@ export function ActivityLog({ taskId }: ActivityLogProps) {
   const [stepFilter, setStepFilter] = useState('all');
   const [decisionOnly, setDecisionOnly] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [openTraceOnFocus, setOpenTraceOnFocus] = useState(false);
   const { traceSessionId, openTrace, closeTrace } = useTraceDeepLink();
+
+  useEffect(() => {
+    const onFocus = (event: Event) => {
+      const custom = event as CustomEvent<{ taskId?: string; agentId?: string; step?: string | null; decisionOnly?: boolean }>;
+      if (!custom.detail || custom.detail.taskId !== taskId) return;
+      setAgentFilter(custom.detail.agentId || 'all');
+      setStepFilter(custom.detail.step || 'all');
+      setDecisionOnly(Boolean(custom.detail.decisionOnly));
+      setExpanded(new Set());
+      setOpenTraceOnFocus(true);
+    };
+
+    window.addEventListener('mc:activity-focus', onFocus as EventListener);
+    return () => window.removeEventListener('mc:activity-focus', onFocus as EventListener);
+  }, [taskId]);
 
   const loadActivities = useCallback(async (showLoading = false) => {
     try {
@@ -99,6 +114,29 @@ export function ActivityLog({ taskId }: ActivityLogProps) {
       return true;
     });
   }, [activities, agentFilter, stepFilter, decisionOnly]);
+
+  useEffect(() => {
+    if (visibleActivities.length === 0) return;
+    setExpanded((prev) => {
+      if (prev.size > 0) return prev;
+      return new Set([visibleActivities[0].id]);
+    });
+  }, [visibleActivities]);
+
+  useEffect(() => {
+    if (!openTraceOnFocus || visibleActivities.length === 0) return;
+    for (const activity of visibleActivities) {
+      for (const raw of activity.raw_activities) {
+        const traceId = getTraceSessionId(raw);
+        if (traceId) {
+          openTrace(traceId, taskId);
+          setOpenTraceOnFocus(false);
+          return;
+        }
+      }
+    }
+    setOpenTraceOnFocus(false);
+  }, [openTraceOnFocus, openTrace, taskId, visibleActivities]);
 
   if (loading) {
     return (
@@ -161,11 +199,17 @@ export function ActivityLog({ taskId }: ActivityLogProps) {
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-start gap-3 min-w-0">
                     {isExpanded ? <ChevronDown className="w-4 h-4 mt-1 text-mc-text-secondary" /> : <ChevronRight className="w-4 h-4 mt-1 text-mc-text-secondary" />}
-                    {activity.agent ? <AgentInitials name={activity.agent.name} size="sm" /> : <div className="w-6 h-6 rounded-full bg-mc-bg border border-mc-border" />}
+                    <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-mc-accent/15 text-mc-accent border border-mc-border flex-shrink-0">
+                      <Bot className="w-3.5 h-3.5" />
+                    </span>
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-xs px-2 py-0.5 rounded bg-mc-accent/15 text-mc-accent">Presenter</span>
-                        {activity.workflow_step && <span className="text-xs px-2 py-0.5 rounded border border-mc-border text-mc-text-secondary">{activity.workflow_step}</span>}
+                        {activity.workflow_step && (
+                          <span className={`text-xs px-2 py-0.5 rounded border ${activity.workflow_step === 'failure' ? 'bg-red-100 text-red-700 border-red-200' : 'border-mc-border text-mc-text-secondary'}`}>
+                            {activity.workflow_step}
+                          </span>
+                        )}
                         <span className="text-xs px-2 py-0.5 rounded border border-mc-border text-mc-text-secondary">{activity.summary_kind === 'live' ? 'live interpretation' : 'post-step consolidation'}</span>
                         {activity.decision_event && <span className="text-xs px-2 py-0.5 rounded bg-amber-100 text-amber-700">decision</span>}
                       </div>

@@ -37,6 +37,19 @@ interface TracePayload {
   openclaw_session_id: string;
   agent_name: string | null;
   session_key: string | null;
+  session?: {
+    id: string;
+    status: string | null;
+    session_type: string | null;
+    channel: string | null;
+    created_at: string | null;
+    ended_at: string | null;
+  };
+  diagnostics?: {
+    candidate_session_keys?: string[];
+    resolved_session_key?: string | null;
+    history_source?: string;
+  };
   invocation?: {
     session_id: string;
     session_key: string;
@@ -345,11 +358,17 @@ export function TraceViewerModal({ taskId, sessionId, onClose }: TraceViewerModa
                 <summary className="cursor-pointer text-sm text-mc-text">Technical details</summary>
                 <div className="mt-2 space-y-2 text-xs">
                   <div className="text-mc-text-secondary">Session key: <span className="font-mono">{data.session_key || 'n/a'}</span></div>
+                  {data.session && (
+                    <div className="text-mc-text-secondary break-words">
+                      Session row: <span className="font-mono">{data.session.id}</span>
+                      {' '}({data.session.status || 'unknown'} / {data.session.session_type || 'unknown'} / {data.session.channel || 'unknown'})
+                    </div>
+                  )}
                   {data.invocation?.output_directory && (
                     <div className="text-mc-text-secondary break-all">Artifacts: <span className="font-mono">{data.invocation.output_directory}</span></div>
                   )}
                   <pre className="p-2 rounded bg-mc-bg-secondary border border-mc-border overflow-x-auto text-[11px] text-mc-text-secondary whitespace-pre-wrap break-words">
-                    {JSON.stringify({ summary: data.summary, invocation: data.invocation }, null, 2)}
+                    {JSON.stringify({ summary: data.summary, invocation: data.invocation, session: data.session, diagnostics: data.diagnostics }, null, 2)}
                   </pre>
                 </div>
               </details>

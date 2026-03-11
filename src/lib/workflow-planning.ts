@@ -2,6 +2,7 @@ import { existsSync, lstatSync, readdirSync, statSync } from 'fs';
 import { join } from 'path';
 import { getDb, queryAll, queryOne, run } from '@/lib/db';
 import { createTaskActivity } from '@/lib/task-activity';
+import { broadcast } from '@/lib/events';
 import { WORKFLOW_TEMPLATES, ensureWorkflowTemplate } from '@/lib/workflow-templates';
 import { llmJsonInfer } from '@/lib/llm';
 import type {
@@ -180,12 +181,74 @@ function deriveStepKind(status: string, role: string | null): WorkflowPlanStep['
   return 'execution';
 }
 
+function defaultStepPrompt(task: PlanningTask, step: Pick<WorkflowPlanStep, 'label' | 'status' | 'role' | 'loop_target_status' | 'kind'>): string {
+  const lines: string[] = [
+    `Task: ${task.title}`,
+    task.description ? `Context: ${task.description}` : '',
+    `Step: ${step.label} (${step.status})`,
+    `Role focus: ${step.role || 'queue transition'}`,
+    'Goal: complete this step with clear evidence and handoff-ready output.',
+  ].filter(Boolean);
+
+  if (step.kind === 'verification') {
+    lines.push('Validation scope: verify quality gates, report failures precisely, and include reproducible evidence.');
+  }
+  if (step.loop_target_status) {
+    lines.push(`Failure loop target: if this step fails, workflow returns to ${step.loop_target_status}.`);
+  }
+
+  lines.push('Output: concise summary of what changed, what was verified, and what the next stage needs.');
+  return lines.join('\n');
+}
+
+function buildPlanningAgentsPayload(
+  task: PlanningTask,
+  participants: WorkflowPlanParticipant[],
+  steps: WorkflowPlanStep[],
+): Array<{ agent_id?: string; name?: string; role?: string; instructions?: string; skills?: string[] }> {
+  const byAgent = new Map<string, Array<WorkflowPlanStep>>();
+  for (const step of steps) {
+    if (!step.agent_id) continue;
+    if (!byAgent.has(step.agent_id)) byAgent.set(step.agent_id, []);
+    byAgent.get(step.agent_id)?.push(step);
+  }
+
+  return participants
+    .filter((participant) => !participant.planner)
+    .map((participant) => {
+      const agentSteps = (byAgent.get(participant.agent_id) || []).sort((a, b) => a.sequence - b.sequence);
+      const instructionBlocks = agentSteps.map((step) => {
+        const header = `Step ${step.sequence}: ${step.label} (${step.status})`;
+        const prompt = (step.prompt || '').trim() || defaultStepPrompt(task, step);
+        return `${header}\n${prompt}`;
+      });
+
+      return {
+        agent_id: participant.agent_id,
+        name: participant.agent_name,
+        role: participant.agent_role,
+        instructions: instructionBlocks.length > 0
+          ? instructionBlocks.join('\n\n---\n\n')
+          : `Execute your assigned workflow stage for task ${task.title}.`,
+        skills: participant.skills,
+      };
+    });
+}
+
 function readPlan(taskId: string): { plan: TaskWorkflowPlan; findings: TaskFinding[]; proposals: CapabilityProposal[] } | null {
   const row = queryOne<PersistedPlanRow>('SELECT * FROM task_workflow_plans WHERE task_id = ? LIMIT 1', [taskId]);
   if (!row) return null;
 
   const findings = queryAll<TaskFinding>('SELECT * FROM task_findings WHERE task_id = ? ORDER BY created_at DESC', [taskId]);
   const proposals = queryAll<CapabilityProposal>('SELECT * FROM capability_proposals WHERE task_id = ? ORDER BY created_at DESC', [taskId]);
+
+  const parsedSteps = JSON.parse(row.steps_json || '[]') as Array<WorkflowPlanStep & { prompt?: string }>;
+  const steps: WorkflowPlanStep[] = parsedSteps.map((step) => ({
+    ...step,
+    prompt: typeof step.prompt === 'string' && step.prompt.trim().length > 0
+      ? step.prompt
+      : `Task: ${row.summary}\nStep: ${step.label} (${step.status})\nGoal: complete this step with clear evidence.`,
+  }));
 
   return {
     plan: {
@@ -197,7 +260,7 @@ function readPlan(taskId: string): { plan: TaskWorkflowPlan; findings: TaskFindi
       workflow_name: row.workflow_name,
       summary: row.summary,
       participants: JSON.parse(row.participants_json || '[]') as WorkflowPlanParticipant[],
-      steps: JSON.parse(row.steps_json || '[]') as WorkflowPlanStep[],
+      steps,
       created_at: row.created_at,
       updated_at: row.updated_at,
     },
@@ -368,7 +431,7 @@ export async function generateTaskWorkflowPlan(taskId: string): Promise<{ plan: 
 
   const steps: WorkflowPlanStep[] = stages.map((stage, index) => {
     const assignment = stage.role ? roleAssignments.get(stage.role) : undefined;
-    return {
+    const step: WorkflowPlanStep = {
       id: stage.id,
       label: stage.label,
       role: stage.role,
@@ -379,13 +442,27 @@ export async function generateTaskWorkflowPlan(taskId: string): Promise<{ plan: 
       agent_name: assignment?.agent?.name || null,
       agent_role: assignment?.agent?.role || null,
       skills: assignment?.skills || [],
+      prompt: '',
       loop_target_status: failTargets[stage.status] || null,
     };
+
+    step.prompt = defaultStepPrompt(task, step);
+    return step;
   });
 
   const summary = `${workflowName} workflow planned by ${orchestrator?.name || 'the orchestrator'} using ${participants.filter((participant) => !participant.planner).length} execution participant(s).`;
   const planId = crypto.randomUUID();
   const now = new Date().toISOString();
+  const firstExecutableStep = steps.find((step) => step.role && step.agent_id);
+  const shouldPrimeExecution = task.assignee_type !== 'human' && ['inbox', 'planning'].includes(task.status);
+  const nextAssignedAgentId = shouldPrimeExecution
+    ? (firstExecutableStep?.agent_id || null)
+    : (task.assigned_agent_id || null);
+  const nextStatus = shouldPrimeExecution
+    ? (firstExecutableStep?.agent_id ? 'assigned' : 'inbox')
+    : task.status;
+
+  const planningAgentsPayload = buildPlanningAgentsPayload(task, participants, steps);
 
   db.transaction(() => {
     run('DELETE FROM task_roles WHERE task_id = ?', [task.id]);
@@ -468,6 +545,8 @@ export async function generateTaskWorkflowPlan(taskId: string): Promise<{ plan: 
            planning_complete = 1,
            planning_spec = ?,
            planning_agents = ?,
+           assigned_agent_id = ?,
+           status = ?,
            planning_dispatch_error = ?,
            updated_at = ?
        WHERE id = ?`,
@@ -481,13 +560,9 @@ export async function generateTaskWorkflowPlan(taskId: string): Promise<{ plan: 
           success_criteria: ['Existing agents selected', 'No dynamic agents created', 'Findings and proposals recorded for missing capability'],
           constraints: { workflow_name: workflowName },
         }),
-        JSON.stringify(steps.filter((step) => step.agent_id).map((step) => ({
-          agent_id: step.agent_id,
-          name: step.agent_name,
-          role: step.agent_role,
-          instructions: `Execute the ${step.label} stage for task ${task.title}.`,
-          skills: step.skills,
-        }))),
+        JSON.stringify(planningAgentsPayload),
+        nextAssignedAgentId,
+        nextStatus,
         findings.length > 0 ? `${findings.length} workflow finding(s) recorded` : null,
         now,
         task.id,
@@ -513,5 +588,50 @@ export async function generateTaskWorkflowPlan(taskId: string): Promise<{ plan: 
   if (!persisted) {
     throw new Error(`Failed to persist workflow plan for task ${task.id}`);
   }
+
+  const updatedTask = queryOne<Task>('SELECT * FROM tasks WHERE id = ? LIMIT 1', [task.id]);
+  if (updatedTask) {
+    broadcast({ type: 'task_updated', payload: updatedTask });
+  }
+
   return persisted;
+}
+
+export function updateWorkflowStepPrompt(taskId: string, stepId: string, prompt: string): { plan: TaskWorkflowPlan; findings: TaskFinding[]; proposals: CapabilityProposal[] } {
+  const row = queryOne<PersistedPlanRow>('SELECT * FROM task_workflow_plans WHERE task_id = ? LIMIT 1', [taskId]);
+  if (!row) {
+    throw new Error('Workflow plan not found');
+  }
+
+  const task = queryOne<PlanningTask>('SELECT * FROM tasks WHERE id = ? LIMIT 1', [taskId]);
+  if (!task) {
+    throw new Error('Task not found');
+  }
+
+  const steps = JSON.parse(row.steps_json || '[]') as WorkflowPlanStep[];
+  const participants = JSON.parse(row.participants_json || '[]') as WorkflowPlanParticipant[];
+  const target = steps.find((step) => step.id === stepId);
+  if (!target) {
+    throw new Error('Workflow step not found');
+  }
+
+  target.prompt = prompt.trim() || defaultStepPrompt(task, target);
+
+  const now = new Date().toISOString();
+  const planningAgentsPayload = buildPlanningAgentsPayload(task, participants, steps);
+
+  run('UPDATE task_workflow_plans SET steps_json = ?, updated_at = ? WHERE task_id = ?', [JSON.stringify(steps), now, taskId]);
+  run('UPDATE tasks SET planning_agents = ?, updated_at = ? WHERE id = ?', [JSON.stringify(planningAgentsPayload), now, taskId]);
+
+  const updatedTask = queryOne<Task>('SELECT * FROM tasks WHERE id = ? LIMIT 1', [taskId]);
+  if (updatedTask) {
+    broadcast({ type: 'task_updated', payload: updatedTask });
+  }
+
+  const updated = readPlan(taskId);
+  if (!updated) {
+    throw new Error('Failed to reload updated workflow plan');
+  }
+
+  return updated;
 }

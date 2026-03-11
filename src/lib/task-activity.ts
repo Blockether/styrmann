@@ -65,6 +65,33 @@ function inferDecisionEvent(activityType: string, message: string, metadata: Rec
     || lower.includes('review');
 }
 
+function hasCriticalTransitionSignal(activity: TaskActivity): boolean {
+  const lower = `${activity.activity_type} ${activity.message}`.toLowerCase();
+  const details = (activity.technical_details && typeof activity.technical_details === 'object')
+    ? activity.technical_details as Record<string, unknown>
+    : null;
+
+  if (
+    lower.includes('fail')
+    || lower.includes('error')
+    || lower.includes('retry')
+    || lower.includes('rejected')
+    || lower.includes('loopback')
+  ) {
+    return true;
+  }
+
+  if (!details) return false;
+  return Boolean(
+    details.fail_reason
+    || details.fail_target
+    || details.dispatch_error
+    || details.retry_error
+    || details.planning_dispatch_error
+    || details.status_reason
+  );
+}
+
 function consolidateStepActivities(rawActivities: TaskActivity[]): TaskActivity[] {
   if (rawActivities.length <= 1) return rawActivities;
 
@@ -80,6 +107,8 @@ function consolidateStepActivities(rawActivities: TaskActivity[]): TaskActivity[
       && current.agent_id === rawActivities[i + 1].agent_id
       && current.activity_type !== 'dispatch_invocation'
       && current.activity_type !== 'completed'
+      && !hasCriticalTransitionSignal(current)
+      && !hasCriticalTransitionSignal(rawActivities[i + 1])
     ) {
       // Skip the duplicate, keep the later one (more recent info)
       i++;
@@ -93,8 +122,20 @@ function consolidateStepActivities(rawActivities: TaskActivity[]): TaskActivity[
         j++;
       }
       if (j > i + 1) {
-        // Keep only the last status change in the chain
-        consolidated.push(rawActivities[j - 1]);
+        const chain = rawActivities.slice(i, j);
+        const critical = chain.filter(hasCriticalTransitionSignal);
+
+        if (critical.length > 0) {
+          const selected = new Map<string, TaskActivity>();
+          for (const item of critical) selected.set(item.id, item);
+          const last = chain[chain.length - 1];
+          selected.set(last.id, last);
+          for (const item of chain) {
+            if (selected.has(item.id)) consolidated.push(item);
+          }
+        } else {
+          consolidated.push(chain[chain.length - 1]);
+        }
         i = j;
         continue;
       }
@@ -119,8 +160,15 @@ function presenterMessage(step: string | null, rawActivities: TaskActivity[], cu
   const decisionCount = consolidated.filter((a) => a.decision_event).length;
   const uniqueSummaries = new Map<string, string>();
 
-  // Build unique semantic summaries (dedup identical messages)
-  for (const activity of consolidated.slice(0, 5)) {
+  const summaryBudget = 5;
+  const critical = consolidated.filter(hasCriticalTransitionSignal);
+  const nonCritical = consolidated.filter((activity) => !hasCriticalTransitionSignal(activity));
+  const prioritized = [
+    ...critical.slice(0, summaryBudget),
+    ...nonCritical.slice(0, Math.max(0, summaryBudget - critical.length)),
+  ];
+
+  for (const activity of prioritized) {
     const summary = summarizeTaskActivity(activity);
     if (!uniqueSummaries.has(summary)) {
       uniqueSummaries.set(summary, summary);
@@ -129,16 +177,23 @@ function presenterMessage(step: string | null, rawActivities: TaskActivity[], cu
 
   const summaryText = Array.from(uniqueSummaries.values()).join(' ');
   const decisionText = decisionCount > 0 ? ` ${decisionCount} decision event(s).` : '';
+  const criticalText = critical.length > 0 ? ` ${critical.length} failure/retry signal(s).` : '';
 
   const prefix = kind === 'live'
     ? `[${stepLabel}]`
     : `[${stepLabel} completed]`;
 
   return {
-    message: `${prefix} ${summaryText}${decisionText}`.trim(),
+    message: `${prefix} ${summaryText}${decisionText}${criticalText}`.trim(),
     summaryKind: kind,
     consolidatedActivities: consolidated,
   };
+}
+
+function isFailureActivity(activity: TaskActivity): boolean {
+  if (hasCriticalTransitionSignal(activity)) return true;
+  const lower = `${activity.activity_type} ${activity.message}`.toLowerCase();
+  return lower.includes('fail') || lower.includes('error') || lower.includes('retry');
 }
 
 function rawToTaskActivity(row: RawActivityRow, taskStatus?: string | null): TaskActivity {
@@ -281,6 +336,36 @@ export function buildPresentedTaskActivities(taskId: string, limit = 200, offset
       agent: presenter ? presenter : undefined,
       // Expose consolidated view, but keep all raw activities for full technical access
       raw_activities: activitiesChronological,
+    });
+  }
+
+  const rawFailures = rawActivities.filter(isFailureActivity);
+  if (rawFailures.length > 0) {
+    const uniqueFailureTexts = Array.from(new Set(
+      rawFailures
+        .map((item) => summarizeTaskActivity(item).trim())
+        .filter((item) => item.length > 0),
+    ));
+    const preview = uniqueFailureTexts.slice(0, 3).join(' ');
+    const failureSummary = `[failure signals] ${preview}${rawFailures.length > 3 ? ` (+${rawFailures.length - 3} more)` : ''}`.trim();
+    presented.unshift({
+      id: `presenter-${taskId}-failure-signals`,
+      task_id: taskId,
+      activity_type: 'activity_summary',
+      summary_role: 'presenter',
+      summary_kind: 'post_step',
+      message: failureSummary,
+      created_at: rawFailures[0]?.created_at || new Date().toISOString(),
+      workflow_step: 'failure',
+      decision_event: true,
+      technical_details: {
+        raw_activity_ids: rawFailures.map((item) => item.id),
+        raw_count: rawFailures.length,
+        consolidated_count: rawFailures.length,
+      },
+      agent_id: presenter?.id,
+      agent: presenter ? presenter : undefined,
+      raw_activities: rawFailures,
     });
   }
 
