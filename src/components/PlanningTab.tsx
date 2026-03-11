@@ -1,13 +1,13 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertCircle, Lightbulb, Loader2 } from 'lucide-react';
 import type { CapabilityProposal, Task, TaskActivity, TaskFinding, TaskWorkflowPlan } from '@/lib/types';
 import { WorkflowPlanDiagram } from './WorkflowPlanDiagram';
+import { ActivityLog } from './ActivityLog';
 
 interface PlanningTabProps {
   taskId: string;
-  onFailureClick?: (agentId: string, step: string | null) => void;
 }
 
 interface WorkflowPlanResponse {
@@ -21,14 +21,14 @@ interface ActivitiesResponse {
   raw_activities: TaskActivity[];
 }
 
-export function PlanningTab({ taskId, onFailureClick }: PlanningTabProps) {
+export function PlanningTab({ taskId }: PlanningTabProps) {
   const [data, setData] = useState<WorkflowPlanResponse | null>(null);
+  const [rawActivities, setRawActivities] = useState<TaskActivity[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [regenerating, setRegenerating] = useState(false);
   const [promptDrafts, setPromptDrafts] = useState<Record<string, string>>({});
   const [savingPromptStepId, setSavingPromptStepId] = useState<string | null>(null);
-  const [failureCounts, setFailureCounts] = useState<Record<string, number>>({});
 
   const hydratePromptDrafts = (payload: WorkflowPlanResponse) => {
     setPromptDrafts(Object.fromEntries((payload.plan.steps || []).map((step) => [step.id, step.prompt || ''])));
@@ -50,49 +50,54 @@ export function PlanningTab({ taskId, onFailureClick }: PlanningTabProps) {
     }
   }, [taskId]);
 
-  const loadFailureStats = useCallback(async () => {
+  const loadActivities = useCallback(async () => {
     try {
-      const res = await fetch(`/api/tasks/${taskId}/activities?limit=200`);
+      const res = await fetch(`/api/tasks/${taskId}/activities?limit=400`);
       const payload = await res.json() as ActivitiesResponse;
-      if (!res.ok || !Array.isArray(payload.raw_activities)) return;
-
-      const counts: Record<string, number> = {};
-      for (const activity of payload.raw_activities) {
-        const details = activity.technical_details && typeof activity.technical_details === 'object'
-          ? activity.technical_details as Record<string, unknown>
-          : null;
-        const lower = `${activity.activity_type} ${activity.message}`.toLowerCase();
-        const isFailure = lower.includes('fail')
-          || lower.includes('error')
-          || Boolean(details?.fail_reason)
-          || Boolean(details?.retry_error)
-          || Boolean(details?.dispatch_error)
-          || Boolean(details?.planning_dispatch_error);
-        if (!isFailure || !activity.agent_id) continue;
-        counts[activity.agent_id] = (counts[activity.agent_id] || 0) + 1;
-      }
-
-      setFailureCounts(counts);
+      if (!res.ok) throw new Error('Failed to load activity state');
+      setRawActivities(Array.isArray(payload.raw_activities) ? payload.raw_activities : []);
     } catch {
+      setRawActivities([]);
     }
   }, [taskId]);
 
   useEffect(() => {
     loadPlan(true);
-    loadFailureStats();
-    const onUpdate = () => {
-      loadPlan(false);
-      loadFailureStats();
-    };
+    loadActivities();
+    const onUpdate = () => loadPlan(false);
+    const onActivity = () => loadActivities();
     window.addEventListener('mc:task-updated', onUpdate);
-    window.addEventListener('mc:activity-logged', onUpdate);
-    window.addEventListener('mc:activity-presented', onUpdate);
+    window.addEventListener('mc:activity-logged', onActivity);
+    window.addEventListener('mc:activity-presented', onActivity);
     return () => {
       window.removeEventListener('mc:task-updated', onUpdate);
-      window.removeEventListener('mc:activity-logged', onUpdate);
-      window.removeEventListener('mc:activity-presented', onUpdate);
+      window.removeEventListener('mc:activity-logged', onActivity);
+      window.removeEventListener('mc:activity-presented', onActivity);
     };
-  }, [loadPlan, loadFailureStats]);
+  }, [loadActivities, loadPlan]);
+
+  const iterationsByStepStatus = useMemo(() => {
+    const totals: Record<string, number> = {};
+    for (const activity of rawActivities) {
+      const step = typeof activity.workflow_step === 'string' && activity.workflow_step.trim().length > 0
+        ? activity.workflow_step.trim()
+        : null;
+      if (!step) continue;
+      const isStageIteration = activity.activity_type === 'dispatch_invocation'
+        || (activity.activity_type === 'status_changed' && activity.message.startsWith('Stage handoff:'))
+        || (activity.activity_type === 'status_changed' && activity.message.startsWith('[Auto-Recovery]'));
+      if (!isStageIteration) continue;
+      totals[step] = (totals[step] || 0) + 1;
+    }
+    return totals;
+  }, [rawActivities]);
+
+  const currentStepStatus = data?.task.status || null;
+  const currentStepLabel = useMemo(() => {
+    if (!data) return null;
+    return data.plan.steps.find((step) => step.status === data.task.status)?.label || null;
+  }, [data]);
+  const currentStepIterations = currentStepStatus ? (iterationsByStepStatus[currentStepStatus] || 0) : 0;
 
   const regenerate = async () => {
     setRegenerating(true);
@@ -103,7 +108,6 @@ export function PlanningTab({ taskId, onFailureClick }: PlanningTabProps) {
       setData(payload);
       hydratePromptDrafts(payload);
       setError(null);
-      await loadFailureStats();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to regenerate workflow plan');
     } finally {
@@ -143,11 +147,12 @@ export function PlanningTab({ taskId, onFailureClick }: PlanningTabProps) {
 
   if (error || !data) {
     return (
-      <div data-component="src/components/PlanningTab" className="p-4">
+      <div data-component="src/components/PlanningTab" className="p-2 sm:p-4 space-y-4">
         <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-400 flex items-start gap-2">
           <AlertCircle className="w-4 h-4 mt-0.5" />
-          <span>{error || 'Workflow plan unavailable'}</span>
+          <span>{error || 'Workflow plan unavailable. Runtime activity remains available below.'}</span>
         </div>
+        <ActivityLog taskId={taskId} />
       </div>
     );
   }
@@ -157,15 +162,19 @@ export function PlanningTab({ taskId, onFailureClick }: PlanningTabProps) {
       <WorkflowPlanDiagram
         task={data.task}
         plan={data.plan}
+        currentStepStatus={currentStepStatus}
+        currentStepLabel={currentStepLabel}
+        currentStepIterations={currentStepIterations}
+        iterationsByStepStatus={iterationsByStepStatus}
         regenerating={regenerating}
         onRegenerate={regenerate}
-        failureCounts={failureCounts}
         promptDrafts={promptDrafts}
         onPromptChange={(stepId, value) => setPromptDrafts((prev) => ({ ...prev, [stepId]: value }))}
         onPromptSave={savePrompt}
         savingPromptStepId={savingPromptStepId}
-        onFailureClick={onFailureClick}
       />
+
+      <ActivityLog taskId={taskId} />
 
       {data.findings.length > 0 && (
         <div className="rounded-lg border border-mc-border bg-mc-bg overflow-hidden">

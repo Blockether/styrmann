@@ -3,12 +3,17 @@
 import { useEffect, useCallback, useRef, useState } from 'react';
 import type { Task } from '@/lib/types';
 
-type TabType = 'overview' | 'planning' | 'activity' | 'deliverables' | 'sessions';
+type TabType = 'overview' | 'activity' | 'deliverables' | 'sessions';
 
-const VALID_TABS: TabType[] = ['overview', 'planning', 'activity', 'deliverables', 'sessions'];
+const VALID_TABS: TabType[] = ['overview', 'activity', 'deliverables', 'sessions'];
 
 function isValidTab(value: string | null): value is TabType {
   return value !== null && (VALID_TABS as string[]).includes(value);
+}
+
+function normalizeTab(value: string | null): TabType | undefined {
+  if (value === 'planning') return 'activity';
+  return isValidTab(value) ? value : undefined;
 }
 
 function readInitialTaskDeepLink(): { taskId: string | null; tab: TabType | undefined } {
@@ -18,7 +23,7 @@ function readInitialTaskDeepLink(): { taskId: string | null; tab: TabType | unde
   const tabParam = params.get('tab');
   return {
     taskId,
-    tab: isValidTab(tabParam) ? tabParam : undefined,
+    tab: normalizeTab(tabParam),
   };
 }
 
@@ -111,9 +116,8 @@ export function useTaskDeepLink() {
       // If the current linked task matches, just update tab
       if (linkedTask && linkedTask.id === taskId) {
         const tabParam = params.get('tab');
-        if (isValidTab(tabParam)) {
-          setInitialTab(tabParam);
-        }
+        const normalizedTab = normalizeTab(tabParam);
+        setInitialTab(normalizedTab);
         return;
       }
 
@@ -124,7 +128,7 @@ export function useTaskDeepLink() {
           if (task) {
             setLinkedTask(task);
             const tabParam = params.get('tab');
-            setInitialTab(isValidTab(tabParam) ? tabParam : undefined);
+            setInitialTab(normalizeTab(tabParam));
           } else {
             setLinkedTask(null);
           }

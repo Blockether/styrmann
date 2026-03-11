@@ -6,7 +6,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { Bot, CheckCircle, Circle, XCircle, Trash2, Check, Shield } from 'lucide-react';
+import { Bot, CheckCircle, Circle, XCircle, Check, Shield, AlertTriangle } from 'lucide-react';
 import { AgentInitials } from './AgentInitials';
 import { TraceViewerModal } from './TraceViewerModal';
 import { useTraceDeepLink } from '@/hooks/useTraceDeepLink';
@@ -24,6 +24,8 @@ interface SessionWithAgent {
   updated_at: string;
   agent_name?: string;
   trace_url?: string;
+  is_active?: boolean;
+  inactivity_minutes?: number | null;
 }
 
 interface ProvenanceSummary {
@@ -65,6 +67,22 @@ export function SessionsList({ taskId }: SessionsListProps) {
   }, [loadSessions]);
 
   useEffect(() => {
+    const refresh = () => {
+      void loadSessions();
+    };
+    const intervalId = window.setInterval(refresh, 30000);
+    window.addEventListener('mc:task-updated', refresh);
+    window.addEventListener('mc:activity-logged', refresh);
+    window.addEventListener('mc:activity-presented', refresh);
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener('mc:task-updated', refresh);
+      window.removeEventListener('mc:activity-logged', refresh);
+      window.removeEventListener('mc:activity-presented', refresh);
+    };
+  }, [loadSessions]);
+
+  useEffect(() => {
     fetch(`/api/tasks/${taskId}/provenance`)
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => { if (data) setProvenance(data as ProvenanceSummary); })
@@ -77,12 +95,36 @@ export function SessionsList({ taskId }: SessionsListProps) {
         return <Circle className="w-4 h-4 text-green-500 fill-current animate-pulse" />;
       case 'completed':
         return <CheckCircle className="w-4 h-4 text-mc-accent" />;
+      case 'interrupted':
+        return <AlertTriangle className="w-4 h-4 text-orange-500" />;
+      case 'stale':
+        return <AlertTriangle className="w-4 h-4 text-mc-accent-yellow" />;
       case 'failed':
         return <XCircle className="w-4 h-4 text-red-500" />;
       default:
         return <Circle className="w-4 h-4 text-mc-text-secondary" />;
     }
   };
+
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case 'active':
+        return 'Running';
+      case 'completed':
+        return 'Completed';
+      case 'interrupted':
+        return 'Interrupted';
+      case 'stale':
+        return 'Stale';
+      case 'failed':
+        return 'Failed';
+      default:
+        return status;
+    }
+  };
+
+  const activeCount = sessions.filter((session) => session.is_active).length;
+  const inactiveCount = sessions.length - activeCount;
 
   const formatDuration = (start: string, end?: string | null) => {
     const startTime = new Date(start).getTime();
@@ -130,20 +172,27 @@ export function SessionsList({ taskId }: SessionsListProps) {
     }
   };
 
-  const handleDelete = async (sessionId: string) => {
-    if (!confirm('Delete this session?')) return;
+  const handleResumeInterrupted = async (sessionId: string) => {
     try {
-      const res = await fetch(`/api/openclaw/sessions/${sessionId}`, {
-        method: 'DELETE',
-      });
-      if (res.ok) {
+      const [resumeRes, dispatchRes] = await Promise.all([
+        fetch(`/api/openclaw/sessions/${sessionId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'active', ended_at: null }),
+        }),
+        fetch(`/api/tasks/${taskId}/dispatch`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: '{}',
+        }),
+      ]);
+      if (resumeRes.ok || dispatchRes.ok) {
         loadSessions();
       }
     } catch (error) {
-      console.error('Failed to delete session:', error);
+      console.error('Failed to resume interrupted session:', error);
     }
   };
-
 
   if (loading) {
     return (
@@ -164,6 +213,14 @@ export function SessionsList({ taskId }: SessionsListProps) {
 
   return (
     <div data-component="src/components/SessionsList" className="space-y-3">
+      <div className="p-3 rounded-lg border border-mc-border bg-mc-bg-secondary text-xs flex items-center justify-between gap-2 flex-wrap">
+        <span className="text-mc-text-secondary">OpenClaw session state</span>
+        <div className="flex items-center gap-2">
+          <span className="px-2 py-0.5 rounded border border-green-200 bg-green-50 text-green-700">Active: {activeCount}</span>
+          <span className="px-2 py-0.5 rounded border border-mc-border bg-mc-bg text-mc-text-secondary">Inactive: {inactiveCount}</span>
+        </div>
+      </div>
+
       {/* ACP Provenance Banner */}
       {provenance && provenance.count > 0 && (
         <div className="p-3 rounded-lg border border-amber-200 bg-amber-50 text-xs space-y-1.5">
@@ -208,7 +265,10 @@ export function SessionsList({ taskId }: SessionsListProps) {
                 {session.agent_name || 'Session Agent'}
               </span>
               <span className="text-xs text-mc-text-secondary capitalize">
-                {session.status}
+                {getStatusLabel(session.status)}
+              </span>
+              <span className={`text-[11px] px-1.5 py-0.5 rounded border ${session.is_active ? 'border-green-200 bg-green-50 text-green-700' : 'border-mc-border bg-mc-bg text-mc-text-secondary'}`}>
+                {session.is_active ? 'active' : 'inactive'}
               </span>
             </div>
 
@@ -236,12 +296,29 @@ export function SessionsList({ taskId }: SessionsListProps) {
               </span>
               <span>•</span>
               <span>Started {formatTimestamp(session.created_at)}</span>
+              {typeof session.inactivity_minutes === 'number' && (
+                <>
+                  <span>•</span>
+                  <span>Idle {session.inactivity_minutes}m</span>
+                </>
+              )}
             </div>
 
             {/* Channel */}
             {session.channel && (
               <div className="mt-2 text-xs text-mc-text-secondary">
                 Channel: <span className="font-mono">{session.channel}</span>
+              </div>
+            )}
+
+            {session.status === 'stale' && (
+              <div className="mt-2 text-xs text-mc-accent-yellow">
+                No explicit session end was recorded; task/activity suggests this run is no longer active.
+              </div>
+            )}
+            {session.status === 'interrupted' && (
+              <div className="mt-2 text-xs text-orange-600">
+                Session heartbeat stopped. Mission Control will try to continue this run via OpenClaw dispatch.
               </div>
             )}
           </div>
@@ -252,18 +329,20 @@ export function SessionsList({ taskId }: SessionsListProps) {
               <button
                 onClick={() => handleMarkComplete(session.openclaw_session_id)}
                 className="p-1.5 hover:bg-mc-bg-tertiary rounded text-green-500"
-                title="Mark as complete"
+                title="Mark session as ended"
               >
                 <Check className="w-4 h-4" />
               </button>
             )}
-            <button
-              onClick={() => handleDelete(session.openclaw_session_id)}
-              className="p-1.5 hover:bg-mc-bg-tertiary rounded text-red-500"
-              title="Delete session"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
+            {session.status === 'interrupted' && (
+              <button
+                onClick={() => handleResumeInterrupted(session.openclaw_session_id)}
+                className="p-1.5 hover:bg-mc-bg-tertiary rounded text-orange-500"
+                title="Resume interrupted session"
+              >
+                <Check className="w-4 h-4" />
+              </button>
+            )}
           </div>
         </div>
       ))}

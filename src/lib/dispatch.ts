@@ -153,6 +153,34 @@ export async function dispatchTaskToAgent(taskId: string): Promise<DispatchResul
     );
 
     if (!session) {
+      const interruptedSession = queryOne<OpenClawSession>(
+        `SELECT * FROM openclaw_sessions
+         WHERE agent_id = ? AND status = ? AND task_id = ?
+         ORDER BY updated_at DESC, created_at DESC
+         LIMIT 1`,
+        [agent.id, 'interrupted', task.id],
+      );
+      if (interruptedSession) {
+        run(
+          'UPDATE openclaw_sessions SET status = ?, ended_at = NULL, updated_at = ? WHERE id = ?',
+          ['active', now, interruptedSession.id],
+        );
+        session = queryOne<OpenClawSession>('SELECT * FROM openclaw_sessions WHERE id = ?', [interruptedSession.id]);
+        createTaskActivity({
+          taskId,
+          activityType: 'status_changed',
+          agentId: agent.id,
+          message: `Resuming interrupted OpenClaw session for ${agent.name}`,
+          metadata: {
+            workflow_step: task.status === 'assigned' ? 'in_progress' : task.status,
+            decision_event: true,
+            openclaw_session_id: interruptedSession.openclaw_session_id,
+          },
+        });
+      }
+    }
+
+    if (!session) {
       const orphanSession = queryOne<OpenClawSession>(
         `SELECT * FROM openclaw_sessions
          WHERE agent_id = ? AND status = ? AND task_id IS NULL

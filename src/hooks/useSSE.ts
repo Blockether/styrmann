@@ -106,7 +106,12 @@ export function useSSE() {
 
             case 'deliverable_added':
               debug.sse('Deliverable added', sseEvent.payload);
-              // Deliverables are fetched when task detail is opened
+              window.dispatchEvent(new CustomEvent('mc:deliverable-added', { detail: sseEvent.payload }));
+              break;
+
+            case 'deliverable_deleted':
+              debug.sse('Deliverable deleted', sseEvent.payload);
+              window.dispatchEvent(new CustomEvent('mc:deliverable-deleted', { detail: sseEvent.payload }));
               break;
 
             case 'agent_spawned':

@@ -1,50 +1,40 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import { AlertTriangle, Bot, Brain, ChevronDown, ChevronRight, GitBranch, RotateCcw } from 'lucide-react';
+import { useState } from 'react';
+import { Bot, Brain, ChevronDown, ChevronRight, GitBranch, RotateCcw } from 'lucide-react';
 import type { Task, TaskWorkflowPlan, WorkflowPlanStep } from '@/lib/types';
 
 interface WorkflowPlanDiagramProps {
-  task: Pick<Task, 'status' | 'assigned_agent_id' | 'title'>;
+  task: Pick<Task, 'status' | 'title'>;
   plan: TaskWorkflowPlan;
+  currentStepStatus?: string | null;
+  currentStepLabel?: string | null;
+  currentStepIterations?: number;
+  iterationsByStepStatus?: Record<string, number>;
   regenerating?: boolean;
   onRegenerate?: () => void;
-  failureCounts?: Record<string, number>;
   promptDrafts?: Record<string, string>;
   onPromptChange?: (stepId: string, value: string) => void;
   onPromptSave?: (stepId: string) => void;
   savingPromptStepId?: string | null;
-  onFailureClick?: (agentId: string, step: string | null) => void;
-}
-
-function getStepState(task: Pick<Task, 'status'>, plan: TaskWorkflowPlan, step: WorkflowPlanStep): 'active' | 'complete' | 'pending' {
-  const currentIndex = plan.steps.findIndex((item) => item.status === task.status);
-  const stepIndex = plan.steps.findIndex((item) => item.id === step.id);
-  if (step.status === task.status) return 'active';
-  if (currentIndex >= 0 && stepIndex >= 0 && stepIndex < currentIndex) return 'complete';
-  return 'pending';
 }
 
 export function WorkflowPlanDiagram({
   task,
   plan,
+  currentStepStatus,
+  currentStepLabel,
+  currentStepIterations = 0,
+  iterationsByStepStatus = {},
   regenerating = false,
   onRegenerate,
-  failureCounts = {},
   promptDrafts = {},
   onPromptChange,
   onPromptSave,
   savingPromptStepId = null,
-  onFailureClick,
 }: WorkflowPlanDiagramProps) {
   const [expandedParticipantSkills, setExpandedParticipantSkills] = useState<Set<string>>(new Set());
   const [expandedStepSkills, setExpandedStepSkills] = useState<Set<string>>(new Set());
-
-  const activeAgentIds = useMemo(() => {
-    const ids = new Set<string>();
-    if (task.assigned_agent_id) ids.add(task.assigned_agent_id);
-    return ids;
-  }, [task.assigned_agent_id]);
 
   const toggleParticipantSkills = (agentId: string) => {
     setExpandedParticipantSkills((prev) => {
@@ -89,16 +79,19 @@ export function WorkflowPlanDiagram({
       </div>
 
       <div className="p-2 sm:p-4 space-y-4">
+        <section className="rounded-lg border border-mc-border bg-mc-bg-secondary/40 p-2 sm:p-3">
+          <div className="mb-2 flex items-center justify-between gap-2 flex-wrap">
+            <div className="text-xs uppercase tracking-wide text-mc-text-secondary">Agent Step Proposals</div>
+            <div className="text-[11px] text-mc-text-secondary">Planning candidates and capabilities</div>
+          </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-2 sm:gap-3">
           {plan.participants.map((participant) => {
-            const isActiveAgent = activeAgentIds.has(participant.agent_id);
-            const failures = failureCounts[participant.agent_id] || 0;
             const skillExpanded = expandedParticipantSkills.has(participant.agent_id);
             const visibleSkills = skillExpanded ? participant.skills : participant.skills.slice(0, 2);
             return (
               <div
                 key={participant.agent_id}
-                className={`rounded-lg border px-3 py-3 text-xs w-full ${isActiveAgent ? 'border-mc-accent bg-mc-accent/10' : 'border-mc-border bg-mc-bg-secondary'}`}
+                className="rounded-lg border px-3 py-3 text-xs w-full border-mc-border bg-mc-bg-secondary"
               >
                 <div className="flex items-center justify-between gap-2 flex-wrap">
                   <div className="flex items-center gap-2 font-medium text-mc-text">
@@ -106,18 +99,7 @@ export function WorkflowPlanDiagram({
                   <span>{participant.agent_name}</span>
                   </div>
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    {isActiveAgent && <span className="text-[11px] px-2 py-0.5 rounded bg-mc-accent text-mc-bg font-medium">active</span>}
                     {participant.planner && <span className="text-[11px] px-2 py-0.5 rounded bg-mc-bg border border-mc-border text-mc-text-secondary">planning lead</span>}
-                    {failures > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => onFailureClick?.(participant.agent_id, null)}
-                        className="text-[11px] px-2 py-0.5 rounded bg-red-100 text-red-700 inline-flex items-center gap-1 hover:bg-red-200"
-                      >
-                        <AlertTriangle className="w-3 h-3" />
-                        {failures} failures
-                      </button>
-                    )}
                   </div>
                 </div>
                 <div className="mt-1 text-mc-text-secondary">{participant.agent_role}</div>
@@ -147,24 +129,33 @@ export function WorkflowPlanDiagram({
             );
           })}
         </div>
+        </section>
 
+        <section className="rounded-lg border border-mc-accent/40 bg-mc-accent/5 p-2 sm:p-3">
+          <div className="mb-2 flex items-center justify-between gap-2 flex-wrap">
+            <div className="text-xs uppercase tracking-wide text-mc-accent font-medium">Execution Track</div>
+            <div className="text-[11px] text-mc-text-secondary">Execution blueprint and runtime state.</div>
+            <div className="text-[11px] px-2 py-0.5 rounded bg-mc-bg border border-mc-border text-mc-text-secondary">
+              Runtime status now: {task.status.replace(/_/g, ' ')}
+            </div>
+            <div className="text-[11px] px-2 py-0.5 rounded bg-mc-bg border border-mc-border text-mc-text-secondary">
+              Current step: {(currentStepLabel || currentStepStatus || task.status).replace(/_/g, ' ')}
+            </div>
+            <div className="text-[11px] px-2 py-0.5 rounded bg-mc-bg border border-mc-border text-mc-text-secondary">
+              Iterations: {currentStepIterations}
+            </div>
+          </div>
         <div className="grid grid-cols-1 gap-3">
             {plan.steps.map((step, index) => {
-              const state = getStepState(task, plan, step);
-              const stepFailures = step.agent_id ? (failureCounts[step.agent_id] || 0) : 0;
               const stepSkillExpanded = expandedStepSkills.has(step.id);
               const visibleStepSkills = stepSkillExpanded ? step.skills : step.skills.slice(0, 2);
               const promptValue = promptDrafts[step.id] ?? step.prompt;
+              const stepIterations = iterationsByStepStatus[step.status] || 0;
+              const isCurrentStep = (currentStepStatus || task.status) === step.status;
               return (
                 <div key={step.id} className="flex items-start gap-2 min-w-0">
                   <div
-                    className={`w-full rounded-lg border p-3 ${
-                      state === 'active'
-                        ? 'border-mc-accent bg-mc-accent/10'
-                        : state === 'complete'
-                          ? 'border-mc-accent-green/40 bg-mc-accent-green/10'
-                          : 'border-mc-border bg-mc-bg-secondary'
-                    }`}
+                    className={`w-full rounded-lg border p-3 ${isCurrentStep ? 'border-mc-accent' : 'border-mc-border'} bg-mc-bg-secondary`}
                   >
                     <div className="flex items-center justify-between gap-2 flex-wrap">
                       <div className="flex items-center gap-1.5 flex-wrap">
@@ -172,23 +163,24 @@ export function WorkflowPlanDiagram({
                         <span className={`text-[11px] px-2 py-0.5 rounded ${step.kind === 'verification' ? 'bg-blue-100 text-blue-700' : step.kind === 'queue' ? 'bg-mc-bg border border-mc-border text-mc-text-secondary' : 'bg-amber-100 text-amber-700'}`}>
                           {step.kind}
                         </span>
-                        {state === 'active' && <span className="text-[11px] px-2 py-0.5 rounded bg-mc-accent text-mc-bg font-medium">active</span>}
-                        {stepFailures > 0 && (
-                          <button
-                            type="button"
-                            onClick={() => step.agent_id && onFailureClick?.(step.agent_id, null)}
-                            className="text-[11px] px-2 py-0.5 rounded bg-red-100 text-red-700 inline-flex items-center gap-1 hover:bg-red-200"
-                          >
-                            <AlertTriangle className="w-3 h-3" />
-                            {stepFailures} failures
-                          </button>
+                        <span className="text-[11px] px-2 py-0.5 rounded bg-mc-bg border border-mc-border text-mc-text-secondary">
+                          iteration {stepIterations}
+                        </span>
+                        {isCurrentStep && (
+                          <span className="text-[11px] px-2 py-0.5 rounded bg-mc-accent/15 text-mc-accent border border-mc-accent/40">
+                            current
+                          </span>
                         )}
                       </div>
-                      <span className="text-[11px] text-mc-text-secondary">status `{step.status}`</span>
+                      <span className="text-[11px] text-mc-text-secondary">planned for {step.status.replace(/_/g, ' ')} phase</span>
                     </div>
                     <div className="mt-2 text-sm font-medium text-mc-text">{step.label}</div>
                     <div className="mt-1 text-xs text-mc-text-secondary">
-                      {step.agent_name ? `${step.agent_name} (${step.agent_role || 'agent'})` : 'Missing capability'}
+                      {step.agent_name
+                        ? `${step.agent_name} (${step.agent_role || 'agent'})`
+                        : step.kind === 'queue'
+                          ? 'System transition (no agent required)'
+                          : 'Unassigned - no matching agent capability'}
                     </div>
                     {step.skills.length > 0 && (
                       <div className="mt-2">
@@ -213,7 +205,7 @@ export function WorkflowPlanDiagram({
                       </div>
                     )}
 
-                    {onPromptChange && onPromptSave && (
+                    {onPromptChange && onPromptSave && step.agent_id && step.kind !== 'queue' && (
                       <div className="mt-3 space-y-2">
                         <div className="text-[11px] uppercase tracking-wide text-mc-text-secondary">Planned Prompt</div>
                         <textarea
@@ -235,15 +227,23 @@ export function WorkflowPlanDiagram({
                       </div>
                     )}
 
+                    {(!step.agent_id || step.kind === 'queue') && (
+                      <div className="mt-3 text-[11px] text-mc-text-secondary">
+                        This is a template queue marker. Runtime completion appears in Activity.
+                      </div>
+                    )}
+
                     {step.loop_target_status && (
-                      <div className="mt-3 text-[11px] text-mc-text-secondary">Failure loops to `{step.loop_target_status}`</div>
+                      <div className="mt-3 text-[11px] text-mc-text-secondary">
+                        On failure, returns task to {step.loop_target_status.replace(/_/g, ' ')} phase
+                      </div>
                     )}
                   </div>
-                  {index < plan.steps.length - 1 && <div className="text-mc-text-secondary/50 pt-4 hidden sm:block">{'->'}</div>}
                 </div>
               );
             })}
         </div>
+        </section>
       </div>
     </div>
   );

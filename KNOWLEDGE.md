@@ -65,7 +65,7 @@ Also: `pending_dispatch` (transient, pre-dispatch state).
 
 **Task creation behavior**: New AI tasks no longer expose manual loop, template, or per-task execution controls. The orchestrator generates a workflow plan immediately from existing agents and linked skills only, stores it on the task, and leaves the task in `inbox` until execution begins. Human tasks still require a selected human and move to `assigned`, which triggers an email through Himalaya.
 
-**Task creation UI**: Manual agent loop configuration, task-level template picking, and direct execution settings are removed. The task modal now shows Planning, Activity, Deliverables, and Sessions tabs. The former Proposals tab has been merged into the Planning tab (learner proposals appear inline below the workflow plan diagram).
+**Task creation UI**: Manual agent loop configuration, task-level template picking, and direct execution settings are removed. The task modal now shows Overview, Activity, Deliverables, and Sessions tabs. Planning is merged into Activity: the workflow blueprint and runtime activity timeline are presented together, including current step and iteration context. The former Proposals tab is merged into this Activity view (learner proposals remain inline below the workflow plan diagram).
 
 **Task fields**: title, description, status, priority (low/normal/high/urgent), task_type (bug/feature/chore/documentation/research), effort (1-5), impact (1-5), assignee_type (`ai` | `human`), assigned_agent_id, assigned_human_id, milestone_id, workflow_template_id, workflow_plan_id, due_date, tags.
 
@@ -599,7 +599,7 @@ The daemon is a standalone Node.js process with nine modules:
 | **heartbeat** | 30s | Polls `/api/agents`, detects stale working agents (>60 min without activity), sets them to standby via internal daemon PATCH (`x-mc-system: daemon`) |
 | **dispatcher** | 10s | Polls `/api/tasks?status=assigned`, auto-dispatches each via `POST /api/tasks/{id}/dispatch` |
 | **scheduler** | 10s | Runs registered `ScheduledJob` entries on interval. Job registry starts empty — no hardcoded jobs |
-| **recovery** | 60s | Polls `in_progress` tasks, detects stale work (default >30m without updates), and performs auto-recovery (re-dispatch to assignee or reassign to fallback orchestrator) |
+| **recovery** | 60s | Polls `in_progress` tasks, detects stale work (default >5m without updates), marks stale active sessions as `interrupted`, then attempts continuation by re-dispatching to the assignee; on conflict or offline assignee, reassigns to fallback orchestrator |
 | **autotrain** | 30s | Polls completed `autotrain` tasks and reopens them for the next repo-improvement iteration until stop/max-iteration conditions are hit |
 | **health** | 60s | Pings MC to verify API is reachable, logs connection changes |
 | **router** | SSE stream | Subscribes to `/api/events/stream`, routes events (e.g., logs task assignments for dispatcher awareness) |

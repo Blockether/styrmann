@@ -21,7 +21,7 @@ interface AgentInfo {
   workspace_id: string;
 }
 
-const STALLED_TASK_THRESHOLD_MS = Number.parseInt(process.env.MC_STALLED_TASK_THRESHOLD_MS || '1800000', 10);
+const STALLED_TASK_THRESHOLD_MS = Number.parseInt(process.env.MC_STALLED_TASK_THRESHOLD_MS || '300000', 10);
 const STALLED_TASK_COOLDOWN_MS = Number.parseInt(process.env.MC_STALLED_TASK_COOLDOWN_MS || '600000', 10);
 
 type RecoveryState = {
@@ -64,6 +64,28 @@ async function reassignTask(taskId: string, agentId: string): Promise<boolean> {
   });
 
   return res.ok;
+}
+
+async function markSessionsInterrupted(taskId: string, agentId: string): Promise<void> {
+  try {
+    await mcFetch(`/api/openclaw/sessions?session_type=subagent&status=active`)
+      .then(async (res) => {
+        if (!res.ok) return [] as Array<{ openclaw_session_id: string; task_id?: string | null; agent_id?: string | null }>;
+        const data = await res.json();
+        return Array.isArray(data) ? data as Array<{ openclaw_session_id: string; task_id?: string | null; agent_id?: string | null }> : [];
+      })
+      .then(async (sessions) => {
+        const targets = sessions.filter((session) => session.task_id === taskId && session.agent_id === agentId);
+        for (const session of targets) {
+          await mcFetch(`/api/openclaw/sessions/${encodeURIComponent(session.openclaw_session_id)}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ status: 'interrupted' }),
+          });
+        }
+      });
+  } catch (err) {
+    log.warn(`Failed to mark interrupted sessions for ${taskId}: ${String(err)}`);
+  }
 }
 
 export function startRecovery(config: DaemonConfig, stats: DaemonStats): () => void {
@@ -174,6 +196,22 @@ export function startRecovery(config: DaemonConfig, stats: DaemonStats): () => v
               log.info(`Reassigned stale task ${task.id} to alternate orchestrator ${fallback.name}`);
             }
           }
+          continue;
+        }
+
+        await markSessionsInterrupted(task.id, task.assigned_agent_id);
+        const retryRes = await mcFetch(`/api/tasks/${task.id}/dispatch`, {
+          method: 'POST',
+          body: '{}',
+        });
+        if (retryRes.ok) {
+          stats.stalledRedispatchedCount = (stats.stalledRedispatchedCount || 0) + 1;
+          recoveryState.set(task.id, { lastActionAt: nowMs });
+          await logRecoveryActivity(
+            task.id,
+            `[Auto-Recovery] Marked stale session as interrupted and resumed task dispatch to ${assignedAgent.name}.`,
+          );
+          log.info(`Resumed interrupted dispatch for ${task.id} via ${assignedAgent.name}`);
           continue;
         }
 

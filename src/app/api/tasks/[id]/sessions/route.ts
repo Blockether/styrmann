@@ -4,12 +4,14 @@ import { getDb } from '@/lib/db';
 export const dynamic = 'force-dynamic';
 
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id: taskId } = await params;
     const db = getDb();
+    const nowMs = Date.now();
+    const staleThresholdMs = Number.parseInt(process.env.MC_SESSION_STALE_THRESHOLD_MS || '300000', 10);
 
     // Get task status to infer session completion
     const task = db.prepare('SELECT status FROM tasks WHERE id = ?').get(taskId) as { status: string } | undefined;
@@ -27,7 +29,6 @@ export async function GET(
       )
       .all(taskId) as Array<Record<string, unknown>>;
 
-    // Check for TASK_COMPLETE in activities to detect finished sessions
     const completedAgentIds = new Set<string>(
       (db.prepare(
         `SELECT DISTINCT agent_id FROM task_activities
@@ -36,16 +37,26 @@ export async function GET(
     );
 
     const sessionsWithTrace = sessions.map((session) => {
-      // Infer effective status: mark as completed if task is done or agent reported completion
-      let effectiveStatus = String(session.status || 'active');
-      if (effectiveStatus === 'active') {
-        if (taskDone || completedAgentIds.has(String(session.agent_id || ''))) {
-          effectiveStatus = 'completed';
-        }
+      const rawStatus = String(session.status || 'active');
+      const hasEndedAt = Boolean(session.ended_at);
+      const updatedAtRaw = String(session.updated_at || session.created_at || '');
+      const updatedAtMs = Number.isFinite(new Date(updatedAtRaw).getTime()) ? new Date(updatedAtRaw).getTime() : 0;
+      const staleByInactivity = rawStatus === 'active' && updatedAtMs > 0 && (nowMs - updatedAtMs) >= staleThresholdMs;
+      const inactivityMinutes = updatedAtMs > 0 ? Math.max(0, Math.floor((nowMs - updatedAtMs) / 60000)) : null;
+
+      let effectiveStatus = rawStatus;
+      if (rawStatus === 'active' && hasEndedAt) {
+        effectiveStatus = 'completed';
+      } else if (rawStatus === 'active' && staleByInactivity) {
+        effectiveStatus = 'interrupted';
+      } else if (rawStatus === 'active' && (taskDone || completedAgentIds.has(String(session.agent_id || '')))) {
+        effectiveStatus = 'stale';
       }
       return {
         ...session,
         status: effectiveStatus,
+        is_active: effectiveStatus === 'active',
+        inactivity_minutes: inactivityMinutes,
         trace_url: `/api/tasks/${taskId}/sessions/${encodeURIComponent(String(session.openclaw_session_id))}/trace`,
       };
     });

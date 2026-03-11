@@ -1,16 +1,15 @@
 'use client';
 
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { X, Save, Trash2, Activity, Package, Bot, ClipboardList, Plus, Upload } from 'lucide-react';
+import { X, Save, Trash2, Activity, Package, Bot, Plus, Upload } from 'lucide-react';
 import { useMissionControl } from '@/lib/store';
 import { DeliverablesList } from './DeliverablesList';
 import { SessionsList } from './SessionsList';
 import { PlanningTab } from './PlanningTab';
-import { TaskActivityExecutionView } from './TaskActivityExecutionView';
 import { CreateMilestoneModal } from './CreateMilestoneModal';
 import type { Task, TaskPriority, TaskStatus, TaskType, GitHubIssue, Human, HimalayaStatus } from '@/lib/types';
 
-type TabType = 'overview' | 'planning' | 'activity' | 'deliverables' | 'sessions';
+type TabType = 'overview' | 'activity' | 'deliverables' | 'sessions';
 
 interface TaskModalProps {
   task?: Task;
@@ -36,19 +35,6 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
     setActiveTab(tab);
     onTabChange?.(tab);
   }, [onTabChange]);
-
-  const handleFailureDrilldown = useCallback((agentId: string, step: string | null) => {
-    if (!task?.id) return;
-    handleTabChange('activity');
-    window.dispatchEvent(new CustomEvent('mc:activity-focus', {
-      detail: {
-        taskId: task.id,
-        agentId,
-        step,
-        decisionOnly: true,
-      },
-    }));
-  }, [handleTabChange, task?.id]);
 
   useEffect(() => {
     if (contentRef.current) {
@@ -313,7 +299,6 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
 
   const tabs = [
     { id: 'overview' as TabType, label: 'Overview', icon: null },
-    { id: 'planning' as TabType, label: 'Planning', icon: <ClipboardList className="w-4 h-4" /> },
     { id: 'activity' as TabType, label: 'Activity', icon: <Activity className="w-4 h-4" /> },
     { id: 'deliverables' as TabType, label: 'Deliverables', icon: <Package className="w-4 h-4" /> },
     { id: 'sessions' as TabType, label: 'Sessions', icon: <Bot className="w-4 h-4" /> },
@@ -368,7 +353,7 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
               value={form.title}
               onChange={(e) => setForm({ ...form, title: e.target.value })}
               required
-              className="w-full min-h-11 bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent"
+              className="w-full min-h-10 bg-mc-bg border border-mc-border rounded px-3 py-1.5 text-sm focus:outline-none focus:border-mc-accent"
               placeholder="What needs to be done?"
             />
           </div>
@@ -464,7 +449,7 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
                   value={newCriteriaInput}
                   onChange={(e) => setNewCriteriaInput(e.target.value)}
                   placeholder="Add acceptance criteria..."
-                  className="flex-1 min-h-11 bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent"
+                  className="flex-1 min-h-10 bg-mc-bg border border-mc-border rounded px-3 py-1.5 text-sm focus:outline-none focus:border-mc-accent"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && newCriteriaInput.trim()) {
                       e.preventDefault();
@@ -482,7 +467,7 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
                     }
                   }}
                   disabled={!newCriteriaInput.trim()}
-                  className="min-h-11 px-3 bg-mc-accent text-white rounded text-sm hover:bg-mc-accent/90 disabled:opacity-50"
+                  className="min-h-10 px-3 bg-mc-accent text-white rounded text-sm hover:bg-mc-accent/90 disabled:opacity-50"
                 >
                   <Plus className="w-4 h-4" />
                 </button>
@@ -496,7 +481,7 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
               <select
                 value={form.task_type}
                 onChange={(e) => setForm({ ...form, task_type: e.target.value as TaskType })}
-                className="w-full min-h-11 bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent"
+                className="w-full min-h-10 bg-mc-bg border border-mc-border rounded px-3 py-1.5 text-sm focus:outline-none focus:border-mc-accent"
               >
                 <option value="bug">Bug</option>
                 <option value="feature">Feature</option>
@@ -511,7 +496,7 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
               <select
                 value={form.priority}
                 onChange={(e) => setForm({ ...form, priority: e.target.value as TaskPriority })}
-                className="w-full min-h-11 bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent"
+                className="w-full min-h-10 bg-mc-bg border border-mc-border rounded px-3 py-1.5 text-sm focus:outline-none focus:border-mc-accent"
               >
                 {priorities.map((p) => (
                   <option key={p} value={p}>
@@ -528,7 +513,7 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
               <select
                 value={form.effort ?? ''}
                 onChange={(e) => setForm({ ...form, effort: e.target.value ? Number(e.target.value) : null })}
-                className="w-full min-h-11 bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent"
+                className="w-full min-h-10 bg-mc-bg border border-mc-border rounded px-3 py-1.5 text-sm focus:outline-none focus:border-mc-accent"
               >
                 <option value="">Not set</option>
                 <option value="1">1 - Trivial</option>
@@ -544,7 +529,7 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
               <select
                 value={form.impact ?? ''}
                 onChange={(e) => setForm({ ...form, impact: e.target.value ? Number(e.target.value) : null })}
-                className="w-full min-h-11 bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent"
+                className="w-full min-h-10 bg-mc-bg border border-mc-border rounded px-3 py-1.5 text-sm focus:outline-none focus:border-mc-accent"
               >
                 <option value="">Not set</option>
                 <option value="1">1 - Minimal</option>
@@ -560,18 +545,18 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
             <div className="space-y-3">
               <div>
                 <label className="block text-sm font-medium mb-1">Assignee Type</label>
-                <div className="flex items-center gap-2">
+                <div className="inline-grid w-full max-w-xs grid-cols-2 gap-1 rounded-lg border border-mc-border bg-mc-bg p-1">
                   <button
                     type="button"
                     onClick={() => setForm({ ...form, assignee_type: 'ai', assigned_human_id: '' })}
-                    className={`min-h-11 px-3 py-2 rounded border text-sm ${form.assignee_type === 'ai' ? 'border-mc-accent bg-mc-accent/10 text-mc-accent' : 'border-mc-border text-mc-text-secondary'}`}
+                    className={`min-h-9 w-full px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${form.assignee_type === 'ai' ? 'bg-mc-accent text-mc-bg' : 'text-mc-text-secondary hover:bg-mc-bg-tertiary'}`}
                   >
                     AI
                   </button>
                   <button
                     type="button"
                     onClick={() => setForm({ ...form, assignee_type: 'human', assigned_agent_id: '' })}
-                    className={`min-h-11 px-3 py-2 rounded border text-sm ${form.assignee_type === 'human' ? 'border-mc-accent bg-mc-accent/10 text-mc-accent' : 'border-mc-border text-mc-text-secondary'}`}
+                    className={`min-h-9 w-full px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${form.assignee_type === 'human' ? 'bg-mc-accent text-mc-bg' : 'text-mc-text-secondary hover:bg-mc-bg-tertiary'}`}
                   >
                     Human
                   </button>
@@ -584,7 +569,7 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
                   <select
                     value={form.assigned_human_id}
                     onChange={(e) => setForm({ ...form, assigned_human_id: e.target.value })}
-                    className="w-full min-h-11 bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent"
+                    className="w-full min-h-10 bg-mc-bg border border-mc-border rounded px-3 py-1.5 text-sm focus:outline-none focus:border-mc-accent"
                   >
                     <option value="">Select human</option>
                     {humans.map((human) => (
@@ -615,7 +600,7 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
                   }
                   setForm({ ...form, milestone_id: e.target.value });
                 }}
-                className="w-full min-h-11 bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent"
+                className="w-full min-h-10 bg-mc-bg border border-mc-border rounded px-3 py-1.5 text-sm focus:outline-none focus:border-mc-accent"
               >
                 <option value="">No milestone</option>
                 {milestones.map((milestone) => (
@@ -644,15 +629,8 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
             </form>
           )}
 
-          {/* Planning Tab */}
-          {activeTab === 'planning' && task && (
-            <PlanningTab taskId={task.id} onFailureClick={handleFailureDrilldown} />
-          )}
-
-
-          {/* Activity Tab */}
           {activeTab === 'activity' && task && (
-            <TaskActivityExecutionView taskId={task.id} />
+            <PlanningTab taskId={task.id} />
           )}
 
           {/* Deliverables Tab */}
