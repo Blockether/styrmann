@@ -1,6 +1,6 @@
 'use client';
 
-import { Bot, Brain, GitBranch, RefreshCw, RotateCcw } from 'lucide-react';
+import { Bot, Brain, GitBranch, RotateCcw } from 'lucide-react';
 import type { Task, TaskWorkflowPlan, WorkflowPlanStep } from '@/lib/types';
 
 interface WorkflowPlanDiagramProps {
@@ -34,10 +34,11 @@ export function WorkflowPlanDiagram({ task, plan, regenerating = false, onRegene
             type="button"
             onClick={onRegenerate}
             disabled={regenerating}
+            title="Re-evaluate agent assignments and capability gaps"
             className="min-h-11 px-3 py-2 border border-mc-border rounded text-sm hover:bg-mc-bg-tertiary disabled:opacity-50 inline-flex items-center gap-2"
           >
-            {regenerating ? <RefreshCw className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />}
-            <span className="hidden sm:inline">Regenerate</span>
+            {regenerating ? <RotateCcw className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />}
+            <span className="hidden sm:inline">Replan Workflow</span>
           </button>
         )}
       </div>
@@ -56,13 +57,15 @@ export function WorkflowPlanDiagram({ task, plan, regenerating = false, onRegene
                   <span>{participant.agent_name}</span>
                 </div>
                 <div className="mt-1 text-mc-text-secondary">{participant.agent_role}{isActiveAgent ? ' - active now' : participant.planner ? ' - planning lead' : ''}</div>
-                <div className="mt-2 flex flex-wrap gap-1">
-                  {participant.skills.map((skill) => (
-                    <span key={`${participant.agent_id}-${skill}`} className="px-2 py-0.5 rounded bg-mc-bg border border-mc-border">
-                      {skill}
-                    </span>
-                  ))}
-                </div>
+                {participant.skills.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {participant.skills.map((skill) => (
+                      <span key={`p-${participant.agent_id}-${skill}`} className="px-1.5 py-0.5 rounded bg-mc-bg border border-mc-border text-[10px]">
+                        {skill}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
             );
           })}
@@ -94,13 +97,15 @@ export function WorkflowPlanDiagram({ task, plan, regenerating = false, onRegene
                     <div className="mt-2 text-xs text-mc-text-secondary">
                       {step.agent_name ? `${step.agent_name} (${step.agent_role || 'agent'})` : 'Missing capability'}
                     </div>
-                    <div className="mt-2 flex flex-wrap gap-1">
-                      {step.skills.map((skill) => (
-                        <span key={`${step.id}-${skill}`} className="px-2 py-0.5 rounded bg-mc-bg border border-mc-border text-[11px]">
-                          {skill}
-                        </span>
-                      ))}
-                    </div>
+                    {step.skills.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {step.skills.map((skill) => (
+                          <span key={`s-${step.id}-${skill}`} className="px-1.5 py-0.5 rounded bg-mc-bg border border-mc-border text-[10px]">
+                            {skill}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                     {step.loop_target_status && (
                       <div className="mt-3 text-[11px] text-mc-text-secondary">Failure loops to `{step.loop_target_status}`</div>
                     )}

@@ -1,17 +1,16 @@
 'use client';
 
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { X, Save, Trash2, Activity, Package, Bot, ClipboardList, Plus, Lightbulb } from 'lucide-react';
+import { X, Save, Trash2, Activity, Package, Bot, ClipboardList, Plus, Upload } from 'lucide-react';
 import { useMissionControl } from '@/lib/store';
 import { DeliverablesList } from './DeliverablesList';
 import { SessionsList } from './SessionsList';
 import { PlanningTab } from './PlanningTab';
-import { ProposalsTab } from './ProposalsTab';
 import { TaskActivityExecutionView } from './TaskActivityExecutionView';
 import { CreateMilestoneModal } from './CreateMilestoneModal';
 import type { Task, TaskPriority, TaskStatus, TaskType, GitHubIssue, Human, HimalayaStatus } from '@/lib/types';
 
-type TabType = 'overview' | 'planning' | 'proposals' | 'activity' | 'deliverables' | 'sessions';
+type TabType = 'overview' | 'planning' | 'activity' | 'deliverables' | 'sessions';
 
 interface TaskModalProps {
   task?: Task;
@@ -31,6 +30,7 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
   const [showMilestoneModal, setShowMilestoneModal] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>(defaultTab || 'overview');
   const contentRef = useRef<HTMLDivElement>(null);
+  const taskFileInputRef = useRef<HTMLInputElement>(null);
 
   const handleTabChange = useCallback((tab: TabType) => {
     setActiveTab(tab);
@@ -301,7 +301,6 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
   const tabs = [
     { id: 'overview' as TabType, label: 'Overview', icon: null },
     { id: 'planning' as TabType, label: 'Planning', icon: <ClipboardList className="w-4 h-4" /> },
-    { id: 'proposals' as TabType, label: 'Proposals', icon: <Lightbulb className="w-4 h-4" /> },
     { id: 'activity' as TabType, label: 'Activity', icon: <Activity className="w-4 h-4" /> },
     { id: 'deliverables' as TabType, label: 'Deliverables', icon: <Package className="w-4 h-4" /> },
     { id: 'sessions' as TabType, label: 'Sessions', icon: <Bot className="w-4 h-4" /> },
@@ -376,17 +375,30 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
           <div>
             <label className="block text-sm font-medium mb-1">Files for Agent Context</label>
             <div className="space-y-2">
-              <input
-                type="file"
-                multiple
-                onChange={(e) => {
-                  const files = Array.from(e.target.files || []);
-                  if (files.length === 0) return;
-                  setAttachedFiles((prev) => [...prev, ...files]);
-                  e.currentTarget.value = '';
+              <div
+                className="border-2 border-dashed border-mc-border rounded p-4 text-center cursor-pointer hover:bg-mc-bg-tertiary"
+                onClick={() => taskFileInputRef.current?.click()}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  const files = Array.from(e.dataTransfer.files || []);
+                  if (files.length > 0) setAttachedFiles((prev) => [...prev, ...files]);
                 }}
-                className="w-full min-h-11 bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm"
-              />
+                onDragOver={(e) => e.preventDefault()}
+              >
+                <Upload className="w-6 h-6 mx-auto text-mc-text-secondary mb-2" />
+                <div className="text-sm text-mc-text-secondary">Drag files here or click to browse</div>
+                <input
+                  ref={taskFileInputRef}
+                  type="file"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => {
+                    const files = Array.from(e.target.files || []);
+                    if (files.length > 0) setAttachedFiles((prev) => [...prev, ...files]);
+                    e.currentTarget.value = '';
+                  }}
+                />
+              </div>
               <p className="text-xs text-mc-text-secondary">
                 Attached files are stored under this task&apos;s `.mission-control` resource directory and automatically ingested into dispatch prompts for agent runs.
               </p>
@@ -624,9 +636,6 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
             <PlanningTab taskId={task.id} />
           )}
 
-          {activeTab === 'proposals' && task && (
-            <ProposalsTab taskId={task.id} />
-          )}
 
           {/* Activity Tab */}
           {activeTab === 'activity' && task && (

@@ -539,10 +539,19 @@ export function KnowledgeView({ workspaceId }: KnowledgeViewProps) {
 
                     {/* File upload UI - only for manually created entries */}
                     {isManuallyCreated && (
-                      <div className="flex items-center gap-2 flex-wrap pt-2">
-                        <label className="inline-flex items-center gap-2 px-3 py-2 border border-mc-border rounded text-sm cursor-pointer hover:bg-mc-bg-tertiary">
-                          <Upload className="w-4 h-4" />
-                          <span className="hidden sm:inline">Upload File</span>
+                      <div className="space-y-2 pt-2">
+                        <div
+                          className="border-2 border-dashed border-mc-border rounded p-3 text-center cursor-pointer hover:bg-mc-bg-tertiary"
+                          onClick={(e) => { const input = (e.currentTarget as HTMLElement).querySelector('input'); input?.click(); }}
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            const file = e.dataTransfer.files?.[0];
+                            if (file) uploadAttachment(entry.id, file);
+                          }}
+                          onDragOver={(e) => e.preventDefault()}
+                        >
+                          <Upload className="w-5 h-5 mx-auto text-mc-text-secondary mb-1" />
+                          <div className="text-xs text-mc-text-secondary">Drop file or click to browse</div>
                           <input
                             type="file"
                             className="hidden"
@@ -555,21 +564,22 @@ export function KnowledgeView({ workspaceId }: KnowledgeViewProps) {
                             }}
                             disabled={uploadingEntryId === entry.id}
                           />
-                        </label>
-
-                        <input
-                          value={attachmentUrls[entry.id] || ''}
-                          onChange={(event) => setAttachmentUrls((current) => ({ ...current, [entry.id]: event.target.value }))}
-                          placeholder="https://docs.example.com/..."
-                          className="min-h-11 flex-1 min-w-60 bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm"
-                        />
-                        <button
-                          onClick={() => attachUrl(entry.id)}
-                          disabled={uploadingEntryId === entry.id || !(attachmentUrls[entry.id] || '').trim()}
-                          className="px-3 py-2 border border-mc-border rounded text-sm hover:bg-mc-bg-tertiary disabled:opacity-50 min-h-11"
-                        >
-                          {uploadingEntryId === entry.id ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Attach URL'}
-                        </button>
+                        </div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <input
+                            value={attachmentUrls[entry.id] || ''}
+                            onChange={(event) => setAttachmentUrls((current) => ({ ...current, [entry.id]: event.target.value }))}
+                            placeholder="https://docs.example.com/..."
+                            className="min-h-11 flex-1 min-w-60 bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm"
+                          />
+                          <button
+                            onClick={() => attachUrl(entry.id)}
+                            disabled={uploadingEntryId === entry.id || !(attachmentUrls[entry.id] || '').trim()}
+                            className="px-3 py-2 border border-mc-border rounded text-sm hover:bg-mc-bg-tertiary disabled:opacity-50 min-h-11"
+                          >
+                            {uploadingEntryId === entry.id ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Attach URL'}
+                          </button>
+                        </div>
                       </div>
                     )}
                   </div>

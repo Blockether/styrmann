@@ -37,7 +37,7 @@ async function handlePlanningCompletion(taskId: string, parsed: any, messages: a
     [JSON.stringify(messages), JSON.stringify(parsed.spec || null), JSON.stringify(parsed.agents || []), taskId],
   );
 
-  generateTaskWorkflowPlan(taskId);
+  void generateTaskWorkflowPlan(taskId);
 
   // Broadcast task update
   const updatedTask = queryOne<Task>('SELECT * FROM tasks WHERE id = ?', [taskId]);

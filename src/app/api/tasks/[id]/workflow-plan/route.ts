@@ -17,7 +17,7 @@ export async function GET(
       return NextResponse.json({ error: 'Task not found' }, { status: 404 });
     }
 
-    const data = ensureTaskWorkflowPlan(taskId);
+    const data = await ensureTaskWorkflowPlan(taskId);
     return NextResponse.json({ task, ...data });
   } catch (error) {
     console.error('Failed to load workflow plan:', error);
@@ -37,7 +37,7 @@ export async function POST(
       return NextResponse.json({ error: 'Task not found' }, { status: 404 });
     }
 
-    const data = generateTaskWorkflowPlan(taskId);
+    const data = await generateTaskWorkflowPlan(taskId);
     return NextResponse.json({ task, ...data });
   } catch (error) {
     console.error('Failed to regenerate workflow plan:', error);

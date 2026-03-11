@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { AlertCircle, Loader2 } from 'lucide-react';
+import { AlertCircle, Lightbulb, Loader2 } from 'lucide-react';
 import type { CapabilityProposal, Task, TaskFinding, TaskWorkflowPlan } from '@/lib/types';
 import { WorkflowPlanDiagram } from './WorkflowPlanDiagram';
 
@@ -98,6 +98,26 @@ export function PlanningTab({ taskId }: PlanningTabProps) {
               <div key={finding.id} className="rounded border border-mc-border bg-mc-bg-secondary p-3">
                 <div className="text-sm font-medium text-mc-text">{finding.title}</div>
                 <div className="mt-1 text-xs text-mc-text-secondary">{finding.detail}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {data.proposals.length > 0 && (
+        <div className="rounded-lg border border-mc-border bg-mc-bg overflow-hidden">
+          <div className="p-3 border-b border-mc-border bg-mc-bg-secondary text-sm font-medium">Learner Proposals</div>
+          <div className="p-4 space-y-3">
+            {data.proposals.map((proposal) => (
+              <div key={proposal.id} className="rounded border border-mc-border bg-mc-bg-secondary p-3">
+                <div className="flex items-center gap-2 text-sm font-medium text-mc-text">
+                  <Lightbulb className="w-4 h-4 text-mc-accent" />
+                  <span>{proposal.title}</span>
+                </div>
+                <div className="mt-1 text-xs text-mc-text-secondary">{proposal.detail}</div>
+                <div className="mt-2 text-[11px] text-mc-text-secondary">
+                  Target: {proposal.target_name} · Meta repo: {proposal.meta_workspace_slug || 'not configured'} · Status: {proposal.status}
+                </div>
               </div>
             ))}
           </div>

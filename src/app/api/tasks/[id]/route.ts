@@ -258,7 +258,7 @@ export async function PATCH(
     run(`UPDATE tasks SET ${updates.join(', ')} WHERE id = ?`, values);
 
     if (effectiveAssigneeType === 'ai' && shouldRegeneratePlan) {
-      generateTaskWorkflowPlan(id);
+      void generateTaskWorkflowPlan(id);
     }
 
     // Fetch updated task with all joined fields

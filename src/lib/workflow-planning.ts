@@ -3,6 +3,7 @@ import { join } from 'path';
 import { getDb, queryAll, queryOne, run } from '@/lib/db';
 import { createTaskActivity } from '@/lib/task-activity';
 import { WORKFLOW_TEMPLATES, ensureWorkflowTemplate } from '@/lib/workflow-templates';
+import { llmJsonInfer } from '@/lib/llm';
 import type {
   Agent,
   CapabilityProposal,
@@ -134,6 +135,45 @@ function pickSkills(agent: Agent, taskTokens: string[]): { skills: string[]; use
   return { skills: fallback, usedFallback: true };
 }
 
+type LlmSkillMap = Record<string, string[]>;
+
+async function llmSelectSkills(
+  task: PlanningTask,
+  roleAssignments: Map<string, { agent: Agent | null; skills: string[]; usedFallback: boolean }>,
+): Promise<LlmSkillMap | null> {
+  const lines: string[] = [];
+  for (const [role, assignment] of roleAssignments) {
+    if (!assignment.agent) continue;
+    const allSkills = listAgentSkillNames(assignment.agent);
+    const fallback = SKILL_FALLBACKS[normalizeRole(assignment.agent.role)] || [];
+    const available = allSkills.length > 0 ? allSkills : fallback;
+    lines.push(
+      `- Agent "${assignment.agent.name}" (id: ${assignment.agent.id}, role: ${assignment.agent.role}), assigned as ${role}` +
+      `\n  Available skills: [${available.join(', ')}]`,
+    );
+  }
+  if (lines.length === 0) return null;
+
+  const system =
+    'You are a workflow planning assistant for an AI agent orchestration system. ' +
+    'Given a task and agents with their available skills, select 1-3 most relevant skills per agent for their assigned workflow step. ' +
+    'Only select from the available skills listed for each agent. ' +
+    'Return ONLY a JSON object mapping agent id to an array of selected skill names. No explanation, no markdown.';
+
+  const user = [
+    `Task: "${task.title}"`,
+    task.description ? `Description: ${task.description}` : null,
+    `Type: ${task.task_type}, Priority: ${task.priority}${task.effort ? `, Effort: ${task.effort}` : ''}${task.impact ? `, Impact: ${task.impact}` : ''}`,
+    '',
+    'Agents and their workflow assignments:',
+    ...lines,
+    '',
+    'Return JSON: {"<agent_id>": ["skill1", "skill2"], ...}',
+  ].filter(Boolean).join('\n');
+
+  return llmJsonInfer<LlmSkillMap>(system, user);
+}
+
 function deriveStepKind(status: string, role: string | null): WorkflowPlanStep['kind'] {
   if (!role) return 'queue';
   if (['testing', 'review', 'verification'].includes(status)) return 'verification';
@@ -170,13 +210,13 @@ export function getTaskWorkflowPlan(taskId: string): { plan: TaskWorkflowPlan; f
   return readPlan(taskId);
 }
 
-export function ensureTaskWorkflowPlan(taskId: string, force = false): { plan: TaskWorkflowPlan; findings: TaskFinding[]; proposals: CapabilityProposal[] } {
+export async function ensureTaskWorkflowPlan(taskId: string, force = false): Promise<{ plan: TaskWorkflowPlan; findings: TaskFinding[]; proposals: CapabilityProposal[] }> {
   const existing = !force ? readPlan(taskId) : null;
   if (existing) return existing;
   return generateTaskWorkflowPlan(taskId);
 }
 
-export function generateTaskWorkflowPlan(taskId: string): { plan: TaskWorkflowPlan; findings: TaskFinding[]; proposals: CapabilityProposal[] } {
+export async function generateTaskWorkflowPlan(taskId: string): Promise<{ plan: TaskWorkflowPlan; findings: TaskFinding[]; proposals: CapabilityProposal[] }> {
   const task = queryOne<PlanningTask>('SELECT * FROM tasks WHERE id = ? LIMIT 1', [taskId]);
   if (!task) {
     throw new Error(`Task not found: ${taskId}`);
@@ -277,6 +317,24 @@ export function generateTaskWorkflowPlan(taskId: string): { plan: TaskWorkflowPl
       skills: pickSkills(orchestrator, taskTokens).skills,
       planner: true,
     });
+  }
+
+  // LLM-powered skill refinement: ask an LLM to pick the most relevant skills per agent
+  const llmSkills = await llmSelectSkills(task, roleAssignments);
+  if (llmSkills) {
+    console.log('[Planning] LLM skill selection applied');
+    for (const p of participants) {
+      const selected = llmSkills[p.agent_id];
+      if (selected && selected.length > 0) p.skills = selected;
+    }
+    for (const [, assignment] of roleAssignments) {
+      if (assignment.agent) {
+        const selected = llmSkills[assignment.agent.id];
+        if (selected && selected.length > 0) assignment.skills = selected;
+      }
+    }
+  } else {
+    console.log('[Planning] LLM unavailable, using rule-based skill selection');
   }
 
   for (const finding of findings) {
@@ -427,7 +485,7 @@ export function generateTaskWorkflowPlan(taskId: string): { plan: TaskWorkflowPl
           agent_id: step.agent_id,
           name: step.agent_name,
           role: step.agent_role,
-          instructions: `Execute the ${step.label} stage for task ${task.title}. Skills: ${step.skills.join(', ') || 'general execution'}.`,
+          instructions: `Execute the ${step.label} stage for task ${task.title}.`,
           skills: step.skills,
         }))),
         findings.length > 0 ? `${findings.length} workflow finding(s) recorded` : null,

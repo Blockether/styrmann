@@ -65,7 +65,7 @@ Also: `pending_dispatch` (transient, pre-dispatch state).
 
 **Task creation behavior**: New AI tasks no longer expose manual loop, template, or per-task execution controls. The orchestrator generates a workflow plan immediately from existing agents and linked skills only, stores it on the task, and leaves the task in `inbox` until execution begins. Human tasks still require a selected human and move to `assigned`, which triggers an email through Himalaya.
 
-**Task creation UI**: Manual agent loop configuration, task-level template picking, and direct execution settings are removed. The task modal now shows Planning, Proposals, Activity, Deliverables, and Sessions tabs.
+**Task creation UI**: Manual agent loop configuration, task-level template picking, and direct execution settings are removed. The task modal now shows Planning, Activity, Deliverables, and Sessions tabs. The former Proposals tab has been merged into the Planning tab (learner proposals appear inline below the workflow plan diagram).
 
 **Task fields**: title, description, status, priority (low/normal/high/urgent), task_type (bug/feature/chore/documentation/research), effort (1-5), impact (1-5), assignee_type (`ai` | `human`), assigned_agent_id, assigned_human_id, milestone_id, workflow_template_id, workflow_plan_id, due_date, tags.
 
@@ -179,7 +179,9 @@ Workflow planning is now orchestrator-owned. The system chooses among the existi
 The Strict template is the default. Per-task workflow plans persist selected participants, per-step skills, loopback targets, findings, and learner proposals.
 
 **Workflow engine** (`src/lib/workflow-engine.ts` + `src/lib/workflow-planning.ts`):
-- `generateTaskWorkflowPlan()` selects existing agents only, derives per-step skills from linked shared skills, and stores the plan in `task_workflow_plans`.
+- `generateTaskWorkflowPlan()` is async. It selects existing agents via rule-based role matching, then applies LLM-powered skill selection to refine per-agent skill picks. Plans are stored in `task_workflow_plans`.
+- **LLM skill selection** (`llmSelectSkills()`): After rule-based agent selection, sends task context and each agent's available skills to an LLM (provider resolved via `src/lib/llm.ts`). The LLM returns a JSON map of `{agent_id: [skill1, skill2]}` selecting only the most relevant skills per agent per task. Falls back to rule-based `pickSkills()` if LLM is unavailable or errors.
+- **LLM provider resolution** (`src/lib/llm.ts`): Provider-agnostic inference utility. Resolution order: `ANTHROPIC_API_KEY` env -> `OPENAI_API_KEY` env -> `~/.openclaw/openclaw.json` (reads first provider with apiKey). Supports Anthropic, Gemini, and OpenAI-compatible APIs. 25s timeout. Exports: `llmInfer()`, `llmJsonInfer()`, `isLlmAvailable()`.
 - Missing capability creates a `task_findings` record and optional learner `capability_proposals` entry pointing to the meta repository. No dynamic agent creation is allowed.
 - `handleStageTransition()` uses orchestrator-populated `task_roles` to assign and dispatch the correct existing agent for the active step.
 - Fail-loopback: `POST /api/tasks/{id}/fail` routes task back to `in_progress` and re-dispatches builder.
@@ -535,6 +537,8 @@ Agents without direct filesystem access use upload/download endpoints:
 
 12. **Repo-driven workspaces**: Standard repositories auto-discover from git repos at `/root/repos/{org}/{repo}`. On DB init, `discoverRepoWorkspaces()` scans for org directories containing git repos and creates/syncs a workspace per repo. Slug format: `{org}-{repo}` (e.g., `blockether-mission-control`). Mission Control is treated like any other discovered repository. The `default` workspace is reserved for the internal OpenClaw meta repository rooted at `/root/.openclaw`. Repositories are grouped by organization in the UI, with the meta repository under `System`.
 13. **Workflow templates in code, not DB-cloned**: Template definitions (Simple, Standard, Strict, Auto-Train, Architecture) live in `src/lib/workflow-templates.ts` as TypeScript constants. New workspaces get templates provisioned from code, not cloned from another workspace's DB rows.
+14. **LLM-powered skill selection**: Workflow planning uses LLM inference to intelligently select the most relevant skills per agent per task step, rather than assigning all available skills. Falls back to rule-based selection when LLM is unavailable.
+15. **Standardized file upload UX**: All file input areas across the UI (task creation, knowledge entry creation, per-entry attachments) use a consistent drag-and-drop zone pattern with Upload icon, dashed border, and "Drop file or click to browse" text.
 ---
 
 ## Environment Variables

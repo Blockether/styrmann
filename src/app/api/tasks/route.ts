@@ -183,7 +183,7 @@ export async function POST(request: NextRequest) {
     );
 
     if (assigneeType === 'ai') {
-      generateTaskWorkflowPlan(id);
+      void generateTaskWorkflowPlan(id);
     }
 
     // Link github issue to this task if provided
