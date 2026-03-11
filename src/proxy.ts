@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { validateFileToken } from '@/lib/file-tokens';
 
 // Log warning at startup if auth is disabled
 const MC_API_TOKEN = process.env.MC_API_TOKEN;
@@ -51,23 +50,127 @@ function isSameOriginRequest(request: NextRequest): boolean {
   return false;
 }
 
-function isLocalhostRequest(request: NextRequest): boolean {
-  const forwardedFor = (request.headers.get('x-forwarded-for') || '').trim();
-  const realIp = (request.headers.get('x-real-ip') || '').trim();
+function hasScope(scopes: string[], scope: string): boolean {
+  return scopes.includes(scope) || scopes.includes('*');
+}
 
-  const isLocal = (value: string): boolean =>
-    value === '127.0.0.1' || value === '::1' || value.startsWith('127.');
+type ScopedPayload = {
+  v: 1 | 2;
+  exp: number;
+  task_id?: string;
+  workspace_id?: string;
+  scopes: string[];
+};
 
-  if (forwardedFor) {
-    const firstHop = forwardedFor.split(',')[0]?.trim() || '';
-    if (isLocal(firstHop)) return true;
+function toBase64Url(input: Uint8Array): string {
+  let binary = '';
+  for (let i = 0; i < input.length; i += 1) binary += String.fromCharCode(input[i]);
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+}
+
+function fromBase64Url(input: string): Uint8Array {
+  const normalized = input.replace(/-/g, '+').replace(/_/g, '/');
+  const padded = normalized + '='.repeat((4 - (normalized.length % 4)) % 4);
+  const binary = atob(padded);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+
+async function verifyScopedPayload(token: string): Promise<ScopedPayload | null> {
+  const parts = token.split('.');
+  if (parts.length !== 3 || parts[0] !== 'mcst') return null;
+  const [, encoded, signature] = parts;
+  const secret = MC_API_TOKEN || process.env.MC_TOKEN || '';
+  if (!secret) return null;
+  const key = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign'],
+  );
+  const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(encoded));
+  const expected = toBase64Url(new Uint8Array(sig));
+  if (expected !== signature) return null;
+
+  try {
+    const payloadText = new TextDecoder().decode(fromBase64Url(encoded));
+    const payload = JSON.parse(payloadText) as ScopedPayload;
+    if (!payload || ![1, 2].includes(payload.v) || !Array.isArray(payload.scopes)) return null;
+    const now = Math.floor(Date.now() / 1000);
+    if (!payload.exp || payload.exp < now) return null;
+    return payload;
+  } catch {
+    return null;
+  }
+}
+
+async function isScopedTokenAuthorized(
+  request: NextRequest,
+  token: string,
+): Promise<{ ok: boolean; invalid?: boolean; required?: string[]; taskId?: string }> {
+  const parsed = await verifyScopedPayload(token);
+  if (!parsed) return { ok: false, invalid: true };
+
+  const method = request.method.toUpperCase();
+  const path = request.nextUrl.pathname;
+
+  if (path === '/api/tasks' && method === 'GET') {
+    return hasScope(parsed.scopes, 'tasks:read')
+      ? { ok: true }
+      : { ok: false, required: ['tasks:read'] };
+  }
+  if (path === '/api/tasks' && method === 'POST') {
+    return hasScope(parsed.scopes, 'tasks:create')
+      ? { ok: true }
+      : { ok: false, required: ['tasks:create'] };
   }
 
-  if (realIp && isLocal(realIp)) {
-    return true;
+  const taskMatch = path.match(/^\/api\/tasks\/([^/]+)(\/.*)?$/);
+  if (taskMatch) {
+    const taskId = decodeURIComponent(taskMatch[1]);
+    if (!parsed.task_id || parsed.task_id !== taskId) {
+      return { ok: false, required: [`task:${taskId}:read`, `task:${taskId}:write`], taskId };
+    }
+    if (method === 'DELETE') {
+      return { ok: false, required: [], taskId };
+    }
+    const writeMethods = new Set(['POST', 'PATCH', 'PUT']);
+    if (writeMethods.has(method)) {
+      return hasScope(parsed.scopes, `task:${taskId}:write`)
+        ? { ok: true, taskId }
+        : { ok: false, required: [`task:${taskId}:write`], taskId };
+    }
+    return hasScope(parsed.scopes, `task:${taskId}:read`) || hasScope(parsed.scopes, 'tasks:read')
+      ? { ok: true, taskId }
+      : { ok: false, required: [`task:${taskId}:read`], taskId };
   }
 
-  return !forwardedFor && !realIp;
+  const knowledgeMatch = path.match(/^\/api\/workspaces\/([^/]+)\/knowledge(\/.*)?$/);
+  if (knowledgeMatch) {
+    const workspaceId = decodeURIComponent(knowledgeMatch[1]);
+    if (!parsed.workspace_id || parsed.workspace_id !== workspaceId) {
+      return { ok: false, required: ['knowledge:write'] };
+    }
+    if (method === 'DELETE') return { ok: false, required: [] };
+    if (method === 'POST' || method === 'PATCH' || method === 'PUT') {
+      return hasScope(parsed.scopes, 'knowledge:write')
+        ? { ok: true }
+        : { ok: false, required: ['knowledge:write'] };
+    }
+    return hasScope(parsed.scopes, 'knowledge:read') || hasScope(parsed.scopes, 'knowledge:write')
+      ? { ok: true }
+      : { ok: false, required: ['knowledge:read'] };
+  }
+
+  if (path === '/api/events/stream') {
+    return hasScope(parsed.scopes, 'events:read') || hasScope(parsed.scopes, 'tasks:read')
+      ? { ok: true }
+      : { ok: false, required: ['events:read'] };
+  }
+
+  return { ok: false, required: [] };
 }
 
 // Demo mode — read-only, blocks all mutations
@@ -76,7 +179,7 @@ if (DEMO_MODE) {
   console.log('[DEMO] Running in demo mode — all write operations are blocked');
 }
 
-export function proxy(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Only protect /api/* routes
@@ -112,36 +215,17 @@ export function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Allow local machine service-to-service traffic (daemon/agents)
-  if (isLocalhostRequest(request)) {
-    return NextResponse.next();
-  }
-
   // Special case: /api/events/stream (SSE) - allow token as query param
   if (pathname === '/api/events/stream') {
     const queryToken = request.nextUrl.searchParams.get('token');
-    if (queryToken && queryToken === MC_API_TOKEN) {
+    const scoped = queryToken ? await isScopedTokenAuthorized(request, queryToken) : { ok: false };
+    if (queryToken && (queryToken === MC_API_TOKEN || scoped.ok)) {
       return NextResponse.next();
     }
     // Fall through to header check below
   }
 
   // Special case: workspace file access with signed token
-  const workspaceFileMatch = pathname.match(/^\/api\/agents\/([^/]+)\/workspace\/file$/);
-  if (workspaceFileMatch) {
-    const fileToken = request.nextUrl.searchParams.get('token');
-    const expires = request.nextUrl.searchParams.get('expires');
-    if (fileToken && expires) {
-      const agentId = workspaceFileMatch[1];
-      const scope = request.nextUrl.searchParams.get('scope') || 'workspace';
-      const filePath = request.nextUrl.searchParams.get('path') || '';
-      if (validateFileToken(fileToken, expires, agentId, scope, filePath)) {
-        return NextResponse.next();
-      }
-    }
-    // Fall through to header check below
-  }
-
   // Check Authorization header for bearer token
   const authHeader = request.headers.get('authorization');
   
@@ -153,11 +237,29 @@ export function proxy(request: NextRequest) {
   }
 
   const token = authHeader.substring(7); // Remove 'Bearer ' prefix
-  
+
   if (token !== MC_API_TOKEN) {
+    const scoped = await isScopedTokenAuthorized(request, token);
+    if (scoped.ok) {
+      return NextResponse.next();
+    }
+    if (scoped.invalid) {
+      return NextResponse.json({ error: 'Unauthorized', code: 'invalid_token' }, { status: 401 });
+    }
     return NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 401 }
+      {
+        error: 'Forbidden',
+        code: 'insufficient_scope',
+        required: scoped.required || [],
+        loopback: scoped.taskId
+          ? {
+              method: 'POST',
+              url: `/api/tasks/${scoped.taskId}/fail`,
+              body: { reason: `Missing API scope: ${(scoped.required || []).join(', ') || 'operation not allowed'}` },
+            }
+          : null,
+      },
+      { status: 403 },
     );
   }
 

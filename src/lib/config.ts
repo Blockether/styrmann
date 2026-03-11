@@ -67,7 +67,7 @@ export function resetConfig(): void {
 
 export function getMissionControlUrl(): string {
   if (typeof window === 'undefined') {
-    return process.env.MISSION_CONTROL_URL || 'http://localhost:4000';
+    return process.env.MISSION_CONTROL_URL || process.env.MISSION_CONTROL_PUBLIC_URL || 'https://control.blockether.com';
   }
 
   return getConfig().missionControlUrl;

@@ -195,6 +195,8 @@ function defaultStepPrompt(task: PlanningTask, step: Pick<WorkflowPlanStep, 'lab
   }
   if (step.loop_target_status) {
     lines.push(`Failure loop target: if this step fails, workflow returns to ${step.loop_target_status}.`);
+    lines.push('Iteration rule: on each retry, state what changed from the prior attempt and why it should now pass.');
+    lines.push('Exit rule: leave the loop only with verifiable evidence, otherwise call failure with root-cause and blocking factors.');
   }
 
   lines.push('Output: concise summary of what changed, what was verified, and what the next stage needs.');
@@ -420,7 +422,7 @@ export async function generateTaskWorkflowPlan(taskId: string): Promise<{ plan: 
       title: finding.finding_type === 'missing_agent'
         ? `Learner proposal: add ${role} agent archetype`
         : `Learner proposal: add ${role} shared skill`,
-      detail: `${learner.name} suggests recording this gap in the meta repository as a proposal only. No automatic system change has been made. ${finding.detail}`,
+      detail: `${learner.name} suggests recording this gap in the meta repository as a proposal only. No automatic system change has been made. Add a loop policy for this capability: explicit retry criteria, retry limit, and clear loop-exit evidence. ${finding.detail}`,
       target_name: String(role),
       meta_workspace_id: metaWorkspace?.id || null,
       meta_workspace_slug: metaWorkspace?.slug || null,

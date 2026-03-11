@@ -9,6 +9,7 @@ import { getRelevantKnowledge, formatKnowledgeForDispatch } from '@/lib/learner'
 import { createTaskActivity } from '@/lib/task-activity';
 import { getTaskWorkflow } from '@/lib/workflow-engine';
 import { getUnresolvedTaskDependencies } from '@/lib/task-dependencies';
+import { generateScopedApiToken } from '@/lib/scoped-api-tokens';
 import type { Task, Agent, OpenClawSession, WorkflowStage } from '@/lib/types';
 
 export interface DispatchResult {
@@ -45,13 +46,23 @@ function resourcePathFromPreviewUrl(url: string): string | null {
   }
 }
 
-function requiresMissionControlAuthHeader(missionControlUrl: string): boolean {
+function getExternalMissionControlUrl(missionControlUrl: string): string {
   try {
     const parsed = new URL(missionControlUrl);
-    return parsed.hostname !== 'localhost' && parsed.hostname !== '127.0.0.1' && parsed.hostname !== '::1';
+    if (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1' || parsed.hostname === '::1') {
+      return process.env.MISSION_CONTROL_PUBLIC_URL || 'https://control.blockether.com';
+    }
+    return missionControlUrl;
   } catch {
-    return true;
+    return process.env.MISSION_CONTROL_PUBLIC_URL || 'https://control.blockether.com';
   }
+}
+
+function getStageLoopTarget(stage: WorkflowStage | null | undefined): string | null {
+  if (!stage) return null;
+  const maybe = stage as unknown as Record<string, unknown>;
+  const value = maybe.loop_target_status;
+  return typeof value === 'string' && value.trim().length > 0 ? value : null;
 }
 
 function buildResourceContext(taskId: string): string {
@@ -255,7 +266,7 @@ export async function dispatchTaskToAgent(taskId: string): Promise<DispatchResul
     const worktree = hasGitWorktree ? ensureTaskWorktree(repoPath, task.id, task.title) : null;
     const taskProjectDir = getTaskPipelineDir(worktree?.worktreePath || repoPath, task.id);
     mkdirSync(taskProjectDir, { recursive: true });
-    const missionControlUrl = getMissionControlUrl();
+    const missionControlUrl = getExternalMissionControlUrl(getMissionControlUrl());
     const activeAcpBinding = queryOne<{
       acp_session_key: string;
       acp_agent_id: string;
@@ -345,10 +356,26 @@ export async function dispatchTaskToAgent(taskId: string): Promise<DispatchResul
       ? `\n**ACP CONTEXT:**\n- ACP session key: ${activeAcpBinding.acp_session_key}\n- ACP agent: ${activeAcpBinding.acp_agent_id}\n- Discord thread: ${activeAcpBinding.discord_thread_id}\n- **ACP Provenance mode:** meta+receipt\n- When sending messages via ACP bridge, always use: \`openclaw acp --provenance meta+receipt\` (or the \`openclaw-acp\` alias)\n- This attaches InputProvenance metadata and Source Receipt blocks to messages for traceability\nUse this as supervisor context if your runtime can access ACP bindings.\n`
       : '';
 
-    const needsAuthHeader = requiresMissionControlAuthHeader(missionControlUrl);
-    const authHeader = needsAuthHeader
-      ? '\n   Headers: {"Authorization": "Bearer $MC_API_TOKEN"} (only when calling Mission Control from another host)'
-      : '';
+    const scopedApiToken = generateScopedApiToken({
+      taskId: task.id,
+      workspaceId: task.workspace_id,
+      sessionId: session.openclaw_session_id,
+      ttlSeconds: 6 * 60 * 60,
+      scopes: [
+        `task:${task.id}:read`,
+        `task:${task.id}:write`,
+        'tasks:create',
+        'tasks:read',
+        'knowledge:read',
+        'knowledge:write',
+        'events:read',
+      ],
+    });
+    const authHeader = `\n   Headers: {"Authorization": "Bearer ${scopedApiToken}"}`;
+    const loopTarget = getStageLoopTarget(currentStage);
+    const loopGuide = loopTarget
+      ? `\nLoop policy:\n- This stage can loop back to ${loopTarget}.\n- On each retry, increment iteration context in activity metadata and explain what changed since last attempt.\n- Exit loop only when verification criteria are satisfied; otherwise call fail endpoint with precise blocker root-cause.`
+      : `\nLoop policy:\n- If you are uncertain, do one evidence-backed iteration and report assumptions explicitly.\n- Do not spin indefinitely; escalate via fail endpoint when blocked.`;
     let completionInstructions: string;
     if (isBuilder) {
       const branchMetadata = worktree
@@ -373,6 +400,7 @@ export async function dispatchTaskToAgent(taskId: string): Promise<DispatchResul
    Body: {"status": "${nextStatus}"}
 
 ${branchRule}
+${loopGuide}
 
 When complete, reply with:
 \`TASK_COMPLETE: [brief summary of what you did]\``;
@@ -386,10 +414,12 @@ Review the output directory for deliverables and run any applicable tests.
    Body: {"activity_type": "completed", "message": "Tests passed: [summary]"}
 2. PATCH ${missionControlUrl}/api/tasks/${task.id}${authHeader}
    Body: {"status": "${nextStatus}"}
+${loopGuide}
 
 **If tests FAIL:**
 1. ${failEndpoint}${authHeader}
    Body: {"reason": "Detailed description of what failed and what needs fixing"}
+${loopGuide}
 
 Reply with: \`TEST_PASS: [summary]\` or \`TEST_FAIL: [what failed]\``;
     } else if (isVerifier) {
@@ -402,10 +432,12 @@ Review deliverables, test results, and task requirements.
    Body: {"activity_type": "completed", "message": "Verification passed: [summary]"}
 2. PATCH ${missionControlUrl}/api/tasks/${task.id}${authHeader}
    Body: {"status": "${nextStatus}"}
+${loopGuide}
 
 **If verification FAILS:**
 1. ${failEndpoint}${authHeader}
    Body: {"reason": "Detailed description of what failed and what needs fixing"}
+${loopGuide}
 
 Reply with: \`VERIFY_PASS: [summary]\` or \`VERIFY_FAIL: [what failed]\``;
     } else {

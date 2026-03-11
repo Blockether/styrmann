@@ -424,7 +424,7 @@ GitHub Issues are synced from the workspace's `github_repo` URL using the `gh` C
 
 - `POST /api/workspaces/[id]/github/sync` -- Trigger manual sync for one workspace. Runs `gh issue list --repo owner/repo --json ... --limit 200 --state all`, upserts into `github_issues` table, broadcasts `github_issues_synced` SSE event. Returns `{ synced_count, workspace_id }`.
 - `GET /api/workspaces/[id]/github/issues?state=open|closed|all` -- Return cached issues from DB. Left-joins `tasks` to expose `task_id` per issue.
-- `GET /api/cron/github-sync` -- Sync all workspaces with a configured `github_repo`. Localhost-only or Bearer token auth. Returns `{ synced_workspaces, total_issues, errors? }`.
+- `GET /api/cron/github-sync` -- Sync all workspaces with a configured `github_repo`. Requires Bearer token auth. Returns `{ synced_workspaces, total_issues, errors? }`.
 
 ### Cron Job
 
@@ -456,11 +456,15 @@ When a task is created from a GitHub issue:
 ## Authentication
 
 When `MC_API_TOKEN` is set in `.env.local`:
-- External or cross-host API calls require `Authorization: Bearer <token>` header.
 - Same-origin browser requests bypass auth.
-- Localhost service-to-service traffic (for example the daemon calling Mission Control on the same machine) also bypasses token auth; daemon and agent-facing fallback instructions should only include `MC_API_TOKEN` when Mission Control is being reached from another host.
+- All non-browser API access requires Bearer auth (no localhost bypass).
+- Scoped per-task tokens (`mcst.<payload>.<sig>`) are supported and enforced at middleware level:
+  - task-scoped read/write (`task:{id}:read`, `task:{id}:write`)
+  - optional task list/create (`tasks:read`, `tasks:create`)
+  - knowledge write scopes (`knowledge:write`) with delete explicitly denied
+- Invalid scoped token => `401 invalid_token`; missing scope => `403 insufficient_scope` with loopback guidance to `/api/tasks/{id}/fail`.
 - SSE streams accept token as query parameter.
-- Implemented in `src/proxy.ts` (Next.js 16 proxy, formerly middleware).
+- Implemented in `middleware.ts` + `src/proxy.ts`.
 
 Webhook verification: `WEBHOOK_SECRET` env var, HMAC signature in `x-webhook-signature` header.
 
@@ -626,7 +630,7 @@ npm run daemon
 npm run daemon:dev
 ```
 
-Env vars: `MC_URL` (default `http://localhost:4000`), `MC_API_TOKEN` (required — same token used by `mc` CLI), `MC_STALLED_TASK_THRESHOLD_MS` (default `1800000`), `MC_STALLED_TASK_COOLDOWN_MS` (default `600000`).
+Env vars: `MC_URL` (default `https://control.blockether.com`), `MC_API_TOKEN` (required — same token used by `mc` CLI), `MC_STALLED_TASK_THRESHOLD_MS` (default `1800000`), `MC_STALLED_TASK_COOLDOWN_MS` (default `600000`).
 
 ### Database Tables
 

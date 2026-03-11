@@ -35,16 +35,10 @@ interface GhIssue {
 }
 
 export async function GET(request: NextRequest) {
-  // Security: only localhost or valid Bearer token
   const authHeader = request.headers.get('authorization');
   const apiToken = process.env.MC_API_TOKEN;
-  const forwarded = request.headers.get('x-forwarded-for') ?? '';
-  const isLocalhost =
-    forwarded === '' ||
-    forwarded.startsWith('127.') ||
-    forwarded.startsWith('::1');
 
-  if (!isLocalhost && apiToken && authHeader !== `Bearer ${apiToken}`) {
+  if (apiToken && authHeader !== `Bearer ${apiToken}`) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
