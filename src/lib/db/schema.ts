@@ -425,6 +425,15 @@ CREATE TABLE IF NOT EXISTS knowledge_vectors (
   updated_at TEXT DEFAULT (datetime('now'))
 );
 
+CREATE TABLE IF NOT EXISTS knowledge_links (
+  id TEXT PRIMARY KEY,
+  source_id TEXT NOT NULL REFERENCES knowledge_entries(id) ON DELETE CASCADE,
+  target_id TEXT NOT NULL REFERENCES knowledge_entries(id) ON DELETE CASCADE,
+  link_type TEXT NOT NULL DEFAULT 'related',
+  created_at TEXT DEFAULT (datetime('now')),
+  UNIQUE(source_id, target_id)
+);
+
 CREATE TABLE IF NOT EXISTS memory_pipeline_config (
   id TEXT PRIMARY KEY,
   enabled INTEGER DEFAULT 1,

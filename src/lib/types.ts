@@ -411,6 +411,7 @@ export interface KnowledgeEntry {
   created_at: string;
   attachments?: KnowledgeAttachment[];
   routing_decisions?: KnowledgeRoutingDecision[];
+  linked_entries?: KnowledgeLink[];
 }
 
 export interface KnowledgeAttachment {
@@ -438,6 +439,15 @@ export interface KnowledgeRoutingDecision {
   selected: boolean;
   reasons: string[];
   created_at?: string;
+}
+
+export interface KnowledgeLink {
+  id: string;
+  source_id: string;
+  target_id: string;
+  link_type: string;
+  created_at: string;
+  linked_entry?: { id: string; title: string; category: string };
 }
 
 export interface OpenClawSession {

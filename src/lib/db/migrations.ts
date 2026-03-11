@@ -2018,6 +2018,22 @@ const migrations: Migration[] = [
         db.exec('ALTER TABLE agents DROP COLUMN workspace_id');
       }
     }
+  },
+  {
+    id: '043',
+    name: 'add_knowledge_links',
+    up: (db) => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS knowledge_links (
+          id TEXT PRIMARY KEY,
+          source_id TEXT NOT NULL REFERENCES knowledge_entries(id) ON DELETE CASCADE,
+          target_id TEXT NOT NULL REFERENCES knowledge_entries(id) ON DELETE CASCADE,
+          link_type TEXT NOT NULL DEFAULT 'related',
+          created_at TEXT DEFAULT (datetime('now')),
+          UNIQUE(source_id, target_id)
+        )
+      `);
+    }
   }
 ];
 

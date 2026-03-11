@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { queryAll, run } from '@/lib/db';
+import { queryAll, queryOne, run } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
@@ -144,11 +144,48 @@ export async function GET(
       return acc;
     }, {});
 
+    // Fetch links for all entries
+    const links = entryIds.length > 0
+      ? queryAll<{
+          id: string; source_id: string; target_id: string; link_type: string; created_at: string;
+          target_title: string; target_category: string;
+        }>(`
+          SELECT kl.id, kl.source_id, kl.target_id, kl.link_type, kl.created_at,
+            ke.title as target_title, ke.category as target_category
+          FROM knowledge_links kl
+          JOIN knowledge_entries ke ON ke.id = kl.target_id
+          WHERE kl.source_id IN (${placeholders})
+          UNION
+          SELECT kl.id, kl.target_id as source_id, kl.source_id as target_id, kl.link_type, kl.created_at,
+            ke.title as target_title, ke.category as target_category
+          FROM knowledge_links kl
+          JOIN knowledge_entries ke ON ke.id = kl.source_id
+          WHERE kl.target_id IN (${placeholders})
+        `, [...entryIds, ...entryIds])
+      : [];
+
+    const linksByEntry = links.reduce<Record<string, Array<{
+      id: string; source_id: string; target_id: string; link_type: string;
+      created_at: string; linked_entry: { id: string; title: string; category: string };
+    }>>>((acc, link) => {
+      if (!acc[link.source_id]) acc[link.source_id] = [];
+      acc[link.source_id].push({
+        id: link.id,
+        source_id: link.source_id,
+        target_id: link.target_id,
+        link_type: link.link_type,
+        created_at: link.created_at,
+        linked_entry: { id: link.target_id, title: link.target_title, category: link.target_category },
+      });
+      return acc;
+    }, {});
+
     const parsed = entries.map(e => ({
       ...e,
       tags: e.tags ? JSON.parse(e.tags) : [],
       attachments: attachmentsByEntry[e.id] || [],
       routing_decisions: routingByEntry[e.id] || [],
+      linked_entries: linksByEntry[e.id] || [],
     }));
 
     return NextResponse.json(parsed);
@@ -192,6 +229,11 @@ export async function POST(
       ]
     );
 
+    // Auto-route to agents based on category and content matching
+    const agents = queryAll<{ id: string; name: string; role: string; description: string | null }>(`
+      SELECT id, name, role, description FROM agents WHERE status != 'offline'
+    `);
+
     const routingDecisions: Array<{
       agent_id: string;
       score: number;
@@ -199,33 +241,90 @@ export async function POST(
       reasons: string[];
     }> = [];
 
+    if (!agent_id && agents.length > 0) {
+      const lowerCategory = category.toLowerCase();
+      const lowerTitle = title.toLowerCase();
+      const lowerContent = content.toLowerCase();
+      const tagList = Array.isArray(tags) ? tags.map((t: string) => t.toLowerCase()) : [];
+
+      for (const agent of agents) {
+        const agentRole = (agent.role || '').toLowerCase();
+        const agentName = (agent.name || '').toLowerCase();
+        const agentDesc = (agent.description || '').toLowerCase();
+        let score = 0;
+        const reasons: string[] = [];
+
+        // Role-category matching
+        const roleCategoryMap: Record<string, string[]> = {
+          builder: ['pattern', 'fix', 'checklist'],
+          learner: ['research', 'pattern', 'failure'],
+          orchestrator: ['guideline', 'checklist'],
+          explorer: ['research', 'pattern'],
+          pragmatist: ['guideline', 'pattern'],
+          guardian: ['failure', 'fix', 'checklist'],
+          consolidator: ['research', 'guideline'],
+          product_owner: ['guideline', 'research'],
+          presenter: ['research'],
+          tester: ['fix', 'failure', 'checklist'],
+          reviewer: ['pattern', 'guideline'],
+        };
+
+        const matchedCategories = roleCategoryMap[agentRole] || [];
+        if (matchedCategories.includes(lowerCategory)) {
+          score += 40;
+          reasons.push(`Role '${agentRole}' matches category '${category}'.`);
+        }
+
+        // Content keyword matching
+        const nameTokens = agentName.split(/[\s|]+/).filter(Boolean);
+        const text = `${lowerTitle} ${lowerContent} ${tagList.join(' ')}`;
+        for (const token of nameTokens) {
+          if (token.length > 2 && text.includes(token)) {
+            score += 15;
+            reasons.push(`Agent name token '${token}' found in content.`);
+            break;
+          }
+        }
+
+        // Description matching
+        if (agentDesc && (agentDesc.includes(lowerCategory) || lowerContent.includes(agentRole))) {
+          score += 10;
+          reasons.push('Category or role mentioned in agent context.');
+        }
+
+        if (score > 0) {
+          routingDecisions.push({ agent_id: agent.id, score, selected: score >= 40, reasons });
+        }
+      }
+
+      routingDecisions.sort((a, b) => b.score - a.score);
+
+      // Ensure at least one agent is selected
+      if (routingDecisions.length > 0 && !routingDecisions.some(d => d.selected)) {
+        routingDecisions[0].selected = true;
+      }
+    }
+
     const selectedDecisions = routingDecisions.filter((decision) => decision.selected);
-    const finalSelectedDecisions = selectedDecisions.length > 0
-      ? selectedDecisions
-      : (routingDecisions.length > 0
-        ? [{ ...routingDecisions[0], selected: true }]
-        : []);
     const targetAgentIds = agent_id
       ? [agent_id]
-      : finalSelectedDecisions.map((decision) => decision.agent_id);
+      : selectedDecisions.map((decision) => decision.agent_id);
 
-    if (!agent_id && routingDecisions.length > 0) {
-      for (const decision of routingDecisions) {
-        const overridden = finalSelectedDecisions.some((selected) => selected.agent_id === decision.agent_id);
-        run(
-          `INSERT INTO knowledge_routing_decisions (id, knowledge_id, workspace_id, agent_id, score, selected, reasons, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
-          [
-            crypto.randomUUID(),
-            id,
-            workspaceId,
-            decision.agent_id,
-            decision.score,
-            overridden ? 1 : 0,
-            JSON.stringify(decision.reasons || []),
-          ],
-        );
-      }
+    // Store routing decisions
+    for (const decision of routingDecisions) {
+      run(
+        `INSERT INTO knowledge_routing_decisions (id, knowledge_id, workspace_id, agent_id, score, selected, reasons, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
+        [
+          crypto.randomUUID(),
+          id,
+          workspaceId,
+          decision.agent_id,
+          decision.score,
+          decision.selected ? 1 : 0,
+          JSON.stringify(decision.reasons || []),
+        ],
+      );
     }
 
     if (agent_id) {
@@ -244,35 +343,11 @@ export async function POST(
       );
     }
 
-    const syncResults: Array<{
-      agent_id: string;
-      memory_sync: { updated: boolean; reason?: string; entryCount?: number } | null;
-      soul_sync: { updated: boolean; reason?: string; entryCount?: number } | null;
-      agents_sync: { updated: boolean; reason?: string; entryCount?: number } | null;
-      user_sync: { updated: boolean; reason?: string; entryCount?: number } | null;
-    }> = [];
-
-    for (const targetAgentId of targetAgentIds) {
-      let memorySync: { updated: boolean; reason?: string; entryCount?: number } | null = null;
-      let soulSync: { updated: boolean; reason?: string; entryCount?: number } | null = null;
-      let agentsSync: { updated: boolean; reason?: string; entryCount?: number } | null = null;
-      let userSync: { updated: boolean; reason?: string; entryCount?: number } | null = null;
-
-      syncResults.push({
-        agent_id: targetAgentId,
-        memory_sync: memorySync,
-        soul_sync: soulSync,
-        agents_sync: agentsSync,
-        user_sync: userSync,
-      });
-    }
-
     return NextResponse.json({
       id,
       message: 'Knowledge entry created',
       routed_agent_ids: targetAgentIds,
-      routing_decisions: finalSelectedDecisions,
-      sync_results: syncResults,
+      routing_decisions: selectedDecisions,
     }, { status: 201 });
   } catch (error) {
     console.error('Failed to create knowledge entry:', error);
