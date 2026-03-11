@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { queryAll, run } from '@/lib/db';
-import { getResponsibilityRoutingDecisions, syncAgentKnowledgeArtifacts } from '@/lib/openclaw-memory';
-import { upsertKnowledgeVector } from '@/lib/memory-search';
 
 export const dynamic = 'force-dynamic';
 
@@ -194,11 +192,12 @@ export async function POST(
       ]
     );
 
-    upsertKnowledgeVector(id);
-
-    const routingDecisions = agent_id
-      ? []
-      : getResponsibilityRoutingDecisions(workspaceId, category, title, content);
+    const routingDecisions: Array<{
+      agent_id: string;
+      score: number;
+      selected: boolean;
+      reasons: string[];
+    }> = [];
 
     const selectedDecisions = routingDecisions.filter((decision) => decision.selected);
     const finalSelectedDecisions = selectedDecisions.length > 0
@@ -258,20 +257,6 @@ export async function POST(
       let soulSync: { updated: boolean; reason?: string; entryCount?: number } | null = null;
       let agentsSync: { updated: boolean; reason?: string; entryCount?: number } | null = null;
       let userSync: { updated: boolean; reason?: string; entryCount?: number } | null = null;
-
-      try {
-        const syncResult = await syncAgentKnowledgeArtifacts(targetAgentId);
-        memorySync = syncResult.memory_sync;
-        soulSync = syncResult.soul_sync;
-        agentsSync = syncResult.agents_sync;
-        userSync = syncResult.user_sync;
-      } catch (error) {
-        console.error(`Failed to sync agent learnings for ${targetAgentId}:`, error);
-        memorySync = { updated: false, reason: 'memory_sync_failed' };
-        soulSync = { updated: false, reason: 'soul_sync_failed' };
-        agentsSync = { updated: false, reason: 'agents_sync_failed' };
-        userSync = { updated: false, reason: 'user_sync_failed' };
-      }
 
       syncResults.push({
         agent_id: targetAgentId,

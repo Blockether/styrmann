@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { queryAll, queryOne, run } from '@/lib/db';
-import { deleteKnowledgeVector, upsertKnowledgeVector } from '@/lib/memory-search';
-import { syncAgentKnowledgeArtifacts } from '@/lib/openclaw-memory';
 
 export const dynamic = 'force-dynamic';
 
@@ -34,7 +32,6 @@ export async function DELETE(
 
     // Delete the entry
     run('DELETE FROM knowledge_entries WHERE id = ?', [entryId]);
-    deleteKnowledgeVector(entryId);
 
     return NextResponse.json({ message: 'Knowledge entry deleted' });
   } catch (error) {
@@ -110,19 +107,9 @@ export async function PATCH(
         `UPDATE knowledge_entries SET ${updates.join(', ')} WHERE id = ?`,
         values
       );
-      upsertKnowledgeVector(entryId);
     }
 
     if (routingAgentIds !== null) {
-      const previousSelected = queryAll<{ agent_id: string | null }>(
-        `SELECT agent_id
-         FROM knowledge_routing_decisions
-         WHERE knowledge_id = ? AND selected = 1`,
-        [entryId],
-      )
-        .map((row) => row.agent_id)
-        .filter((id): id is string => Boolean(id));
-
       run('UPDATE knowledge_routing_decisions SET selected = 0 WHERE knowledge_id = ?', [entryId]);
 
       for (const targetAgentId of routingAgentIds) {
@@ -155,15 +142,6 @@ export async function PATCH(
               JSON.stringify(['Manual routing override from Knowledge UI.']),
             ],
           );
-        }
-      }
-
-      const agentsToSync = Array.from(new Set([...previousSelected, ...routingAgentIds]));
-      for (const targetAgentId of agentsToSync) {
-        try {
-          await syncAgentKnowledgeArtifacts(targetAgentId);
-        } catch (error) {
-          console.error(`Failed to sync agent knowledge after routing override (${targetAgentId}):`, error);
         }
       }
     }
