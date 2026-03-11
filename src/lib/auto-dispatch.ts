@@ -21,14 +21,8 @@ export async function triggerAutoDispatch(options: AutoDispatchOptions): Promise
 
   try {
     const missionControlUrl = getMissionControlUrl();
-    const headers: Record<string, string> = {};
-    if (process.env.MC_API_TOKEN) {
-      headers.Authorization = `Bearer ${process.env.MC_API_TOKEN}`;
-    }
-
     const dispatchRes = await fetch(`${missionControlUrl}/api/tasks/${taskId}/dispatch`, {
       method: 'POST',
-      headers,
     });
 
     if (dispatchRes.ok) {

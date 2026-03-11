@@ -44,6 +44,15 @@ function resourcePathFromPreviewUrl(url: string): string | null {
   }
 }
 
+function requiresMissionControlAuthHeader(missionControlUrl: string): boolean {
+  try {
+    const parsed = new URL(missionControlUrl);
+    return parsed.hostname !== 'localhost' && parsed.hostname !== '127.0.0.1' && parsed.hostname !== '::1';
+  } catch {
+    return true;
+  }
+}
+
 function buildResourceContext(taskId: string): string {
   const resources = queryAll<{ title: string; url: string; resource_type: string }>(
     `SELECT title, url, resource_type
@@ -296,8 +305,13 @@ export async function dispatchTaskToAgent(taskId: string): Promise<DispatchResul
       ? `\n**ACP CONTEXT:**\n- ACP session key: ${activeAcpBinding.acp_session_key}\n- ACP agent: ${activeAcpBinding.acp_agent_id}\n- Discord thread: ${activeAcpBinding.discord_thread_id}\n- **ACP Provenance mode:** meta+receipt\n- When sending messages via ACP bridge, always use: \`openclaw acp --provenance meta+receipt\` (or the \`openclaw-acp\` alias)\n- This attaches InputProvenance metadata and Source Receipt blocks to messages for traceability\nUse this as supervisor context if your runtime can access ACP bindings.\n`
       : '';
 
-    const mcApiToken = process.env.MC_API_TOKEN;
-    const authHeader = mcApiToken ? `\n   Headers: {"Authorization": "Bearer ${mcApiToken}"}` : '';
+    const needsAuthHeader = requiresMissionControlAuthHeader(missionControlUrl);
+    const authHeader = needsAuthHeader
+      ? '\n   Headers: {"Authorization": "Bearer $MC_API_TOKEN"} (only when calling Mission Control from another host)'
+      : '';
+    const deliverableCurlAuth = needsAuthHeader
+      ? " -H 'Authorization: Bearer $MC_API_TOKEN'"
+      : '';
 
     let completionInstructions: string;
     if (isBuilder) {
@@ -319,7 +333,7 @@ Use JSON-RPC on ${missionControlUrl}/api/mcp:
 1. tools/call name=mc_task_log arguments={"task_id":"${task.id}","activity_type":"completed","message":"Description of what was done"}
 2. Register deliverable via API (no MCP tool yet):
    \
-   curl -sS -X POST ${missionControlUrl}/api/tasks/${task.id}/deliverables -H 'Content-Type: application/json'${mcApiToken ? ` -H 'Authorization: Bearer ${mcApiToken}'` : ''} -d '{"deliverable_type":"file","title":"File name","path":"${taskProjectDir}/filename.html"}'
+   curl -sS -X POST ${missionControlUrl}/api/tasks/${task.id}/deliverables -H 'Content-Type: application/json'${deliverableCurlAuth} -d '{"deliverable_type":"file","title":"File name","path":"${taskProjectDir}/filename.html"}'
 3. tools/call name=mc_task_status arguments={"task_id":"${task.id}","status":"${nextStatus}"}
 
 Raw HTTP fallback (only if MCP is unavailable):
