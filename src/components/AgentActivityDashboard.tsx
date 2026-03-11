@@ -3,11 +3,19 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { ArrowLeft, AlertTriangle, Activity, Clock, Filter, RefreshCw, Loader2, ChevronRight } from 'lucide-react';
+import { ArrowLeft, AlertTriangle, Activity, Clock, Filter, RefreshCw, Loader2, ChevronRight, ChevronDown, FileText } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
-import type { Agent, Event, Task, Workspace } from '@/lib/types';
+import type { Agent, Event, PresentedTaskActivity, Task, Workspace } from '@/lib/types';
 
 type ActivityFilter = 'all' | 'working' | 'blocked' | 'idle';
+
+interface WorkspaceSummaryEntry {
+  task_id: string;
+  task_title: string;
+  task_status: string;
+  assigned_agent_name: string | null;
+  summary: PresentedTaskActivity;
+}
 
 interface AgentActivityDashboardProps {
   workspace?: Workspace | null;
@@ -21,6 +29,8 @@ export function AgentActivityDashboard({ workspace, embedded = false }: AgentAct
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<ActivityFilter>('all');
   const [isPortrait, setIsPortrait] = useState(true);
+  const [workspaceSummaries, setWorkspaceSummaries] = useState<WorkspaceSummaryEntry[]>([]);
+  const [expandedSummaries, setExpandedSummaries] = useState<Set<string>>(new Set());
   const [sseConnected, setSseConnected] = useState(false);
 
   const eventSourceRef = useRef<EventSource | null>(null);
@@ -45,17 +55,28 @@ export function AgentActivityDashboard({ workspace, embedded = false }: AgentAct
 
     const loadData = async () => {
       try {
-        const [agentsRes, tasksRes, eventsRes] = await Promise.all([
-          fetch(workspaceId ? `/api/agents?workspace_id=${workspaceId}` : '/api/agents'),
-          fetch(workspaceId ? `/api/tasks?workspace_id=${workspaceId}` : '/api/tasks'),
-          fetch('/api/events?limit=150'),
-        ]);
+        const fetchUrls = [
+          workspaceId ? `/api/agents?workspace_id=${workspaceId}` : '/api/agents',
+          workspaceId ? `/api/tasks?workspace_id=${workspaceId}` : '/api/tasks',
+          '/api/events?limit=150',
+        ];
+        const [agentsRes, tasksRes, eventsRes] = await Promise.all(fetchUrls.map(u => fetch(u)));
+
+        // Fetch workspace summaries if scoped to a workspace
+        let summariesRes: Response | null = null;
+        if (workspaceId) {
+          summariesRes = await fetch(`/api/workspaces/${workspaceId}/activity-summary?limit=10`);
+        }
 
         if (!mounted) return;
 
         if (agentsRes.ok) setAgents(await agentsRes.json());
         if (tasksRes.ok) setTasks(await tasksRes.json());
         if (eventsRes.ok) setEvents(await eventsRes.json());
+        if (summariesRes?.ok) {
+          const data = await summariesRes.json();
+          setWorkspaceSummaries(data.summaries ?? []);
+        }
       } catch (error) {
         console.error('Failed to load activity dashboard data:', error);
       } finally {
@@ -73,15 +94,25 @@ export function AgentActivityDashboard({ workspace, embedded = false }: AgentAct
   useEffect(() => {
     const refresh = async () => {
       try {
-        const [agentsRes, tasksRes, eventsRes] = await Promise.all([
-          fetch(workspaceId ? `/api/agents?workspace_id=${workspaceId}` : '/api/agents'),
-          fetch(workspaceId ? `/api/tasks?workspace_id=${workspaceId}` : '/api/tasks'),
-          fetch('/api/events?limit=150'),
-        ]);
+        const fetchUrls = [
+          workspaceId ? `/api/agents?workspace_id=${workspaceId}` : '/api/agents',
+          workspaceId ? `/api/tasks?workspace_id=${workspaceId}` : '/api/tasks',
+          '/api/events?limit=150',
+        ];
+        const [agentsRes, tasksRes, eventsRes] = await Promise.all(fetchUrls.map(u => fetch(u)));
+
+        let summariesRes: Response | null = null;
+        if (workspaceId) {
+          summariesRes = await fetch(`/api/workspaces/${workspaceId}/activity-summary?limit=10`);
+        }
 
         if (agentsRes.ok) setAgents(await agentsRes.json());
         if (tasksRes.ok) setTasks(await tasksRes.json());
         if (eventsRes.ok) setEvents(await eventsRes.json());
+        if (summariesRes?.ok) {
+          const data = await summariesRes.json();
+          setWorkspaceSummaries(data.summaries ?? []);
+        }
       } catch (error) {
         console.error('Failed to refresh activity dashboard data:', error);
       }
@@ -269,6 +300,62 @@ export function AgentActivityDashboard({ workspace, embedded = false }: AgentAct
             )}
           </section>
 
+          {workspaceSummaries.length > 0 && (
+          <section className="bg-mc-bg-secondary border border-mc-border rounded-xl p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <FileText className="w-4 h-4 text-mc-accent" />
+              <h2 className="font-semibold">Presenter Feed</h2>
+            </div>
+            <div className="space-y-2">
+              {workspaceSummaries.map((entry) => {
+                const isExpanded = expandedSummaries.has(entry.task_id);
+                return (
+                  <div key={entry.task_id} className="border border-mc-border rounded-lg bg-mc-bg">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setExpandedSummaries(prev => {
+                          const next = new Set(prev);
+                          if (next.has(entry.task_id)) next.delete(entry.task_id);
+                          else next.add(entry.task_id);
+                          return next;
+                        });
+                      }}
+                      className="w-full p-3 flex items-start justify-between gap-2 text-left"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-xs px-1.5 py-0.5 rounded bg-mc-bg-tertiary text-mc-text-secondary uppercase">{entry.task_status.replace('_', ' ')}</span>
+                          {entry.assigned_agent_name && (
+                            <span className="text-xs text-mc-text-secondary">{entry.assigned_agent_name}</span>
+                          )}
+                        </div>
+                        <div className="font-medium text-sm truncate">{entry.task_title}</div>
+                        <div className="text-xs text-mc-text-secondary mt-1 line-clamp-2">{entry.summary.message}</div>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0 mt-1">
+                        <span className="text-[11px] text-mc-text-secondary whitespace-nowrap">{formatDistanceToNow(new Date(entry.summary.created_at), { addSuffix: true })}</span>
+                        {isExpanded ? <ChevronDown className="w-3.5 h-3.5 text-mc-text-secondary" /> : <ChevronRight className="w-3.5 h-3.5 text-mc-text-secondary" />}
+                      </div>
+                    </button>
+                    {isExpanded && entry.summary.raw_activities.length > 0 && (
+                      <div className="border-t border-mc-border px-3 py-2 space-y-1.5">
+                        <div className="text-[11px] uppercase text-mc-text-secondary font-medium">Raw Activities</div>
+                        {entry.summary.raw_activities.slice(0, 8).map((raw) => (
+                          <div key={raw.id} className="text-xs text-mc-text-secondary py-1 border-b border-mc-border/50 last:border-0">
+                            <span className="text-mc-text">{raw.message}</span>
+                            <span className="ml-2">{formatDistanceToNow(new Date(raw.created_at), { addSuffix: true })}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+          )}
+
           <section>
             <div className="grid grid-cols-1 gap-3">
               {filteredAgents.map((agent) => {
@@ -380,6 +467,62 @@ export function AgentActivityDashboard({ workspace, embedded = false }: AgentAct
             </div>
           )}
         </section>
+
+        {workspaceSummaries.length > 0 && (
+        <section className="bg-mc-bg-secondary border border-mc-border rounded-xl p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <FileText className="w-4 h-4 text-mc-accent" />
+            <h2 className="font-semibold">Presenter Feed</h2>
+          </div>
+          <div className="space-y-2">
+            {workspaceSummaries.map((entry) => {
+              const isExpanded = expandedSummaries.has(entry.task_id);
+              return (
+                <div key={entry.task_id} className="border border-mc-border rounded-lg bg-mc-bg">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setExpandedSummaries(prev => {
+                        const next = new Set(prev);
+                        if (next.has(entry.task_id)) next.delete(entry.task_id);
+                        else next.add(entry.task_id);
+                        return next;
+                      });
+                    }}
+                    className="w-full p-3 flex items-start justify-between gap-2 text-left"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-xs px-1.5 py-0.5 rounded bg-mc-bg-tertiary text-mc-text-secondary uppercase">{entry.task_status.replace('_', ' ')}</span>
+                        {entry.assigned_agent_name && (
+                          <span className="text-xs text-mc-text-secondary">{entry.assigned_agent_name}</span>
+                        )}
+                      </div>
+                      <div className="font-medium text-sm truncate">{entry.task_title}</div>
+                      <div className="text-xs text-mc-text-secondary mt-1 line-clamp-2">{entry.summary.message}</div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0 mt-1">
+                      <span className="text-[11px] text-mc-text-secondary whitespace-nowrap">{formatDistanceToNow(new Date(entry.summary.created_at), { addSuffix: true })}</span>
+                      {isExpanded ? <ChevronDown className="w-3.5 h-3.5 text-mc-text-secondary" /> : <ChevronRight className="w-3.5 h-3.5 text-mc-text-secondary" />}
+                    </div>
+                  </button>
+                  {isExpanded && entry.summary.raw_activities.length > 0 && (
+                    <div className="border-t border-mc-border px-3 py-2 space-y-1.5">
+                      <div className="text-[11px] uppercase text-mc-text-secondary font-medium">Raw Activities</div>
+                      {entry.summary.raw_activities.slice(0, 8).map((raw) => (
+                        <div key={raw.id} className="text-xs text-mc-text-secondary py-1 border-b border-mc-border/50 last:border-0">
+                          <span className="text-mc-text">{raw.message}</span>
+                          <span className="ml-2">{formatDistanceToNow(new Date(raw.created_at), { addSuffix: true })}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </section>
+        )}
 
         <section>
           <div className="flex flex-wrap items-center gap-2 mb-3">

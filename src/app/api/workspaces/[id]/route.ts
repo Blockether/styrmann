@@ -126,15 +126,19 @@ export async function DELETE(
   try {
     const db = getDb();
     
-    // Don't allow deleting the default workspace
+    // Don't allow deleting internal system repositories
     if (id === 'default') {
-      return NextResponse.json({ error: 'Cannot delete the default workspace' }, { status: 400 });
+      return NextResponse.json({ error: 'Cannot delete the system meta repository' }, { status: 403 });
     }
-    
+
     // Check workspace exists
-    const existing = db.prepare('SELECT * FROM workspaces WHERE id = ?').get(id);
+    const existing = db.prepare('SELECT * FROM workspaces WHERE id = ?').get(id) as Workspace | undefined;
     if (!existing) {
       return NextResponse.json({ error: 'Workspace not found' }, { status: 404 });
+    }
+
+    if (existing.is_internal) {
+      return NextResponse.json({ error: 'Cannot delete internal system repositories' }, { status: 403 });
     }
     
     // Check if workspace has tasks

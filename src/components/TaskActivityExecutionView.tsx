@@ -39,8 +39,16 @@ export function TaskActivityExecutionView({ taskId }: TaskActivityExecutionViewP
 
   useEffect(() => {
     load(true);
-    const interval = setInterval(() => load(false), 5000);
-    return () => clearInterval(interval);
+    // SSE-driven: re-fetch on task updates or new activities instead of polling
+    const onUpdate = () => load(false);
+    window.addEventListener('mc:task-updated', onUpdate);
+    window.addEventListener('mc:activity-logged', onUpdate);
+    window.addEventListener('mc:activity-presented', onUpdate);
+    return () => {
+      window.removeEventListener('mc:task-updated', onUpdate);
+      window.removeEventListener('mc:activity-logged', onUpdate);
+      window.removeEventListener('mc:activity-presented', onUpdate);
+    };
   }, [load]);
 
   return (

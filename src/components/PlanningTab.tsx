@@ -39,8 +39,16 @@ export function PlanningTab({ taskId }: PlanningTabProps) {
 
   useEffect(() => {
     loadPlan(true);
-    const interval = setInterval(() => loadPlan(false), 5000);
-    return () => clearInterval(interval);
+    // SSE-driven: re-fetch on task updates or new activities instead of polling
+    const onUpdate = () => loadPlan(false);
+    window.addEventListener('mc:task-updated', onUpdate);
+    window.addEventListener('mc:activity-logged', onUpdate);
+    window.addEventListener('mc:activity-presented', onUpdate);
+    return () => {
+      window.removeEventListener('mc:task-updated', onUpdate);
+      window.removeEventListener('mc:activity-logged', onUpdate);
+      window.removeEventListener('mc:activity-presented', onUpdate);
+    };
   }, [loadPlan]);
 
   const regenerate = async () => {

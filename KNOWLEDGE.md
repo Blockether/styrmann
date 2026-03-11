@@ -1,6 +1,6 @@
 # KNOWLEDGE.md -- Mission Control
 
-Last updated: 2026-03-10
+Last updated: 2026-03-11
 
 ---
 
@@ -239,6 +239,11 @@ The Presenter is a core role that interprets technical execution data without ch
 - Presenter output keeps full raw metadata and traces accessible via expansion
 - Activity filtering supports agent, workflow step, and decision-event views while task-level activity remains scoped to the current task
 
+**Semantic summarization** (`src/lib/activity-presentation.ts`): Each activity type gets a purpose-built human-readable summary. `dispatch_invocation` extracts agent name and step; `status_changed` extracts stage handoff or failure reason; `test_passed`/`test_failed` extracts pass/fail counts and failed deliverables; `completed` extracts TASK_COMPLETE summary; `spawned` extracts sub-agent name; `file_created` extracts deliverable type and path. HTTP/curl payloads extract method + hostname + path.
+
+**Post-step consolidation** (`src/lib/task-activity.ts`): `consolidateStepActivities()` merges consecutive same-type activities from the same agent (deduplicates, keeps latest), collapses `status_changed` chains to final transition, and only applies to `post_step` summaries (live summaries keep all events). `presenterMessage()` builds unique semantic summaries with `[step]` / `[step completed]` prefix format.
+
+**Workspace presenter feed**: `buildWorkspaceActivitySummary()` fetches latest presented activity per active task in a workspace. Exposed via `GET /api/workspaces/{id}/activity-summary?limit=N`. AgentActivityDashboard renders a "Presenter Feed" section with expandable per-task summaries (shows task status, agent, latest presenter message, and expandable raw activities).
 ### Human Assignments & Himalaya
 
 - `humans` table stores assignable humans with `name`, `email`, and `is_active`.
@@ -275,13 +280,13 @@ Server-Sent Events, not WebSocket. Endpoint: `GET /api/events/stream`.
 
 Events broadcast:
 - `task_created`, `task_updated`, `task_deleted`
-- `activity_logged`, `deliverable_added`
+- `activity_logged`, `activity_presented`, `deliverable_added`, `deliverable_deleted`
 - `agent_spawned`, `agent_completed`
-
+- `agent_updated`, `agent_log_added`, `github_issues_synced`, `daemon_stats_updated`
 Client: `src/hooks/useSSE.ts` with auto-reconnect (5s retry) and 30s keep-alive pings.
 Server: `src/lib/events.ts` manages connected clients.
 
-Fallback: Task polling every 60s, event polling every 30s.
+Fallback: Agent Activity Dashboard polls every 20s; task-specific views use SSE event listeners (`mc:task-updated`, `mc:activity-logged`, `mc:activity-presented`) for immediate updates instead of interval polling.
 
 ---
 
@@ -330,10 +335,11 @@ Fallback: Task polling every 60s, event polling every 30s.
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
 | GET/POST | `/api/workspaces` | List (optional stats=true) / create repository/workspace |
-| GET/PATCH/DELETE | `/api/workspaces/{id}` | Workspace CRUD (lookup by ID or slug); internal meta repository cannot be linked to GitHub |
+| GET/PATCH/DELETE | `/api/workspaces/{id}` | Workspace CRUD (lookup by ID or slug); internal meta repository cannot be linked to GitHub; DELETE returns 403 for internal workspaces (checked by both `id === 'default'` and `is_internal` flag) |
 | GET/POST | `/api/workspaces/{id}/knowledge` | Knowledge entries (list/create) |
 | GET/PATCH/DELETE | `/api/workspaces/{id}/knowledge/{entryId}` | Single knowledge entry (read/update/delete) |
 | GET/POST | `/api/workspaces/{id}/workflows` | Workflow templates |
+| GET | `/api/workspaces/{id}/activity-summary` | Presenter summaries across active tasks (query: ?limit=N, max 50) |
 
 ### Other
 | Method | Endpoint | Purpose |

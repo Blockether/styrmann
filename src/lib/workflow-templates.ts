@@ -60,6 +60,16 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplateDefinition[] = [
     failTargets: { testing: 'in_progress', verification: 'in_progress', review: 'in_progress' },
     isDefault: true,
   },
+  {
+    name: 'Auto-Train',
+    description: 'Continuous builder loop for repo-improvement iterations. Builder executes repeatedly until stopped.',
+    stages: [
+      { id: 'build', label: 'Build', role: 'builder', status: 'in_progress' },
+      { id: 'done', label: 'Loop Complete', role: null, status: 'done' },
+    ],
+    failTargets: {},
+    isDefault: false,
+  },
 ];
 
 /**

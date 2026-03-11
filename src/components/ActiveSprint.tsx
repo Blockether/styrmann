@@ -1,10 +1,10 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { Plus, ChevronDown, CheckCircle2, Loader2, Flag, Users, Calendar, ChevronRight, ArrowRightLeft, LayoutList, Columns3, GripVertical, Target, AlertCircle, Crown } from 'lucide-react';
+import { Plus, ChevronDown, CheckCircle2, Loader2, Flag, Users, Calendar, ChevronRight, ArrowRightLeft, LayoutList, Columns3, GripVertical, Target, AlertCircle, Crown, Bug, Lightbulb, Wrench, BookOpen, FlaskConical } from 'lucide-react';
 import { useMissionControl } from '@/lib/store';
 import { triggerAutoDispatch, shouldTriggerAutoDispatch } from '@/lib/auto-dispatch';
-import type { Task, TaskStatus, Sprint, Milestone, Agent } from '@/lib/types';
+import type { Task, TaskStatus, TaskType, Sprint, Milestone, Agent } from '@/lib/types';
 import { TaskModal } from './TaskModal';
 import { CreateMilestoneModal } from './CreateMilestoneModal';
 import { AgentInitials } from './AgentInitials';
@@ -54,6 +54,14 @@ const PRIORITY_COLORS: Record<string, string> = {
   high: 'bg-orange-500',
   normal: 'bg-blue-500',
   low: 'bg-gray-400',
+};
+
+const TASK_TYPE_CONFIG: Record<TaskType, { icon: typeof Bug; color: string }> = {
+  bug: { icon: Bug, color: 'text-red-500' },
+  feature: { icon: Lightbulb, color: 'text-yellow-500' },
+  chore: { icon: Wrench, color: 'text-blue-500' },
+  documentation: { icon: BookOpen, color: 'text-green-500' },
+  research: { icon: FlaskConical, color: 'text-purple-500' },
 };
 
 export function ActiveSprint({ workspaceId, mobileMode = false, isPortrait = true }: ActiveSprintProps) {
@@ -564,7 +572,7 @@ export function ActiveSprint({ workspaceId, mobileMode = false, isPortrait = tru
                     className="bg-mc-bg-secondary border border-mc-border/50 rounded-lg p-3 cursor-pointer hover:border-mc-accent/40 transition-colors"
                   >
                     <div className="flex items-start gap-2 mb-2">
-                      <span className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${STATUS_CONFIG[task.status].color}`} />
+                      {(() => { const TI = TASK_TYPE_CONFIG[task.task_type]; return TI ? <TI.icon className={`w-4 h-4 mt-0.5 flex-shrink-0 ${TI.color}`} /> : <span className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${STATUS_CONFIG[task.status].color}`} />; })()}
                       <h4 className="font-medium text-sm line-clamp-2 flex-1">{task.title}</h4>
                     </div>
                     <div className="flex items-center gap-3 text-xs text-mc-text-secondary mb-3">
@@ -970,8 +978,11 @@ function MilestoneBoard({
                           <div className="absolute top-1 left-1 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing">
                             <GripVertical className="w-3 h-3 text-mc-text-secondary" />
                           </div>
-                          <h4 className="font-medium text-xs line-clamp-2 mb-1 pl-3">{task.title}</h4>
-                          <div className="flex items-center gap-1.5">
+                          <div className="flex items-center gap-1.5 mb-1 pl-3">
+                            {(() => { const TI = TASK_TYPE_CONFIG[task.task_type]; return TI ? <TI.icon className={`w-3.5 h-3.5 flex-shrink-0 ${TI.color}`} /> : null; })()}
+                            <h4 className="font-medium text-xs line-clamp-2">{task.title}</h4>
+                          </div>
+                          <div className="flex items-center gap-1.5 pl-3">
                             <span className={`w-1.5 h-1.5 rounded-full ${task.priority === 'urgent' ? 'bg-red-500' : task.priority === 'high' ? 'bg-orange-500' : task.priority === 'normal' ? 'bg-yellow-500' : 'bg-gray-400'}`} />
                             {task.assignee_display_name && (
                               <AgentInitials name={task.assignee_display_name} size="xs" />
@@ -1005,6 +1016,8 @@ function TaskRow({ task, isPortrait, onClick, onMoveStatus, mobileMode }: TaskRo
   const isDone = DONE_STATUSES.includes(task.status);
   const isPlanning = task.status === 'planning';
   const dispatchError = task.planning_dispatch_error;
+  const TypeIcon = TASK_TYPE_CONFIG[task.task_type]?.icon;
+  const typeColor = TASK_TYPE_CONFIG[task.task_type]?.color;
 
   return (
     <div
@@ -1012,7 +1025,11 @@ function TaskRow({ task, isPortrait, onClick, onMoveStatus, mobileMode }: TaskRo
       className={`group cursor-pointer transition-colors hover:bg-mc-bg-tertiary/30 ${isPortrait ? 'px-4 py-3' : 'px-3 py-2.5'}`}
     >
       <div className="flex items-start gap-3">
-        <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${isDone ? 'bg-mc-accent-green' : statusConfig.color}`} />
+        {TypeIcon ? (
+          <TypeIcon className={`w-4 h-4 mt-0.5 flex-shrink-0 ${typeColor}`} />
+        ) : (
+          <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${isDone ? 'bg-mc-accent-green' : statusConfig.color}`} />
+        )}
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">

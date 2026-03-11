@@ -66,18 +66,79 @@ function inferDecisionEvent(activityType: string, message: string, metadata: Rec
     || lower.includes('review');
 }
 
-function presenterMessage(step: string | null, rawActivities: TaskActivity[], currentStep: string | null): { message: string; summaryKind: PresentedTaskActivity['summary_kind'] } {
-  const decisionCount = rawActivities.filter((activity) => activity.decision_event).length;
-  const summaryParts = rawActivities.slice(0, 3).map((activity) => summarizeTaskActivity(activity));
-  const stepLabel = step || 'general';
+function consolidateStepActivities(rawActivities: TaskActivity[]): TaskActivity[] {
+  if (rawActivities.length <= 1) return rawActivities;
+
+  const consolidated: TaskActivity[] = [];
+  let i = 0;
+
+  while (i < rawActivities.length) {
+    const current = rawActivities[i];
+
+    // Merge consecutive same-type activities from same agent (e.g., multiple status_changed or updated)
+    if (i + 1 < rawActivities.length
+      && current.activity_type === rawActivities[i + 1].activity_type
+      && current.agent_id === rawActivities[i + 1].agent_id
+      && current.activity_type !== 'dispatch_invocation'
+      && current.activity_type !== 'completed'
+    ) {
+      // Skip the duplicate, keep the later one (more recent info)
+      i++;
+      continue;
+    }
+
+    // Deduplicate status_changed chains — keep only the final state transition
+    if (current.activity_type === 'status_changed' && i + 1 < rawActivities.length) {
+      let j = i + 1;
+      while (j < rawActivities.length && rawActivities[j].activity_type === 'status_changed') {
+        j++;
+      }
+      if (j > i + 1) {
+        // Keep only the last status change in the chain
+        consolidated.push(rawActivities[j - 1]);
+        i = j;
+        continue;
+      }
+    }
+
+    consolidated.push(current);
+    i++;
+  }
+
+  return consolidated;
+}
+
+function presenterMessage(step: string | null, rawActivities: TaskActivity[], currentStep: string | null): { message: string; summaryKind: PresentedTaskActivity['summary_kind']; consolidatedActivities: TaskActivity[] } {
   const kind: PresentedTaskActivity['summary_kind'] = step === currentStep ? 'live' : 'post_step';
-  const prefix = kind === 'live'
-    ? `Presenter live summary for ${stepLabel}`
-    : `Presenter consolidated ${stepLabel}`;
+  const stepLabel = step || 'general';
+
+  // Post-step consolidation: merge and deduplicate events
+  const consolidated = kind === 'post_step'
+    ? consolidateStepActivities(rawActivities)
+    : rawActivities;
+
+  const decisionCount = consolidated.filter((a) => a.decision_event).length;
+  const uniqueSummaries = new Map<string, string>();
+
+  // Build unique semantic summaries (dedup identical messages)
+  for (const activity of consolidated.slice(0, 5)) {
+    const summary = summarizeTaskActivity(activity);
+    if (!uniqueSummaries.has(summary)) {
+      uniqueSummaries.set(summary, summary);
+    }
+  }
+
+  const summaryText = Array.from(uniqueSummaries.values()).join(' ');
   const decisionText = decisionCount > 0 ? ` ${decisionCount} decision event(s).` : '';
+
+  const prefix = kind === 'live'
+    ? `[${stepLabel}]`
+    : `[${stepLabel} completed]`;
+
   return {
-    message: `${prefix}: ${summaryParts.join(' ')}${decisionText}`.trim(),
+    message: `${prefix} ${summaryText}${decisionText}`.trim(),
     summaryKind: kind,
+    consolidatedActivities: consolidated,
   };
 }
 
@@ -202,7 +263,8 @@ export function buildPresentedTaskActivities(taskId: string, limit = 200, offset
 
   const presented: PresentedTaskActivity[] = [];
   for (const [step, stepActivities] of grouped.entries()) {
-    const summary = presenterMessage(step, [...stepActivities].reverse(), task?.status || null);
+    const activitiesChronological = [...stepActivities].reverse();
+    const summary = presenterMessage(step, activitiesChronological, task?.status || null);
     presented.unshift({
       id: `presenter-${taskId}-${step}`,
       task_id: taskId,
@@ -216,10 +278,12 @@ export function buildPresentedTaskActivities(taskId: string, limit = 200, offset
       technical_details: {
         raw_activity_ids: stepActivities.map((activity) => activity.id),
         raw_count: stepActivities.length,
+        consolidated_count: summary.consolidatedActivities.length,
       },
       agent_id: presenter?.id,
       agent: presenter ? presenter : undefined,
-      raw_activities: [...stepActivities].reverse(),
+      // Expose consolidated view, but keep all raw activities for full technical access
+      raw_activities: activitiesChronological,
     });
   }
 
@@ -235,4 +299,53 @@ export function buildPresentedTaskActivities(taskId: string, limit = 200, offset
 
 export function summarizeFeedItem(message: string, metadata: Record<string, unknown> | null, source: 'activity' | 'agent_log', activityType: string | null): string {
   return summarizeFeedItemPure(message, metadata, source, activityType);
+}
+
+/**
+ * Build workspace-level presenter summaries across recent active tasks.
+ * Returns one presented summary per task, showing the latest workflow step.
+ */
+export function buildWorkspaceActivitySummary(workspaceId: string, limit = 10): {
+  summaries: Array<{
+    task_id: string;
+    task_title: string;
+    task_status: string;
+    assigned_agent_name: string | null;
+    summary: PresentedTaskActivity;
+  }>;
+} {
+  const db = getDb();
+  const tasks = db.prepare(
+    `SELECT t.id, t.title, t.status, a.name as agent_name
+     FROM tasks t
+     LEFT JOIN agents a ON t.assigned_agent_id = a.id
+     WHERE t.workspace_id = ? AND t.status != 'done'
+     ORDER BY t.updated_at DESC
+     LIMIT ?`
+  ).all(workspaceId, limit) as Array<{ id: string; title: string; status: string; agent_name: string | null }>;
+
+  const summaries: Array<{
+    task_id: string;
+    task_title: string;
+    task_status: string;
+    assigned_agent_name: string | null;
+    summary: PresentedTaskActivity;
+  }> = [];
+
+  for (const task of tasks) {
+    const result = buildPresentedTaskActivities(task.id, 50, 0);
+    // Take the most recent (first) presented activity as the task summary
+    const latest = result.activities[0];
+    if (latest) {
+      summaries.push({
+        task_id: task.id,
+        task_title: task.title,
+        task_status: task.status,
+        assigned_agent_name: task.agent_name,
+        summary: latest,
+      });
+    }
+  }
+
+  return { summaries };
 }

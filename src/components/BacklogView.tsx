@@ -17,6 +17,8 @@ import {
   ChevronDown,
   ChevronUp,
   ChevronRight,
+  Eye,
+  EyeOff,
   Target,
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
@@ -52,6 +54,7 @@ export function BacklogView({ workspaceId }: BacklogViewProps) {
   const [sortBy, setSortBy] = useState<'priority' | 'created' | 'title'>('created');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [showFilters, setShowFilters] = useState(false);
+  const [hideDone, setHideDone] = useState(true);
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
@@ -83,6 +86,9 @@ export function BacklogView({ workspaceId }: BacklogViewProps) {
 
   const filteredTasks = useMemo(() => {
     let result = tasks.filter((t) => !t.milestone_id);
+    if (hideDone) {
+      result = result.filter((t) => t.status !== 'done');
+    }
 
     if (filterType !== 'all') {
       result = result.filter((t) => t.task_type === filterType);
@@ -105,7 +111,7 @@ export function BacklogView({ workspaceId }: BacklogViewProps) {
     });
 
     return result;
-  }, [tasks, filterType, filterPriority, sortBy, sortDir]);
+  }, [tasks, filterType, filterPriority, sortBy, sortDir, hideDone]);
 
 
 
@@ -163,6 +169,15 @@ export function BacklogView({ workspaceId }: BacklogViewProps) {
             {(filterType !== 'all' || filterPriority !== 'all') && (
               <span className="w-2 h-2 rounded-full bg-mc-accent-green" />
             )}
+          </button>
+          <button
+            onClick={() => setHideDone(!hideDone)}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-medium transition-colors min-h-9 border ${
+              hideDone ? 'border-mc-border text-mc-text-secondary hover:bg-mc-bg-tertiary' : 'bg-mc-accent text-white border-mc-accent'
+            }`}
+          >
+            {hideDone ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+            <span className="hidden sm:inline">{hideDone ? 'Show Done' : 'Hide Done'}</span>
           </button>
           <div className="flex items-center bg-mc-bg-tertiary rounded-lg p-0.5">
             <button
