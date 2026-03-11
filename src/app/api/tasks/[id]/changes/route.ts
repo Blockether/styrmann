@@ -19,6 +19,13 @@ interface BranchDetail {
   remote: boolean;
 }
 
+interface SessionSummaryCounts {
+  interrupted_count: number;
+  stale_count: number;
+  finished_count: number;
+  unfinished_count: number;
+}
+
 function extractWorktreePath(metadataRaw: string | null | undefined): string[] {
   if (!metadataRaw) return [];
   try {
@@ -55,6 +62,46 @@ function extractBranchNames(metadataRaw: string | null | undefined): string[] {
   } catch {
     return [];
   }
+}
+
+function normalizeTaskBranchCandidates(branches: string[], taskId: string): string[] {
+  const shortId = taskId.slice(0, 8).toLowerCase();
+  const preferred = branches.filter((branch) => {
+    const lower = branch.toLowerCase();
+    return lower.startsWith('task/') || lower.includes(shortId);
+  });
+  if (preferred.length > 0) return Array.from(new Set(preferred));
+  return Array.from(new Set(branches));
+}
+
+function isTaskScopedBranch(branch: string, taskId: string): boolean {
+  const lower = branch.toLowerCase();
+  const shortId = taskId.slice(0, 8).toLowerCase();
+  return lower.startsWith('task/') || lower.includes(shortId);
+}
+
+function summarizeSessions(rows: Array<{ status?: string | null; ended_at?: string | null }>): SessionSummaryCounts {
+  let interrupted = 0;
+  let stale = 0;
+  let finished = 0;
+  let unfinished = 0;
+
+  for (const row of rows) {
+    const status = String(row.status || '').toLowerCase();
+    const ended = Boolean(row.ended_at);
+    const isFinished = status === 'completed' || status === 'done' || ended;
+    if (status === 'interrupted') interrupted += 1;
+    if (status === 'stale') stale += 1;
+    if (isFinished) finished += 1;
+    else unfinished += 1;
+  }
+
+  return {
+    interrupted_count: interrupted,
+    stale_count: stale,
+    finished_count: finished,
+    unfinished_count: unfinished,
+  };
 }
 
 function parseGitLog(raw: string): CommitInfo[] {
@@ -173,6 +220,7 @@ export async function GET(
         branchMetadataRows.flatMap((row) => extractBranchNames(row.metadata)),
       ),
     );
+    branches = normalizeTaskBranchCandidates(branches, task.id);
 
     const workspaceRepoPath = getWorkspaceRepoPath(task.workspace_repo || null);
 
@@ -244,24 +292,11 @@ export async function GET(
             .map((line) => line.trim())
             .filter(Boolean);
           if (discovered.length > 0) {
-            branches = Array.from(new Set(discovered));
+            branches = normalizeTaskBranchCandidates(Array.from(new Set(discovered)), task.id);
             diagnostics.branch_source = 'git_discovery';
           }
         } catch {
         }
-      }
-
-      try {
-        const currentBranch = execFileSync(
-          'git',
-          ['branch', '--show-current'],
-          { cwd: repoPath, encoding: 'utf8', timeout: 3000 },
-        ).trim();
-        if (currentBranch && !branches.includes(currentBranch)) {
-          branches.push(currentBranch);
-          if (diagnostics.branch_source === 'none') diagnostics.branch_source = 'git_discovery';
-        }
-      } catch {
       }
 
       for (const branch of branches) {
@@ -303,32 +338,9 @@ export async function GET(
       }
 
       try {
-        const rawStatus = execFileSync(
-          'git',
-          ['status', '--porcelain'],
-          { cwd: repoPath, encoding: 'utf8', timeout: 5000 },
-        );
-        const statusFiles = rawStatus
-          .split('\n')
-          .map((line) => line.trim())
-          .filter(Boolean)
-          .map((line) => {
-            const fileSegment = line.slice(3).trim();
-            if (fileSegment.includes(' -> ')) {
-              return fileSegment.split(' -> ')[1].trim();
-            }
-            return fileSegment;
-          })
-          .filter(Boolean);
-        if (statusFiles.length > 0) {
-          changedFiles.push(...statusFiles);
-          diagnostics.files_source = 'git_status';
-        }
-      } catch {
-      }
-
-      try {
-        const localBranch = Array.from(branchDetails.values()).find((item) => item.local)?.name;
+        const localBranch = Array.from(branchDetails.values())
+          .find((item) => item.local && isTaskScopedBranch(item.name, task.id))
+          ?.name;
         if (localBranch) {
           const raw = execFileSync(
             'git',
@@ -338,20 +350,16 @@ export async function GET(
           commits = parseGitLog(raw);
           diagnostics.commits_source = 'branch_scoped';
         }
-
-        if (commits.length === 0) {
-          const raw = execFileSync(
-            'git',
-            ['log', `--since=${task.created_at}`, '--pretty=format:%h%x09%s%x09%an%x09%ad', '--date=short', '-n', '30'],
-            { cwd: repoPath, encoding: 'utf8', timeout: 5000 },
-          );
-          commits = parseGitLog(raw);
-          if (commits.length > 0) diagnostics.commits_source = 'task_since';
-        }
       } catch (error) {
         console.error('Failed to read git commits for task changes:', error);
       }
     }
+
+    const sessionSummary = summarizeSessions((Array.isArray(sessions) ? sessions : []) as Array<{ status?: string | null; ended_at?: string | null }>);
+    const worktreeName = branchMetadataRows
+      .flatMap((row) => extractWorktreePath(row.metadata))
+      .find((candidate) => candidate.includes(`${path.sep}.mission-control${path.sep}worktrees${path.sep}`));
+    const primaryBranch = branches.find((branch) => branch.toLowerCase().startsWith('task/')) || branches[0] || null;
 
     const uniqueChangedFiles = Array.from(new Set(changedFiles));
     if (uniqueChangedFiles.length === 0 && diagnostics.files_source === 'none' && deliverables.length > 0) {
@@ -371,9 +379,15 @@ export async function GET(
         organization: task.workspace_org || null,
         repo: task.workspace_repo || null,
         repo_path: hasRepo ? repoPath : null,
+        worktree_name: worktreeName ? path.basename(worktreeName) : null,
+        worktree_branch: primaryBranch,
       },
       summary: {
         sessions_count: Array.isArray(sessions) ? sessions.length : 0,
+        interruptions_count: sessionSummary.interrupted_count,
+        stales_count: sessionSummary.stale_count,
+        finished_count: sessionSummary.finished_count,
+        unfinished_count: sessionSummary.unfinished_count,
         deliverables_count: deliverables.length,
         changed_files_count: uniqueChangedFiles.length,
         commits_count: commits.length,
