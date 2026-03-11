@@ -40,9 +40,6 @@ export default function RootLayout({
 }) {
   return (
     <html data-component="src/app/layout" lang="en" className={`${ibmPlexMono.variable} ${atkinsonHyperlegible.variable}`}>
-      <head>
-        <link rel="preload" href="/logo.png" as="image" />
-      </head>
       <body className={`${ibmPlexMono.className} bg-mc-bg text-mc-text min-h-screen`}>
         <DemoBanner />
         {children}

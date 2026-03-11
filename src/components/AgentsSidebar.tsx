@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { ChevronRight, ChevronLeft, ChevronDown, ListTodo, Inbox, BarChart3, Activity, X, CircleDot, Clock, Cpu, Bot, Route } from 'lucide-react';
+import { ChevronRight, ChevronLeft, ChevronDown, ListTodo, Inbox, BarChart3, Activity, X, CircleDot, Clock, Settings2, Bot, Route } from 'lucide-react';
 import { useMissionControl } from '@/lib/store';
 import type { Sprint } from '@/lib/types';
 import type { DashboardView } from './Header';
@@ -153,17 +153,17 @@ export function AgentsSidebar({
         href="/operations#openclaw"
         className={`group transition-colors ${
           minimized
-            ? 'flex items-center justify-center rounded-md border border-mc-border bg-mc-bg-secondary hover:bg-mc-bg-tertiary p-1.5'
+            ? 'flex items-center justify-center rounded-md border border-mc-border bg-mc-bg hover:bg-mc-bg-tertiary p-2'
             : 'flex items-center gap-2.5 rounded-md border border-mc-border bg-mc-bg hover:bg-mc-bg-tertiary px-2.5 py-2'
         }`}
         title={minimized ? `${agentSummary.total} agents, ${agentSummary.working} working` : undefined}
       >
-        <div className="relative flex-shrink-0 w-8 h-8 rounded-md border border-mc-border bg-mc-bg-secondary flex items-center justify-center">
-          <Cpu className="w-4 h-4 text-mc-text-secondary group-hover:text-mc-accent transition-colors" />
+        <div className={`relative flex-shrink-0 ${minimized ? 'w-auto h-auto' : 'w-8 h-8 rounded-md border border-mc-border bg-mc-bg-secondary'} flex items-center justify-center`}>
+          <Settings2 className={`${minimized ? 'w-5 h-5' : 'w-4 h-4'} text-mc-text-secondary group-hover:text-mc-accent transition-colors`} />
           {agentSummary.working > 0 && (
             <span
               className={`absolute w-2 h-2 rounded-full bg-mc-accent ${
-                minimized ? 'top-0.5 right-0.5' : '-top-0.5 -right-0.5 ring-2 ring-mc-bg'
+                minimized ? '-top-0.5 -right-0.5 ring-2 ring-mc-bg' : '-top-0.5 -right-0.5 ring-2 ring-mc-bg'
               }`}
             />
           )}

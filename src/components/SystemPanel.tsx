@@ -125,6 +125,22 @@ export function SystemPanel({ embedded = false }: SystemPanelProps) {
     }
   };
 
+  const formatModuleLastTick = (mod: DaemonModuleInfo, snapshot: DaemonStatsSnapshot) => {
+    if (mod.interval_ms === 0) {
+      return mod.last_tick ? formatDistanceToNow(new Date(mod.last_tick), { addSuffix: true }) : 'Streaming';
+    }
+    if (!mod.last_tick) {
+      return snapshot.uptime_seconds < Math.max(30, Math.round(mod.interval_ms / 1000) + 5)
+        ? 'Waiting first tick'
+        : 'No tick recorded';
+    }
+    try {
+      return formatDistanceToNow(new Date(mod.last_tick), { addSuffix: true });
+    } catch {
+      return 'Invalid date';
+    }
+  };
+
   const formatRelativeTime = (dateStr?: string) => {
     if (!dateStr) return 'Never';
     try {
@@ -319,8 +335,8 @@ export function SystemPanel({ embedded = false }: SystemPanelProps) {
                             {daemonStats.snapshot.modules.map((mod: DaemonModuleInfo) => (
                               <tr key={mod.name} className="border-t border-mc-border">
                                 <td className="py-2 font-mono">{mod.name}</td>
-                                <td className="py-2">{mod.interval_ms}ms</td>
-                                <td className="py-2">{formatRelativeTime(mod.last_tick)}</td>
+                                <td className="py-2">{mod.interval_ms === 0 ? 'continuous' : `${mod.interval_ms}ms`}</td>
+                                <td className="py-2">{formatModuleLastTick(mod, daemonStats.snapshot!)}</td>
                               </tr>
                             ))}
                           </tbody>

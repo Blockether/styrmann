@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { formatDistanceToNow } from 'date-fns';
+import { format, formatDistanceToNow } from 'date-fns';
 import { Activity, Bot, ChevronDown, ChevronRight, Filter, Loader2 } from 'lucide-react';
 import type { PresentedTaskActivity, TaskActivity } from '@/lib/types';
 import { TraceViewerModal } from './TraceViewerModal';
@@ -224,7 +224,9 @@ export function ActivityLog({ taskId }: ActivityLogProps) {
 
               {isExpanded && (
                 <div className="border-t border-mc-border p-4 space-y-3 bg-mc-bg">
-                  {activity.raw_activities.map((raw) => {
+                  {[...activity.raw_activities]
+                    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+                    .map((raw) => {
                     const metadata = parseMetadata(raw);
                     const traceId = getTraceSessionId(raw);
                     return (
@@ -234,6 +236,7 @@ export function ActivityLog({ taskId }: ActivityLogProps) {
                           {raw.agent?.name && <span>{raw.agent.name}</span>}
                           {raw.workflow_step && <span>step {raw.workflow_step}</span>}
                           {raw.decision_event && <span className="text-amber-700">decision event</span>}
+                          <span>{format(new Date(raw.created_at), 'yyyy-MM-dd HH:mm:ss')}</span>
                         </div>
                         <div className="mt-2 text-sm text-mc-text whitespace-pre-wrap break-words">{raw.message}</div>
                         {traceId && (

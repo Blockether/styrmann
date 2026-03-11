@@ -18,6 +18,8 @@ export interface ScheduledJob {
 
 export interface DaemonStats {
   startedAt: number;
+  lastHealthTick?: string;
+  lastRouterTick?: string;
   lastHeartbeatTick?: string;
   lastDispatchTick?: string;
   lastSchedulerTick?: string;

@@ -341,17 +341,18 @@ export function ActivityFeed({ workspaceId, sprintId }: ActivityFeedProps) {
             {total > 0 ? `${total} total` : ''}
           </span>
         </div>
-        <div className="flex items-center gap-2 flex-wrap justify-end">
+        <div className="w-full xl:w-auto flex items-center justify-end">
+          <div className="flex items-center gap-2 overflow-x-auto max-w-full pb-1">
           <input
             value={taskFilter}
             onChange={(e) => setTaskFilter(e.target.value)}
             placeholder="Filter task"
-            className="min-h-11 px-3 py-2 bg-mc-bg border border-mc-border rounded text-sm"
+            className="min-h-11 w-52 sm:w-64 px-3 py-2 bg-mc-bg border border-mc-border rounded text-sm flex-shrink-0"
           />
           <select
             value={agentFilter}
             onChange={(e) => setAgentFilter(e.target.value)}
-            className="min-h-11 px-2 py-2 bg-mc-bg border border-mc-border rounded text-sm focus:outline-none focus:border-mc-accent"
+            className="min-h-11 px-2 py-2 bg-mc-bg border border-mc-border rounded text-sm focus:outline-none focus:border-mc-accent flex-shrink-0"
           >
             <option value="all">All Agents</option>
             {agentOptions.map((agent) => (
@@ -361,22 +362,23 @@ export function ActivityFeed({ workspaceId, sprintId }: ActivityFeedProps) {
           <select
             value={workflowStepFilter}
             onChange={(e) => setWorkflowStepFilter(e.target.value)}
-            className="min-h-11 px-2 py-2 bg-mc-bg border border-mc-border rounded text-sm focus:outline-none focus:border-mc-accent"
+            className="min-h-11 px-2 py-2 bg-mc-bg border border-mc-border rounded text-sm focus:outline-none focus:border-mc-accent flex-shrink-0"
           >
             <option value="all">All Steps</option>
             {workflowStepOptions.map((step) => (
               <option key={step} value={step}>{step}</option>
             ))}
           </select>
-          <label className="inline-flex items-center gap-2 min-h-11 px-3 py-2 border border-mc-border rounded text-sm bg-mc-bg">
+          <label className="inline-flex items-center gap-2 min-h-11 px-3 py-2 border border-mc-border rounded text-sm bg-mc-bg flex-shrink-0">
             <input type="checkbox" checked={decisionOnly} onChange={(e) => setDecisionOnly(e.target.checked)} />
-            Decisions
+            <span className="hidden sm:inline">Decisions</span>
+            <span className="sm:hidden">Dec</span>
           </label>
           {/* Milestone Filter */}
           <select
             value={milestoneFilter}
             onChange={(e) => setMilestoneFilter(e.target.value)}
-            className="min-h-11 px-2 py-2 bg-mc-bg border border-mc-border rounded text-sm focus:outline-none focus:border-mc-accent"
+            className="min-h-11 px-2 py-2 bg-mc-bg border border-mc-border rounded text-sm focus:outline-none focus:border-mc-accent flex-shrink-0"
           >
             <option value="">All Milestones</option>
             {milestones.map((m) => (
@@ -390,7 +392,7 @@ export function ActivityFeed({ workspaceId, sprintId }: ActivityFeedProps) {
           <select
             value={sourceFilter}
             onChange={(e) => setSourceFilter(e.target.value as SourceFilter)}
-            className="min-h-11 px-2 py-2 bg-mc-bg border border-mc-border rounded text-sm focus:outline-none focus:border-mc-accent"
+            className="min-h-11 px-2 py-2 bg-mc-bg border border-mc-border rounded text-sm focus:outline-none focus:border-mc-accent flex-shrink-0"
           >
             <option value="all">All Sources</option>
             <option value="activity">Status Changes</option>
@@ -401,11 +403,12 @@ export function ActivityFeed({ workspaceId, sprintId }: ActivityFeedProps) {
           <button
             onClick={() => fetchFeed(0, false)}
             disabled={loading}
-            className="flex items-center gap-2 px-3 min-h-11 border border-mc-border rounded text-sm hover:bg-mc-bg-tertiary disabled:opacity-50 transition-colors"
+            className="flex items-center gap-2 px-3 min-h-11 border border-mc-border rounded text-sm hover:bg-mc-bg-tertiary disabled:opacity-50 transition-colors flex-shrink-0"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             <span className="hidden sm:inline">{loading ? 'Loading...' : 'Refresh'}</span>
           </button>
+          </div>
         </div>
       </div>
 

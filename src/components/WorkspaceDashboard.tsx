@@ -196,7 +196,7 @@ function WorkspaceCard({ workspace, onDelete, onEdit }: { workspace: WorkspaceSt
   return (
     <>
     <Link href={`/workspace/${workspace.slug}`}>
-      <div className="bg-mc-bg-secondary border border-mc-border rounded-xl p-4 sm:p-5 hover:border-mc-accent/50 transition-all hover:shadow-lg cursor-pointer group">
+      <div className="bg-mc-bg-secondary border border-mc-border rounded-xl p-4 sm:p-5 hover:border-mc-accent/50 transition-all hover:shadow-lg cursor-pointer group min-h-[13.5rem] max-h-[13.5rem] flex flex-col">
         <div className="flex items-start justify-between mb-3">
           <div className="flex items-center gap-3 min-w-0 flex-1">
             {workspace.logo_url ? (
@@ -269,7 +269,7 @@ function WorkspaceCard({ workspace, onDelete, onEdit }: { workspace: WorkspaceSt
           </div>
         )}
 
-        <div className="flex items-center gap-1 text-sm text-mc-text-secondary">
+        <div className="flex items-center gap-1 text-sm text-mc-text-secondary mt-auto">
           <CheckSquare className="w-3.5 h-3.5" />
           <span>{workspace.taskCounts.total} tasks</span>
         </div>
@@ -381,24 +381,26 @@ function EditWorkspaceModal({ workspace, onClose, onSaved }: { workspace: Worksp
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-3 sm:p-4" onClick={onClose}>
-      <div className="bg-mc-bg-secondary border border-mc-border rounded-t-xl sm:rounded-xl w-full max-w-md pb-[env(safe-area-inset-bottom)] sm:pb-0" onClick={e => e.stopPropagation()}>
+      <div className="bg-mc-bg-secondary border border-mc-border rounded-t-xl sm:rounded-xl w-full sm:w-[92vw] lg:w-[80vw] max-w-4xl pb-[env(safe-area-inset-bottom)] sm:pb-0" onClick={e => e.stopPropagation()}>
         <div className="p-6 border-b border-mc-border">
           <h2 className="text-lg font-semibold">Edit Repository</h2>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} autoComplete="off" className="p-6 space-y-4">
           {workspace.is_internal ? (
             <div className="rounded-lg border border-mc-accent bg-mc-accent/10 px-3 py-2 text-sm text-mc-text-secondary">
               This is the internal OpenClaw meta repository. GitHub linking is disabled here.
             </div>
           ) : null}
 
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium mb-2">Name</label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
+              autoComplete="off"
               className="w-full bg-mc-bg border border-mc-border rounded-lg px-4 py-2 focus:outline-none focus:border-mc-accent"
               autoFocus
             />
@@ -410,6 +412,7 @@ function EditWorkspaceModal({ workspace, onClose, onSaved }: { workspace: Worksp
               type="text"
               value={logoUrl}
               onChange={(e) => setLogoUrl(e.target.value)}
+              autoComplete="off"
               placeholder="/workspace-logos/mission-control.png"
               className="w-full bg-mc-bg border border-mc-border rounded-lg px-4 py-2 focus:outline-none focus:border-mc-accent"
             />
@@ -421,6 +424,7 @@ function EditWorkspaceModal({ workspace, onClose, onSaved }: { workspace: Worksp
               type="text"
               value={githubRepo}
               onChange={(e) => setGithubRepo(e.target.value)}
+              autoComplete="off"
               disabled={Boolean(workspace.is_internal)}
               placeholder="https://github.com/org/repo"
               className="w-full bg-mc-bg border border-mc-border rounded-lg px-4 py-2 focus:outline-none focus:border-mc-accent disabled:opacity-50 disabled:cursor-not-allowed"
@@ -445,6 +449,7 @@ function EditWorkspaceModal({ workspace, onClose, onSaved }: { workspace: Worksp
               type="email"
               value={ownerEmail}
               onChange={(e) => setOwnerEmail(e.target.value)}
+              autoComplete="off"
               placeholder="owner@company.com"
               className="w-full bg-mc-bg border border-mc-border rounded-lg px-4 py-2 focus:outline-none focus:border-mc-accent"
             />
@@ -456,16 +461,18 @@ function EditWorkspaceModal({ workspace, onClose, onSaved }: { workspace: Worksp
               type="email"
               value={coordinatorEmail}
               onChange={(e) => setCoordinatorEmail(e.target.value)}
+              autoComplete="off"
               placeholder="coordinator@company.com"
               className="w-full bg-mc-bg border border-mc-border rounded-lg px-4 py-2 focus:outline-none focus:border-mc-accent"
             />
           </div>
 
-          <div>
+          <div className="md:col-span-2">
             <label className="block text-sm font-medium mb-2">Himalaya Sender Account</label>
             <select
               value={himalayaAccount}
               onChange={(e) => setHimalayaAccount(e.target.value)}
+              autoComplete="off"
               className="w-full bg-mc-bg border border-mc-border rounded-lg px-4 py-2 focus:outline-none focus:border-mc-accent"
             >
               <option value="">Use Himalaya default account</option>
@@ -476,6 +483,7 @@ function EditWorkspaceModal({ workspace, onClose, onSaved }: { workspace: Worksp
             <p className="mt-1 text-xs text-mc-text-secondary">
               This account is used when Mission Control sends human task-assignment emails via Himalaya.
             </p>
+          </div>
           </div>
 
           {error && (

@@ -376,7 +376,13 @@ export function buildPresentedTaskActivities(taskId: string, limit = 200, offset
     workflow_steps: Array.from(new Set(rawActivities.map((activity) => activity.workflow_step).filter((step): step is string => Boolean(step)))),
   };
 
-  return { activities: presented, raw_activities: rawActivities, total, filters };
+  const sortedPresented = [...presented].sort((a, b) => {
+    const aTs = new Date(a.created_at).getTime();
+    const bTs = new Date(b.created_at).getTime();
+    return bTs - aTs;
+  });
+
+  return { activities: sortedPresented, raw_activities: rawActivities, total, filters };
 }
 
 export function summarizeFeedItem(message: string, metadata: Record<string, unknown> | null, source: 'activity' | 'agent_log', activityType: string | null): string {

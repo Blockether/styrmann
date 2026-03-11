@@ -8,6 +8,7 @@ export function startHealthCheck(config: DaemonConfig, stats: DaemonStats): () =
   let lastOnline = false;
 
   async function tick() {
+    stats.lastHealthTick = new Date().toISOString();
     try {
       const res = await mcFetch('/api/openclaw/status');
       const online = res.ok;

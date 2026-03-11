@@ -48,11 +48,11 @@ export function startReporter(config: DaemonConfig, stats: DaemonStats): () => v
         pid: process.pid,
         // Modules with intervals
         modules: [
-          { name: 'health', interval_ms: 60_000, last_tick: undefined },
+          { name: 'health', interval_ms: 60_000, last_tick: stats.lastHealthTick },
           { name: 'heartbeat', interval_ms: config.heartbeatIntervalMs, last_tick: stats.lastHeartbeatTick },
           { name: 'dispatcher', interval_ms: config.dispatchIntervalMs, last_tick: stats.lastDispatchTick },
           { name: 'scheduler', interval_ms: config.schedulerIntervalMs, last_tick: stats.lastSchedulerTick },
-          { name: 'router', interval_ms: 0, last_tick: undefined },  // continuous SSE
+          { name: 'router', interval_ms: 0, last_tick: stats.lastRouterTick },
           { name: 'log_poller', interval_ms: config.logPollIntervalMs, last_tick: stats.lastLogPollTick },
           { name: 'recovery', interval_ms: config.recoveryIntervalMs, last_tick: stats.lastRecoveryTick },
           { name: 'reporter', interval_ms: 30_000, last_tick: new Date().toISOString() },
