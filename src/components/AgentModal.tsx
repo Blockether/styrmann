@@ -13,6 +13,13 @@ interface AgentModalProps {
   initialTab?: 'info' | 'workspace' | 'soul' | 'user' | 'agents';
 }
 
+const IDENTITY_MD_ALLOWLIST = new Set(['lidia', 'michal']);
+
+function canEditIdentityMd(agent?: Agent): boolean {
+  const key = (agent?.gateway_agent_id || agent?.name || '').trim().toLowerCase();
+  return IDENTITY_MD_ALLOWLIST.has(key);
+}
+
 interface BrowserEntry {
   name: string;
   relative_path: string;
@@ -67,6 +74,11 @@ function isEmbeddable(name: string): boolean {
     || ext === '.png' || ext === '.jpg' || ext === '.jpeg' || ext === '.gif' || ext === '.webp';
 }
 
+function isImagePreview(name: string): boolean {
+  const ext = name.slice(name.lastIndexOf('.')).toLowerCase();
+  return ext === '.svg' || ext === '.png' || ext === '.jpg' || ext === '.jpeg' || ext === '.gif' || ext === '.webp';
+}
+
 interface FilePreview {
   scope: 'workspace' | 'agent';
   path: string;
@@ -106,6 +118,9 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated, initia
   const [filePreview, setFilePreview] = useState<FilePreview | null>(null);
   const [filePreviewContent, setFilePreviewContent] = useState<string | null>(null);
   const [filePreviewLoading, setFilePreviewLoading] = useState(false);
+  const filePreviewSrc = filePreview && agent
+    ? `/api/agents/${agent.id}/workspace/file?scope=${filePreview.scope}&path=${encodeURIComponent(filePreview.path)}`
+    : null;
 
   const [form, setForm] = useState({
     name: agent?.name || '',
@@ -117,6 +132,7 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated, initia
     agents_md: agent?.agents_md || '',
     model: agent?.model || '',
   });
+  const identityMdEnabled = canEditIdentityMd(agent);
 
   // Load available models from OpenClaw config
   useEffect(() => {
@@ -352,10 +368,15 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated, initia
   const tabs = [
     { id: 'info', label: 'Info' },
     { id: 'workspace', label: 'Workspace' },
-    { id: 'soul', label: 'SOUL.md' },
-    { id: 'user', label: 'USER.md' },
+    ...(identityMdEnabled ? [{ id: 'soul' as const, label: 'SOUL.md' }, { id: 'user' as const, label: 'USER.md' }] : []),
     { id: 'agents', label: 'AGENTS.md' },
   ] as const;
+
+  useEffect(() => {
+    if (!tabs.some((tab) => tab.id === activeTab)) {
+      setActiveTab('info');
+    }
+  }, [activeTab, tabs]);
 
   const renderBrowser = (
     title: string,
@@ -491,17 +512,19 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated, initia
                 />
               </div>
 
-              {/* Description */}
               <div>
-                <label className="block text-sm font-medium mb-1">Description</label>
+                <label className="block text-sm font-medium mb-1">System Prompt (`system.md`)</label>
                 <textarea
                   value={form.description}
                   onChange={(e) => setForm({ ...form, description: e.target.value })}
                   rows={8}
                   disabled={isReadOnlySyncedAgent}
                   className="w-full bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent resize-y"
-                  placeholder="What does this agent do?"
+                  placeholder="Core operating instructions written to system.md"
                 />
+                <p className="text-xs text-mc-text-secondary mt-1">
+                  This field directly edits the agent's OpenClaw `system.md` prompt.
+                </p>
               </div>
 
               {/* Model Selection */}
@@ -829,7 +852,7 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated, initia
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
                 <a
-                  href={filePreview.signedUrl || `/api/agents/${agent.id}/workspace/file?scope=${filePreview.scope}&path=${encodeURIComponent(filePreview.path)}`}
+                  href={filePreview.signedUrl || filePreviewSrc || '#'}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="p-1.5 hover:bg-mc-bg-tertiary rounded text-mc-text-secondary hover:text-mc-text"
@@ -838,7 +861,7 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated, initia
                   <ExternalLink className="w-4 h-4" />
                 </a>
                 <a
-                  href={filePreview.signedUrl || `/api/agents/${agent.id}/workspace/file?scope=${filePreview.scope}&path=${encodeURIComponent(filePreview.path)}`}
+                  href={filePreview.signedUrl || filePreviewSrc || '#'}
                   download={filePreview.name}
                   className="p-1.5 hover:bg-mc-bg-tertiary rounded text-mc-text-secondary hover:text-mc-text"
                   title="Download"
@@ -857,9 +880,13 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated, initia
 
             {/* Preview Content */}
             <div className="flex-1 overflow-hidden bg-mc-bg">
-              {isEmbeddable(filePreview.name) ? (
+              {isEmbeddable(filePreview.name) && isImagePreview(filePreview.name) && filePreviewSrc ? (
+                <div className="h-full w-full overflow-auto p-3">
+                  <img src={filePreviewSrc} alt={filePreview.name} className="max-w-full max-h-full object-contain mx-auto" />
+                </div>
+              ) : isEmbeddable(filePreview.name) && filePreviewSrc ? (
                 <iframe
-                  src={`/api/agents/${agent.id}/workspace/file?scope=${filePreview.scope}&path=${encodeURIComponent(filePreview.path)}`}
+                  src={filePreviewSrc}
                   className="w-full h-full border-0"
                   sandbox="allow-same-origin allow-scripts allow-popups"
                   title={filePreview.name}

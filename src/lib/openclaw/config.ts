@@ -1,9 +1,10 @@
-import { existsSync, readFileSync, writeFileSync, statSync, mkdirSync } from 'fs';
+import { existsSync, readFileSync, writeFileSync, statSync, mkdirSync, unlinkSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
 
 const MAX_CONFIG_SIZE_BYTES = 1024 * 1024;
 const MAX_MD_FILE_SIZE_BYTES = 512 * 1024;
+const IDENTITY_MD_ALLOWLIST = new Set(['lidia', 'michal']);
 
 let lastConfigMtimeMs = 0;
 
@@ -64,6 +65,11 @@ export interface ResolvedAgent {
   role: string;
 }
 
+export function canUseIdentityMd(agentId: string | null | undefined): boolean {
+  if (!agentId) return false;
+  return IDENTITY_MD_ALLOWLIST.has(agentId.trim().toLowerCase());
+}
+
 function getConfigPath(): string {
   return join(homedir(), '.openclaw', 'openclaw.json');
 }
@@ -76,6 +82,25 @@ function readFileSafe(path: string, maxSize: number = MAX_MD_FILE_SIZE_BYTES): s
     return readFileSync(path, 'utf-8');
   } catch {
     return null;
+  }
+}
+
+function removeFileIfExists(filePath: string): void {
+  try {
+    if (existsSync(filePath)) unlinkSync(filePath);
+  } catch {
+  }
+}
+
+function enforceWorkspaceMdPolicy(workspacePath: string, agentId: string): void {
+  const allowIdentityMd = canUseIdentityMd(agentId);
+  removeFileIfExists(join(workspacePath, 'BOOTSTRAP.md'));
+  removeFileIfExists(join(workspacePath, 'bootstrap.md'));
+  removeFileIfExists(join(workspacePath, 'BOOTSTRAP'));
+  removeFileIfExists(join(workspacePath, 'bootstrap'));
+  if (!allowIdentityMd) {
+    removeFileIfExists(join(workspacePath, 'SOUL.md'));
+    removeFileIfExists(join(workspacePath, 'USER.md'));
   }
 }
 
@@ -142,9 +167,11 @@ export function resolveAgents(config: OpenClawFullConfig): ResolvedAgent[] {
   return agents.map((agent) => {
     const workspacePath = resolveWorkspacePath(agent, config.agents);
     const agentDir = resolveAgentDir(agent);
+    if (workspacePath) enforceWorkspaceMdPolicy(workspacePath, agent.id);
 
-    const soulMd = workspacePath ? readFileSafe(join(workspacePath, 'SOUL.md')) : null;
-    const userMd = workspacePath ? readFileSafe(join(workspacePath, 'USER.md')) : null;
+    const allowIdentityMd = canUseIdentityMd(agent.id);
+    const soulMd = workspacePath && allowIdentityMd ? readFileSafe(join(workspacePath, 'SOUL.md')) : null;
+    const userMd = workspacePath && allowIdentityMd ? readFileSafe(join(workspacePath, 'USER.md')) : null;
     const agentsMd = workspacePath ? readFileSafe(join(workspacePath, 'AGENTS.md')) : null;
     const memoryMd = workspacePath ? readFileSafe(join(workspacePath, 'MEMORY.md')) : null;
     const systemMd = agentDir ? readFileSafe(join(agentDir, 'system.md')) : null;
@@ -169,16 +196,17 @@ export function resolveAgents(config: OpenClawFullConfig): ResolvedAgent[] {
   });
 }
 
-export function readAgentMdFromDisk(workspacePath: string | null | undefined): {
+export function readAgentMdFromDisk(workspacePath: string | null | undefined, agentId?: string | null): {
   soul_md: string | null;
   user_md: string | null;
   agents_md: string | null;
   memory_md: string | null;
 } {
   if (!workspacePath) return { soul_md: null, user_md: null, agents_md: null, memory_md: null };
+  const allowIdentityMd = canUseIdentityMd(agentId);
   return {
-    soul_md: readFileSafe(join(workspacePath, 'SOUL.md')),
-    user_md: readFileSafe(join(workspacePath, 'USER.md')),
+    soul_md: allowIdentityMd ? readFileSafe(join(workspacePath, 'SOUL.md')) : null,
+    user_md: allowIdentityMd ? readFileSafe(join(workspacePath, 'USER.md')) : null,
     agents_md: readFileSafe(join(workspacePath, 'AGENTS.md')),
     memory_md: readFileSafe(join(workspacePath, 'MEMORY.md')),
   };
@@ -283,17 +311,21 @@ export function createAgentInOpenClawConfig(input: CreateOpenClawAgentInput): {
 
     writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf-8');
 
+    const allowIdentityMd = canUseIdentityMd(input.id);
     const soulMd = input.soulMd || `# ${input.name}\n\nYou are ${input.name}. Work clearly, safely, and with strong execution discipline.`;
     const userMd = input.userMd || '# USER\n\nContext about the human operator.';
     const agentsMd = input.agentsMd || '# AGENTS\n\nTeam coordination notes.';
     const memoryMd = input.memoryMd || '# MEMORY\n\nDurable lessons learned and stable operating preferences.';
     const systemMd = input.systemMd || `---\nrole: ${input.role}\n---\n\n# ${input.role}\n\nYou are ${input.name}. Execute tasks accurately and report verifiable outcomes.`;
 
-    writeFileSync(join(workspacePath, 'SOUL.md'), soulMd, 'utf-8');
-    writeFileSync(join(workspacePath, 'USER.md'), userMd, 'utf-8');
+    if (allowIdentityMd) {
+      writeFileSync(join(workspacePath, 'SOUL.md'), soulMd, 'utf-8');
+      writeFileSync(join(workspacePath, 'USER.md'), userMd, 'utf-8');
+    }
     writeFileSync(join(workspacePath, 'AGENTS.md'), agentsMd, 'utf-8');
     writeFileSync(join(workspacePath, 'MEMORY.md'), memoryMd, 'utf-8');
     writeFileSync(join(agentDir, 'system.md'), systemMd, 'utf-8');
+    enforceWorkspaceMdPolicy(workspacePath, input.id);
 
     return { ok: true, workspacePath, agentDir };
   } catch (err) {

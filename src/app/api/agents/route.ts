@@ -16,7 +16,7 @@ export async function GET(_request: NextRequest) {
     `);
 for (const agent of agents) {
 if (agent.source === 'synced') {
-const mdFiles = readAgentMdFromDisk(agent.agent_workspace_path);
+const mdFiles = readAgentMdFromDisk(agent.agent_workspace_path, agent.gateway_agent_id);
 agent.soul_md = mdFiles.soul_md ?? undefined;
 agent.user_md = mdFiles.user_md ?? undefined;
 agent.agents_md = mdFiles.agents_md ?? undefined;
