@@ -22,8 +22,8 @@ export async function GET(request: NextRequest) {
     const params: unknown[] = [];
 
     if (workspaceId) {
-      sql += ' AND (t.workspace_id = ? OR (t.id IS NULL AND a.workspace_id = ?) OR (t.id IS NULL AND a.id IS NULL))';
-      params.push(workspaceId, workspaceId);
+      sql += ' AND (t.workspace_id = ? OR (t.id IS NULL AND a.id IS NULL))';
+      params.push(workspaceId);
     }
 
     if (since) {

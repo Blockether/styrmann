@@ -245,10 +245,9 @@ export function buildPresentedTaskActivities(taskId: string, limit = 200, offset
   const task = queryOne<Pick<Task, 'status' | 'assigned_agent_id'>>('SELECT status, assigned_agent_id FROM tasks WHERE id = ? LIMIT 1', [taskId]);
   const presenter = queryOne<Agent>(
     `SELECT * FROM agents
-     WHERE role = 'presenter' AND (workspace_id = (SELECT workspace_id FROM tasks WHERE id = ?) OR workspace_id = 'default')
-     ORDER BY CASE WHEN workspace_id = (SELECT workspace_id FROM tasks WHERE id = ?) THEN 0 ELSE 1 END, created_at ASC
+     WHERE role = 'presenter'
+     ORDER BY created_at ASC
      LIMIT 1`,
-    [taskId, taskId],
   );
   const { activities: rawActivities, total } = getRawTaskActivities(taskId, limit, offset);
   const grouped = new Map<string, TaskActivity[]>();

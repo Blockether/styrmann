@@ -105,14 +105,13 @@ export async function dispatchTaskToAgent(taskId: string): Promise<DispatchResul
     }
 
     if (agent.role === 'orchestrator') {
-      const otherOrchestrators = queryAll<{ id: string; name: string; role: string }>(
+    const otherOrchestrators = queryAll<{ id: string; name: string; role: string }>(
         `SELECT id, name, role
          FROM agents
          WHERE role = 'orchestrator'
          AND id != ?
-         AND workspace_id = ?
          AND status != 'offline'`,
-        [agent.id, task.workspace_id]
+        [agent.id]
       );
 
       if (otherOrchestrators.length > 0) {

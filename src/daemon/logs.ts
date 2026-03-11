@@ -21,7 +21,6 @@ interface HistoryMessage {
 interface AgentInfo {
   id: string;
   name: string;
-  workspace_id: string;
   gateway_agent_id?: string;
 }
 
@@ -112,7 +111,7 @@ export function startLogPoller(config: DaemonConfig, stats: DaemonStats): () => 
           const messages: HistoryMessage[] = Array.isArray(body) ? body : (body.history || []);
           if (messages.length === 0) continue;
 
-          const workspaceId = agent?.workspace_id || 'default';
+          const workspaceId = 'default';
 
           // Build log entries, skipping already-known hashes
           const newEntries: Array<{
