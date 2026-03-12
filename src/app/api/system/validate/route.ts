@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { existsSync } from 'fs';
 import { readFileSync } from 'fs';
 import { execSync } from 'child_process';
+import path from 'path';
 import { getOpenClawClient } from '@/lib/openclaw/client';
 import { getDb } from '@/lib/db';
 import { getHimalayaStatus } from '@/lib/himalaya';
@@ -10,7 +11,13 @@ import type { ValidationCheck, ValidationResult } from '@/lib/types';
 export const dynamic = 'force-dynamic';
 
 const PROJECT_DIR = '/root/repos/blockether/mission-control';
-const DB_PATH = `${PROJECT_DIR}/mission-control.db`;
+const DB_CANDIDATES = [
+  process.env.DATABASE_PATH,
+  path.join(PROJECT_DIR, 'mission-control.db'),
+  path.join(PROJECT_DIR, 'styrmann.db'),
+  path.join(PROJECT_DIR, 'styrmann'),
+].filter((value): value is string => Boolean(value));
+const DB_PATH = DB_CANDIDATES.find((candidate) => existsSync(candidate)) || DB_CANDIDATES[0];
 const ENV_FILE = `${PROJECT_DIR}/.env.local`;
 const PUBLIC_URL = 'https://control.blockether.com';
 const LOCAL_URL = 'http://localhost:4000';
