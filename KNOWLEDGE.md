@@ -65,7 +65,7 @@ Also: `pending_dispatch` (transient, pre-dispatch state).
 
 **Task creation behavior**: New AI tasks no longer expose manual loop, template, or per-task execution controls. The orchestrator generates a workflow plan immediately from existing agents and linked skills only, stores it on the task, and leaves the task in `inbox` until execution begins. Human tasks still require a selected human and move to `assigned`, which triggers an email through Himalaya.
 
-**Task creation UI**: Manual agent loop configuration, task-level template picking, and direct execution settings are removed. The task modal now shows Overview, Activity, Sessions, and Deliverables tabs. Planning is merged into Activity: the workflow blueprint and runtime activity timeline are presented together, including current step and iteration context. The former Proposals tab is merged into this Activity view (learner proposals remain inline below the workflow plan diagram).
+**Task creation UI**: Manual agent loop configuration, task-level template picking, and direct execution settings are removed. The task modal now shows Overview, Activity, Sessions, and Deliverables tabs. Planning is merged into Activity: the workflow blueprint and runtime activity timeline are presented together, including current step and iteration context. Capability proposals remain inline below the workflow plan diagram.
 
 **Activity orchestration UX**: The Activity tab now presents a staged orchestration control room instead of a dense planning block. The workflow plan is split into an orchestration guide, participant roster, live runtime strip, and per-stage cards that explain owner, trigger phase, expected outcome, skill coverage, and failure loopback. Activity log cards and the task detail shell use the same cream/gold visual language so the whole task view reads as one continuous pipeline surface.
 
@@ -236,10 +236,10 @@ The Strict template is the default. Per-task workflow plans persist selected par
 
 **Global visibility**: Agents are ALWAYS global. The `agents` table no longer includes `workspace_id`, and agent APIs/query paths now operate on the full global roster.
 
-**Bootstrap policy**: `bootstrapCoreAgentsRaw()` is a fallback for fresh installs without an OpenClaw gateway. It bootstraps 10 local fallback agents globally: Orchestrator, Builder, Tester, Reviewer, Learner, Presenter, Explorer, Pragmatist, Guardian, and Consolidator. If any synced agents exist, bootstrap is skipped entirely — synced agents ARE the real team. Workflow planning handles missing roles via `task_findings` and `capability_proposals` rather than creating new agents.
+**Bootstrap policy**: `bootstrapCoreAgentsRaw()` is a fallback for fresh installs without an OpenClaw gateway. It bootstraps 8 local fallback agents globally: Orchestrator, Builder, Tester, Reviewer, Explorer, Pragmatist, Guardian, and Consolidator. If any synced agents exist, bootstrap is skipped entirely — synced agents ARE the real team. Workflow planning handles missing roles via `task_findings` and `capability_proposals` rather than creating new agents.
 
 **OpenClaw prompt source policy**: Mission Control treats workspace `AGENTS.md` as the canonical agent instruction source and `SOUL.md` as identity/personality context. `system.md` in agent directories is considered legacy and is auto-migrated into workspace `AGENTS.md` + `SOUL.md` when detected, then removed. Framework-level duplicate system prompt injection is intentionally avoided.
-**Memory handling**: Memory is handled natively by OpenClaw's lossless memory system. Mission Control no longer runs its own memory consolidation pipeline, vector search, or agent filesystem sync. The `knowledge_entries` and `knowledge_vectors` tables remain in the schema but are not actively maintained by MC. The `/api/memory/*` endpoints and daemon consolidation job have been removed.
+**Memory handling**: Memory is handled natively by OpenClaw's lossless memory system. Mission Control no longer runs its own memory consolidation pipeline, vector search, agent filesystem sync, or workspace knowledge API. The `/api/memory/*` endpoints and daemon consolidation job have been removed.
 
 **Agent fields**: name, role, description, status (standby/working/offline), model, source (local/gateway/synced), gateway_agent_id, session_key_prefix, agent_dir, agent_workspace_path, soul_md, user_md, agents_md. **API enrichment**: `GET /api/agents` returns `active_task_count` (number of active tasks) and `current_task_title` (title of in-progress task, if any) for each agent.
 
@@ -247,7 +247,7 @@ The Strict template is the default. Per-task workflow plans persist selected par
 
 **Workspace visibility**: Synced OpenClaw agents expose their real filesystem paths via `agent_dir` and `agent_workspace_path`. Mission Control includes a read-only browser endpoint for these roots so the agent modal can inspect the actual workspace/config directories and installed `skills/` entries on disk.
 
-**OpenClaw modal policy**: Synced OpenClaw agents are inspected read-only in the Agent modal. The Operations/OpenClaw view is now a management entrypoint, not a direct prompt editor for synced agents.
+**OpenClaw modal policy**: Synced OpenClaw agents are inspected read-only in the Agent modal. The Operations/OpenClaw view is now a management entrypoint, not a direct prompt editor for synced agents. `/operations#agents/{agentId}` hash routes open agent-specific modals directly, the role field is selected from the canonical default role list, and the Agents panel shows a warning banner when required default roles are missing.
 
 **Skill linking policy**: Main OpenClaw agent skills are treated as the shared source. Sub-agents link skills via symlinks into their workspace `skills/` directories (no copy). Mission Control exposes `/api/agents/{id}/skills` for listing and link/unlink/sync actions. Workflow planning reads these linked skills when choosing which existing agent should run each step.
 
@@ -360,8 +360,6 @@ Fallback: Agent Activity Dashboard polls every 20s; task-specific views use SSE 
 |--------|----------|---------|
 | GET/POST | `/api/workspaces` | List (optional stats=true) / create repository/workspace |
 | GET/PATCH/DELETE | `/api/workspaces/{id}` | Workspace CRUD (lookup by ID or slug); internal meta repository cannot be linked to GitHub; DELETE returns 403 for internal workspaces (checked by both `id === 'default'` and `is_internal` flag) |
-| GET/POST | `/api/workspaces/{id}/knowledge` | Knowledge entries (list/create) |
-| GET/PATCH/DELETE | `/api/workspaces/{id}/knowledge/{entryId}` | Single knowledge entry (read/update/delete) |
 | GET/POST | `/api/workspaces/{id}/workflows` | Workflow templates |
 | GET | `/api/workspaces/{id}/activity-summary` | Presenter summaries across active tasks (query: ?limit=N, max 50) |
 
@@ -414,9 +412,8 @@ Fallback: Agent Activity Dashboard polls every 20s; task-specific views use SSE 
 - **task_findings** -- finding_type, severity, title, detail, metadata
 - **capability_proposals** -- learner_agent_id, proposal_type, title, detail, target_name, meta_workspace_id, meta_workspace_slug, status
 
-### Workflow and Knowledge Tables
+### Workflow Tables
 - **workflow_templates** -- stages (JSON array, supports per-stage `required_artifacts`/`required_fields`), fail_targets (JSON), is_default
-- **knowledge_entries** -- category, title, content, tags (JSON), confidence score
 
 ### Session and Event Tables
 - **openclaw_sessions** -- agent_id, openclaw_session_id, channel, status, session_type (persistent/subagent), task_id, ended_at
@@ -476,7 +473,6 @@ When `MC_API_TOKEN` is set in `.env.local`:
 - Scoped per-task tokens (`mcst.<payload>.<sig>`) are supported and enforced at middleware level:
   - task-scoped read/write (`task:{id}:read`, `task:{id}:write`)
   - optional task list/create (`tasks:read`, `tasks:create`)
-  - knowledge write scopes (`knowledge:write`) with delete explicitly denied
   - OpenClaw session endpoints are scoped by `session_id` in the token payload (`/api/openclaw/sessions/{id}` and `/api/openclaw/sessions/{id}/history`) and additionally require task scope (`task:{id}:read`/`task:{id}:write`)
 - Scoped token signing/verification uses configured API secrets only (`MC_API_TOKEN` / `MC_TOKEN`) and supports cross-checking both configured values to avoid env-order mismatches.
 - Bearer parsing is normalized (trims whitespace, handles duplicated `Bearer`, strips quote wrappers) before scoped verification.
@@ -567,12 +563,6 @@ Webhook verification: `WEBHOOK_SECRET` env var, HMAC signature in `x-webhook-sig
 - `logActivity()` / `logDeliverable()` -- Audit trail
 - `verifyTaskHasDeliverables()` -- Required before review -> done transition
 
-`src/lib/learner.ts`:
-- Captures transition outcomes as knowledge entries
-- Injects relevant lessons into future dispatches
-
----
-
 ## File Operations (Remote Agents)
 
 Agents without direct filesystem access use upload/download endpoints:
@@ -587,7 +577,7 @@ Agents without direct filesystem access use upload/download endpoints:
 
 1. **SSE over WebSocket**: Simpler, works with Next.js App Router natively, sufficient for server-to-client updates.
 2. **SQLite over Postgres**: Single-file DB, zero config, WAL mode for concurrent reads. Sufficient for single-server deployment.
-3. **Single-page dashboard**: All views render in same page via state switching. No route navigations between views -- prevents layout jumps.
+3. **Single-page dashboard**: All views render in same page via state switching. No route navigations between views -- prevents layout jumps. Workspace-level dashboard views are now `sprint`, `backlog`, `pareto`, and `issues`; removed views like `activity` and `knowledge` fall back to the main panel.
 4. **Milestone-first hierarchy**: Tasks belong to milestones; milestones belong to sprints. The hierarchy is `Workspace -> Sprint -> Milestone -> Task`. Tasks do not have a direct sprint relationship. Backlog is defined as `milestone_id IS NULL`.
 5. **Agent sync from gateway config**: Agents defined in OpenClaw config files, auto-synced on startup. Prompts stored in files (not DB). Synced agents appear in all workspaces.
 6. **Migrations auto-run on DB connection**: Schema creation only for fresh databases. `legacy_alter_table = ON` during migrations to prevent FK rewriting bug.
@@ -600,7 +590,7 @@ Agents without direct filesystem access use upload/download endpoints:
 12. **Repo-driven workspaces**: Standard repositories auto-discover from git repos at `/root/repos/{org}/{repo}`. On DB init, `discoverRepoWorkspaces()` scans for org directories containing git repos and creates/syncs a workspace per repo. Slug format: `{org}-{repo}` (e.g., `blockether-mission-control`). Mission Control is treated like any other discovered repository. The `default` workspace is reserved for the internal OpenClaw meta repository rooted at `/root/.openclaw`. Repositories are grouped by organization in the UI, with the meta repository under `System`.
 13. **Workflow templates in code, not DB-cloned**: Template definitions (Simple, Standard, Strict, Auto-Train, Architecture) live in `src/lib/workflow-templates.ts` as TypeScript constants. New workspaces get templates provisioned from code, not cloned from another workspace's DB rows.
 14. **LLM-powered skill selection**: Workflow planning uses LLM inference to intelligently select the most relevant skills per agent per task step, rather than assigning all available skills. Falls back to rule-based selection when LLM is unavailable.
-15. **Standardized file upload UX**: All file input areas across the UI (task creation, knowledge entry creation, per-entry attachments) use a consistent drag-and-drop zone pattern with Upload icon, dashed border, and "Drop file or click to browse" text.
+15. **Standardized file upload UX**: Active file input areas across the UI use a consistent drag-and-drop zone pattern with Upload icon, dashed border, and "Drop file or click to browse" text.
 ---
 
 ## Environment Variables
@@ -690,7 +680,7 @@ Env vars: `MC_URL` (default `https://control.blockether.com`), `MC_API_TOKEN` (r
 | `agent_logs` | OpenClaw session transcripts — role (user/assistant/system), content, content_hash (dedup), linked to agent and workspace |
 ### Shared Dispatch (`src/lib/dispatch.ts`)
 
-The dispatch logic (task message building, OpenClaw session management, workflow stage awareness, knowledge injection) was extracted from the API route into a shared module `dispatchTaskToAgent(taskId)`. Both the API route (`POST /api/tasks/{id}/dispatch`) and the daemon's dispatcher call the same function. Returns a `DispatchResult` with success/error status and updated task/agent payloads.
+The dispatch logic (task message building, OpenClaw session management, workflow stage awareness, and resource injection) was extracted from the API route into a shared module `dispatchTaskToAgent(taskId)`. Both the API route (`POST /api/tasks/{id}/dispatch`) and the daemon's dispatcher call the same function. Returns a `DispatchResult` with success/error status and updated task/agent payloads.
 
 The dispatch module includes a **concurrent session guard**: before creating a new OpenClaw session for a task, it interrupts any existing active sessions on that task via `finalizeOtherActiveSessionsForTask()`. This prevents the dual-session bug where two agents run simultaneously on the same task. Interrupted sessions are logged as task activities.
 
