@@ -7,7 +7,7 @@
 <sub>Task orchestration · Sprint planning · Kanban boards · Agent sync · Real-time SSE · Workflow pipelines · Deliverable tracking — one self-hosted dashboard, zero telemetry.</sub>
 
 <h2>
-  <a href="https://github.com/Blockether/mission-control/blob/main/LICENSE">
+  <a href="https://github.com/Blockether/Styrmann/blob/main/LICENSE">
     <img src="https://img.shields.io/badge/license-Apache%202.0-green" alt="License - Apache 2.0">
   </a>
 </h2>
@@ -35,8 +35,8 @@ Styrmann is a focused, self-hosted dashboard that connects to your [OpenClaw](ht
 ## Quick Start
 
 ```bash
-git clone https://github.com/Blockether/mission-control.git
-cd mission-control
+git clone https://github.com/Blockether/Styrmann.git
+cd Styrmann
 npm install
 cp .env.example .env.local
 ```
@@ -70,7 +70,7 @@ npx next start -p 4000
 | `OPENCLAW_GATEWAY_TOKEN` | Yes | Authentication token for OpenClaw |
 | `MC_API_TOKEN` | No | API auth token (enables Bearer auth middleware) |
 | `WEBHOOK_SECRET` | No | HMAC secret for webhook signature verification |
-| `DATABASE_PATH` | No | SQLite database location (default: `./mission-control.db`) |
+| `DATABASE_PATH` | No | SQLite database location (default: `./styrmann.db`) |
 
 </details>
 
