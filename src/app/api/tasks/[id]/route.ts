@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
-import { queryOne, run } from '@/lib/db';
+import { execFileSync } from 'child_process';
+import { existsSync, rmSync } from 'fs';
+import path from 'path';
+import { queryAll, queryOne, run } from '@/lib/db';
 import { broadcast } from '@/lib/events';
 import { getMissionControlUrl } from '@/lib/config';
 import { getHimalayaStatus, sendHumanAssignmentEmail } from '@/lib/himalaya';
@@ -10,9 +13,79 @@ import { captureTaskRunResult } from '@/lib/task-run-results';
 import { checkBuilderEvidence } from '@/lib/builder-evidence';
 import { UpdateTaskSchema } from '@/lib/validation';
 import { generateTaskWorkflowPlan } from '@/lib/workflow-planning';
+import { getOpenClawClient } from '@/lib/openclaw/client';
+import { getTaskPipelineDir, getTaskWorktreePath, getWorkspaceRepoPath } from '@/lib/git-repo';
 import type { Task, UpdateTaskRequest, Agent, Human } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
+
+type DispatchMetadata = {
+  worktree_path?: unknown;
+  output_directory?: unknown;
+  session_key?: unknown;
+  openclaw_session_id?: unknown;
+};
+
+async function terminateGatewaySession(openclawSessionId: string, sessionKey?: string): Promise<boolean> {
+  const client = getOpenClawClient();
+  if (!client.isConnected()) {
+    try {
+      await client.connect();
+    } catch {
+      return false;
+    }
+  }
+
+  const keys = new Set<string>();
+  if (sessionKey && sessionKey.trim().length > 0) keys.add(sessionKey.trim());
+  if (openclawSessionId && openclawSessionId.trim().length > 0) keys.add(openclawSessionId.trim());
+
+  for (const key of keys) {
+    try {
+      await client.call('sessions.delete', {
+        key,
+        deleteTranscript: true,
+        emitLifecycleHooks: true,
+      });
+      return true;
+    } catch {
+    }
+  }
+
+  try {
+    const fallbackTarget = sessionKey || openclawSessionId;
+    await client.call('chat.send', {
+      sessionKey: fallbackTarget,
+      message: '[Mission Control] Stop this session now. Task was deleted.',
+    });
+  } catch {
+  }
+  return false;
+}
+
+function withinMissionControlRoot(candidate: string, missionControlRoot: string): boolean {
+  const resolvedCandidate = path.resolve(candidate);
+  const resolvedRoot = path.resolve(missionControlRoot);
+  return resolvedCandidate === resolvedRoot || resolvedCandidate.startsWith(`${resolvedRoot}${path.sep}`);
+}
+
+function parseDispatchMetadata(raw: string | null): DispatchMetadata | null {
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as DispatchMetadata;
+  } catch {
+    return null;
+  }
+}
+
+function tableHasColumn(table: string, column: string): boolean {
+  try {
+    const rows = queryAll<{ name: string }>(`PRAGMA table_info(${table})`);
+    return rows.some((row) => row.name === column);
+  } catch {
+    return false;
+  }
+}
 
 // GET /api/tasks/[id] - Get a single task
 export async function GET(
@@ -501,17 +574,94 @@ export async function DELETE(
       return NextResponse.json({ error: 'Task not found' }, { status: 404 });
     }
 
-    // Delete or nullify related records first (foreign key constraints)
-    // Note: task_activities and task_deliverables have ON DELETE CASCADE
+    const sessionRows = queryAll<{ openclaw_session_id: string }>(
+      'SELECT openclaw_session_id FROM openclaw_sessions WHERE task_id = ?',
+      [id],
+    );
+
+    const dispatchMetadataRows = queryAll<{ metadata: string | null }>(
+      'SELECT metadata FROM task_activities WHERE task_id = ? AND activity_type = ? ORDER BY created_at DESC LIMIT 200',
+      [id, 'dispatch_invocation'],
+    );
+
+    const sessionKeyByOpenClawId = new Map<string, string>();
+    for (const row of dispatchMetadataRows) {
+      const metadata = parseDispatchMetadata(row.metadata);
+      if (!metadata) continue;
+      const openclawId = typeof metadata.openclaw_session_id === 'string' ? metadata.openclaw_session_id.trim() : '';
+      const sessionKey = typeof metadata.session_key === 'string' ? metadata.session_key.trim() : '';
+      if (openclawId && sessionKey && !sessionKeyByOpenClawId.has(openclawId)) {
+        sessionKeyByOpenClawId.set(openclawId, sessionKey);
+      }
+    }
+
+    for (const row of sessionRows) {
+      if (!row.openclaw_session_id) continue;
+      await terminateGatewaySession(row.openclaw_session_id, sessionKeyByOpenClawId.get(row.openclaw_session_id));
+    }
+
+    const workspace = queryOne<{ local_path: string | null; github_repo: string | null }>(
+      'SELECT local_path, github_repo FROM workspaces WHERE id = ?',
+      [existing.workspace_id],
+    );
+
+    const repoPath = getWorkspaceRepoPath(workspace?.local_path || workspace?.github_repo || null);
+    if (repoPath && existsSync(repoPath)) {
+      const missionControlRoot = path.join(repoPath, '.mission-control');
+      const candidatePaths = new Set<string>();
+
+      candidatePaths.add(getTaskPipelineDir(repoPath, id));
+      candidatePaths.add(getTaskWorktreePath(repoPath, id, existing.title));
+
+      for (const row of dispatchMetadataRows) {
+        const metadata = parseDispatchMetadata(row.metadata);
+        if (!metadata) continue;
+        if (typeof metadata.worktree_path === 'string' && metadata.worktree_path.trim().length > 0) {
+          candidatePaths.add(metadata.worktree_path.trim());
+        }
+        if (typeof metadata.output_directory === 'string' && metadata.output_directory.trim().length > 0) {
+          candidatePaths.add(metadata.output_directory.trim());
+        }
+      }
+
+      for (const rawCandidate of candidatePaths) {
+        if (!rawCandidate) continue;
+        const resolvedCandidate = path.resolve(rawCandidate);
+        if (!withinMissionControlRoot(resolvedCandidate, missionControlRoot)) continue;
+        if (!existsSync(resolvedCandidate)) continue;
+
+        const isWorktreePath = resolvedCandidate.includes(`${path.sep}worktrees${path.sep}`);
+        if (isWorktreePath) {
+          try {
+            execFileSync('git', ['worktree', 'remove', '--force', resolvedCandidate], {
+              cwd: repoPath,
+              encoding: 'utf8',
+              timeout: 15000,
+            });
+          } catch {
+          }
+        }
+
+        rmSync(resolvedCandidate, { recursive: true, force: true });
+      }
+    }
+
     run('DELETE FROM openclaw_sessions WHERE task_id = ?', [id]);
     run('DELETE FROM task_run_results WHERE task_id = ?', [id]);
     run('DELETE FROM events WHERE task_id = ?', [id]);
-    run('UPDATE acp_bindings SET task_id = NULL WHERE task_id = ?', [id]);
-    run('UPDATE github_issues SET task_id = NULL WHERE task_id = ?', [id]);
-    // Conversations reference tasks - nullify or delete
-    run('UPDATE conversations SET task_id = NULL WHERE task_id = ?', [id]);
+    if (tableHasColumn('acp_bindings', 'task_id')) {
+      run('UPDATE acp_bindings SET task_id = NULL WHERE task_id = ?', [id]);
+    }
+    if (tableHasColumn('github_issues', 'task_id')) {
+      run('UPDATE github_issues SET task_id = NULL WHERE task_id = ?', [id]);
+    }
+    if (tableHasColumn('knowledge_entries', 'task_id')) {
+      run('UPDATE knowledge_entries SET task_id = NULL WHERE task_id = ?', [id]);
+    }
+    if (tableHasColumn('conversations', 'task_id')) {
+      run('DELETE FROM conversations WHERE task_id = ?', [id]);
+    }
 
-    // Now delete the task (cascades to task_activities and task_deliverables)
     run('DELETE FROM tasks WHERE id = ?', [id]);
 
     // Broadcast deletion via SSE

@@ -6,7 +6,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { Bot, CheckCircle, Circle, XCircle, Check, Shield, AlertTriangle } from 'lucide-react';
+import { Bot, Circle, XCircle, Shield, AlertTriangle } from 'lucide-react';
 import { AgentInitials } from './AgentInitials';
 import { TraceViewerModal } from './TraceViewerModal';
 import { useTraceDeepLink } from '@/hooks/useTraceDeepLink';
@@ -96,7 +96,7 @@ export function SessionsList({ taskId }: SessionsListProps) {
       case 'active':
         return <Circle className="w-4 h-4 text-green-500 fill-current animate-pulse" />;
       case 'completed':
-        return <CheckCircle className="w-4 h-4 text-mc-accent" />;
+        return <Circle className="w-4 h-4 text-mc-text-secondary" />;
       case 'interrupted':
         return <AlertTriangle className="w-4 h-4 text-orange-500" />;
       case 'stale':
@@ -113,7 +113,7 @@ export function SessionsList({ taskId }: SessionsListProps) {
       case 'active':
         return 'Running';
       case 'completed':
-        return 'Completed';
+        return 'Ended';
       case 'interrupted':
         return 'Interrupted';
       case 'stale':
@@ -342,23 +342,23 @@ export function SessionsList({ taskId }: SessionsListProps) {
           </div>
 
           {/* Action Buttons */}
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-col gap-1 items-end">
             {session.status === 'active' && (
               <button
                 onClick={() => handleMarkComplete(session.openclaw_session_id)}
-                className="p-1.5 hover:bg-mc-bg-tertiary rounded text-green-500"
+                className="px-2 py-1 text-[11px] border border-mc-border rounded bg-mc-bg hover:bg-mc-bg-tertiary text-mc-text-secondary whitespace-nowrap"
                 title="Mark session as ended"
               >
-                <Check className="w-4 h-4" />
+                End
               </button>
             )}
             {session.status === 'interrupted' && (
               <button
                 onClick={() => handleResumeInterrupted(session.openclaw_session_id)}
-                className="p-1.5 hover:bg-mc-bg-tertiary rounded text-orange-500"
+                className="px-2 py-1 text-[11px] border border-orange-200 rounded bg-orange-50 hover:bg-orange-100 text-orange-700 whitespace-nowrap"
                 title="Resume interrupted session"
               >
-                <Check className="w-4 h-4" />
+                Resume
               </button>
             )}
           </div>

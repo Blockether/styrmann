@@ -163,6 +163,21 @@ export async function DELETE(request: Request, { params }: RouteParams) {
   try {
     const { id } = await params;
     const db = getDb();
+    const client = getOpenClawClient();
+
+    let gatewayDeleted = false;
+    try {
+      if (!client.isConnected()) {
+        await client.connect();
+      }
+      await client.call('sessions.delete', {
+        key: id,
+        deleteTranscript: true,
+        emitLifecycleHooks: true,
+      });
+      gatewayDeleted = true;
+    } catch {
+    }
 
     // Find session by openclaw_session_id or internal id
     let session = db.prepare('SELECT * FROM openclaw_sessions WHERE openclaw_session_id = ?').get(id) as any;
@@ -171,11 +186,15 @@ export async function DELETE(request: Request, { params }: RouteParams) {
       session = db.prepare('SELECT * FROM openclaw_sessions WHERE id = ?').get(id) as any;
     }
 
-    if (!session) {
+    if (!session && !gatewayDeleted) {
       return NextResponse.json(
         { error: 'Session not found' },
         { status: 404 }
       );
+    }
+
+    if (!session && gatewayDeleted) {
+      return NextResponse.json({ success: true, gateway_deleted: true, db_deleted: false });
     }
 
     const taskId = session.task_id;
@@ -205,7 +224,7 @@ export async function DELETE(request: Request, { params }: RouteParams) {
       },
     });
 
-    return NextResponse.json({ success: true, deleted: session.id });
+    return NextResponse.json({ success: true, deleted: session.id, gateway_deleted: gatewayDeleted, db_deleted: true });
   } catch (error) {
     console.error('Failed to delete OpenClaw session:', error);
     return NextResponse.json(

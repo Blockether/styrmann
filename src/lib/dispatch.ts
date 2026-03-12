@@ -399,6 +399,11 @@ export async function dispatchTaskToAgent(taskId: string): Promise<DispatchResul
 3. Update status: PATCH ${missionControlUrl}/api/tasks/${task.id}${authHeader}
    Body: {"status": "${nextStatus}"}
 
+Progress reporting rules:
+- Post at least one mid-run update using /activities with activity_type "updated" before completion.
+- If any command fails due to access, auth, or missing files, post an explicit "updated" activity describing blocker and fallback.
+- Do not silently continue after tool/API failures.
+
 ${branchRule}
 ${loopGuide}
 
@@ -419,6 +424,10 @@ ${loopGuide}
 **If tests FAIL:**
 1. ${failEndpoint}${authHeader}
    Body: {"reason": "Detailed description of what failed and what needs fixing"}
+
+Progress reporting rules:
+- Post at least one mid-run update using /activities with activity_type "updated".
+- If test environment/access failures occur, report them immediately with blocker details before fail-loopback call.
 ${loopGuide}
 
 Reply with: \`TEST_PASS: [summary]\` or \`TEST_FAIL: [what failed]\``;
@@ -437,6 +446,10 @@ ${loopGuide}
 **If verification FAILS:**
 1. ${failEndpoint}${authHeader}
    Body: {"reason": "Detailed description of what failed and what needs fixing"}
+
+Progress reporting rules:
+- Post at least one mid-run update using /activities with activity_type "updated".
+- If blocked by permissions/access/scopes, report the blocker explicitly before fail-loopback call.
 ${loopGuide}
 
 Reply with: \`VERIFY_PASS: [summary]\` or \`VERIFY_FAIL: [what failed]\``;

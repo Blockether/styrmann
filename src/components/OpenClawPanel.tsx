@@ -286,19 +286,17 @@ export function OpenClawPanel({ embedded = false, focusArea = 'gateway' }: OpenC
             </div>
           </div>}
 
-          {/* Bottom Row: Agent Occupation + Models */}
+          {/* Bottom Row: Agents + Models */}
           <div className="grid grid-cols-1 gap-6">
-            {/* Card 2: Agent Occupation */}
+            {/* Card 2: Agents */}
             {isAgentsFocus && <div className="rounded-lg border border-mc-border bg-mc-bg overflow-hidden">
               <div className="p-3 border-b border-mc-border bg-mc-bg-secondary flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
                   <Bot className="w-4 h-4 text-mc-text-secondary" />
-                  <h3 className="text-sm font-medium">Agent Occupation</h3>
+                  <h3 className="text-sm font-medium">Agents</h3>
                 </div>
                 <div className="flex gap-3 text-xs text-mc-text-secondary">
-                  <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-green-500" />{agentCounts.working} working</span>
-                  <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-blue-500" />{agentCounts.standby} standby</span>
-                  {agentCounts.offline > 0 && <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-gray-400" />{agentCounts.offline} offline</span>}
+                  <span>{agentCounts.total} total</span>
                 </div>
               </div>
               <div>

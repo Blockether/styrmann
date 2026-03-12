@@ -298,8 +298,14 @@ export async function handleStageTransition(
   // Dispatch to the agent
   const missionControlUrl = getMissionControlUrl();
   try {
+    const internalToken = process.env.MC_API_TOKEN?.trim();
+    const headers: Record<string, string> = {};
+    if (internalToken) {
+      headers.Authorization = `Bearer ${internalToken}`;
+    }
     const dispatchRes = await fetch(`${missionControlUrl}/api/tasks/${taskId}/dispatch`, {
       method: 'POST',
+      headers,
     });
 
     if (!dispatchRes.ok) {

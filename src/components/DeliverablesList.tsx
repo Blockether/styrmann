@@ -67,6 +67,15 @@ function isPreviewable(filePath: string | undefined): boolean {
   return PREVIEWABLE_EXTENSIONS.has(getExtension(filePath));
 }
 
+function toTitleCaseLabel(value: string): string {
+  return value
+    .replace(/_/g, ' ')
+    .split(' ')
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+}
+
 export function DeliverablesList({ taskId }: DeliverablesListProps) {
   const [deliverables, setDeliverables] = useState<TaskDeliverable[]>([]);
   const [changes, setChanges] = useState<TaskChangesPayload | null>(null);
@@ -291,22 +300,30 @@ export function DeliverablesList({ taskId }: DeliverablesListProps) {
 
   const finalResult = useMemo(() => {
     const sorted = rawActivities.slice().sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-    const completion = sorted.find((activity) => activity.activity_type === 'completed');
-    const failure = sorted.find((activity) => {
+    const scoped = sorted.filter((activity) => {
+      if (lastResumeAt === null) {
+        return true;
+      }
+      return new Date(activity.created_at).getTime() >= lastResumeAt;
+    });
+    const completion = scoped.find((activity) => activity.activity_type === 'completed');
+    const failure = scoped.find((activity) => {
       if (lastResumeAt !== null && new Date(activity.created_at).getTime() < lastResumeAt) {
         return false;
       }
       const lower = `${activity.activity_type} ${activity.message}`.toLowerCase();
       return lower.includes('fail') || lower.includes('error') || lower.includes('retry');
     });
-    const latest = sorted[0] || null;
-    const finalSignal = completion || latest;
+    const latest = scoped[0] || sorted[0] || null;
+    const isTerminal = task?.status === 'done' || Boolean(completion);
+    const finalSignal = isTerminal ? (completion || latest) : latest;
 
     return {
       status: task?.status || 'unknown',
       summary: finalSignal ? summarizeTaskActivity(finalSignal) : 'No execution result captured yet.',
       failureSignal: failure ? summarizeTaskActivity(failure) : null,
       lastUpdated: finalSignal?.created_at || null,
+      isTerminal,
     };
   }, [rawActivities, task?.status, lastResumeAt]);
 
@@ -346,7 +363,7 @@ export function DeliverablesList({ taskId }: DeliverablesListProps) {
                 {phaseSummaries.map((phase) => (
                   <details key={`current-${phase.step}`} className="rounded border border-mc-border bg-mc-bg-secondary px-3 py-2">
                     <summary className="cursor-pointer text-sm flex items-center justify-between gap-2">
-                      <span className="font-medium text-mc-text">{phase.step.replace(/_/g, ' ')}</span>
+                      <span className="font-medium text-mc-text">{toTitleCaseLabel(phase.step)}</span>
                       <span className="text-xs text-mc-text-secondary">{phase.iterations} iteration(s) • {phase.activitiesCount} event(s)</span>
                     </summary>
                     <div className="mt-2 space-y-1">
@@ -371,7 +388,7 @@ export function DeliverablesList({ taskId }: DeliverablesListProps) {
                   {historicalPhaseSummaries.map((phase) => (
                     <details key={`historical-${phase.step}`} className="rounded border border-mc-border bg-mc-bg-secondary/70 px-3 py-2">
                       <summary className="cursor-pointer text-sm flex items-center justify-between gap-2">
-                        <span className="font-medium text-mc-text">{phase.step.replace(/_/g, ' ')}</span>
+                        <span className="font-medium text-mc-text">{toTitleCaseLabel(phase.step)}</span>
                         <span className="text-xs text-mc-text-secondary">{phase.iterations} iteration(s) • {phase.activitiesCount} event(s)</span>
                       </summary>
                       <div className="mt-2 space-y-1">
@@ -393,8 +410,11 @@ export function DeliverablesList({ taskId }: DeliverablesListProps) {
         )}
 
         <div className="rounded border border-mc-border bg-mc-bg-secondary px-3 py-2 space-y-1">
-          <div className="text-sm font-medium text-mc-text">Final Result</div>
-          <div className="text-xs text-mc-text-secondary">Status: {finalResult.status.replace(/_/g, ' ')}</div>
+          <div className="text-sm font-medium text-mc-text">{finalResult.isTerminal ? 'Final Result' : 'Latest Runtime Snapshot'}</div>
+          <div className="text-xs text-mc-text-secondary">{finalResult.isTerminal ? 'Status' : 'Status now'}: {toTitleCaseLabel(finalResult.status)}</div>
+          {!finalResult.isTerminal && (
+            <div className="text-[11px] text-mc-text-secondary">This reflects the latest runtime signal and may still change.</div>
+          )}
           <div className="text-sm text-mc-text">{finalResult.summary}</div>
           {finalResult.failureSignal && (
             <div className="text-xs text-mc-accent-red">Latest failure signal: {finalResult.failureSignal}</div>

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getOpenClawClient } from '@/lib/openclaw/client';
 import { queryOne, queryAll, run } from '@/lib/db';
+import { broadcast } from '@/lib/events';
 import type { InputProvenance, SourceReceipt } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
@@ -8,6 +9,7 @@ export const dynamic = 'force-dynamic';
 type Params = { params: Promise<{ id: string; sessionId: string }> };
 
 type TraceMessage = { role: string; content: string; tool_calls?: { id?: string; name: string; input?: string }[]; tool_result?: string; tool_name?: string; tool_call_id?: string; is_error?: boolean; timestamp?: string; provenance?: InputProvenance | null; receipt?: SourceReceipt | null };
+type AutoDeliverableCandidate = { path: string; title: string; sourceTool: string };
 
 const SOURCE_RECEIPT_RE = /\[Source Receipt\]\n([\s\S]*?)\n\[\/?Source Receipt\]/;
 
@@ -137,6 +139,74 @@ function extractSessionMetadata(taskId: string, sessionId: string): {
       }
     })
     .find((row) => row && row.session_id === sessionId) || null;
+}
+
+function tableHasColumn(table: string, column: string): boolean {
+  try {
+    const rows = queryAll<{ name: string }>(`PRAGMA table_info(${table})`);
+    return rows.some((row) => row.name === column);
+  } catch {
+    return false;
+  }
+}
+
+function parseToolInputObject(input?: string): Record<string, unknown> | null {
+  if (!input || input.trim().length === 0) return null;
+  try {
+    const parsed = JSON.parse(input) as unknown;
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      return parsed as Record<string, unknown>;
+    }
+  } catch {
+  }
+  return null;
+}
+
+function isWriteTool(toolName: string): boolean {
+  const name = toolName.toLowerCase();
+  return name === 'write'
+    || name.endsWith('.write')
+    || name.includes('write_file')
+    || name.includes('writefile');
+}
+
+function extractFilePathFromToolInput(input?: string): string | null {
+  const obj = parseToolInputObject(input);
+  if (!obj) return null;
+  const keys = ['filePath', 'file_path', 'path', 'targetPath', 'target_path', 'filename'];
+  for (const key of keys) {
+    const value = obj[key];
+    if (typeof value === 'string' && value.trim().length > 0) {
+      return value.trim();
+    }
+  }
+  return null;
+}
+
+function titleFromPath(filePath: string): string {
+  const normalized = filePath.replace(/\\/g, '/');
+  const segments = normalized.split('/').filter(Boolean);
+  return segments[segments.length - 1] || filePath;
+}
+
+function extractAutoDeliverableCandidates(history: TraceMessage[]): AutoDeliverableCandidate[] {
+  const byPath = new Map<string, AutoDeliverableCandidate>();
+  for (const msg of history) {
+    if (msg.role !== 'assistant' || !msg.tool_calls || msg.tool_calls.length === 0) continue;
+    for (const call of msg.tool_calls) {
+      if (!isWriteTool(call.name)) continue;
+      const filePath = extractFilePathFromToolInput(call.input);
+      if (!filePath) continue;
+      if (!byPath.has(filePath)) {
+        byPath.set(filePath, {
+          path: filePath,
+          title: titleFromPath(filePath),
+          sourceTool: call.name,
+        });
+      }
+    }
+  }
+  return Array.from(byPath.values());
 }
 
 function buildTraceSummary(
@@ -325,6 +395,69 @@ export async function GET(request: Request, { params }: Params) {
       if ((msg.role === 'toolResult' || msg.role === 'tool') && msg.tool_call_id && !msg.tool_name) {
         const name = toolCallMap.get(msg.tool_call_id);
         if (name) msg.tool_name = name;
+      }
+    }
+
+    const hasSessionIdColumn = tableHasColumn('task_deliverables', 'openclaw_session_id');
+    const autoDeliverableCandidates = extractAutoDeliverableCandidates(history);
+    for (const candidate of autoDeliverableCandidates) {
+      const existing = hasSessionIdColumn
+        ? queryOne<{ id: string }>(
+          'SELECT id FROM task_deliverables WHERE task_id = ? AND openclaw_session_id = ? AND path = ? LIMIT 1',
+          [taskId, session.openclaw_session_id, candidate.path],
+        )
+        : queryOne<{ id: string }>(
+          'SELECT id FROM task_deliverables WHERE task_id = ? AND path = ? LIMIT 1',
+          [taskId, candidate.path],
+        );
+      if (existing) continue;
+
+      const deliverableId = crypto.randomUUID();
+      if (hasSessionIdColumn) {
+        run(
+          `INSERT INTO task_deliverables
+            (id, task_id, deliverable_type, title, path, description, openclaw_session_id)
+           VALUES (?, ?, 'file', ?, ?, ?, ?)`,
+          [
+            deliverableId,
+            taskId,
+            candidate.title,
+            candidate.path,
+            `Auto-captured from trace write operation (${candidate.sourceTool})`,
+            session.openclaw_session_id,
+          ],
+        );
+      } else {
+        run(
+          `INSERT INTO task_deliverables
+            (id, task_id, deliverable_type, title, path, description)
+           VALUES (?, ?, 'file', ?, ?, ?)`,
+          [
+            deliverableId,
+            taskId,
+            candidate.title,
+            candidate.path,
+            `Auto-captured from trace write operation (${candidate.sourceTool})`,
+          ],
+        );
+      }
+
+      const created = queryOne<{
+        id: string;
+        task_id: string;
+        deliverable_type: string;
+        title: string;
+        path: string | null;
+        description: string | null;
+        openclaw_session_id?: string | null;
+        created_at: string;
+      }>('SELECT * FROM task_deliverables WHERE id = ?', [deliverableId]);
+
+      if (created) {
+        broadcast({
+          type: 'deliverable_added',
+          payload: created,
+        });
       }
     }
 

@@ -311,7 +311,7 @@ Fallback: Agent Activity Dashboard polls every 20s; task-specific views use SSE 
 | POST | `/api/tasks` | Create task |
 | GET | `/api/tasks/{id}` | Get task with agent joins, tags, comments, blockers, resources, acceptance criteria |
 | PATCH | `/api/tasks/{id}` | Update task (triggers workflow engine on status changes) |
-| DELETE | `/api/tasks/{id}` | Delete task |
+| DELETE | `/api/tasks/{id}` | Delete task and cleanup OpenClaw sessions + `.mission-control` task artifacts/worktrees |
 | POST | `/api/tasks/{id}/dispatch` | Dispatch to agent via OpenClaw |
 | GET/POST | `/api/tasks/{id}/dependencies` | Task dependency list/create (`depends_on_task_id`, `required_status`) |
 | PATCH/DELETE | `/api/tasks/{id}/dependencies/{dependencyId}` | Task dependency update/remove |
@@ -364,7 +364,7 @@ Fallback: Agent Activity Dashboard polls every 20s; task-specific views use SSE 
 | GET | `/api/tags` | List tags for workspace |
 | POST | `/api/tags` | Create tag |
 | PATCH/DELETE | `/api/tags/{id}` | Update/delete tag |
-| GET/PATCH/DELETE | `/api/openclaw/sessions/{id}` | OpenClaw session management |
+| GET/PATCH/DELETE | `/api/openclaw/sessions/{id}` | OpenClaw session management (DELETE attempts gateway `sessions.delete` by key before DB cleanup) |
 | GET | `/api/openclaw/gateway-logs` | OpenClaw gateway runtime logs (RPC-first; journalctl fallback) |
 | POST | `/api/files/upload` | Upload file from remote agent |
 | GET | `/api/files/download` | Download file |
@@ -494,7 +494,13 @@ Webhook verification: `WEBHOOK_SECRET` env var, HMAC signature in `x-webhook-sig
   - `output_directory`
   - `invocation` (full dispatched prompt)
 - Per-session trace endpoint: `GET /api/tasks/{id}/sessions/{sessionId}/trace` returns dispatch invocation + normalized OpenClaw chat history.
+- Trace fetch auto-captures deliverables from write-style tool calls (for example `write`, `functions.write`, `write_file`) and inserts deduped `task_deliverables` rows by task/session/path.
 - Workspace Activity and Task Activity surfaces include links to session traces when available.
+
+**Task deletion cleanup**:
+- Task delete attempts OpenClaw gateway session termination using `sessions.delete` with `key` (session key preferred, then session id fallback).
+- Task delete removes `.mission-control/tasks/{taskId}` and derived `.mission-control/worktrees/*` task paths resolved from dispatch metadata and deterministic path builders.
+- DB cleanup is schema-aware (`PRAGMA table_info`) and nullifies/removes related rows safely across environments with slight schema drift.
 
 **Auto-Train dispatch specialization**:
 - For `task_type='autotrain'`, dispatch prompt switches to a continuous loop contract: inspect -> propose -> implement -> verify -> report.
