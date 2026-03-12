@@ -19,6 +19,8 @@ import {
   Eye,
   EyeOff,
   Target,
+  ListTodo,
+  FunnelX,
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { useMissionControl } from '@/lib/store';
@@ -120,6 +122,12 @@ export function BacklogView({ workspaceId }: BacklogViewProps) {
     return result;
   }, [tasks, filterType, filterPriority, sortBy, sortDir, hideDone]);
 
+  const backlogTasks = useMemo(() => tasks.filter((t) => !t.milestone_id), [tasks]);
+  const urgentCount = useMemo(() => filteredTasks.filter((t) => t.priority === 'urgent').length, [filteredTasks]);
+  const readyCount = useMemo(() => filteredTasks.filter((t) => t.status === 'assigned' || t.status === 'pending_dispatch').length, [filteredTasks]);
+  const doneCount = useMemo(() => filteredTasks.filter((t) => t.status === 'done').length, [filteredTasks]);
+  const activeFilterCount = (filterType !== 'all' ? 1 : 0) + (filterPriority !== 'all' ? 1 : 0);
+
 
 
   const getMilestoneName = (milestoneId: string | undefined): string => {
@@ -152,14 +160,41 @@ export function BacklogView({ workspaceId }: BacklogViewProps) {
     }
   };
 
+  const resetFilters = () => {
+    setFilterType('all');
+    setFilterPriority('all');
+  };
+
   return (
     <div data-component="src/components/BacklogView" className="flex-1 flex flex-col overflow-hidden">
       <div className="p-3 border-b border-mc-border bg-mc-bg-secondary flex items-center justify-between gap-2 flex-wrap">
-        <div className="flex items-center gap-2">
-          <span className="font-medium">Backlog</span>
-          <span className="text-sm text-mc-text-secondary">{filteredTasks.length} tasks</span>
+        <div>
+          <div className="flex items-center gap-2 text-sm font-medium text-mc-text">
+            <ListTodo className="w-4 h-4 text-mc-accent" />
+            <span>Backlog</span>
+          </div>
+          <p className="mt-1 text-xs text-mc-text-secondary">
+            Unscheduled tasks waiting for milestone assignment and dispatch.
+          </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap text-xs">
+          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full border border-mc-border bg-mc-bg text-mc-text-secondary">
+            Total unscheduled: {backlogTasks.length}
+          </span>
+          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full border border-red-200 bg-red-50 text-red-700">
+            Urgent: {urgentCount}
+          </span>
+          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full border border-cyan-200 bg-cyan-50 text-cyan-700">
+            Ready: {readyCount}
+          </span>
+          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full border border-green-200 bg-green-50 text-green-700">
+            Done in view: {doneCount}
+          </span>
+        </div>
+      </div>
+
+      <div className="p-3 border-b border-mc-border bg-mc-bg-secondary flex items-center justify-between gap-2 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap">
           <button
             onClick={() => setShowFilters(!showFilters)}
             className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-medium transition-colors min-h-9 border ${
@@ -168,10 +203,19 @@ export function BacklogView({ workspaceId }: BacklogViewProps) {
           >
             <Filter className="w-4 h-4" />
             <span className="hidden sm:inline">Filters</span>
-            {(filterType !== 'all' || filterPriority !== 'all') && (
+            {activeFilterCount > 0 && (
               <span className="w-2 h-2 rounded-full bg-mc-accent-green" />
             )}
           </button>
+          {activeFilterCount > 0 && (
+            <button
+              onClick={resetFilters}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-medium transition-colors min-h-9 border border-mc-border text-mc-text-secondary hover:bg-mc-bg-tertiary"
+            >
+              <FunnelX className="w-4 h-4" />
+              <span className="hidden sm:inline">Reset ({activeFilterCount})</span>
+            </button>
+          )}
           <button
             onClick={() => setHideDone(!hideDone)}
             className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-medium transition-colors min-h-9 border ${
@@ -216,6 +260,8 @@ export function BacklogView({ workspaceId }: BacklogViewProps) {
               {sortBy === 'title' && (sortDir === 'asc' ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />)}
             </button>
           </div>
+        </div>
+        <div className="flex items-center gap-2">
           <button
             onClick={() => setShowCreateModal(true)}
             className="flex items-center gap-2 px-4 min-h-9 bg-mc-accent text-white rounded-md text-sm font-medium hover:bg-mc-accent/90"
@@ -259,6 +305,14 @@ export function BacklogView({ workspaceId }: BacklogViewProps) {
                   <option value="low">Low</option>
                 </select>
               </div>
+              <div className="flex items-end">
+                <button
+                  onClick={resetFilters}
+                  className="w-full min-h-11 px-3 rounded-lg border border-mc-border bg-mc-bg text-sm text-mc-text-secondary hover:text-mc-text hover:bg-mc-bg-tertiary"
+                >
+                  Clear Filters
+                </button>
+              </div>
             </div>
           )}
 
@@ -287,7 +341,7 @@ export function BacklogView({ workspaceId }: BacklogViewProps) {
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="border-b border-mc-border bg-mc-bg-tertiary/30">
+                <tr className="border-b border-mc-border bg-mc-bg-tertiary/50">
                   <th className="text-left px-4 py-3 text-xs font-medium text-mc-text-secondary uppercase tracking-wider">
                     Task
                   </th>
@@ -321,18 +375,18 @@ export function BacklogView({ workspaceId }: BacklogViewProps) {
                     <tr
                       key={task.id}
                       onClick={() => handleTaskClick(task)}
-                      className="cursor-pointer hover:bg-mc-bg-tertiary/30 transition-colors"
+                      className="cursor-pointer hover:bg-mc-bg-tertiary/40 transition-colors"
                     >
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
                           <TypeIcon className={`w-4 h-4 flex-shrink-0 ${typeColor}`} />
-                          <span className="font-medium text-sm truncate max-w-[200px]">
+                          <span className="font-medium text-sm truncate max-w-[280px]">
                             {task.title}
                           </span>
                         </div>
                       </td>
                       <td className="px-4 py-3">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-mc-bg-tertiary text-mc-text-secondary capitalize">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-mc-bg-tertiary text-mc-text-secondary capitalize border border-mc-border">
                           {task.status.replace('_', ' ')}
                         </span>
                       </td>
@@ -400,7 +454,7 @@ export function BacklogView({ workspaceId }: BacklogViewProps) {
                         ) : (
                           <button
                             onClick={() => setAssigningMilestone(task.id)}
-                            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium text-mc-text-secondary hover:bg-mc-bg-tertiary transition-colors"
+                            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium text-cyan-700 border border-cyan-200 bg-cyan-50 hover:bg-cyan-100 transition-colors"
                           >
                             <Target className="w-3.5 h-3.5" />
                             <span className="hidden sm:inline">Assign</span>

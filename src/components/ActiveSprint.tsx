@@ -210,6 +210,9 @@ export function ActiveSprint({ workspaceId, mobileMode = false, isPortrait = tru
 
   const selectedSprint = sprints.find((s) => s.id === selectedSprintId);
   const activeSprint = sprints.find((s) => s.status === 'active');
+  const completedSprintTasks = sprintTasks.filter((task) => DONE_STATUSES.includes(task.status)).length;
+  const completionPercent = sprintTasks.length > 0 ? Math.round((completedSprintTasks / sprintTasks.length) * 100) : 0;
+  const blockedSprintTasks = sprintTasks.filter((task) => Boolean(task.planning_dispatch_error)).length;
 
   const updateTaskStatusWithPersist = async (task: Task, targetStatus: TaskStatus) => {
     if (task.status === targetStatus) return;
@@ -494,6 +497,27 @@ export function ActiveSprint({ workspaceId, mobileMode = false, isPortrait = tru
         </div>
       </div>
 
+      <div className="p-3 border-b border-mc-border bg-mc-bg-secondary">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+          <div className="p-2.5 rounded-lg border border-mc-border bg-mc-bg">
+            <div className="text-mc-text-secondary">Milestones</div>
+            <div className="text-mc-text font-semibold mt-0.5">{milestones.length}</div>
+          </div>
+          <div className="p-2.5 rounded-lg border border-mc-border bg-mc-bg">
+            <div className="text-mc-text-secondary">Tasks</div>
+            <div className="text-mc-text font-semibold mt-0.5">{sprintTasks.length}</div>
+          </div>
+          <div className="p-2.5 rounded-lg border border-green-200 bg-green-50">
+            <div className="text-green-700">Completed</div>
+            <div className="text-green-700 font-semibold mt-0.5">{completedSprintTasks} ({completionPercent}%)</div>
+          </div>
+          <div className="p-2.5 rounded-lg border border-red-200 bg-red-50">
+            <div className="text-red-700">Blocked</div>
+            <div className="text-red-700 font-semibold mt-0.5">{blockedSprintTasks}</div>
+          </div>
+        </div>
+      </div>
+
       <div className={`flex-1 overflow-y-auto ${viewMode === 'board' ? 'overflow-hidden' : ''} ${isPortrait && viewMode === 'list' ? 'p-3 pb-[calc(1rem+env(safe-area-inset-bottom))]' : viewMode === 'list' ? 'p-3' : ''}`}>
         {viewMode === 'list' && sprintTasks.length === 0 && milestoneOrder.length === 0 ? (
           <div className="text-center py-12">
@@ -755,11 +779,11 @@ function MilestoneGroup({
   const hasDependencies = milestone?.dependencies && milestone.dependencies.length > 0;
 
   return (
-    <section className="bg-mc-bg-secondary border border-mc-border rounded-xl overflow-hidden">
+    <section className="bg-mc-bg-secondary border border-mc-border rounded-xl overflow-hidden shadow-[0_12px_30px_-28px_rgba(0,0,0,0.35)]">
       <button
         onClick={onToggle}
         aria-label={`Toggle ${milestone?.name || 'Ungrouped Tasks'} group`}
-        className={`w-full px-4 py-3 border-b border-mc-border bg-mc-bg-tertiary/50 text-left ${isPortrait ? '' : 'px-3 py-2.5'}`}
+        className={`w-full px-4 py-3 border-b border-mc-border bg-mc-bg text-left ${isPortrait ? '' : 'px-3 py-2.5'}`}
       >
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2 min-w-0">
@@ -1067,9 +1091,9 @@ function TaskRow({ task, isPortrait, onClick, onMoveStatus, mobileMode }: TaskRo
           </div>
 
           {isPlanning && (
-            <div className={`flex items-center gap-2 mb-2 py-1.5 px-2.5 bg-purple-600/15 rounded border border-purple-600/25 ${isPortrait ? 'text-xs' : 'text-xs'}`}>
-              <div className="w-1.5 h-1.5 bg-purple-600 rounded-full animate-pulse flex-shrink-0" />
-              <span className="text-purple-700 font-medium">Continue planning</span>
+            <div className={`flex items-center gap-2 mb-2 py-1.5 px-2.5 bg-amber-50 rounded border border-amber-200 ${isPortrait ? 'text-xs' : 'text-xs'}`}>
+              <div className="w-1.5 h-1.5 bg-amber-600 rounded-full animate-pulse flex-shrink-0" />
+              <span className="text-amber-700 font-medium">Planning still in progress</span>
             </div>
           )}
 
