@@ -5,6 +5,18 @@ import { join } from 'path';
 const MAX_CONFIG_SIZE_BYTES = 1024 * 1024;
 const MAX_MD_FILE_SIZE_BYTES = 512 * 1024;
 const USER_MD_ALLOWLIST = new Set(['lidia', 'michal']);
+const CANONICAL_AGENT_ROLES = new Set([
+  'orchestrator',
+  'builder',
+  'tester',
+  'reviewer',
+  'learner',
+  'presenter',
+  'explorer',
+  'pragmatist',
+  'guardian',
+  'consolidator',
+]);
 
 let lastConfigMtimeMs = 0;
 
@@ -176,17 +188,49 @@ function resolveAgentDir(agent: OpenClawAgentConfig): string | null {
 }
 
 function extractRoleFromAgentsMd(agentsMd: string | null, agentName: string): string {
-  if (!agentsMd) return agentName;
-  const frontmatterMatch = agentsMd.match(/^---\s*\n([\s\S]*?)\n---/);
-  if (frontmatterMatch) {
-    const roleMatch = frontmatterMatch[1].match(/role:\s*"?([^"\n]+)"?/);
-    if (roleMatch) return roleMatch[1].trim();
-    const descMatch = frontmatterMatch[1].match(/description:\s*"?([^"\n]+)"?/);
-    if (descMatch) return descMatch[1].trim();
+  const canonicalizeRole = (raw: string | null | undefined): string | null => {
+    const value = String(raw || '').trim().toLowerCase();
+    if (!value) return null;
+    if (CANONICAL_AGENT_ROLES.has(value)) return value;
+
+    if (/\borchestrator\b|\bcoordinator\b|\bproduct\s*owner\b/.test(value)) return 'orchestrator';
+    if (/\bbuilder\b|\bdeveloper\b|\bimplement(er|ation)?\b/.test(value)) return 'builder';
+    if (/\btester\b|\bqa\b|\bquality\s*assurance\b|\btest\b/.test(value)) return 'tester';
+    if (/\breviewer\b|\breview\b|\bverifier\b|\bverify\b/.test(value)) return 'reviewer';
+    if (/\blearner\b|\blearning\b|\bknowledge\b/.test(value)) return 'learner';
+    if (/\bpresenter\b|\bsummar(y|izer)\b/.test(value)) return 'presenter';
+    if (/\bexplorer\b|\bresearch\b|\bdiscovery\b/.test(value)) return 'explorer';
+    if (/\bpragmatist\b|\bsimplicity\b/.test(value)) return 'pragmatist';
+    if (/\bguardian\b|\bresilien(ce|t)\b|\bcorrectness\b|\bsafety\b/.test(value)) return 'guardian';
+    if (/\bconsolidator\b|\bsynthes(is|ize|izer)\b/.test(value)) return 'consolidator';
+
+    const slug = value
+      .replace(/\|/g, ' ')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+    return slug.length > 0 ? slug : null;
+  };
+
+  if (agentsMd) {
+    const frontmatterMatch = agentsMd.match(/^---\s*\n([\s\S]*?)\n---/);
+    if (frontmatterMatch) {
+      const roleMatch = frontmatterMatch[1].match(/role:\s*"?([^"\n]+)"?/i);
+      const canonicalRole = canonicalizeRole(roleMatch?.[1]);
+      if (canonicalRole && CANONICAL_AGENT_ROLES.has(canonicalRole)) return canonicalRole;
+
+      const descMatch = frontmatterMatch[1].match(/description:\s*"?([^"\n]+)"?/i);
+      const canonicalDescription = canonicalizeRole(descMatch?.[1]);
+      if (canonicalDescription && CANONICAL_AGENT_ROLES.has(canonicalDescription)) return canonicalDescription;
+    }
+
+    const headingMatch = agentsMd.match(/^#\s+(.+)/m);
+    const canonicalHeading = canonicalizeRole(headingMatch?.[1]);
+    if (canonicalHeading && CANONICAL_AGENT_ROLES.has(canonicalHeading)) return canonicalHeading;
   }
-  const headingMatch = agentsMd.match(/^#\s+(.+)/m);
-  if (headingMatch) return headingMatch[1].trim();
-  return agentName;
+
+  const canonicalName = canonicalizeRole(agentName);
+  if (canonicalName && CANONICAL_AGENT_ROLES.has(canonicalName)) return canonicalName;
+  return 'builder';
 }
 
 export function resolveAgents(config: OpenClawFullConfig): ResolvedAgent[] {

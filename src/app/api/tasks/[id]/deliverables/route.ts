@@ -7,11 +7,30 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { broadcast } from '@/lib/events';
 import { CreateDeliverableSchema } from '@/lib/validation';
+import { verifyScopedApiToken } from '@/lib/scoped-api-tokens';
 import { existsSync } from 'fs';
 
 import type { TaskDeliverable } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
+
+function extractBearerToken(authHeader: string | null): string | null {
+  if (!authHeader) return null;
+  const normalized = authHeader.trim().replace(/^Bearer\s+Bearer\s+/i, 'Bearer ');
+  const match = normalized.match(/^Bearer\s+(.+)$/i);
+  if (!match) return null;
+  const token = match[1].trim().replace(/^["'`]+|["'`]+$/g, '');
+  return token.length > 0 ? token : null;
+}
+
+function deriveScopedSessionId(request: NextRequest, taskId: string): string | null {
+  const token = extractBearerToken(request.headers.get('authorization'));
+  if (!token || !token.startsWith('mcst.')) return null;
+  const payload = verifyScopedApiToken(token);
+  if (!payload || payload.task_id !== taskId) return null;
+  const sessionId = typeof payload.session_id === 'string' ? payload.session_id.trim() : '';
+  return sessionId.length > 0 ? sessionId : null;
+}
 /**
  * GET /api/tasks/[id]/deliverables
  * Retrieve all deliverables for a task
@@ -32,7 +51,19 @@ export async function GET(
     `).all(taskId) as TaskDeliverable[];
 
     const enriched = deliverables.map((deliverable) => {
-      if (!deliverable.openclaw_session_id) {
+      const fallbackSessionId = db.prepare(`
+        SELECT json_extract(metadata, '$.openclaw_session_id') as openclaw_session_id
+        FROM task_activities
+        WHERE task_id = ?
+          AND activity_type = 'dispatch_invocation'
+          AND json_extract(metadata, '$.openclaw_session_id') IS NOT NULL
+          AND created_at <= ?
+        ORDER BY created_at DESC
+        LIMIT 1
+      `).get(taskId, deliverable.created_at) as { openclaw_session_id?: string | null } | undefined;
+
+      const effectiveSessionId = deliverable.openclaw_session_id || fallbackSessionId?.openclaw_session_id || null;
+      if (!effectiveSessionId) {
         return {
           ...deliverable,
           created_via_agent_id: null,
@@ -42,13 +73,24 @@ export async function GET(
         };
       }
 
+      const inferredSession = !deliverable.openclaw_session_id && Boolean(fallbackSessionId?.openclaw_session_id);
+      if (inferredSession) {
+        return {
+          ...deliverable,
+          created_via_agent_id: null,
+          created_via_agent_name: null,
+          created_via_workflow_step: null,
+          created_via_session_id: effectiveSessionId,
+        };
+      }
+
       const session = db.prepare(`
         SELECT s.openclaw_session_id, s.agent_id, a.name as agent_name
         FROM openclaw_sessions s
         LEFT JOIN agents a ON a.id = s.agent_id
         WHERE s.openclaw_session_id = ?
         LIMIT 1
-      `).get(deliverable.openclaw_session_id) as { openclaw_session_id?: string | null; agent_id?: string | null; agent_name?: string | null } | undefined;
+      `).get(effectiveSessionId) as { openclaw_session_id?: string | null; agent_id?: string | null; agent_name?: string | null } | undefined;
 
       const stepRow = db.prepare(`
         SELECT json_extract(metadata, '$.workflow_step') as workflow_step
@@ -58,7 +100,7 @@ export async function GET(
           AND json_extract(metadata, '$.openclaw_session_id') = ?
         ORDER BY created_at DESC
         LIMIT 1
-      `).get(taskId, deliverable.openclaw_session_id) as { workflow_step?: string | null } | undefined;
+      `).get(taskId, effectiveSessionId) as { workflow_step?: string | null } | undefined;
 
       const derivedDescription = session?.agent_name && stepRow?.workflow_step
         ? `Created during ${String(stepRow.workflow_step).replace(/_/g, ' ')} by ${session.agent_name}${deliverable.description?.includes('dispatch') ? ' via dispatch initialization' : ' via captured task output'}.`
@@ -70,7 +112,7 @@ export async function GET(
         created_via_agent_id: session?.agent_id || null,
         created_via_agent_name: session?.agent_name || null,
         created_via_workflow_step: stepRow?.workflow_step || null,
-        created_via_session_id: session?.openclaw_session_id || deliverable.openclaw_session_id || null,
+        created_via_session_id: session?.openclaw_session_id || effectiveSessionId,
       };
     });
 
@@ -106,6 +148,19 @@ export async function POST(
     }
 
     const { deliverable_type, title, path, description, openclaw_session_id } = validation.data;
+    const scopedSessionId = deriveScopedSessionId(request, taskId);
+    const requestedSessionId = typeof openclaw_session_id === 'string' && openclaw_session_id.trim().length > 0
+      ? openclaw_session_id.trim()
+      : null;
+    if (scopedSessionId && requestedSessionId && scopedSessionId !== requestedSessionId) {
+      return NextResponse.json(
+        { error: 'openclaw_session_id does not match scoped token session' },
+        { status: 400 }
+      );
+    }
+    const resolvedSessionId =
+      requestedSessionId
+      || scopedSessionId;
 
     // Validate file existence for file deliverables
     let fileExists = true;
@@ -121,6 +176,13 @@ export async function POST(
 
     const db = getDb();
     const id = crypto.randomUUID();
+    let linkedSessionId = resolvedSessionId;
+    if (linkedSessionId) {
+      const sessionExists = db.prepare(
+        'SELECT 1 FROM openclaw_sessions WHERE openclaw_session_id = ? AND task_id = ? LIMIT 1'
+      ).get(linkedSessionId, taskId) as { 1?: number } | undefined;
+      if (!sessionExists) linkedSessionId = null;
+    }
 
     // Insert deliverable
     db.prepare(`
@@ -133,7 +195,7 @@ export async function POST(
       title,
       path || null,
       description || null,
-      openclaw_session_id || null
+      linkedSessionId
     );
 
     // Get the created deliverable
