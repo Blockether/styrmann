@@ -12,6 +12,7 @@ import { getTaskWorkflow } from '@/lib/workflow-engine';
 import { getUnresolvedTaskDependencies } from '@/lib/task-dependencies';
 import { generateScopedApiToken } from '@/lib/scoped-api-tokens';
 import { getTaskWorkflowPlan } from '@/lib/workflow-planning';
+import { finalizeOtherActiveSessionsForTask } from '@/lib/session-lifecycle';
 import type { Task, Agent, OpenClawSession, WorkflowStage, WorkflowPlanParticipant, WorkflowPlanStep } from '@/lib/types';
 
 export interface DispatchResult {
@@ -295,6 +296,7 @@ function ensureProblemStatementArtifact(args: {
   if (!existing) {
     const deliverableId = uuidv4();
     const now = new Date().toISOString();
+
     try {
       run(
         `INSERT INTO task_deliverables (id, task_id, deliverable_type, title, path, description, openclaw_session_id, created_at)
@@ -403,6 +405,21 @@ export async function dispatchTaskToAgent(taskId: string): Promise<DispatchResul
     }
 
     const now = new Date().toISOString();
+
+    const interruptedSessions = finalizeOtherActiveSessionsForTask(task.id, agent.id, 'interrupted');
+    if (interruptedSessions.length > 0) {
+      createTaskActivity({
+        taskId: task.id,
+        activityType: 'status_changed',
+        agentId: agent.id,
+        message: `Interrupted ${interruptedSessions.length} concurrent active session(s) before dispatch to ${agent.name}`,
+        metadata: {
+          interrupted_openclaw_session_ids: interruptedSessions,
+          workflow_step: task.status === 'assigned' ? 'in_progress' : task.status,
+          decision_event: true,
+        },
+      });
+    }
 
     let session = queryOne<OpenClawSession>(
       `SELECT * FROM openclaw_sessions
