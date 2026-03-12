@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Bot, Brain, ChevronDown, ChevronRight, GitBranch, RotateCcw } from 'lucide-react';
+import { Bot, Brain, ChevronDown, ChevronRight, GitBranch } from 'lucide-react';
 import type { Task, TaskWorkflowPlan, WorkflowPlanStep } from '@/lib/types';
 
 interface WorkflowPlanDiagramProps {
@@ -11,12 +11,20 @@ interface WorkflowPlanDiagramProps {
   currentStepLabel?: string | null;
   currentStepIterations?: number;
   iterationsByStepStatus?: Record<string, number>;
+  sessionRuntime?: {
+    active: number;
+    interrupted: number;
+    stale: number;
+    total: number;
+  };
+  currentRuntimeAgentName?: string | null;
   regenerating?: boolean;
   onRegenerate?: () => void;
   promptDrafts?: Record<string, string>;
   onPromptChange?: (stepId: string, value: string) => void;
   onPromptSave?: (stepId: string) => void;
   savingPromptStepId?: string | null;
+  canEditPlan?: boolean;
 }
 
 export function WorkflowPlanDiagram({
@@ -26,12 +34,15 @@ export function WorkflowPlanDiagram({
   currentStepLabel,
   currentStepIterations = 0,
   iterationsByStepStatus = {},
+  sessionRuntime,
+  currentRuntimeAgentName = null,
   regenerating = false,
   onRegenerate,
   promptDrafts = {},
   onPromptChange,
   onPromptSave,
   savingPromptStepId = null,
+  canEditPlan = true,
 }: WorkflowPlanDiagramProps) {
   const [expandedParticipantSkills, setExpandedParticipantSkills] = useState<Set<string>>(new Set());
   const [expandedStepSkills, setExpandedStepSkills] = useState<Set<string>>(new Set());
@@ -72,7 +83,7 @@ export function WorkflowPlanDiagram({
             title="Re-evaluate agent assignments and capability gaps"
             className="min-h-11 px-3 py-2 border border-mc-border rounded text-sm hover:bg-mc-bg-tertiary disabled:opacity-50 inline-flex items-center gap-2"
           >
-            {regenerating ? <RotateCcw className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />}
+            <Brain className={`w-4 h-4 ${regenerating ? 'animate-pulse' : ''}`} />
             <span className="hidden sm:inline">Replan Workflow</span>
           </button>
         )}
@@ -144,6 +155,14 @@ export function WorkflowPlanDiagram({
             <div className="text-[11px] px-2 py-0.5 rounded bg-mc-bg border border-mc-border text-mc-text-secondary">
               Iterations: {currentStepIterations}
             </div>
+            {sessionRuntime && (
+              <div className={`text-[11px] px-2 py-0.5 rounded border ${sessionRuntime.active > 0 ? 'bg-green-50 border-green-200 text-green-700' : 'bg-orange-50 border-orange-200 text-orange-700'}`}>
+                Sessions: {sessionRuntime.active} active / {sessionRuntime.interrupted} interrupted / {sessionRuntime.total} total
+              </div>
+            )}
+            <div className="text-[11px] px-2 py-0.5 rounded bg-mc-bg border border-mc-border text-mc-text-secondary">
+              Current runtime agent: {currentRuntimeAgentName || 'none active'}
+            </div>
           </div>
         <div className="grid grid-cols-1 gap-3">
             {plan.steps.map((step, index) => {
@@ -161,7 +180,7 @@ export function WorkflowPlanDiagram({
                       <div className="flex items-center gap-1.5 flex-wrap">
                         <span className="text-[11px] uppercase tracking-wide text-mc-text-secondary">Step {step.sequence}</span>
                         <span className={`text-[11px] px-2 py-0.5 rounded ${step.kind === 'verification' ? 'bg-blue-100 text-blue-700' : step.kind === 'queue' ? 'bg-mc-bg border border-mc-border text-mc-text-secondary' : 'bg-amber-100 text-amber-700'}`}>
-                          {step.kind}
+                          {step.kind === 'queue' ? 'transition' : step.kind}
                         </span>
                         <span className="text-[11px] px-2 py-0.5 rounded bg-mc-bg border border-mc-border text-mc-text-secondary">
                           iteration {stepIterations}
@@ -205,7 +224,7 @@ export function WorkflowPlanDiagram({
                       </div>
                     )}
 
-                    {onPromptChange && onPromptSave && step.agent_id && step.kind !== 'queue' && (
+                    {canEditPlan && onPromptChange && onPromptSave && step.agent_id && step.kind !== 'queue' && (
                       <div className="mt-3 space-y-2">
                         <div className="text-[11px] uppercase tracking-wide text-mc-text-secondary">Planned Prompt</div>
                         <textarea
@@ -229,7 +248,7 @@ export function WorkflowPlanDiagram({
 
                     {(!step.agent_id || step.kind === 'queue') && (
                       <div className="mt-3 text-[11px] text-mc-text-secondary">
-                        This is a template queue marker. Runtime completion appears in Activity.
+                        Automatic transition checkpoint. No agent executes here; the orchestrator advances to the next actionable stage.
                       </div>
                     )}
 

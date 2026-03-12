@@ -218,19 +218,9 @@ export function DeliverablesList({ taskId }: DeliverablesListProps) {
     });
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-8">
-        <div className="text-mc-text-secondary">Loading deliverables...</div>
-      </div>
-    );
-  }
-
-  const hasDeliverables = deliverables.length > 0;
-
-  const phaseSummaries = useMemo(() => {
+  const buildPhaseSummaries = useCallback((activitiesInput: TaskActivity[], activeStatus?: string) => {
     const grouped = new Map<string, TaskActivity[]>();
-    for (const activity of rawActivities) {
+    for (const activity of activitiesInput) {
       const step = typeof activity.workflow_step === 'string' && activity.workflow_step.trim().length > 0
         ? activity.workflow_step.trim()
         : 'general';
@@ -238,8 +228,8 @@ export function DeliverablesList({ taskId }: DeliverablesListProps) {
       grouped.get(step)?.push(activity);
     }
 
-    const phaseOrder = task?.status
-      ? [task.status, ...Array.from(grouped.keys()).filter((step) => step !== task.status)]
+    const phaseOrder = activeStatus
+      ? [activeStatus, ...Array.from(grouped.keys()).filter((step) => step !== activeStatus)]
       : Array.from(grouped.keys());
 
     return phaseOrder
@@ -270,12 +260,42 @@ export function DeliverablesList({ taskId }: DeliverablesListProps) {
           latestAt: activities[activities.length - 1]?.created_at || null,
         };
       });
-  }, [rawActivities, task?.status]);
+  }, []);
+
+  const lastResumeAt = useMemo(() => {
+    const sorted = rawActivities.slice().sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    const lastResume = sorted.find((activity) => {
+      if (typeof activity.message !== 'string') return false;
+      return activity.message.includes('Resumed interrupted session');
+    });
+    return lastResume ? new Date(lastResume.created_at).getTime() : null;
+  }, [rawActivities]);
+
+  const currentRunActivities = useMemo(() => {
+    if (lastResumeAt === null) return rawActivities;
+    return rawActivities.filter((activity) => new Date(activity.created_at).getTime() >= lastResumeAt);
+  }, [rawActivities, lastResumeAt]);
+
+  const historicalActivities = useMemo(() => {
+    if (lastResumeAt === null) return [];
+    return rawActivities.filter((activity) => new Date(activity.created_at).getTime() < lastResumeAt);
+  }, [rawActivities, lastResumeAt]);
+
+  const phaseSummaries = useMemo(() => {
+    return buildPhaseSummaries(currentRunActivities, task?.status);
+  }, [buildPhaseSummaries, currentRunActivities, task?.status]);
+
+  const historicalPhaseSummaries = useMemo(() => {
+    return buildPhaseSummaries(historicalActivities, task?.status);
+  }, [buildPhaseSummaries, historicalActivities, task?.status]);
 
   const finalResult = useMemo(() => {
     const sorted = rawActivities.slice().sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
     const completion = sorted.find((activity) => activity.activity_type === 'completed');
     const failure = sorted.find((activity) => {
+      if (lastResumeAt !== null && new Date(activity.created_at).getTime() < lastResumeAt) {
+        return false;
+      }
       const lower = `${activity.activity_type} ${activity.message}`.toLowerCase();
       return lower.includes('fail') || lower.includes('error') || lower.includes('retry');
     });
@@ -288,10 +308,26 @@ export function DeliverablesList({ taskId }: DeliverablesListProps) {
       failureSignal: failure ? summarizeTaskActivity(failure) : null,
       lastUpdated: finalSignal?.created_at || null,
     };
-  }, [rawActivities, task?.status]);
+  }, [rawActivities, task?.status, lastResumeAt]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <div className="text-mc-text-secondary">Loading deliverables...</div>
+      </div>
+    );
+  }
+
+  const hasDeliverables = deliverables.length > 0;
 
   return (
     <div data-component="src/components/DeliverablesList" className="space-y-3">
+      {!hasDeliverables && (
+        <div className="p-3 rounded-lg border border-yellow-200 bg-yellow-50 text-sm text-yellow-800">
+          No deliverables are registered yet for this task. Runtime summaries and task changes are shown below.
+        </div>
+      )}
+
       <div className="p-3 bg-mc-bg rounded-lg border border-mc-border space-y-3">
         <div>
           <h4 className="font-medium text-mc-text">Phase Summaries</h4>
@@ -303,25 +339,56 @@ export function DeliverablesList({ taskId }: DeliverablesListProps) {
         {phaseSummaries.length === 0 ? (
           <div className="text-xs text-mc-text-secondary">No phase activity recorded yet.</div>
         ) : (
-          <div className="space-y-2">
-            {phaseSummaries.map((phase) => (
-              <details key={phase.step} className="rounded border border-mc-border bg-mc-bg-secondary px-3 py-2">
-                <summary className="cursor-pointer text-sm flex items-center justify-between gap-2">
-                  <span className="font-medium text-mc-text">{phase.step.replace(/_/g, ' ')}</span>
-                  <span className="text-xs text-mc-text-secondary">{phase.iterations} iteration(s) • {phase.activitiesCount} event(s)</span>
-                </summary>
-                <div className="mt-2 space-y-1">
-                  {phase.highlights.map((line) => (
-                    <div key={`${phase.step}-${line}`} className="text-xs text-mc-text-secondary">
-                      {line}
+          <div className="space-y-3">
+            <div>
+              <div className="text-xs font-medium text-mc-text-secondary mb-1">Current Run {lastResumeAt ? `(since ${formatTimestamp(new Date(lastResumeAt).toISOString())})` : '(full timeline)'}</div>
+              <div className="space-y-2">
+                {phaseSummaries.map((phase) => (
+                  <details key={`current-${phase.step}`} className="rounded border border-mc-border bg-mc-bg-secondary px-3 py-2">
+                    <summary className="cursor-pointer text-sm flex items-center justify-between gap-2">
+                      <span className="font-medium text-mc-text">{phase.step.replace(/_/g, ' ')}</span>
+                      <span className="text-xs text-mc-text-secondary">{phase.iterations} iteration(s) • {phase.activitiesCount} event(s)</span>
+                    </summary>
+                    <div className="mt-2 space-y-1">
+                      {phase.highlights.map((line) => (
+                        <div key={`current-${phase.step}-${line}`} className="text-xs text-mc-text-secondary">
+                          {line}
+                        </div>
+                      ))}
+                      {phase.latestAt && (
+                        <div className="text-[11px] text-mc-text-secondary">Latest: {formatTimestamp(phase.latestAt)}</div>
+                      )}
                     </div>
+                  </details>
+                ))}
+              </div>
+            </div>
+
+            {historicalPhaseSummaries.length > 0 && (
+              <div>
+                <div className="text-xs font-medium text-mc-text-secondary mb-1">Historical Attempts (before last resume)</div>
+                <div className="space-y-2">
+                  {historicalPhaseSummaries.map((phase) => (
+                    <details key={`historical-${phase.step}`} className="rounded border border-mc-border bg-mc-bg-secondary/70 px-3 py-2">
+                      <summary className="cursor-pointer text-sm flex items-center justify-between gap-2">
+                        <span className="font-medium text-mc-text">{phase.step.replace(/_/g, ' ')}</span>
+                        <span className="text-xs text-mc-text-secondary">{phase.iterations} iteration(s) • {phase.activitiesCount} event(s)</span>
+                      </summary>
+                      <div className="mt-2 space-y-1">
+                        {phase.highlights.map((line) => (
+                          <div key={`historical-${phase.step}-${line}`} className="text-xs text-mc-text-secondary">
+                            {line}
+                          </div>
+                        ))}
+                        {phase.latestAt && (
+                          <div className="text-[11px] text-mc-text-secondary">Latest: {formatTimestamp(phase.latestAt)}</div>
+                        )}
+                      </div>
+                    </details>
                   ))}
-                  {phase.latestAt && (
-                    <div className="text-[11px] text-mc-text-secondary">Latest: {formatTimestamp(phase.latestAt)}</div>
-                  )}
                 </div>
-              </details>
-            ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -403,10 +470,6 @@ export function DeliverablesList({ taskId }: DeliverablesListProps) {
             </div>
           )}
         </div>
-      )}
-
-      {!hasDeliverables && (
-        <div className="text-center py-6 text-sm text-mc-text-secondary">No deliverables registered for this task yet.</div>
       )}
 
       {hasDeliverables && deliverables.map((deliverable) => (

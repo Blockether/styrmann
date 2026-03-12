@@ -26,6 +26,8 @@ interface SessionWithAgent {
   trace_url?: string;
   is_active?: boolean;
   inactivity_minutes?: number | null;
+  resumed_via_session_continuation?: boolean;
+  resumed_at?: string | null;
 }
 
 interface ProvenanceSummary {
@@ -178,19 +180,10 @@ export function SessionsList({ taskId }: SessionsListProps) {
 
   const handleResumeInterrupted = async (sessionId: string) => {
     try {
-      const [resumeRes, dispatchRes] = await Promise.all([
-        fetch(`/api/openclaw/sessions/${sessionId}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status: 'active', ended_at: null }),
-        }),
-        fetch(`/api/tasks/${taskId}/dispatch`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: '{}',
-        }),
-      ]);
-      if (resumeRes.ok || dispatchRes.ok) {
+      const resumeRes = await fetch(`/api/tasks/${taskId}/sessions/${encodeURIComponent(sessionId)}/resume`, {
+        method: 'POST',
+      });
+      if (resumeRes.ok) {
         loadSessions();
       }
     } catch (error) {
@@ -216,16 +209,16 @@ export function SessionsList({ taskId }: SessionsListProps) {
   }
 
   return (
-    <div data-component="src/components/SessionsList" className="space-y-3">
+    <div data-component="src/components/SessionsList" className="space-y-3 max-w-full overflow-x-hidden">
       <div className="p-3 rounded-lg border border-mc-border bg-mc-bg-secondary text-xs flex items-center justify-between gap-2 flex-wrap">
         <span className="text-mc-text-secondary">OpenClaw session state</span>
-        <div className="flex items-center gap-2">
-          <span className="px-2 py-0.5 rounded border border-green-200 bg-green-50 text-green-700">Active: {activeCount}</span>
-          <span className="px-2 py-0.5 rounded border border-mc-border bg-mc-bg text-mc-text-secondary">Inactive: {inactiveCount}</span>
-          <span className="px-2 py-0.5 rounded border border-orange-200 bg-orange-50 text-orange-700">Interrupted: {interruptedCount}</span>
-          <span className="px-2 py-0.5 rounded border border-yellow-200 bg-yellow-50 text-yellow-700">Stale: {staleCount}</span>
-          <span className="px-2 py-0.5 rounded border border-mc-border bg-mc-bg text-mc-text-secondary">Finished: {finishedCount}</span>
-          <span className="px-2 py-0.5 rounded border border-mc-border bg-mc-bg text-mc-text-secondary">Unfinished: {unfinishedCount}</span>
+        <div className="flex flex-wrap items-center gap-2 justify-start">
+          <span className="px-2 py-0.5 rounded border border-green-200 bg-green-50 text-green-700 whitespace-nowrap">Active: {activeCount}</span>
+          <span className="px-2 py-0.5 rounded border border-mc-border bg-mc-bg text-mc-text-secondary whitespace-nowrap">Inactive: {inactiveCount}</span>
+          <span className="px-2 py-0.5 rounded border border-orange-200 bg-orange-50 text-orange-700 whitespace-nowrap">Interrupted: {interruptedCount}</span>
+          <span className="px-2 py-0.5 rounded border border-yellow-200 bg-yellow-50 text-yellow-700 whitespace-nowrap">Stale: {staleCount}</span>
+          <span className="px-2 py-0.5 rounded border border-mc-border bg-mc-bg text-mc-text-secondary whitespace-nowrap">Finished: {finishedCount}</span>
+          <span className="px-2 py-0.5 rounded border border-mc-border bg-mc-bg text-mc-text-secondary whitespace-nowrap">Unfinished: {unfinishedCount}</span>
         </div>
       </div>
 
@@ -267,18 +260,23 @@ export function SessionsList({ taskId }: SessionsListProps) {
           {/* Content */}
           <div className="flex-1 min-w-0">
             {/* Agent name and status */}
-            <div className="flex items-center gap-2 mb-1">
+            <div className="flex items-center gap-2 mb-1 flex-wrap">
               {getStatusIcon(session.status)}
               <span className="font-medium text-mc-text">
                 {session.agent_name || 'Session Agent'}
               </span>
-              <span className="text-xs text-mc-text-secondary capitalize">
-                {getStatusLabel(session.status)}
-              </span>
-              <span className={`text-[11px] px-1.5 py-0.5 rounded border ${session.is_active ? 'border-green-200 bg-green-50 text-green-700' : 'border-mc-border bg-mc-bg text-mc-text-secondary'}`}>
-                {session.is_active ? 'active' : 'inactive'}
-              </span>
-            </div>
+                <span className="text-xs text-mc-text-secondary capitalize whitespace-nowrap">
+                  {getStatusLabel(session.status)}
+                </span>
+                <span className={`text-[11px] px-1.5 py-0.5 rounded border whitespace-nowrap ${session.is_active ? 'border-green-200 bg-green-50 text-green-700' : 'border-mc-border bg-mc-bg text-mc-text-secondary'}`}>
+                  {session.is_active ? 'active' : 'inactive'}
+                </span>
+                {session.resumed_via_session_continuation && session.is_active && (
+                  <span className="text-[11px] px-1.5 py-0.5 rounded border border-cyan-200 bg-cyan-50 text-cyan-700 whitespace-nowrap">
+                    resumed via continuation
+                  </span>
+                )}
+              </div>
 
             {/* Session ID */}
             <div className="text-xs text-mc-text-secondary font-mono mb-2 truncate">
@@ -310,6 +308,12 @@ export function SessionsList({ taskId }: SessionsListProps) {
                   <span>Idle {session.inactivity_minutes}m</span>
                 </>
               )}
+              {session.resumed_via_session_continuation && session.resumed_at && session.is_active && (
+                <>
+                  <span>•</span>
+                  <span>Resumed {formatTimestamp(session.resumed_at)}</span>
+                </>
+              )}
             </div>
 
             {/* Channel */}
@@ -324,9 +328,15 @@ export function SessionsList({ taskId }: SessionsListProps) {
                 No explicit session end was recorded; task/activity suggests this run is no longer active.
               </div>
             )}
-            {session.status === 'interrupted' && (
+            {session.status === 'interrupted' && !session.resumed_via_session_continuation && (
               <div className="mt-2 text-xs text-orange-600">
-                Session heartbeat stopped. Mission Control will try to continue this run via OpenClaw dispatch.
+                Session heartbeat stopped. Resume will continue this exact session in OpenClaw.
+              </div>
+            )}
+            {session.status === 'interrupted' && session.resumed_via_session_continuation && (
+              <div className="mt-2 text-xs text-orange-600">
+                This run resumed earlier, then became interrupted again due to inactivity. Tap Resume to continue the same session.
+                {session.resumed_at ? ` Last resume: ${formatTimestamp(session.resumed_at)}.` : ''}
               </div>
             )}
           </div>

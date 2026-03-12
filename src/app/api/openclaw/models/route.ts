@@ -43,11 +43,11 @@ interface OpenClawModelsResponse {
 
 // Common fallback models when neither remote nor local discovery succeeds
 const FALLBACK_MODELS = [
-  'anthropic/claude-sonnet-4-5',
-  'anthropic/claude-opus-4-5',
-  'anthropic/claude-haiku-4-5',
+  'openai/gpt-5-codex',
+  'openai/codex-mini-latest',
   'openai/gpt-4o',
   'openai/o1',
+  'openai/gpt-4o-mini',
 ];
 
 /**

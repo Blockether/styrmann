@@ -2,8 +2,8 @@
  * Lightweight LLM inference for planning decisions.
  *
  * Resolution order:
- *  1. ANTHROPIC_API_KEY env var  → Anthropic Messages API
- *  2. OPENAI_API_KEY env var     → OpenAI Chat Completions API
+ *  1. OPENAI_API_KEY env var     → OpenAI Chat Completions API
+ *  2. ANTHROPIC_API_KEY env var  → Anthropic Messages API
  *  3. ~/.openclaw/openclaw.json  → first provider with apiKey + models
  *
  * Override model:  PLANNING_MODEL env var (default: cheapest fast model).
@@ -42,23 +42,23 @@ const MAX_CONFIG_BYTES = 1024 * 1024;
 function resolveProvider(): LlmProviderConfig | null {
   const overrideModel = process.env.PLANNING_MODEL;
 
-  // 1. Anthropic env var
-  if (process.env.ANTHROPIC_API_KEY) {
-    return {
-      kind: 'anthropic',
-      baseUrl: 'https://api.anthropic.com',
-      apiKey: process.env.ANTHROPIC_API_KEY,
-      model: overrideModel || 'claude-haiku-4-5',
-    };
-  }
-
-  // 2. OpenAI env var
+  // 1. OpenAI env var (preferred default)
   if (process.env.OPENAI_API_KEY) {
     return {
       kind: 'openai-compat',
       baseUrl: process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1',
       apiKey: process.env.OPENAI_API_KEY,
       model: overrideModel || 'gpt-4o-mini',
+    };
+  }
+
+  // 2. Anthropic env var
+  if (process.env.ANTHROPIC_API_KEY) {
+    return {
+      kind: 'anthropic',
+      baseUrl: 'https://api.anthropic.com',
+      apiKey: process.env.ANTHROPIC_API_KEY,
+      model: overrideModel || 'claude-haiku-4-5',
     };
   }
 

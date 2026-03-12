@@ -322,19 +322,19 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
 
         {/* Tabs - only show for existing tasks */}
         {task && (
-          <div className="flex border-b border-mc-border flex-shrink-0 overflow-x-auto">
+          <div className="grid grid-cols-2 sm:grid-cols-4 border-b border-mc-border flex-shrink-0">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => handleTabChange(tab.id)}
-                className={`flex-1 flex items-center justify-center gap-2 px-4 min-h-11 py-2 text-sm font-medium transition-colors whitespace-nowrap ${
+                className={`w-full flex items-center justify-center gap-1.5 px-2 sm:px-4 min-h-11 py-2 text-sm font-medium transition-colors ${
                   activeTab === tab.id
-                    ? 'text-mc-accent border-b-2 border-mc-accent'
-                    : 'text-mc-text-secondary hover:text-mc-text'
+                    ? 'text-mc-accent bg-mc-accent/10 sm:border-b-2 sm:border-mc-accent'
+                    : 'text-mc-text-secondary hover:text-mc-text hover:bg-mc-bg-tertiary/40'
                 }`}
               >
                 {tab.icon}
-                {tab.label}
+                <span className="text-xs sm:text-sm">{tab.label}</span>
               </button>
             ))}
           </div>

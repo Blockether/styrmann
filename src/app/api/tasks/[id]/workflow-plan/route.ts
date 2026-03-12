@@ -5,6 +5,8 @@ import type { Task } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
 
+const REPLAN_ALLOWED_STATUSES = new Set(['inbox', 'planning', 'pending_dispatch']);
+
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -37,6 +39,16 @@ export async function POST(
       return NextResponse.json({ error: 'Task not found' }, { status: 404 });
     }
 
+    if (!REPLAN_ALLOWED_STATUSES.has(task.status)) {
+      return NextResponse.json(
+        {
+          error: `Replanning is locked after execution starts (current status: ${task.status}).`,
+          code: 'REPLAN_LOCKED',
+        },
+        { status: 409 },
+      );
+    }
+
     const data = await generateTaskWorkflowPlan(taskId);
     return NextResponse.json({ task, ...data });
   } catch (error) {
@@ -55,6 +67,16 @@ export async function PATCH(
     const task = queryOne<Task>('SELECT * FROM tasks WHERE id = ? LIMIT 1', [taskId]);
     if (!task) {
       return NextResponse.json({ error: 'Task not found' }, { status: 404 });
+    }
+
+    if (!REPLAN_ALLOWED_STATUSES.has(task.status)) {
+      return NextResponse.json(
+        {
+          error: `Workflow edits are locked after execution starts (current status: ${task.status}).`,
+          code: 'REPLAN_LOCKED',
+        },
+        { status: 409 },
+      );
     }
 
     const body = await request.json() as { step_id?: string; prompt?: string };

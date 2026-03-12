@@ -1,6 +1,6 @@
 # KNOWLEDGE.md -- Mission Control
 
-Last updated: 2026-03-11
+Last updated: 2026-03-12
 
 ---
 
@@ -66,6 +66,12 @@ Also: `pending_dispatch` (transient, pre-dispatch state).
 **Task creation behavior**: New AI tasks no longer expose manual loop, template, or per-task execution controls. The orchestrator generates a workflow plan immediately from existing agents and linked skills only, stores it on the task, and leaves the task in `inbox` until execution begins. Human tasks still require a selected human and move to `assigned`, which triggers an email through Himalaya.
 
 **Task creation UI**: Manual agent loop configuration, task-level template picking, and direct execution settings are removed. The task modal now shows Overview, Activity, Sessions, and Deliverables tabs. Planning is merged into Activity: the workflow blueprint and runtime activity timeline are presented together, including current step and iteration context. The former Proposals tab is merged into this Activity view (learner proposals remain inline below the workflow plan diagram).
+
+**Replanning lock**: Regenerating/editing workflow plans is allowed only before execution starts (`planning`, `inbox`, `pending_dispatch`). Once a task enters runtime stages (`assigned`, `in_progress`, `testing`, `review`, `verification`, `done`), workflow-plan regenerate/edit endpoints return `409 REPLAN_LOCKED`, and Activity UI hides plan-edit controls.
+
+**Runtime communication updates**:
+- Activity execution header now includes explicit current runtime agent (`none active` if no active session).
+- Deliverables phase summaries are split into `Current Run` (since last resume) and `Historical Attempts` (before last resume) so stale failures from older attempts are not presented as current run state.
 
 **Task fields**: title, description, status, priority (low/normal/high/urgent), task_type (bug/feature/chore/documentation/research), effort (1-5), impact (1-5), assignee_type (`ai` | `human`), assigned_agent_id, assigned_human_id, milestone_id, workflow_template_id, workflow_plan_id, due_date, tags.
 

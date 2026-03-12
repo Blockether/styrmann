@@ -21,6 +21,20 @@ interface ActivitiesResponse {
   raw_activities: TaskActivity[];
 }
 
+interface SessionRuntimeSummary {
+  active: number;
+  interrupted: number;
+  stale: number;
+  total: number;
+  currentAgentName: string | null;
+}
+
+interface SessionRuntimeRow {
+  status?: string;
+  is_active?: boolean;
+  agent_name?: string;
+}
+
 export function PlanningTab({ taskId }: PlanningTabProps) {
   const [data, setData] = useState<WorkflowPlanResponse | null>(null);
   const [rawActivities, setRawActivities] = useState<TaskActivity[]>([]);
@@ -29,6 +43,7 @@ export function PlanningTab({ taskId }: PlanningTabProps) {
   const [regenerating, setRegenerating] = useState(false);
   const [promptDrafts, setPromptDrafts] = useState<Record<string, string>>({});
   const [savingPromptStepId, setSavingPromptStepId] = useState<string | null>(null);
+  const [sessionRuntime, setSessionRuntime] = useState<SessionRuntimeSummary>({ active: 0, interrupted: 0, stale: 0, total: 0, currentAgentName: null });
 
   const hydratePromptDrafts = (payload: WorkflowPlanResponse) => {
     setPromptDrafts(Object.fromEntries((payload.plan.steps || []).map((step) => [step.id, step.prompt || ''])));
@@ -61,20 +76,41 @@ export function PlanningTab({ taskId }: PlanningTabProps) {
     }
   }, [taskId]);
 
+  const loadSessionRuntime = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/tasks/${taskId}/sessions`);
+      if (!res.ok) return;
+      const rows = (await res.json()) as SessionRuntimeRow[];
+      const active = rows.filter((row) => row.is_active).length;
+      const interrupted = rows.filter((row) => row.status === 'interrupted').length;
+      const stale = rows.filter((row) => row.status === 'stale').length;
+      const currentAgentName = rows.find((row) => row.is_active)?.agent_name || null;
+      setSessionRuntime({ active, interrupted, stale, total: rows.length, currentAgentName });
+    } catch {
+      setSessionRuntime({ active: 0, interrupted: 0, stale: 0, total: 0, currentAgentName: null });
+    }
+  }, [taskId]);
+
   useEffect(() => {
     loadPlan(true);
     loadActivities();
+    loadSessionRuntime();
     const onUpdate = () => loadPlan(false);
     const onActivity = () => loadActivities();
+    const onSession = () => loadSessionRuntime();
     window.addEventListener('mc:task-updated', onUpdate);
     window.addEventListener('mc:activity-logged', onActivity);
     window.addEventListener('mc:activity-presented', onActivity);
+    window.addEventListener('mc:agent-updated', onSession);
+    window.addEventListener('mc:agent-completed', onSession);
     return () => {
       window.removeEventListener('mc:task-updated', onUpdate);
       window.removeEventListener('mc:activity-logged', onActivity);
       window.removeEventListener('mc:activity-presented', onActivity);
+      window.removeEventListener('mc:agent-updated', onSession);
+      window.removeEventListener('mc:agent-completed', onSession);
     };
-  }, [loadActivities, loadPlan]);
+  }, [loadActivities, loadPlan, loadSessionRuntime]);
 
   const iterationsByStepStatus = useMemo(() => {
     const totals: Record<string, number> = {};
@@ -94,6 +130,7 @@ export function PlanningTab({ taskId }: PlanningTabProps) {
   }, [rawActivities]);
 
   const currentStepStatus = data?.task.status || null;
+  const canReplan = Boolean(data && ['inbox', 'planning', 'pending_dispatch'].includes(data.task.status));
   const currentStepLabel = useMemo(() => {
     if (!data) return null;
     return data.plan.steps.find((step) => step.status === data.task.status)?.label || null;
@@ -160,6 +197,11 @@ export function PlanningTab({ taskId }: PlanningTabProps) {
 
   return (
     <div data-component="src/components/PlanningTab" className="p-2 sm:p-4 space-y-4">
+      {!canReplan && (
+        <div className="rounded-lg border border-yellow-200 bg-yellow-50 px-3 py-2 text-xs text-yellow-800">
+          Replanning is locked because execution already started. Current status: {data.task.status.replace(/_/g, ' ')}.
+        </div>
+      )}
       <WorkflowPlanDiagram
         task={data.task}
         plan={data.plan}
@@ -167,12 +209,15 @@ export function PlanningTab({ taskId }: PlanningTabProps) {
         currentStepLabel={currentStepLabel}
         currentStepIterations={currentStepIterations}
         iterationsByStepStatus={iterationsByStepStatus}
+        sessionRuntime={sessionRuntime}
+        currentRuntimeAgentName={sessionRuntime.currentAgentName}
         regenerating={regenerating}
-        onRegenerate={regenerate}
+        onRegenerate={canReplan ? regenerate : undefined}
         promptDrafts={promptDrafts}
         onPromptChange={(stepId, value) => setPromptDrafts((prev) => ({ ...prev, [stepId]: value }))}
-        onPromptSave={savePrompt}
+        onPromptSave={canReplan ? savePrompt : undefined}
         savingPromptStepId={savingPromptStepId}
+        canEditPlan={canReplan}
       />
 
       <ActivityLog taskId={taskId} />
