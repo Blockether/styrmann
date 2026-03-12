@@ -138,6 +138,12 @@ function formatPlanningSpecMarkdown(spec: Record<string, unknown> | null): strin
   return lines.join('\n').trim();
 }
 
+function sanitizePlanningSection(section: string): string {
+  return section
+    .replace(/^---\n\*\*PLANNING SPECIFICATION:\*\*\n?/i, '')
+    .trim();
+}
+
 function buildWorkflowDiagram(planSummary: string | null, participants: WorkflowPlanParticipant[], steps: WorkflowPlanStep[]): string | null {
   const executionSteps = steps.filter((step) => step.agent_name || step.role || step.label);
   if (executionSteps.length === 0 && participants.length === 0 && !planSummary) return null;
@@ -243,7 +249,7 @@ ${orchestratorPlanDiagram}\n\n\
     orchestratorPlanSection,
     orchestratorDiagramSection,
     participantsSection,
-    planningSpecSection.trim().length > 0 ? `## Planning Specification\n${planningSpecSection.trim()}` : '',
+    planningSpecSection.trim().length > 0 ? `## Planning Specification\n${sanitizePlanningSection(planningSpecSection)}` : '',
     agentInstructionsSection.trim().length > 0 ? `## Role Instructions\n${agentInstructionsSection.trim()}` : '',
     knowledgeSection.trim().length > 0 ? `## Lessons Learned Context\n${knowledgeSection.trim()}` : '',
     resourceSection.trim().length > 0 ? `## Task Resources\n${resourceSection.trim()}` : '',
@@ -749,7 +755,7 @@ If you need help or clarification, ask the orchestrator.`;
       missionControlUrl,
       outputDirectory: taskProjectDir,
       currentStageLabel: roleLabel,
-      currentStageStatus: task.status,
+      currentStageStatus: task.status === 'assigned' ? 'in_progress' : task.status,
       nextStatus,
       acceptanceCriteria: Array.from(new Set(acceptanceCriteria)),
       orchestratorPlanSummary,
