@@ -661,7 +661,7 @@ The daemon is a standalone Node.js process with nine modules:
 | **autotrain** | 30s | Polls completed `autotrain` tasks and reopens them for the next repo-improvement iteration until stop/max-iteration conditions are hit |
 | **health** | 60s | Pings MC to verify API is reachable, logs connection changes |
 | **router** | SSE stream | Subscribes to `/api/events/stream`, routes events (e.g., logs task assignments for dispatcher awareness) |
-| **logs** | 30s | Polls OpenClaw session histories via `/api/openclaw/sessions/{id}/history`, stores new entries in `agent_logs` table via `/api/logs/ingest`, broadcasts `agent_log_added` SSE events, auto-cleans entries older than 30 days |
+| **logs** | 30s | Polls OpenClaw session histories via `/api/openclaw/sessions/{id}/history`, stores new entries in `agent_logs` table via `/api/logs/ingest`, broadcasts `agent_log_added` SSE events, auto-cleans entries older than 30 days. **Auth failure detection**: scans new log entries for provider/auth error patterns (401/403, API key missing, rate limits, provider timeouts, model unavailable); when detected, posts a `[Provider Alert]` task activity with actionable diagnostics. Uses 10-minute cooldown per session to avoid spam. |
 | **reporter** | 30s | Pushes daemon runtime snapshot to `/api/daemon/stats` for Operations UI visibility |
 Communication flow: `Daemon → HTTP API → Next.js → SQLite / OpenClaw Gateway → SSE broadcast → UI`
 
@@ -689,6 +689,8 @@ Env vars: `MC_URL` (default `https://control.blockether.com`), `MC_API_TOKEN` (r
 ### Shared Dispatch (`src/lib/dispatch.ts`)
 
 The dispatch logic (task message building, OpenClaw session management, workflow stage awareness, knowledge injection) was extracted from the API route into a shared module `dispatchTaskToAgent(taskId)`. Both the API route (`POST /api/tasks/{id}/dispatch`) and the daemon's dispatcher call the same function. Returns a `DispatchResult` with success/error status and updated task/agent payloads.
+
+The dispatch module includes a **concurrent session guard**: before creating a new OpenClaw session for a task, it interrupts any existing active sessions on that task via `finalizeOtherActiveSessionsForTask()`. This prevents the dual-session bug where two agents run simultaneously on the same task. Interrupted sessions are logged as task activities.
 
 ### Broadcast Endpoint
 
@@ -722,7 +724,7 @@ The homepage has two top-level destinations: **Workspaces** and **Operations**. 
 - **Process Info** — Node.js version, platform, hostname, web process memory (RSS, heap), system memory usage bar, web/daemon service status dots.
 - **Daemon Status** — Uptime, PID, memory, module table (name, interval, last tick), counters (dispatched, heartbeats, stale recovered, events routed, logs stored/cleaned). Shows stale warning if last report is >2min old.
 - **Scheduled Jobs** — List of registered cron jobs from the daemon scheduler (id, name, cron, enabled, last run).
-- **Config Validation** — "Run Validation" button that POSTs to `/api/system/validate` and displays pass/fail/warn results for each check (env file, env vars, database, web service, daemon service, HTTP endpoint).
+- **Config Validation** -- "Run Validation" button that POSTs to `/api/system/validate` and displays pass/fail/warn results for each check (env file, env vars, database, web service, daemon service, HTTP endpoint, Himalaya CLI, gateway connection, agents, models, config, sessions, nodes, **agent credentials**). The **Agent Credentials** check reads each agent's `auth-profiles.json` from their `agent_dir`, compares provider coverage against the main agent, and flags auth error stats (high error counts, cooldown states).
 
 The **OpenClaw Control Plane** section shows 4 cards:
 - **Gateway Status** — Connection status (connected/disconnected), masked gateway URL (tokens replaced with `***`), active session count.

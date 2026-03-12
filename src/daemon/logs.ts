@@ -9,6 +9,7 @@ interface OpenClawSessionInfo {
   id: string;
   agent_id?: string;
   openclaw_session_id: string;
+  task_id?: string | null;
   status: string;
 }
 
@@ -22,6 +23,76 @@ interface AgentInfo {
   id: string;
   name: string;
   gateway_agent_id?: string;
+}
+
+// ── Auth/provider failure detection ──────────────────────────────────
+// Patterns that indicate provider auth failures or config issues in agent logs.
+// When detected, an activity is posted on the task so humans can see why an agent stalled.
+const AUTH_FAILURE_PATTERNS: Array<{ pattern: RegExp; label: string }> = [
+  { pattern: /\b(401|403)\b.*\b(unauthorized|forbidden|auth|api[_\s-]?key|token)\b/i, label: 'HTTP auth rejection' },
+  { pattern: /\bapi[_\s-]?key\b.*(missing|invalid|expired|not\s+found|not\s+set)/i, label: 'API key misconfigured' },
+  { pattern: /\b(OPENAI|ANTHROPIC|GOOGLE|AZURE|DEEPSEEK|GLM|MISTRAL)[_\s-]?API[_\s-]?KEY\b.*(missing|invalid|not\s+set|not\s+found)/i, label: 'Provider API key missing' },
+  { pattern: /\brate\s*limit(ed)?\b/i, label: 'Rate limited' },
+  { pattern: /\bquota\s*(exceeded|exhausted|limit)\b/i, label: 'Quota exhausted' },
+  { pattern: /\bmodel\s+(not\s+found|unavailable|does\s+not\s+exist)\b/i, label: 'Model unavailable' },
+  { pattern: /\btimeout\b.*(provider|model|api|gateway|request)/i, label: 'Provider timeout' },
+  { pattern: /\b(provider|gateway)\b.*(error|failed|unavailable|unreachable)/i, label: 'Provider error' },
+  { pattern: /\ball\s+(fallback|provider|model)s?\s+(failed|exhausted|unavailable)/i, label: 'All providers failed' },
+];
+
+// Cooldown: don't spam activities for the same session
+const authFailureReportedSessions = new Map<string, number>();
+const AUTH_FAILURE_COOLDOWN_MS = 10 * 60 * 1000; // 10 minutes
+
+function detectAuthFailures(entries: Array<{ role: string; content: string }>): { detected: boolean; labels: string[] } {
+  const labels = new Set<string>();
+  for (const entry of entries) {
+    if (entry.role !== 'assistant' && entry.role !== 'system') continue;
+    for (const { pattern, label } of AUTH_FAILURE_PATTERNS) {
+      if (pattern.test(entry.content)) {
+        labels.add(label);
+      }
+    }
+  }
+  return { detected: labels.size > 0, labels: Array.from(labels) };
+}
+
+async function reportAuthFailure(
+  sessionKey: string,
+  taskId: string,
+  agentId: string | null,
+  agentName: string | undefined,
+  labels: string[],
+): Promise<void> {
+  const now = Date.now();
+  const lastReported = authFailureReportedSessions.get(sessionKey);
+  if (lastReported && now - lastReported < AUTH_FAILURE_COOLDOWN_MS) return;
+  authFailureReportedSessions.set(sessionKey, now);
+
+  const agentLabel = agentName || agentId || 'unknown agent';
+  const issueList = labels.join(', ');
+  const message = `[Provider Alert] Detected provider/auth failures in ${agentLabel} session: ${issueList}. Agent may be stalled due to credential or provider issues.`;
+
+  try {
+    await mcFetch(`/api/tasks/${taskId}/activities`, {
+      method: 'POST',
+      body: JSON.stringify({
+        activity_type: 'status_changed',
+        agent_id: agentId,
+        message,
+        metadata: JSON.stringify({
+          workflow_step: 'in_progress',
+          decision_event: true,
+          provider_alert: true,
+          failure_labels: labels,
+          session_key: sessionKey,
+        }),
+      }),
+    });
+    log.warn(`Reported auth failure for task ${taskId}: ${issueList}`);
+  } catch (err) {
+    log.error(`Failed to report auth failure activity: ${String(err)}`);
+  }
 }
 
 // Track which hashes we've already stored, to avoid re-POSTing
@@ -180,6 +251,20 @@ export function startLogPoller(config: DaemonConfig, stats: DaemonStats): () => 
                 },
               });
             }
+
+            // 5b. Detect auth/provider failures in new entries
+            if (stored > 0 && session.task_id) {
+              const { detected, labels } = detectAuthFailures(newEntries);
+              if (detected) {
+                await reportAuthFailure(
+                  sessionKey,
+                  session.task_id,
+                  agent?.id || session.agent_id || null,
+                  agent?.name,
+                  labels,
+                );
+              }
+            }
           } else {
             // If 409 conflict, the entries already exist — mark hashes as known
             if (storeRes.status === 409) {
@@ -207,6 +292,11 @@ export function startLogPoller(config: DaemonConfig, stats: DaemonStats): () => 
       if (tickCount % 100 === 0) {
         await cleanupStaleLogs();
         pruneKnownHashes();
+        // Prune stale auth failure cooldowns
+        const pruneThreshold = Date.now() - AUTH_FAILURE_COOLDOWN_MS * 2;
+        for (const [key, ts] of authFailureReportedSessions) {
+          if (ts < pruneThreshold) authFailureReportedSessions.delete(key);
+        }
       }
     } catch (err) {
       log.error('Log poller tick failed:', err);

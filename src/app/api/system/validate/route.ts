@@ -455,6 +455,107 @@ export async function POST() {
     }));
   }
 
+  // ── Agent credential health checks ────────────────────────────────────
+  // Check agent auth-profiles.json for missing files, provider drift, and error stats.
+  checks.push(check('Agent Credentials', 'openclaw', () => {
+    try {
+      const db = getDb();
+      const agents = db.prepare(
+        "SELECT id, name, agent_dir, gateway_agent_id FROM agents WHERE agent_dir IS NOT NULL AND agent_dir != ''"
+      ).all() as Array<{ id: string; name: string; agent_dir: string; gateway_agent_id: string | null }>;
+
+      if (agents.length === 0) {
+        return { status: 'pass', message: 'No agents with local directories configured' };
+      }
+
+      // Find main agent auth profiles as reference
+      const mainAgent = agents.find(a => a.gateway_agent_id === 'main' || a.name.toLowerCase() === 'main');
+      let mainProviders = new Set<string>();
+      if (mainAgent) {
+        const mainAuthPath = `${mainAgent.agent_dir}/auth-profiles.json`;
+        if (existsSync(mainAuthPath)) {
+          try {
+            const mainAuth = JSON.parse(readFileSync(mainAuthPath, 'utf8'));
+            if (mainAuth.profiles && typeof mainAuth.profiles === 'object') {
+              mainProviders = new Set(Object.keys(mainAuth.profiles).map(k => k.split(':')[0]));
+            }
+          } catch { /* ignore parse errors */ }
+        }
+      }
+
+      const issues: string[] = [];
+      const errorAgents: string[] = [];
+      let agentsWithAuth = 0;
+      let agentsWithoutAuth = 0;
+
+      for (const agent of agents) {
+        if (agent.gateway_agent_id === 'main') continue; // Skip main itself
+        const authPath = `${agent.agent_dir}/auth-profiles.json`;
+        if (!existsSync(authPath)) {
+          agentsWithoutAuth++;
+          continue;
+        }
+        agentsWithAuth++;
+
+        try {
+          const authData = JSON.parse(readFileSync(authPath, 'utf8'));
+          const profiles = authData.profiles || {};
+          const agentProviders = new Set(Object.keys(profiles).map(k => k.split(':')[0]));
+          const usageStats = authData.usageStats || {};
+
+          // Check for provider drift vs main
+          if (mainProviders.size > 0) {
+            const missing = Array.from(mainProviders).filter(p => !agentProviders.has(p));
+            if (missing.length > 0) {
+              issues.push(`${agent.name}: missing providers ${missing.join(', ')}`);
+            }
+          }
+
+          // Check for auth errors in usageStats
+          for (const [profileKey, stats] of Object.entries(usageStats)) {
+            const s = stats as { errorCount?: number; failureCounts?: Record<string, number>; cooldownUntil?: number };
+            if (s.errorCount && s.errorCount > 2) {
+              errorAgents.push(`${agent.name}/${profileKey}: ${s.errorCount} errors`);
+            }
+            if (s.cooldownUntil && s.cooldownUntil > Date.now()) {
+              errorAgents.push(`${agent.name}/${profileKey}: in cooldown`);
+            }
+          }
+        } catch { /* ignore individual parse errors */ }
+      }
+
+      if (issues.length > 0 || errorAgents.length > 0) {
+        const parts: string[] = [];
+        if (agentsWithoutAuth > 0) parts.push(`${agentsWithoutAuth} agent(s) have no auth-profiles.json`);
+        if (issues.length > 0) parts.push(`Provider drift: ${issues.join('; ')}`);
+        if (errorAgents.length > 0) parts.push(`Auth errors: ${errorAgents.join('; ')}`);
+        return {
+          status: 'warn',
+          message: parts.join('. '),
+          details: `${agentsWithAuth} with auth, ${agentsWithoutAuth} without, ${mainProviders.size} main providers`,
+          repairable: false,
+        };
+      }
+
+      if (agentsWithoutAuth > 0) {
+        return {
+          status: 'warn',
+          message: `${agentsWithoutAuth} agent(s) have no auth-profiles.json (no provider credentials)`,
+          details: `These agents rely on gateway-level auth fallback which may not have all providers configured`,
+          repairable: false,
+        };
+      }
+
+      return {
+        status: 'pass',
+        message: `All ${agentsWithAuth} agents have credential files`,
+        details: mainProviders.size > 0 ? `Main agent providers: ${Array.from(mainProviders).join(', ')}` : undefined,
+      };
+    } catch (err) {
+      return { status: 'warn', message: `Credential check error: ${err instanceof Error ? err.message : String(err)}` };
+    }
+  }));
+
   const errors = checks.filter(c => c.status === 'fail').length;
   const warnings = checks.filter(c => c.status === 'warn').length;
 
