@@ -475,6 +475,9 @@ When `MC_API_TOKEN` is set in `.env.local`:
   - task-scoped read/write (`task:{id}:read`, `task:{id}:write`)
   - optional task list/create (`tasks:read`, `tasks:create`)
   - knowledge write scopes (`knowledge:write`) with delete explicitly denied
+  - OpenClaw session endpoints are scoped by `session_id` in the token payload (`/api/openclaw/sessions/{id}` and `/api/openclaw/sessions/{id}/history`) and additionally require task scope (`task:{id}:read`/`task:{id}:write`)
+- Scoped token signing/verification uses configured API secrets only (`MC_API_TOKEN` / `MC_TOKEN`) and supports cross-checking both configured values to avoid env-order mismatches.
+- Bearer parsing is normalized (trims whitespace, handles duplicated `Bearer`, strips quote wrappers) before scoped verification.
 - Invalid scoped token => `401 invalid_token`; missing scope => `403 insufficient_scope` with loopback guidance to `/api/tasks/{id}/fail`.
 - SSE streams accept token as query parameter.
 - Implemented in `middleware.ts` + `src/proxy.ts`.

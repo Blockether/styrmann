@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 // Log warning at startup if auth is disabled
-const MC_API_TOKEN = process.env.MC_API_TOKEN;
+const MC_API_TOKEN = process.env.MC_API_TOKEN?.trim() || '';
 if (!MC_API_TOKEN) {
   console.warn('[SECURITY WARNING] MC_API_TOKEN not set - API authentication is DISABLED (local dev mode)');
 }
@@ -59,8 +59,25 @@ type ScopedPayload = {
   exp: number;
   task_id?: string;
   workspace_id?: string;
+  session_id?: string;
   scopes: string[];
 };
+
+function getScopedSigningSecrets(): string[] {
+  const candidates = [process.env.MC_API_TOKEN, process.env.MC_TOKEN]
+    .map((value) => (value || '').trim())
+    .filter((value) => value.length > 0);
+  return Array.from(new Set(candidates));
+}
+
+function extractBearerToken(authHeader: string | null): string | null {
+  if (!authHeader) return null;
+  const normalized = authHeader.trim().replace(/^Bearer\s+Bearer\s+/i, 'Bearer ');
+  const match = normalized.match(/^Bearer\s+(.+)$/i);
+  if (!match) return null;
+  const token = match[1].trim().replace(/^['"`]+|['"`]+$/g, '');
+  return token.length > 0 ? token : null;
+}
 
 function toBase64Url(input: Uint8Array): string {
   let binary = '';
@@ -81,18 +98,26 @@ async function verifyScopedPayload(token: string): Promise<ScopedPayload | null>
   const parts = token.split('.');
   if (parts.length !== 3 || parts[0] !== 'mcst') return null;
   const [, encoded, signature] = parts;
-  const secret = MC_API_TOKEN || process.env.MC_TOKEN || '';
-  if (!secret) return null;
-  const key = await crypto.subtle.importKey(
-    'raw',
-    new TextEncoder().encode(secret),
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign'],
-  );
-  const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(encoded));
-  const expected = toBase64Url(new Uint8Array(sig));
-  if (expected !== signature) return null;
+  const secrets = getScopedSigningSecrets();
+  if (secrets.length === 0) return null;
+
+  let validSignature = false;
+  for (const secret of secrets) {
+    const key = await crypto.subtle.importKey(
+      'raw',
+      new TextEncoder().encode(secret),
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['sign'],
+    );
+    const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(encoded));
+    const expected = toBase64Url(new Uint8Array(sig));
+    if (expected === signature) {
+      validSignature = true;
+      break;
+    }
+  }
+  if (!validSignature) return null;
 
   try {
     const payloadText = new TextDecoder().decode(fromBase64Url(encoded));
@@ -170,6 +195,30 @@ async function isScopedTokenAuthorized(
       : { ok: false, required: ['events:read'] };
   }
 
+  const openclawSessionMatch = path.match(/^\/api\/openclaw\/sessions\/([^/]+)(\/history)?$/);
+  if (openclawSessionMatch) {
+    const sessionId = decodeURIComponent(openclawSessionMatch[1]);
+    if (!parsed.session_id || parsed.session_id !== sessionId) {
+      return { ok: false, required: [`session:${sessionId}:read`, `session:${sessionId}:write`] };
+    }
+
+    const taskWriteScope = parsed.task_id ? `task:${parsed.task_id}:write` : '';
+    const taskReadScope = parsed.task_id ? `task:${parsed.task_id}:read` : '';
+    const writeMethods = new Set(['POST', 'PATCH', 'PUT', 'DELETE']);
+    if (writeMethods.has(method)) {
+      return taskWriteScope && hasScope(parsed.scopes, taskWriteScope)
+        ? { ok: true, taskId: parsed.task_id }
+        : { ok: false, required: taskWriteScope ? [taskWriteScope] : [] };
+    }
+
+    const hasRead = (Boolean(taskReadScope) && hasScope(parsed.scopes, taskReadScope))
+      || (Boolean(taskWriteScope) && hasScope(parsed.scopes, taskWriteScope))
+      || hasScope(parsed.scopes, 'tasks:read');
+    return hasRead
+      ? { ok: true, taskId: parsed.task_id }
+      : { ok: false, required: taskReadScope ? [taskReadScope] : ['tasks:read'] };
+  }
+
   return { ok: false, required: [] };
 }
 
@@ -228,15 +277,14 @@ export async function proxy(request: NextRequest) {
   // Special case: workspace file access with signed token
   // Check Authorization header for bearer token
   const authHeader = request.headers.get('authorization');
-  
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+  const token = extractBearerToken(authHeader);
+
+  if (!token) {
     return NextResponse.json(
       { error: 'Unauthorized' },
       { status: 401 }
     );
   }
-
-  const token = authHeader.substring(7); // Remove 'Bearer ' prefix
 
   if (token !== MC_API_TOKEN) {
     const scoped = await isScopedTokenAuthorized(request, token);

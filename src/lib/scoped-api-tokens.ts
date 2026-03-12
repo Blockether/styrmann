@@ -1,6 +1,11 @@
-import { createHmac, randomBytes, timingSafeEqual } from 'crypto';
+import { createHmac, timingSafeEqual } from 'crypto';
 
-const TOKEN_SECRET = process.env.MC_API_TOKEN || process.env.MC_TOKEN || randomBytes(32).toString('hex');
+function getTokenSecrets(): string[] {
+  const candidates = [process.env.MC_API_TOKEN, process.env.MC_TOKEN]
+    .map((value) => (value || '').trim())
+    .filter((value) => value.length > 0);
+  return Array.from(new Set(candidates));
+}
 
 export interface ScopedTokenPayload {
   v: 1 | 2;
@@ -20,6 +25,12 @@ export function generateScopedApiToken(input: {
   sessionId?: string;
   ttlSeconds?: number;
 }): string {
+  const secrets = getTokenSecrets();
+  const primarySecret = secrets[0];
+  if (!primarySecret) {
+    throw new Error('MC_API_TOKEN (or MC_TOKEN) is required to generate scoped API tokens');
+  }
+
   const now = Math.floor(Date.now() / 1000);
   const exp = now + Math.max(60, input.ttlSeconds || 6 * 60 * 60);
   const payload: ScopedTokenPayload = {
@@ -33,7 +44,7 @@ export function generateScopedApiToken(input: {
     scopes: Array.from(new Set(input.scopes.filter(Boolean))),
   };
   const encoded = Buffer.from(JSON.stringify(payload)).toString('base64url');
-  const signature = createHmac('sha256', TOKEN_SECRET).update(encoded).digest('base64url');
+  const signature = createHmac('sha256', primarySecret).update(encoded).digest('base64url');
   return `mcst.${encoded}.${signature}`;
 }
 
@@ -41,12 +52,22 @@ export function verifyScopedApiToken(token: string): ScopedTokenPayload | null {
   const parts = token.split('.');
   if (parts.length !== 3 || parts[0] !== 'mcst') return null;
   const [, encoded, signature] = parts;
-  const expected = createHmac('sha256', TOKEN_SECRET).update(encoded).digest('base64url');
-  try {
-    if (!timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) return null;
-  } catch {
-    return null;
+  const secrets = getTokenSecrets();
+  if (secrets.length === 0) return null;
+
+  let validSignature = false;
+  for (const secret of secrets) {
+    const expected = createHmac('sha256', secret).update(encoded).digest('base64url');
+    try {
+      if (timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) {
+        validSignature = true;
+        break;
+      }
+    } catch {
+      continue;
+    }
   }
+  if (!validSignature) return null;
 
   let parsed: ScopedTokenPayload;
   try {
