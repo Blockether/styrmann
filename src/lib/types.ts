@@ -427,59 +427,6 @@ export interface TaskRole {
   agent?: Agent;
 }
 
-export interface KnowledgeEntry {
-  id: string;
-  workspace_id: string;
-  task_id?: string;
-  agent_id?: string;
-  category: string;
-  title: string;
-  content: string;
-  tags?: string[];
-  confidence: number;
-  created_by_agent_id?: string;
-  created_at: string;
-  attachments?: KnowledgeAttachment[];
-  routing_decisions?: KnowledgeRoutingDecision[];
-  linked_entries?: KnowledgeLink[];
-}
-
-export interface KnowledgeAttachment {
-  id: string;
-  knowledge_id: string;
-  workspace_id: string;
-  file_name: string;
-  mime_type?: string | null;
-  size_bytes?: number | null;
-  source_url?: string | null;
-  content_text?: string | null;
-  content_base64?: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface KnowledgeRoutingDecision {
-  id: string;
-  knowledge_id?: string;
-  workspace_id?: string;
-  agent_id: string | null;
-  agent_name?: string;
-  agent_role?: string;
-  score: number;
-  selected: boolean;
-  reasons: string[];
-  created_at?: string;
-}
-
-export interface KnowledgeLink {
-  id: string;
-  source_id: string;
-  target_id: string;
-  link_type: string;
-  created_at: string;
-  linked_entry?: { id: string; title: string; category: string };
-}
-
 export interface OpenClawSession {
   id: string;
   agent_id: string;

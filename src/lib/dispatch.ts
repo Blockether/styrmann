@@ -6,7 +6,6 @@ import { getOpenClawClient, sendMessageWithProvenance } from '@/lib/openclaw/cli
 import { broadcast } from '@/lib/events';
 import { getMissionControlUrl } from '@/lib/config';
 import { ensureTaskWorktree, getTaskPipelineDir, getWorkspaceRepoPath, isGitWorkTree } from '@/lib/git-repo';
-import { getRelevantKnowledge, formatKnowledgeForDispatch } from '@/lib/learner';
 import { createTaskActivity } from '@/lib/task-activity';
 import { getTaskWorkflow } from '@/lib/workflow-engine';
 import { getUnresolvedTaskDependencies } from '@/lib/task-dependencies';
@@ -205,7 +204,6 @@ function buildTaskProblemStatementMarkdown(args: {
   orchestratorPlanDiagram: string | null;
   planningSpecSection: string;
   agentInstructionsSection: string;
-  knowledgeSection: string;
   resourceSection: string;
 }): string {
   const {
@@ -222,7 +220,6 @@ function buildTaskProblemStatementMarkdown(args: {
     orchestratorPlanDiagram,
     planningSpecSection,
     agentInstructionsSection,
-    knowledgeSection,
     resourceSection,
   } = args;
 
@@ -269,7 +266,6 @@ ${orchestratorPlanDiagram}\n\n\
     participantsSection,
     planningSpecSection.trim().length > 0 ? `## Planning Specification\n${sanitizePlanningSection(planningSpecSection)}` : '',
     agentInstructionsSection.trim().length > 0 ? `## Role Instructions\n${agentInstructionsSection.trim()}` : '',
-    knowledgeSection.trim().length > 0 ? `## Lessons Learned Context\n${knowledgeSection.trim()}` : '',
     resourceSection.trim().length > 0 ? `## Task Resources\n${resourceSection.trim()}` : '',
     '',
     `Generated at: ${new Date().toISOString()}`,
@@ -593,12 +589,6 @@ export async function dispatchTaskToAgent(taskId: string): Promise<DispatchResul
       }
     }
 
-    let knowledgeSection = '';
-    try {
-      const knowledge = getRelevantKnowledge(task.workspace_id, task.title, agent.id);
-      knowledgeSection = formatKnowledgeForDispatch(knowledge);
-    } catch {
-    }
     const resourceSection = buildResourceContext(task.id);
     const acceptanceCriteriaRows = queryAll<{ description: string; is_met: number }>(
       `SELECT description, is_met
@@ -675,8 +665,6 @@ export async function dispatchTaskToAgent(taskId: string): Promise<DispatchResul
         `task:${task.id}:write`,
         'tasks:create',
         'tasks:read',
-        'knowledge:read',
-        'knowledge:write',
         'events:read',
       ],
     });
@@ -777,7 +765,7 @@ ${task.description ? `**Description:** ${task.description}\n` : ''}
 ${task.due_date ? `**Due:** ${task.due_date}\n` : ''}
 **Task ID:** ${task.id}
 **Mission Control API base:** ${missionControlUrl}/api
-${planningSpecSection}${agentInstructionsSection}${knowledgeSection}${resourceSection}
+${planningSpecSection}${agentInstructionsSection}${resourceSection}
 **RUNTIME CONTRACT:**
 - This task runs in the OpenClaw ACP session runtime for this agent.
 - Use the plain Pi-style coding workflow inside that ACP session: inspect, edit, and verify with the runtime tools available to you.
@@ -801,7 +789,6 @@ If you need help or clarification, ask the orchestrator.`;
       orchestratorPlanDiagram,
       planningSpecSection,
       agentInstructionsSection,
-      knowledgeSection,
       resourceSection,
     });
     const problemStatementPath = ensureProblemStatementArtifact({

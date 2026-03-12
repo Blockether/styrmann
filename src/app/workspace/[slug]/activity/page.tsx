@@ -8,7 +8,7 @@ export default function ActivityRedirect() {
   const router = useRouter();
 
   useEffect(() => {
-    router.replace(`/workspace/${params.slug}?view=activity`);
+    router.replace(`/workspace/${params.slug}`);
   }, [params.slug, router]);
 
   return <div data-component="src/app/workspace/[slug]/activity/page" />;

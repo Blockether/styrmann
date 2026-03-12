@@ -2091,6 +2091,25 @@ const migrations: Migration[] = [
       db.exec('CREATE INDEX IF NOT EXISTS idx_task_acceptance_parent ON task_acceptance_criteria(task_id, parent_criteria_id, sort_order)');
       db.exec('CREATE INDEX IF NOT EXISTS idx_task_acceptance_gate ON task_acceptance_criteria(task_id, required_for_status, gate_type)');
     }
+  },
+  {
+    id: '046',
+    name: 'remove_mission_control_knowledge_system',
+    up: (db) => {
+      db.exec('DROP INDEX IF EXISTS idx_knowledge_entries_workspace');
+      db.exec('DROP INDEX IF EXISTS idx_knowledge_entries_task');
+      db.exec('DROP INDEX IF EXISTS idx_knowledge_entries_agent');
+      db.exec('DROP INDEX IF EXISTS idx_knowledge_attachments_knowledge');
+      db.exec('DROP INDEX IF EXISTS idx_knowledge_attachments_workspace');
+      db.exec('DROP INDEX IF EXISTS idx_knowledge_routing_decisions_knowledge');
+      db.exec('DROP INDEX IF EXISTS idx_knowledge_routing_decisions_agent');
+
+      db.exec('DROP TABLE IF EXISTS knowledge_links');
+      db.exec('DROP TABLE IF EXISTS knowledge_vectors');
+      db.exec('DROP TABLE IF EXISTS knowledge_routing_decisions');
+      db.exec('DROP TABLE IF EXISTS knowledge_attachments');
+      db.exec('DROP TABLE IF EXISTS knowledge_entries');
+    }
   }
 ];
 

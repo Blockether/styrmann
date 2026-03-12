@@ -38,7 +38,6 @@ const SKILL_FALLBACKS: Record<string, string[]> = {
   tester: ['validation', 'test-design', 'regression-check'],
   reviewer: ['verification', 'quality-gate', 'risk-review'],
   verifier: ['verification', 'acceptance-gate', 'release-check'],
-  learner: ['capability-gap-analysis', 'proposal-drafting', 'memory-synthesis'],
   explorer: ['research-discovery', 'option-mapping', 'tradeoff-analysis'],
   pragmatist: ['simplicity-review', 'scope-minimization', 'maintenance-lens'],
   guardian: ['correctness-review', 'risk-assessment', 'safety-check'],
@@ -299,13 +298,6 @@ export async function generateTaskWorkflowPlan(taskId: string): Promise<{ plan: 
      ORDER BY created_at ASC
      LIMIT 1`,
   );
-  const learner = queryOne<Agent>(
-    `SELECT * FROM agents
-     WHERE role = 'learner'
-     ORDER BY created_at ASC
-     LIMIT 1`,
-  );
-
   const candidateAgents = queryAll<Agent>(
     `SELECT * FROM agents
      WHERE status != 'offline'
@@ -403,7 +395,6 @@ export async function generateTaskWorkflowPlan(taskId: string): Promise<{ plan: 
   }
 
   for (const finding of findings) {
-    if (!learner) continue;
     const role = (() => {
       try {
         const parsed = finding.metadata ? JSON.parse(finding.metadata) as { role?: string; agent_id?: string } : {};
@@ -417,12 +408,12 @@ export async function generateTaskWorkflowPlan(taskId: string): Promise<{ plan: 
       id: crypto.randomUUID(),
       task_id: task.id,
       workspace_id: task.workspace_id,
-      learner_agent_id: learner.id,
+      learner_agent_id: null,
       proposal_type: finding.finding_type === 'missing_agent' ? 'agent' : 'skill',
       title: finding.finding_type === 'missing_agent'
-        ? `Learner proposal: add ${role} agent archetype`
-        : `Learner proposal: add ${role} shared skill`,
-      detail: `${learner.name} suggests recording this gap in the meta repository as a proposal only. No automatic system change has been made. Add a loop policy for this capability: explicit retry criteria, retry limit, and clear loop-exit evidence. ${finding.detail}`,
+        ? `Capability proposal: add ${role} agent archetype`
+        : `Capability proposal: add ${role} shared skill`,
+      detail: `Mission Control recorded this gap in the meta repository as a proposal only. No automatic system change has been made. Add a loop policy for this capability: explicit retry criteria, retry limit, and clear loop-exit evidence. ${finding.detail}`,
       target_name: String(role),
       meta_workspace_id: metaWorkspace?.id || null,
       meta_workspace_slug: metaWorkspace?.slug || null,
@@ -499,14 +490,6 @@ export async function generateTaskWorkflowPlan(taskId: string): Promise<{ plan: 
         `INSERT INTO task_roles (id, task_id, role, agent_id, created_at)
          VALUES (?, ?, ?, ?, ?)`,
         [crypto.randomUUID(), task.id, step.role, step.agent_id, now],
-      );
-    }
-
-    if (learner && !steps.some((step) => step.role === 'learner')) {
-      run(
-        `INSERT OR IGNORE INTO task_roles (id, task_id, role, agent_id, created_at)
-         VALUES (?, ?, 'learner', ?, ?)`,
-        [crypto.randomUUID(), task.id, learner.id, now],
       );
     }
 

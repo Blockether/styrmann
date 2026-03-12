@@ -10,8 +10,6 @@ import { AgentsSidebar } from '@/components/AgentsSidebar';
 import { ActiveSprint } from '@/components/ActiveSprint';
 import { BacklogView } from '@/components/BacklogView';
 import { ParetoView } from '@/components/ParetoView';
-import { ActivityFeed } from '@/components/ActivityFeed';
-import { KnowledgeView } from '@/components/KnowledgeView';
 import { SSEDebugPanel } from '@/components/SSEDebugPanel';
 import { GithubIssuesView } from '@/components/GithubIssuesView';
 import { TaskModal } from '@/components/TaskModal';
@@ -24,7 +22,7 @@ function getInitialView(): DashboardView {
   if (typeof window === 'undefined') return 'sprint';
   const params = new URLSearchParams(window.location.search);
   const urlView = params.get('view');
-  if (urlView && ['sprint', 'backlog', 'pareto', 'activity', 'issues', 'knowledge'].includes(urlView)) {
+  if (urlView && ['sprint', 'backlog', 'pareto', 'issues'].includes(urlView)) {
     return urlView as DashboardView;
   }
   return 'sprint';
@@ -47,7 +45,13 @@ export default function WorkspacePage() {
 
   useEffect(() => {
     const urlView = new URLSearchParams(window.location.search).get('view');
-    if (urlView && ['sprint', 'backlog', 'pareto', 'activity', 'issues', 'knowledge'].includes(urlView)) {
+    if (urlView && ['sprint', 'backlog', 'pareto', 'issues'].includes(urlView)) {
+      return;
+    }
+    if (urlView) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('view');
+      window.history.replaceState({}, '', url.toString());
     }
   }, []);
 
@@ -199,12 +203,8 @@ export default function WorkspacePage() {
         return <BacklogView workspaceId={workspace.id} />;
       case 'pareto':
         return <ParetoView workspaceId={workspace.id} />;
-      case 'activity':
-        return <ActivityFeed workspaceId={workspace.id} />;
       case 'issues':
         return <GithubIssuesView workspaceId={workspace.id} workspace={workspace} onCreateTask={(issue) => setGithubIssueForTask(issue)} />;
-      case 'knowledge':
-        return <KnowledgeView workspaceId={workspace.id} />;
       default:
         return <ActiveSprint workspaceId={workspace.id} />;
     }

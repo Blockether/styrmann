@@ -18,7 +18,7 @@ import { useMissionControl } from '@/lib/store';
 import { format } from 'date-fns';
 import type { Workspace } from '@/lib/types';
 
-export type DashboardView = 'sprint' | 'backlog' | 'pareto' | 'activity' | 'issues' | 'knowledge';
+export type DashboardView = 'sprint' | 'backlog' | 'pareto' | 'issues';
 
 interface HeaderProps {
   workspace?: Workspace;
@@ -169,10 +169,10 @@ export function Header({ workspace, isPortrait = true, onMenuToggle, sidebarOpen
               {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
 
-            <div className="hidden sm:flex items-center gap-2">
+            <Link href="/" className="hidden sm:flex items-center gap-2 rounded px-1 py-1 transition-colors hover:bg-mc-bg-tertiary">
               <Image src="/logo.png" alt="Blockether" width={24} height={24} className="rounded" />
               <h1 className="font-semibold text-mc-text uppercase tracking-wider text-sm">Mission Control</h1>
-            </div>
+            </Link>
 
             {workspace ? (
               <div ref={switcherRef} className="relative flex items-center gap-2 min-w-0">

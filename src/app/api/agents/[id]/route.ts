@@ -205,8 +205,6 @@ export async function DELETE(
     run('UPDATE tasks SET created_by_agent_id = NULL WHERE created_by_agent_id = ?', [id]);
     run('UPDATE task_activities SET agent_id = NULL WHERE agent_id = ?', [id]);
     run('UPDATE task_run_results SET agent_id = NULL WHERE agent_id = ?', [id]);
-    run('UPDATE knowledge_entries SET agent_id = NULL WHERE agent_id = ?', [id]);
-    run('UPDATE knowledge_entries SET created_by_agent_id = NULL WHERE created_by_agent_id = ?', [id]);
     run('UPDATE milestones SET coordinator_agent_id = NULL WHERE coordinator_agent_id = ?', [id]);
     run('UPDATE acp_bindings SET agent_id = NULL WHERE agent_id = ?', [id]);
 

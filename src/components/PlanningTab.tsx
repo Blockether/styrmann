@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { AlertCircle, GitBranch, Lightbulb, Loader2, Radar } from 'lucide-react';
+import { AlertCircle, Lightbulb, Loader2 } from 'lucide-react';
 import type { CapabilityProposal, Task, TaskActivity, TaskFinding, TaskWorkflowPlan } from '@/lib/types';
 import { WorkflowPlanDiagram } from './WorkflowPlanDiagram';
 import { ActivityLog } from './ActivityLog';
@@ -203,39 +203,6 @@ export function PlanningTab({ taskId }: PlanningTabProps) {
         </div>
       )}
 
-      <div className="rounded-[1.1rem] border border-mc-border bg-gradient-to-br from-white via-[#fff8ea] to-[#f8f1e3] p-4 shadow-[0_18px_42px_-36px_rgba(120,90,20,0.35)]">
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] lg:items-center">
-          <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-mc-accent/25 bg-white/80 px-3 py-1 text-[11px] uppercase tracking-[0.2em] text-mc-text-secondary">
-              <GitBranch className="h-3.5 w-3.5 text-mc-accent" />
-              Orchestration Guide
-            </div>
-            <h3 className="mt-3 text-lg font-semibold text-mc-text">This view now separates planning, staffing, live execution, and loopback behavior.</h3>
-            <p className="mt-2 text-sm leading-6 text-mc-text-secondary">
-              Read it top to bottom: the orchestrator sets the route, the participants staff each role, the live strip shows runtime state,
-              and every stage card explains the owner, trigger, expected outcome, and what happens when the stage fails.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="rounded-2xl border border-mc-border bg-white/80 p-3">
-              <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-mc-text-secondary">
-                <Radar className="h-3.5 w-3.5 text-mc-accent" />
-                What this solves
-              </div>
-              <p className="mt-2 text-sm leading-6 text-mc-text-secondary">Removes the old telemetry wall and turns the pipeline into a guided narrative for operators.</p>
-            </div>
-            <div className="rounded-2xl border border-mc-border bg-white/80 p-3">
-              <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-mc-text-secondary">
-                <Lightbulb className="h-3.5 w-3.5 text-mc-accent" />
-                Best time to edit
-              </div>
-              <p className="mt-2 text-sm leading-6 text-mc-text-secondary">Before execution starts, prompts and staffing can still be refined directly from the stage cards.</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
       <WorkflowPlanDiagram
         task={data.task}
         plan={data.plan}
@@ -272,7 +239,7 @@ export function PlanningTab({ taskId }: PlanningTabProps) {
 
       {data.proposals.length > 0 && (
         <div className="overflow-hidden rounded-[1.1rem] border border-mc-border bg-white/75 shadow-[0_16px_36px_-34px_rgba(0,0,0,0.25)]">
-          <div className="border-b border-mc-border bg-mc-bg-secondary/70 p-3 text-sm font-medium">Learner Proposals</div>
+          <div className="border-b border-mc-border bg-mc-bg-secondary/70 p-3 text-sm font-medium">Capability Proposals</div>
           <div className="p-4 space-y-3">
             {data.proposals.map((proposal) => (
               <div key={proposal.id} className="rounded-2xl border border-mc-border bg-gradient-to-br from-mc-bg-secondary via-mc-bg to-mc-bg p-3">

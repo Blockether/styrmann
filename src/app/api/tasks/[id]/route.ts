@@ -9,7 +9,6 @@ import { getMissionControlUrl } from '@/lib/config';
 import { getHimalayaStatus, sendHumanAssignmentEmail } from '@/lib/himalaya';
 import { finalizeOtherActiveSessionsForTask, finalizeSessionByOpenClawId } from '@/lib/session-lifecycle';
 import { checkTransitionEligibility, handleStageTransition, getTaskWorkflow, drainQueue } from '@/lib/workflow-engine';
-import { notifyLearner } from '@/lib/learner';
 import { captureTaskRunResult } from '@/lib/task-run-results';
 import { checkBuilderEvidence } from '@/lib/builder-evidence';
 import { UpdateTaskSchema } from '@/lib/validation';
@@ -503,18 +502,6 @@ export async function PATCH(
       }
     }
 
-    // Notify learner on stage transitions (non-blocking)
-    if (nextStatus && nextStatus !== existing.status) {
-      const isForwardMove = !['inbox', 'assigned', 'planning', 'pending_dispatch'].includes(nextStatus);
-      if (isForwardMove) {
-        notifyLearner(id, {
-          previousStatus: existing.status,
-          newStatus: nextStatus,
-          passed: true,
-        }).catch(err => console.error('[Learner] notification failed:', err));
-      }
-    }
-
     // Drain the review queue when a task reaches 'done' (frees the verification slot)
     if (nextStatus === 'done' && existing.status !== 'done') {
       finalizeOtherActiveSessionsForTask(id, null, 'completed');
@@ -660,9 +647,6 @@ export async function DELETE(
     }
     if (tableHasColumn('github_issues', 'task_id')) {
       run('UPDATE github_issues SET task_id = NULL WHERE task_id = ?', [id]);
-    }
-    if (tableHasColumn('knowledge_entries', 'task_id')) {
-      run('UPDATE knowledge_entries SET task_id = NULL WHERE task_id = ?', [id]);
     }
     if (tableHasColumn('conversations', 'task_id')) {
       run('DELETE FROM conversations WHERE task_id = ?', [id]);

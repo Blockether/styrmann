@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { queryOne } from '@/lib/db';
 import { finalizeSessionByOpenClawId } from '@/lib/session-lifecycle';
 import { handleStageFailure, drainQueue } from '@/lib/workflow-engine';
-import { notifyLearner } from '@/lib/learner';
 import type { Task } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
@@ -42,14 +41,6 @@ export async function POST(
         { status: 400 }
       );
     }
-
-    // Notify learner about the failure
-    notifyLearner(taskId, {
-      previousStatus: task.status,
-      newStatus: 'in_progress',
-      passed: false,
-      failReason: reason,
-    }).catch(err => console.error('[Learner] notification failed:', err));
 
     // Trigger the fail-loopback via the workflow engine
     if (typeof openclaw_session_id === 'string' && openclaw_session_id.trim().length > 0) {

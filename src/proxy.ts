@@ -172,23 +172,6 @@ async function isScopedTokenAuthorized(
       : { ok: false, required: [`task:${taskId}:read`], taskId };
   }
 
-  const knowledgeMatch = path.match(/^\/api\/workspaces\/([^/]+)\/knowledge(\/.*)?$/);
-  if (knowledgeMatch) {
-    const workspaceId = decodeURIComponent(knowledgeMatch[1]);
-    if (!parsed.workspace_id || parsed.workspace_id !== workspaceId) {
-      return { ok: false, required: ['knowledge:write'] };
-    }
-    if (method === 'DELETE') return { ok: false, required: [] };
-    if (method === 'POST' || method === 'PATCH' || method === 'PUT') {
-      return hasScope(parsed.scopes, 'knowledge:write')
-        ? { ok: true }
-        : { ok: false, required: ['knowledge:write'] };
-    }
-    return hasScope(parsed.scopes, 'knowledge:read') || hasScope(parsed.scopes, 'knowledge:write')
-      ? { ok: true }
-      : { ok: false, required: ['knowledge:read'] };
-  }
-
   if (path === '/api/events/stream') {
     return hasScope(parsed.scopes, 'events:read') || hasScope(parsed.scopes, 'tasks:read')
       ? { ok: true }

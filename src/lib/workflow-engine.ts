@@ -456,18 +456,6 @@ export function populateTaskRolesFromAgents(taskId: string, _workspaceId: string
     }
   }
 
-  // Learner fallback: the 'learner' role isn't in any workflow stage,
-  // so it won't be matched above. Find a learner agent and assign it.
-  if (!roleMap['learner']) {
-    const learner = agents.find(a =>
-      a.role.toLowerCase() === 'learner' ||
-      a.name.toLowerCase().includes('learner')
-    );
-    if (learner) {
-      roleMap['learner'] = learner.id;
-    }
-  }
-
   // Insert role assignments
   for (const [role, agentId] of Object.entries(roleMap)) {
     run(
