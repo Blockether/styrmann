@@ -21,6 +21,14 @@ interface AgentInfo {
   workspace_id: string;
 }
 
+interface ActiveSessionInfo {
+  openclaw_session_id: string;
+  task_id?: string | null;
+  agent_id?: string | null;
+  status?: string;
+  updated_at?: string;
+}
+
 const STALLED_TASK_THRESHOLD_MS = Number.parseInt(process.env.MC_STALLED_TASK_THRESHOLD_MS || '1200000', 10);
 const STALLED_TASK_COOLDOWN_MS = Number.parseInt(process.env.MC_STALLED_TASK_COOLDOWN_MS || '600000', 10);
 const RECOVERABLE_TASK_STATUSES = ['assigned', 'in_progress', 'testing', 'verification', 'review'] as const;
@@ -75,23 +83,28 @@ async function reassignTask(taskId: string, agentId: string): Promise<boolean> {
   return res.ok;
 }
 
-async function markSessionsInterrupted(taskId: string, agentId: string): Promise<void> {
+async function markSessionsInterrupted(
+  taskId: string,
+  agentId: string,
+  activeSessions?: ActiveSessionInfo[],
+): Promise<void> {
   try {
-    await mcFetch(`/api/openclaw/sessions?session_type=subagent&status=active`)
-      .then(async (res) => {
-        if (!res.ok) return [] as Array<{ openclaw_session_id: string; task_id?: string | null; agent_id?: string | null }>;
-        const data = await res.json();
-        return Array.isArray(data) ? data as Array<{ openclaw_session_id: string; task_id?: string | null; agent_id?: string | null }> : [];
-      })
-      .then(async (sessions) => {
-        const targets = sessions.filter((session) => session.task_id === taskId && session.agent_id === agentId);
-        for (const session of targets) {
-          await mcFetch(`/api/openclaw/sessions/${encodeURIComponent(session.openclaw_session_id)}`, {
-            method: 'PATCH',
-            body: JSON.stringify({ status: 'interrupted' }),
+    const sessions = activeSessions
+      ? activeSessions
+      : await mcFetch(`/api/openclaw/sessions?session_type=subagent&status=active`)
+          .then(async (res) => {
+            if (!res.ok) return [] as ActiveSessionInfo[];
+            const data = await res.json();
+            return Array.isArray(data) ? data as ActiveSessionInfo[] : [];
           });
-        }
+
+    const targets = sessions.filter((session) => session.task_id === taskId && session.agent_id === agentId);
+    for (const session of targets) {
+      await mcFetch(`/api/openclaw/sessions/${encodeURIComponent(session.openclaw_session_id)}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status: 'interrupted' }),
       });
+    }
   } catch (err) {
     log.warn(`Failed to mark interrupted sessions for ${taskId}: ${String(err)}`);
   }
@@ -105,9 +118,10 @@ export function startRecovery(config: DaemonConfig, stats: DaemonStats): () => v
     stats.lastRecoveryTick = new Date(nowMs).toISOString();
 
     try {
-      const [taskResponses, agentsRes] = await Promise.all([
+      const [taskResponses, agentsRes, activeSessionsRes] = await Promise.all([
         Promise.all(RECOVERABLE_TASK_STATUSES.map((status) => mcFetch(`/api/tasks?status=${status}`))),
         mcFetch('/api/agents'),
+        mcFetch('/api/openclaw/sessions?session_type=subagent&status=active'),
       ]);
 
       const failedTaskResponse = taskResponses.find((res) => !res.ok);
@@ -121,6 +135,11 @@ export function startRecovery(config: DaemonConfig, stats: DaemonStats): () => v
         return;
       }
 
+      if (!activeSessionsRes.ok) {
+        log.warn(`Failed to fetch active sessions for recovery: ${activeSessionsRes.status}`);
+        return;
+      }
+
       const tasksByStatus = await Promise.all(taskResponses.map(async (res) => {
         const payload = await res.json();
         return Array.isArray(payload) ? (payload as TaskInfo[]) : [];
@@ -130,6 +149,16 @@ export function startRecovery(config: DaemonConfig, stats: DaemonStats): () => v
       );
       const agentsRaw = await agentsRes.json();
       const agents = Array.isArray(agentsRaw) ? (agentsRaw as AgentInfo[]) : [];
+      const activeSessionsRaw = await activeSessionsRes.json();
+      const activeSessions = Array.isArray(activeSessionsRaw) ? (activeSessionsRaw as ActiveSessionInfo[]) : [];
+      const latestSessionUpdateByTask = new Map<string, number>();
+      for (const session of activeSessions) {
+        if (!session.task_id) continue;
+        const ms = parseUpdatedAtMs(session.updated_at);
+        if (!ms) continue;
+        const prev = latestSessionUpdateByTask.get(session.task_id) || 0;
+        if (ms > prev) latestSessionUpdateByTask.set(session.task_id, ms);
+      }
 
       if (tasks.length === 0) return;
 
@@ -137,7 +166,9 @@ export function startRecovery(config: DaemonConfig, stats: DaemonStats): () => v
         if (!task.assigned_agent_id) continue;
         if (!RECOVERABLE_TASK_STATUSES.includes(task.status as (typeof RECOVERABLE_TASK_STATUSES)[number])) continue;
 
-        const updatedAtMs = parseUpdatedAtMs(task.updated_at);
+        const taskUpdatedAtMs = parseUpdatedAtMs(task.updated_at);
+        const sessionUpdatedAtMs = latestSessionUpdateByTask.get(task.id) || 0;
+        const updatedAtMs = Math.max(taskUpdatedAtMs, sessionUpdatedAtMs);
         const staleThresholdMs = getStatusThresholdMs(task.status);
         if (!updatedAtMs || nowMs - updatedAtMs < staleThresholdMs) continue;
         if (shouldSkipByCooldown(recoveryState, task.id, nowMs)) continue;
@@ -215,7 +246,7 @@ export function startRecovery(config: DaemonConfig, stats: DaemonStats): () => v
           continue;
         }
 
-        await markSessionsInterrupted(task.id, task.assigned_agent_id);
+        await markSessionsInterrupted(task.id, task.assigned_agent_id, activeSessions);
         const retryRes = await mcFetch(`/api/tasks/${task.id}/dispatch`, {
           method: 'POST',
           body: '{}',
