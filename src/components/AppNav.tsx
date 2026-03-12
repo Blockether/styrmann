@@ -24,8 +24,8 @@ export function AppNav() {
         <div className="flex items-center justify-between h-14">
           {/* Left: Logo + Title */}
           <Link href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
-            <Image src="/logo.png" alt="Blockether" width={28} height={28} className="rounded" />
-            <span className="font-mono font-medium text-lg">Mission Control</span>
+            <Image src="/logo.png" alt="Styrmann" width={28} height={28} className="rounded" />
+            <span className="font-mono font-medium text-lg">Styrmann</span>
           </Link>
 
           {/* Right: Nav Links */}

@@ -170,8 +170,8 @@ export function Header({ workspace, isPortrait = true, onMenuToggle, sidebarOpen
             </button>
 
             <Link href="/" className="hidden sm:flex items-center gap-2 rounded px-1 py-1 transition-colors hover:bg-mc-bg-tertiary">
-              <Image src="/logo.png" alt="Blockether" width={24} height={24} className="rounded" />
-              <h1 className="font-semibold text-mc-text uppercase tracking-wider text-sm">Mission Control</h1>
+              <Image src="/logo.png" alt="Styrmann" width={24} height={24} className="rounded" />
+              <h1 className="font-semibold text-mc-text uppercase tracking-wider text-sm">Styrmann</h1>
             </Link>
 
             {workspace ? (

@@ -413,7 +413,7 @@ function EditWorkspaceModal({ workspace, onClose, onSaved }: { workspace: Worksp
               value={logoUrl}
               onChange={(e) => setLogoUrl(e.target.value)}
               autoComplete="off"
-              placeholder="/workspace-logos/mission-control.png"
+              placeholder="/logo.png"
               className="w-full bg-mc-bg border border-mc-border rounded-lg px-4 py-2 focus:outline-none focus:border-mc-accent"
             />
           </div>
