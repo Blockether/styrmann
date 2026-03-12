@@ -455,8 +455,10 @@ export async function POST() {
     }));
   }
 
-  // ── Agent credential health checks ────────────────────────────────────
-  // Check agent auth-profiles.json for missing files, provider drift, and error stats.
+  // ── Agent credential health checks (inheritance model) ───────────────
+  // OpenClaw uses credential inheritance: sub-agents inherit auth-profiles from the
+  // main agent via loadAuthProfileStoreForRuntime merge. Sub-agents should NOT have
+  // their own auth-profiles.json -- that's a stale override risk.
   checks.push(check('Agent Credentials', 'openclaw', () => {
     try {
       const db = getDb();
@@ -468,88 +470,122 @@ export async function POST() {
         return { status: 'pass', message: 'No agents with local directories configured' };
       }
 
-      // Find main agent auth profiles as reference
+      // 1. Find and validate main agent credentials (source of truth)
       const mainAgent = agents.find(a => a.gateway_agent_id === 'main' || a.name.toLowerCase() === 'main');
-      let mainProviders = new Set<string>();
-      if (mainAgent) {
-        const mainAuthPath = `${mainAgent.agent_dir}/auth-profiles.json`;
-        if (existsSync(mainAuthPath)) {
+      if (!mainAgent) {
+        return {
+          status: 'warn',
+          message: 'No main agent found -- cannot verify credential inheritance',
+          repairable: false,
+        };
+      }
+
+      const mainAuthPath = `${mainAgent.agent_dir}/auth-profiles.json`;
+      if (!existsSync(mainAuthPath)) {
+        return {
+          status: 'fail',
+          message: 'Main agent has no auth-profiles.json -- all sub-agents will lack credentials',
+          repairable: true,
+          repair_prompt: 'The main agent is missing auth-profiles.json. Run: openclaw models auth login --provider <provider> to set up OAuth credentials. The main agent\'s credentials are inherited by all sub-agents.',
+        };
+      }
+
+      let mainProfiles: Record<string, Record<string, unknown>> = {};
+      try {
+        const mainAuth = JSON.parse(readFileSync(mainAuthPath, 'utf8'));
+        mainProfiles = mainAuth.profiles || {};
+      } catch {
+        return {
+          status: 'fail',
+          message: 'Main agent auth-profiles.json is corrupted',
+          repairable: true,
+          repair_prompt: `The main agent auth-profiles.json at ${mainAuthPath} could not be parsed. Re-authenticate: openclaw models auth login --provider <provider>`,
+        };
+      }
+
+      const mainProviderNames = Object.keys(mainProfiles).map(k => k.split(':')[0]);
+      if (mainProviderNames.length === 0) {
+        return {
+          status: 'fail',
+          message: 'Main agent auth-profiles.json has no provider profiles',
+          repairable: true,
+          repair_prompt: 'The main agent auth-profiles.json exists but has no profiles configured. Run: openclaw models auth login --provider <provider>',
+        };
+      }
+
+      // 2. Check OAuth token expiry on main agent profiles
+      const issues: string[] = [];
+      const now = Date.now();
+      const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+
+      for (const [profileKey, profile] of Object.entries(mainProfiles)) {
+        const p = profile as { type?: string; expires?: number; errorCount?: number };
+        if (p.type === 'oauth' && typeof p.expires === 'number') {
+          if (p.expires < now) {
+            issues.push(`${profileKey}: OAuth token EXPIRED`);
+          } else if (p.expires - now < ONE_DAY_MS) {
+            const hoursLeft = Math.round((p.expires - now) / (60 * 60 * 1000));
+            issues.push(`${profileKey}: OAuth token expires in ${hoursLeft}h`);
+          }
+        }
+      }
+
+      // 3. Check for sub-agents with their OWN auth-profiles (stale override risk)
+      const staleOverrides: string[] = [];
+      const subAgents = agents.filter(a => a.gateway_agent_id !== 'main' && a.name.toLowerCase() !== 'main');
+
+      for (const agent of subAgents) {
+        const authPath = `${agent.agent_dir}/auth-profiles.json`;
+        if (existsSync(authPath)) {
+          staleOverrides.push(agent.name);
+
+          // Also check for error stats in the sub-agent file
           try {
-            const mainAuth = JSON.parse(readFileSync(mainAuthPath, 'utf8'));
-            if (mainAuth.profiles && typeof mainAuth.profiles === 'object') {
-              mainProviders = new Set(Object.keys(mainAuth.profiles).map(k => k.split(':')[0]));
+            const authData = JSON.parse(readFileSync(authPath, 'utf8'));
+            const usageStats = authData.usageStats || {};
+            for (const [key, stats] of Object.entries(usageStats)) {
+              const s = stats as { errorCount?: number; cooldownUntil?: number };
+              if (s.cooldownUntil && s.cooldownUntil > now) {
+                issues.push(`${agent.name}/${key}: in error cooldown (stale override)`);
+              }
             }
           } catch { /* ignore parse errors */ }
         }
       }
 
-      const issues: string[] = [];
-      const errorAgents: string[] = [];
-      let agentsWithAuth = 0;
-      let agentsWithoutAuth = 0;
-
-      for (const agent of agents) {
-        if (agent.gateway_agent_id === 'main') continue; // Skip main itself
-        const authPath = `${agent.agent_dir}/auth-profiles.json`;
-        if (!existsSync(authPath)) {
-          agentsWithoutAuth++;
-          continue;
-        }
-        agentsWithAuth++;
-
-        try {
-          const authData = JSON.parse(readFileSync(authPath, 'utf8'));
-          const profiles = authData.profiles || {};
-          const agentProviders = new Set(Object.keys(profiles).map(k => k.split(':')[0]));
-          const usageStats = authData.usageStats || {};
-
-          // Check for provider drift vs main
-          if (mainProviders.size > 0) {
-            const missing = Array.from(mainProviders).filter(p => !agentProviders.has(p));
-            if (missing.length > 0) {
-              issues.push(`${agent.name}: missing providers ${missing.join(', ')}`);
-            }
-          }
-
-          // Check for auth errors in usageStats
-          for (const [profileKey, stats] of Object.entries(usageStats)) {
-            const s = stats as { errorCount?: number; failureCounts?: Record<string, number>; cooldownUntil?: number };
-            if (s.errorCount && s.errorCount > 2) {
-              errorAgents.push(`${agent.name}/${profileKey}: ${s.errorCount} errors`);
-            }
-            if (s.cooldownUntil && s.cooldownUntil > Date.now()) {
-              errorAgents.push(`${agent.name}/${profileKey}: in cooldown`);
-            }
-          }
-        } catch { /* ignore individual parse errors */ }
+      if (staleOverrides.length > 0) {
+        issues.push(`Sub-agents with own auth-profiles (stale override risk): ${staleOverrides.join(', ')}`);
       }
 
-      if (issues.length > 0 || errorAgents.length > 0) {
-        const parts: string[] = [];
-        if (agentsWithoutAuth > 0) parts.push(`${agentsWithoutAuth} agent(s) have no auth-profiles.json`);
-        if (issues.length > 0) parts.push(`Provider drift: ${issues.join('; ')}`);
-        if (errorAgents.length > 0) parts.push(`Auth errors: ${errorAgents.join('; ')}`);
+      // 4. Build result
+      const hasExpiredTokens = issues.some(i => i.includes('EXPIRED'));
+      const hasStaleOverrides = staleOverrides.length > 0;
+
+      if (hasExpiredTokens) {
         return {
-          status: 'warn',
-          message: parts.join('. '),
-          details: `${agentsWithAuth} with auth, ${agentsWithoutAuth} without, ${mainProviders.size} main providers`,
-          repairable: false,
+          status: 'fail',
+          message: issues.join('. '),
+          details: `Main agent providers: ${mainProviderNames.join(', ')}. ${subAgents.length} sub-agent(s) inherit via OpenClaw credential merge.`,
+          repairable: true,
+          repair_prompt: 'One or more OAuth tokens on the main agent have expired. Re-authenticate: openclaw models auth login --provider <provider>. This will also sync tokens to sub-agents via syncSiblingAgents.',
         };
       }
 
-      if (agentsWithoutAuth > 0) {
+      if (issues.length > 0 || hasStaleOverrides) {
         return {
           status: 'warn',
-          message: `${agentsWithoutAuth} agent(s) have no auth-profiles.json (no provider credentials)`,
-          details: `These agents rely on gateway-level auth fallback which may not have all providers configured`,
-          repairable: false,
+          message: issues.join('. '),
+          details: `Main agent providers: ${mainProviderNames.join(', ')}. ${subAgents.length} sub-agent(s) inherit via OpenClaw credential merge.`,
+          repairable: hasStaleOverrides,
+          repair_prompt: hasStaleOverrides
+            ? `Sub-agent(s) ${staleOverrides.join(', ')} have their own auth-profiles.json which may override inherited main credentials with stale values. Delete these files to restore proper credential inheritance.`
+            : undefined,
         };
       }
 
       return {
         status: 'pass',
-        message: `All ${agentsWithAuth} agents have credential files`,
-        details: mainProviders.size > 0 ? `Main agent providers: ${Array.from(mainProviders).join(', ')}` : undefined,
+        message: `Main agent credentials healthy (${mainProviderNames.join(', ')}). ${subAgents.length} sub-agent(s) inherit via OpenClaw merge.`,
       };
     } catch (err) {
       return { status: 'warn', message: `Credential check error: ${err instanceof Error ? err.message : String(err)}` };
