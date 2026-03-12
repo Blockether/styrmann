@@ -93,10 +93,10 @@ function CollapsibleSection({ title, defaultOpen = true, children, badge }: Coll
   const [isOpen, setIsOpen] = useState(defaultOpen);
 
   return (
-    <div className="border-b border-mc-border last:border-b-0">
+    <div className="mx-3 mb-3 overflow-hidden rounded-[1.1rem] border border-mc-border bg-gradient-to-br from-white via-[#fff9ee] to-[#f7f0e2] shadow-[0_16px_36px_-34px_rgba(0,0,0,0.22)] last:mb-0">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex items-center justify-between p-3 hover:bg-mc-bg-tertiary/50 transition-colors"
+        className="w-full flex items-center justify-between p-3 hover:bg-white/50 transition-colors"
       >
         <div className="flex items-center gap-2">
           {isOpen ? (
@@ -106,7 +106,7 @@ function CollapsibleSection({ title, defaultOpen = true, children, badge }: Coll
           )}
           <span className="font-medium text-sm">{title}</span>
           {badge !== undefined && (
-            <span className="text-xs bg-mc-bg-tertiary px-2 py-0.5 rounded text-mc-text-secondary">
+            <span className="text-xs bg-white/80 border border-mc-border px-2 py-0.5 rounded-full text-mc-text-secondary">
               {badge}
             </span>
           )}
@@ -555,20 +555,20 @@ export function TaskDetailPanel({ taskId, onClose }: TaskDetailPanelProps) {
       className="fixed inset-0 z-50 flex justify-end"
       onClick={handleBackdropClick}
     >
-      <div className="absolute inset-0 bg-black/40" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(184,134,11,0.22),rgba(0,0,0,0.48)_52%)]" />
 
-      <div className="relative w-full max-w-[480px] h-full bg-mc-bg-secondary border-l border-mc-border flex flex-col animate-slide-in">
-        <div className="flex items-center justify-between p-4 border-b border-mc-border gap-2">
+      <div className="relative w-full max-w-[520px] h-full bg-[linear-gradient(180deg,#fffaf0_0%,#f8f1e3_100%)] border-l border-mc-border flex flex-col animate-slide-in shadow-[-20px_0_60px_-40px_rgba(60,40,10,0.5)]">
+        <div className="flex items-center justify-between p-4 border-b border-mc-border gap-2 bg-[linear-gradient(135deg,rgba(184,134,11,0.12),rgba(255,255,255,0.96)_42%,rgba(255,248,230,0.98))]">
           <div className="flex items-center gap-1.5 flex-wrap min-w-0">
             {task && (
-              <span className={`px-2 py-0.5 rounded text-xs uppercase flex-shrink-0 ${TASK_TYPE_COLORS[task.task_type]}`}>
+              <span className={`px-2 py-0.5 rounded-full text-xs uppercase flex-shrink-0 ${TASK_TYPE_COLORS[task.task_type]}`}>
                 {TASK_TYPE_LABELS[task.task_type]}
               </span>
             )}
-            <span className={`px-2 py-0.5 rounded text-xs uppercase flex-shrink-0 ${task ? PRIORITY_COLORS[task.priority] : ''}`}>
+            <span className={`px-2 py-0.5 rounded-full text-xs uppercase flex-shrink-0 ${task ? PRIORITY_COLORS[task.priority] : ''}`}>
               {task?.priority}
             </span>
-            <span className={`px-2 py-0.5 rounded text-xs uppercase flex-shrink-0 truncate ${task ? STATUS_COLORS[task.status] : ''}`}>
+            <span className={`px-2 py-0.5 rounded-full text-xs uppercase flex-shrink-0 truncate ${task ? STATUS_COLORS[task.status] : ''}`}>
               {task?.status?.replace('_', ' ')}
             </span>
           </div>
@@ -596,7 +596,7 @@ export function TaskDetailPanel({ taskId, onClose }: TaskDetailPanelProps) {
             </div>
           ) : task ? (
             <div>
-              <div className="p-4 border-b border-mc-border">
+              <div className="p-4 border-b border-mc-border bg-white/70">
                 {editingTitle ? (
                   <div className="flex items-center gap-2">
                     <input
@@ -631,7 +631,7 @@ export function TaskDetailPanel({ taskId, onClose }: TaskDetailPanelProps) {
                 )}
               </div>
 
-              <div className="p-4 border-b border-mc-border bg-mc-bg-tertiary/30">
+              <div className="mx-3 mt-3 rounded-[1.1rem] border border-mc-border bg-gradient-to-br from-white via-[#fff9ee] to-[#f7f0e2] p-4 shadow-[0_16px_36px_-34px_rgba(0,0,0,0.22)]">
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
                   <div className="flex items-center gap-2 flex-shrink-0">
                     <button
@@ -679,6 +679,8 @@ export function TaskDetailPanel({ taskId, onClose }: TaskDetailPanelProps) {
                   )}
                 </div>
               </div>
+
+              <div className="mt-3" />
 
               <CollapsibleSection title="Description" defaultOpen={!!task.description}>
                 {task.description ? (

@@ -135,37 +135,42 @@ export function ActivityLog({ taskId }: ActivityLogProps) {
 
   return (
     <div data-component="src/components/ActivityLog" className="space-y-4">
-      <div className="p-3 border-b border-mc-border bg-mc-bg-secondary flex items-center justify-between gap-2 flex-wrap rounded-lg">
-        <div className="flex items-center gap-2 text-sm font-medium text-mc-text">
-          <Activity className="w-4 h-4 text-mc-text-secondary" />
-          <span>Task Activity</span>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="inline-flex items-center gap-2 text-xs text-mc-text-secondary px-2 py-1 border border-mc-border rounded">
+      <div className="overflow-hidden rounded-[1.1rem] border border-mc-border bg-gradient-to-br from-white via-[#fff8ea] to-[#f7efe0] shadow-[0_18px_42px_-34px_rgba(120,90,20,0.35)]">
+        <div className="border-b border-mc-border bg-[linear-gradient(135deg,rgba(184,134,11,0.08),rgba(255,255,255,0.94)_40%,rgba(255,248,230,0.98))] p-3 sm:p-4 flex items-center justify-between gap-2 flex-wrap">
+          <div>
+            <div className="flex items-center gap-2 text-sm font-medium text-mc-text">
+              <Activity className="w-4 h-4 text-mc-accent" />
+              <span>Task Activity</span>
+            </div>
+            <p className="mt-1 text-xs text-mc-text-secondary">Live orchestration evidence, decisions, and step-level operator traces.</p>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="inline-flex items-center gap-2 text-xs text-mc-text-secondary px-2 py-1 border border-mc-border rounded-full bg-white/80">
             <Filter className="w-3.5 h-3.5" />
             Current task filter active
           </div>
-          <select value={agentFilter} onChange={(event) => setAgentFilter(event.target.value)} className="min-h-11 px-2 py-2 bg-mc-bg border border-mc-border rounded text-sm">
+            <select value={agentFilter} onChange={(event) => setAgentFilter(event.target.value)} className="min-h-11 px-3 py-2 bg-white/80 border border-mc-border rounded-full text-sm">
             <option value="all">All Agents</option>
             {filters.agents.map((agent) => (
               <option key={agent.id} value={agent.id}>{agent.name}</option>
             ))}
           </select>
-          <select value={stepFilter} onChange={(event) => setStepFilter(event.target.value)} className="min-h-11 px-2 py-2 bg-mc-bg border border-mc-border rounded text-sm">
+            <select value={stepFilter} onChange={(event) => setStepFilter(event.target.value)} className="min-h-11 px-3 py-2 bg-white/80 border border-mc-border rounded-full text-sm">
             <option value="all">All Steps</option>
             {filters.workflow_steps.map((step) => (
               <option key={step} value={step}>{step}</option>
             ))}
           </select>
-          <label className="inline-flex items-center gap-2 min-h-11 px-3 py-2 border border-mc-border rounded text-sm">
+            <label className="inline-flex items-center gap-2 min-h-11 px-3 py-2 border border-mc-border rounded-full text-sm bg-white/80">
             <input type="checkbox" checked={decisionOnly} onChange={(event) => setDecisionOnly(event.target.checked)} />
             Decisions only
           </label>
+          </div>
         </div>
       </div>
 
       {visibleActivities.length === 0 ? (
-        <div className="rounded-lg border border-mc-border bg-mc-bg-secondary p-6 text-sm text-mc-text-secondary">
+        <div className="rounded-[1.1rem] border border-mc-border bg-gradient-to-br from-mc-bg-secondary via-mc-bg to-mc-bg p-6 text-sm text-mc-text-secondary shadow-[0_16px_36px_-34px_rgba(0,0,0,0.25)]">
           No task activities match the current filters.
         </div>
       ) : (
@@ -173,9 +178,9 @@ export function ActivityLog({ taskId }: ActivityLogProps) {
           const metadata = parseMetadata(activity);
           const traceId = getTraceSessionId(activity);
           return (
-            <div key={activity.id} className="rounded-lg border border-mc-border bg-mc-bg-secondary p-4">
+            <div key={activity.id} className="rounded-[1.1rem] border border-mc-border bg-gradient-to-br from-mc-bg-secondary via-mc-bg to-mc-bg p-4 shadow-[0_16px_36px_-34px_rgba(0,0,0,0.2)]">
               <div className="flex items-center gap-2 flex-wrap text-xs text-mc-text-secondary">
-                <span className="px-2 py-0.5 rounded bg-mc-bg border border-mc-border">{activity.activity_type}</span>
+                <span className="px-2 py-0.5 rounded-full bg-white/80 border border-mc-border">{activity.activity_type}</span>
                 {activity.agent?.name && <span>{activity.agent.name}</span>}
                 {activity.workflow_step && <span>step {activity.workflow_step}</span>}
                 {activity.decision_event && <span className="text-amber-700">decision event</span>}
