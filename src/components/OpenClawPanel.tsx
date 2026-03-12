@@ -9,15 +9,10 @@ import {
   Bot,
   Star,
   AlertCircle,
-  Power,
   Save,
   CheckCircle2,
-  Plus,
-  Link2,
   ChevronDown,
   ChevronRight,
-  ScrollText,
-  Package,
   Settings,
   Shield,
   ShieldCheck,
@@ -87,7 +82,6 @@ export function OpenClawPanel({ embedded = false, focusArea = 'gateway' }: OpenC
   const [restartResult, setRestartResult] = useState<{ success: boolean; error?: string } | null>(null);
   const [selectedModel, setSelectedModel] = useState<string>('');
   const [savingModel, setSavingModel] = useState(false);
-  const [expandedAgents, setExpandedAgents] = useState<Set<string>>(new Set());
   const [modelSaveStatus, setModelSaveStatus] = useState<'idle' | 'saved' | 'error'>('idle');
   const [editingAgent, setEditingAgent] = useState<Agent | null>(null);
   const [auditResult, setAuditResult] = useState<AuditResult | null>(null);
@@ -141,12 +135,7 @@ export function OpenClawPanel({ embedded = false, focusArea = 'gateway' }: OpenC
     return url.replace(/token=[^&]+/gi, 'token=***');
   };
 
-  const agentCounts = {
-    working: agents.filter((a) => a.status === 'working').length,
-    standby: agents.filter((a) => a.status === 'standby').length,
-    offline: agents.filter((a) => a.status === 'offline').length,
-    total: agents.length,
-  };
+  const agentCounts = { total: agents.length };
 
   const toolbarInnerClass = embedded
     ? 'px-4 sm:px-6 py-3 flex items-center justify-between gap-2 flex-wrap'
@@ -172,39 +161,29 @@ export function OpenClawPanel({ embedded = false, focusArea = 'gateway' }: OpenC
             <span>{panelTitle}</span>
           </div>
           <div className="flex items-center gap-2">
-            {isAgentsFocus && (
+            {!isAgentsFocus && (
               <button
-                onClick={() => {
-                  setModalInitialTab('info');
-                  setCreatingAgent(true);
+                onClick={async () => {
+                  setRestarting(true);
+                  setRestartResult(null);
+                  try {
+                    const res = await fetch('/api/system/restart-gateway', { method: 'POST' });
+                    const data = await res.json();
+                    setRestartResult(data);
+                    if (data.success) setTimeout(() => { setRestartResult(null); fetchData(); }, 3000);
+                  } catch {
+                    setRestartResult({ success: false, error: 'Request failed' });
+                  } finally {
+                    setRestarting(false);
+                  }
                 }}
-                className="flex items-center gap-2 px-3 min-h-11 border border-mc-border rounded text-sm hover:bg-mc-bg-tertiary transition-colors"
+                disabled={restarting}
+                className="flex items-center gap-2 px-3 min-h-11 border border-red-300 text-red-600 rounded text-sm hover:bg-red-50 disabled:opacity-50 transition-colors"
               >
-                <Plus className="w-4 h-4" />
-                <span className="hidden sm:inline">Create Agent</span>
+                <RefreshCw className={`w-4 h-4 ${restarting ? 'animate-spin' : ''}`} />
+                <span className="hidden sm:inline">{restarting ? 'Restarting...' : 'Restart Gateway'}</span>
               </button>
             )}
-            <button
-              onClick={async () => {
-                setRestarting(true);
-                setRestartResult(null);
-                try {
-                  const res = await fetch('/api/system/restart-gateway', { method: 'POST' });
-                  const data = await res.json();
-                  setRestartResult(data);
-                  if (data.success) setTimeout(() => { setRestartResult(null); fetchData(); }, 3000);
-                } catch {
-                  setRestartResult({ success: false, error: 'Request failed' });
-                } finally {
-                  setRestarting(false);
-                }
-              }}
-              disabled={restarting}
-              className="flex items-center gap-2 px-3 min-h-11 border border-red-300 text-red-600 rounded text-sm hover:bg-red-50 disabled:opacity-50 transition-colors"
-            >
-              <Power className={`w-4 h-4 ${restarting ? 'animate-spin' : ''}`} />
-              <span className="hidden sm:inline">{restarting ? 'Restarting...' : 'Restart Gateway'}</span>
-            </button>
             <button
               onClick={fetchData}
               disabled={loading}
@@ -289,164 +268,32 @@ export function OpenClawPanel({ embedded = false, focusArea = 'gateway' }: OpenC
           {/* Bottom Row: Agents + Models */}
           <div className="grid grid-cols-1 gap-6">
             {/* Card 2: Agents */}
-            {isAgentsFocus && <div className="rounded-lg border border-mc-border bg-mc-bg overflow-hidden">
-              <div className="p-3 border-b border-mc-border bg-mc-bg-secondary flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <Bot className="w-4 h-4 text-mc-text-secondary" />
-                  <h3 className="text-sm font-medium">Agents</h3>
+            {isAgentsFocus && <div>
+              <div className="mb-2 text-xs text-mc-text-secondary">{agentCounts.total} total</div>
+              {agents.length > 0 ? (
+                <div className="bg-mc-bg overflow-hidden divide-y divide-mc-border">
+                  {agents.map((agent) => (
+                    <div key={agent.id} className="px-4 py-3 flex items-center gap-3">
+                      <span className="font-medium text-sm truncate flex-1 min-w-0">{agent.name}</span>
+                      <button
+                        onClick={() => {
+                          setModalInitialTab(agent.source === 'synced' ? 'workspace' : 'info');
+                          setEditingAgent(agent);
+                        }}
+                        className="p-1 rounded hover:bg-mc-bg-tertiary text-mc-text-secondary hover:text-mc-text transition-colors flex-shrink-0"
+                        title={`Configure ${agent.name}`}
+                      >
+                        <Settings className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
                 </div>
-                <div className="flex gap-3 text-xs text-mc-text-secondary">
-                  <span>{agentCounts.total} total</span>
+              ) : (
+                <div className="flex items-center justify-center py-8 text-mc-text-secondary">
+                  <RefreshCw className="w-5 h-5 animate-spin mr-2" />
+                  <span>Loading agents...</span>
                 </div>
-              </div>
-              <div>
-                {agents.length > 0 ? (
-                  <div className="divide-y divide-mc-border">
-                    {agents.map((agent) => {
-                      const isWorking = agent.status === 'working';
-                      const isOffline = agent.status === 'offline';
-                      const taskCount = agent.active_task_count ?? 0;
-                      const isExpanded = expandedAgents.has(agent.id);
-                      const tasks = agent.active_tasks ?? [];
-
-                      return (
-                        <div key={agent.id} className={isOffline ? 'opacity-50' : ''}>
-                          {/* Agent row — always visible */}
-                          <button
-                            onClick={() => {
-                              setExpandedAgents(prev => {
-                                const next = new Set(prev);
-                                if (next.has(agent.id)) next.delete(agent.id);
-                                else next.add(agent.id);
-                                return next;
-                              });
-                            }}
-                            className="w-full px-4 py-3 flex items-center gap-3 text-left hover:bg-mc-bg-tertiary/30 transition-colors"
-                          >
-                            {/* Status dot */}
-                            <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${
-                              isWorking ? 'bg-green-500 ring-2 ring-green-500/30 ring-offset-1' :
-                              agent.status === 'standby' ? 'bg-blue-500' : 'bg-gray-400'
-                            }`} />
-
-                            {/* Name */}
-                            <span className="font-medium text-sm truncate flex-1 min-w-0">{agent.name}</span>
-
-                            <div className="ml-auto flex items-center gap-2 flex-shrink-0">
-                              {/* Task count badge */}
-                              {taskCount > 0 ? (
-                                <span className={`text-xs font-mono px-2 py-0.5 rounded-full ${
-                                  isWorking ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
-                                }`}>
-                                  {taskCount} task{taskCount !== 1 ? 's' : ''}
-                                </span>
-                              ) : (
-                                <span className="text-xs text-mc-text-secondary">No tasks</span>
-                              )}
-
-                              {/* Edit button */}
-                              {agent.source === 'synced' && (
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setModalInitialTab('workspace');
-                                    setEditingAgent(agent);
-                                  }}
-                                  className="p-1 rounded hover:bg-mc-bg-tertiary text-mc-text-secondary hover:text-mc-text transition-colors flex-shrink-0"
-                                  title={`Configure skills for ${agent.name}`}
-                                >
-                                  <Link2 className="w-3.5 h-3.5" />
-                                </button>
-                              )}
-
-                              {/* Edit button */}
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setModalInitialTab('info');
-                                  setEditingAgent(agent);
-                                }}
-                                className="p-1 rounded hover:bg-mc-bg-tertiary text-mc-text-secondary hover:text-mc-text transition-colors flex-shrink-0"
-                                title={`Edit ${agent.name}`}
-                              >
-                                <Settings className="w-3.5 h-3.5" />
-                              </button>
-
-                              {/* Expand chevron */}
-                              {taskCount > 0 && (
-                                isExpanded ? <ChevronDown className="w-4 h-4 text-mc-text-secondary flex-shrink-0" /> : <ChevronRight className="w-4 h-4 text-mc-text-secondary flex-shrink-0" />
-                              )}
-                            </div>
-                          </button>
-
-                          {/* Expanded task list */}
-                          {isExpanded && tasks.length > 0 && (
-                            <div className="border-t border-mc-border/50 bg-mc-bg-tertiary/20">
-                              {tasks.map((task) => {
-                                const statusColors: Record<string, string> = {
-                                  in_progress: 'bg-mc-accent text-white',
-                                  assigned: 'bg-mc-accent-yellow text-white',
-                                  testing: 'bg-mc-accent-cyan text-white',
-                                  review: 'bg-mc-accent-purple text-white',
-                                  verification: 'bg-orange-500 text-white',
-                                };
-                                const statusLabels: Record<string, string> = {
-                                  in_progress: 'In Progress',
-                                  assigned: 'Assigned',
-                                  testing: 'Testing',
-                                  review: 'Review',
-                                  verification: 'Verification',
-                                };
-
-                                return (
-                                  <div key={task.id} className="px-4 py-2.5 pl-10 flex items-center gap-3 border-b border-mc-border/30 last:border-b-0">
-                                    <div className="flex-1 min-w-0">
-                                      <div className="flex items-center gap-2 mb-0.5">
-                                        <span className="text-sm font-medium truncate">{task.title}</span>
-                                        <span className={`text-[10px] px-1.5 py-0.5 rounded flex-shrink-0 ${statusColors[task.status] || 'bg-gray-200 text-gray-600'}`}>
-                                          {statusLabels[task.status] || task.status}
-                                        </span>
-                                      </div>
-                                      <span className="text-xs text-mc-text-secondary">{task.workspace_name || task.workspace_slug}</span>
-                                    </div>
-                                    <div className="flex items-center gap-1.5 flex-shrink-0">
-                                      <a
-                                        href="/operations#gateway"
-                                        onClick={(e) => e.stopPropagation()}
-                                        className="flex items-center gap-1 px-2 py-1 rounded text-xs border border-mc-border hover:bg-mc-bg-tertiary transition-colors text-mc-text-secondary hover:text-mc-text"
-                                        title="View logs"
-                                      >
-                                        <ScrollText className="w-3.5 h-3.5" />
-                                        <span className="hidden sm:inline">Logs</span>
-                                      </a>
-                                      {task.deliverable_count > 0 && (
-                                        <a
-                                          href={`/workspace/${task.workspace_slug}?task=${task.id}&tab=deliverables`}
-                                          onClick={(e) => e.stopPropagation()}
-                                          className="flex items-center gap-1 px-2 py-1 rounded text-xs border border-mc-border hover:bg-mc-bg-tertiary transition-colors text-mc-text-secondary hover:text-mc-text"
-                                          title="View deliverables"
-                                        >
-                                          <Package className="w-3.5 h-3.5" />
-                                          <span className="hidden sm:inline">{task.deliverable_count}</span>
-                                        </a>
-                                      )}
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className="flex items-center justify-center py-8 text-mc-text-secondary">
-                    <RefreshCw className="w-5 h-5 animate-spin mr-2" />
-                    <span>Loading agents...</span>
-                  </div>
-                )}
-              </div>
+              )}
             </div>}
 
             {/* Card 3: Models + Default Model Selector */}

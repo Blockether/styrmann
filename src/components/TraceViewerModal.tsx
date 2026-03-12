@@ -376,15 +376,6 @@ export function TraceViewerModal({ taskId, sessionId, onClose }: TraceViewerModa
           )}
         </div>
 
-        <div className="border-t border-mc-border bg-mc-bg-secondary p-3 flex items-center justify-end gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="min-h-11 px-3 border border-mc-border rounded text-sm hover:bg-mc-bg-tertiary"
-          >
-            Close
-          </button>
-        </div>
       </div>
     </div>
   );

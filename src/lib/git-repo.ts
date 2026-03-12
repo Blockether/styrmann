@@ -46,7 +46,7 @@ export function isGitWorkTree(repoPath: string): boolean {
 }
 
 export function getTaskPipelineDir(repoPath: string, taskId: string): string {
-  return path.join(repoPath, '.mission-control', 'tasks', taskId);
+  return path.join(repoPath, 'task-artifacts', taskId);
 }
 
 function runGit(repoPath: string, args: string[], timeout = 10000): string {

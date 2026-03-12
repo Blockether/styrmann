@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { readFileSync, existsSync, statSync, realpathSync } from 'fs';
 import path from 'path';
+import { marked } from 'marked';
 import { getStoredArtifactByPath } from '@/lib/task-run-results';
 
 export const dynamic = 'force-dynamic';
@@ -172,7 +173,12 @@ export async function GET(request: NextRequest) {
     const fileName = path.basename(pathToRead);
     const escapedFileName = escapeHtml(fileName);
     const escapedContent = escapeHtml(content);
-    const bodyContent = `<pre class="raw">${escapedContent}</pre>`;
+    const markdownHtml = isMarkdown
+      ? marked.parse(escapedContent, { gfm: true, breaks: true })
+      : null;
+    const bodyContent = isMarkdown
+      ? `<div class="content">${typeof markdownHtml === 'string' ? markdownHtml : ''}</div>`
+      : `<pre class="raw">${escapedContent}</pre>`;
 
     const html = `<!DOCTYPE html>
 <html lang="en"><head>

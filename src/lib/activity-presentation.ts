@@ -63,10 +63,34 @@ function summarizeStatusChange(message: string, metadata: Record<string, unknown
       : `Stage handoff${step ? ` to ${step}` : ''}.`;
   }
 
+  if (message.toLowerCase().startsWith('task dispatched to')) {
+    return message.length > 200 ? `${message.slice(0, 200)}...` : message;
+  }
+
   // Generic status change — extract from/to if present
   const statusMatch = message.match(/(\w+)\s*(?:->|to)\s*(\w+)/i);
   if (statusMatch) {
-    return `Task moved from ${statusMatch[1]} to ${statusMatch[2]}${agent ? ` (${agent})` : ''}.`;
+    const knownStatuses = new Set([
+      'pending_dispatch',
+      'planning',
+      'inbox',
+      'assigned',
+      'in_progress',
+      'testing',
+      'review',
+      'verification',
+      'done',
+      'active',
+      'interrupted',
+      'stale',
+      'failed',
+      'completed',
+    ]);
+    const from = statusMatch[1].toLowerCase();
+    const to = statusMatch[2].toLowerCase();
+    if (knownStatuses.has(from) && knownStatuses.has(to)) {
+      return `Task moved from ${statusMatch[1]} to ${statusMatch[2]}${agent ? ` (${agent})` : ''}.`;
+    }
   }
 
   return message.length > 200 ? `${message.slice(0, 200)}...` : message;

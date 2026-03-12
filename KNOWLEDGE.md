@@ -311,7 +311,7 @@ Fallback: Agent Activity Dashboard polls every 20s; task-specific views use SSE 
 | POST | `/api/tasks` | Create task |
 | GET | `/api/tasks/{id}` | Get task with agent joins, tags, comments, blockers, resources, acceptance criteria |
 | PATCH | `/api/tasks/{id}` | Update task (triggers workflow engine on status changes) |
-| DELETE | `/api/tasks/{id}` | Delete task and cleanup OpenClaw sessions + `.mission-control` task artifacts/worktrees |
+| DELETE | `/api/tasks/{id}` | Delete task and cleanup OpenClaw sessions + task artifacts/worktrees (`task-artifacts/{taskId}` + legacy `.mission-control/tasks/{taskId}`) |
 | POST | `/api/tasks/{id}/dispatch` | Dispatch to agent via OpenClaw |
 | GET/POST | `/api/tasks/{id}/dependencies` | Task dependency list/create (`depends_on_task_id`, `required_status`) |
 | PATCH/DELETE | `/api/tasks/{id}/dependencies/{dependencyId}` | Task dependency update/remove |
@@ -480,9 +480,13 @@ Webhook verification: `WEBHOOK_SECRET` env var, HMAC signature in `x-webhook-sig
 
 **Dispatch**: Task dispatched to agent via OpenClaw `chat.send` RPC. Includes task ID, description, output directory, callback endpoints. Role-specific instructions (builder: "when done, update to testing"; tester: "pass -> review, fail -> POST /fail").
 
-**Pipeline storage rule**: Agent output path is workspace-repo anchored and always under `.mission-control`:
-- `<workspace-repo>/.mission-control/tasks/<task-id>`
-- This path is used so downstream stages read the same artifacts consistently.
+**Pipeline storage rule**: Agent output path is workspace-repo anchored under task artifacts:
+- `<workspace-repo>/task-artifacts/<task-id>`
+- Legacy reads still support prior `.mission-control/tasks/<task-id>` paths.
+
+**Dispatch-generated task brief artifact**:
+- Before agent execution, dispatch writes `<output-directory>/task-problem-statement.md`.
+- The file is auto-registered as a `task_deliverables` file artifact (deduped by path), so each task has a canonical problem statement artifact from the start.
 
 **Git repo handling**: repo validation uses git worktree detection (`git rev-parse --is-inside-work-tree`), not `.git` directory checks, so linked worktrees are supported.
 
@@ -499,7 +503,7 @@ Webhook verification: `WEBHOOK_SECRET` env var, HMAC signature in `x-webhook-sig
 
 **Task deletion cleanup**:
 - Task delete attempts OpenClaw gateway session termination using `sessions.delete` with `key` (session key preferred, then session id fallback).
-- Task delete removes `.mission-control/tasks/{taskId}` and derived `.mission-control/worktrees/*` task paths resolved from dispatch metadata and deterministic path builders.
+- Task delete removes `task-artifacts/{taskId}` and legacy `.mission-control/tasks/{taskId}`, plus derived `.mission-control/worktrees/*` task paths resolved from dispatch metadata and deterministic path builders.
 - DB cleanup is schema-aware (`PRAGMA table_info`) and nullifies/removes related rows safely across environments with slight schema drift.
 
 **Auto-Train dispatch specialization**:
@@ -579,6 +583,7 @@ Agents without direct filesystem access use upload/download endpoints:
 | `WORKSPACE_BASE_PATH` | No | `~/Documents/Shared` | Base workspace directory |
 | `PROJECTS_PATH` | No | `/root/repos` | Repos base directory — scanned for `{org}/{repo}` git repos, auto-discovered as workspaces |
 | `MISSION_CONTROL_URL` | No | auto-detected | API URL for agent callbacks |
+| `MC_AGENT_STALE_THRESHOLD_MS` | No | `3600000` | Daemon heartbeat threshold before considering a working agent stale (requires no active subagent session) |
 | `DEMO_MODE` | No | -- | Enables read-only demo mode |
 
 ---
@@ -619,10 +624,10 @@ The daemon is a standalone Node.js process with nine modules:
 
 | Module | Interval | Purpose |
 |--------|----------|---------|
-| **heartbeat** | 30s | Polls `/api/agents`, detects stale working agents (>60 min without activity), sets them to standby via internal daemon PATCH (`x-mc-system: daemon`) |
+| **heartbeat** | 30s | Polls `/api/agents` and active subagent sessions; stale working agents are set to standby only when they exceed `MC_AGENT_STALE_THRESHOLD_MS` (default 60m) and have no active subagent session |
 | **dispatcher** | 10s | Polls `/api/tasks?status=assigned`, auto-dispatches each via `POST /api/tasks/{id}/dispatch` |
 | **scheduler** | 10s | Runs registered `ScheduledJob` entries on interval. Job registry starts empty — no hardcoded jobs |
-| **recovery** | 60s | Polls `in_progress` tasks, detects stale work (default >5m without updates), marks stale active sessions as `interrupted`, then attempts continuation by re-dispatching to the assignee; on conflict or offline assignee, reassigns to fallback orchestrator |
+| **recovery** | 60s | Polls recoverable statuses (`assigned`, `in_progress`, `testing`, `verification`, `review`), detects stale work (default 20m via `MC_STALLED_TASK_THRESHOLD_MS`), marks stale active sessions as `interrupted`, then attempts continuation by re-dispatching to the assignee; on conflict or offline assignee, reassigns to fallback orchestrator |
 | **autotrain** | 30s | Polls completed `autotrain` tasks and reopens them for the next repo-improvement iteration until stop/max-iteration conditions are hit |
 | **health** | 60s | Pings MC to verify API is reachable, logs connection changes |
 | **router** | SSE stream | Subscribes to `/api/events/stream`, routes events (e.g., logs task assignments for dispatcher awareness) |

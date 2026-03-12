@@ -21,8 +21,17 @@ interface AgentInfo {
   workspace_id: string;
 }
 
-const STALLED_TASK_THRESHOLD_MS = Number.parseInt(process.env.MC_STALLED_TASK_THRESHOLD_MS || '300000', 10);
+const STALLED_TASK_THRESHOLD_MS = Number.parseInt(process.env.MC_STALLED_TASK_THRESHOLD_MS || '1200000', 10);
 const STALLED_TASK_COOLDOWN_MS = Number.parseInt(process.env.MC_STALLED_TASK_COOLDOWN_MS || '600000', 10);
+const RECOVERABLE_TASK_STATUSES = ['assigned', 'in_progress', 'testing', 'verification', 'review'] as const;
+
+function getStatusThresholdMs(status: string): number {
+  const normalized = status.toLowerCase();
+  if (normalized === 'in_progress' || normalized === 'assigned') {
+    return STALLED_TASK_THRESHOLD_MS;
+  }
+  return Math.max(STALLED_TASK_THRESHOLD_MS, 20 * 60 * 1000);
+}
 
 type RecoveryState = {
   lastActionAt: number;
@@ -96,13 +105,14 @@ export function startRecovery(config: DaemonConfig, stats: DaemonStats): () => v
     stats.lastRecoveryTick = new Date(nowMs).toISOString();
 
     try {
-      const [tasksRes, agentsRes] = await Promise.all([
-        mcFetch('/api/tasks?status=in_progress'),
+      const [taskResponses, agentsRes] = await Promise.all([
+        Promise.all(RECOVERABLE_TASK_STATUSES.map((status) => mcFetch(`/api/tasks?status=${status}`))),
         mcFetch('/api/agents'),
       ]);
 
-      if (!tasksRes.ok) {
-        log.warn(`Failed to fetch in_progress tasks for recovery: ${tasksRes.status}`);
+      const failedTaskResponse = taskResponses.find((res) => !res.ok);
+      if (failedTaskResponse) {
+        log.warn(`Failed to fetch recoverable tasks for recovery: ${failedTaskResponse.status}`);
         return;
       }
 
@@ -111,19 +121,25 @@ export function startRecovery(config: DaemonConfig, stats: DaemonStats): () => v
         return;
       }
 
-      const tasksRaw = await tasksRes.json();
+      const tasksByStatus = await Promise.all(taskResponses.map(async (res) => {
+        const payload = await res.json();
+        return Array.isArray(payload) ? (payload as TaskInfo[]) : [];
+      }));
+      const tasks = Array.from(
+        new Map(tasksByStatus.flat().map((task) => [task.id, task])).values(),
+      );
       const agentsRaw = await agentsRes.json();
-      const tasks = Array.isArray(tasksRaw) ? (tasksRaw as TaskInfo[]) : [];
       const agents = Array.isArray(agentsRaw) ? (agentsRaw as AgentInfo[]) : [];
 
       if (tasks.length === 0) return;
 
       for (const task of tasks) {
         if (!task.assigned_agent_id) continue;
-        if (task.status !== 'in_progress') continue;
+        if (!RECOVERABLE_TASK_STATUSES.includes(task.status as (typeof RECOVERABLE_TASK_STATUSES)[number])) continue;
 
         const updatedAtMs = parseUpdatedAtMs(task.updated_at);
-        if (!updatedAtMs || nowMs - updatedAtMs < STALLED_TASK_THRESHOLD_MS) continue;
+        const staleThresholdMs = getStatusThresholdMs(task.status);
+        if (!updatedAtMs || nowMs - updatedAtMs < staleThresholdMs) continue;
         if (shouldSkipByCooldown(recoveryState, task.id, nowMs)) continue;
 
         const ageMinutes = Math.round((nowMs - updatedAtMs) / 60000);

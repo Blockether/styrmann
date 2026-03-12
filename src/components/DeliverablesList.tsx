@@ -298,6 +298,9 @@ export function DeliverablesList({ taskId }: DeliverablesListProps) {
     return buildPhaseSummaries(historicalActivities, task?.status);
   }, [buildPhaseSummaries, historicalActivities, task?.status]);
 
+  const currentPhaseSteps = useMemo(() => new Set(phaseSummaries.map((phase) => phase.step)), [phaseSummaries]);
+  const historicalPhaseSteps = useMemo(() => new Set(historicalPhaseSummaries.map((phase) => phase.step)), [historicalPhaseSummaries]);
+
   const finalResult = useMemo(() => {
     const sorted = rawActivities.slice().sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
     const scoped = sorted.filter((activity) => {
@@ -349,7 +352,7 @@ export function DeliverablesList({ taskId }: DeliverablesListProps) {
         <div>
           <h4 className="font-medium text-mc-text">Phase Summaries</h4>
           <p className="text-xs text-mc-text-secondary mt-1">
-            Runtime grouped by workflow phases with iteration counts and highlights.
+            Runtime grouped by workflow phase and run segment. Attempts count re-dispatch/handoff loops; log entries count all activity events.
           </p>
         </div>
 
@@ -359,12 +362,18 @@ export function DeliverablesList({ taskId }: DeliverablesListProps) {
           <div className="space-y-3">
             <div>
               <div className="text-xs font-medium text-mc-text-secondary mb-1">Current Run {lastResumeAt ? `(since ${formatTimestamp(new Date(lastResumeAt).toISOString())})` : '(full timeline)'}</div>
+              {lastResumeAt && (
+                <div className="text-[11px] text-mc-text-secondary mb-1">Only events after the most recent resume are shown here.</div>
+              )}
               <div className="space-y-2">
                 {phaseSummaries.map((phase) => (
                   <details key={`current-${phase.step}`} className="rounded border border-mc-border bg-mc-bg-secondary px-3 py-2">
-                    <summary className="cursor-pointer text-sm flex items-center justify-between gap-2">
-                      <span className="font-medium text-mc-text">{toTitleCaseLabel(phase.step)}</span>
-                      <span className="text-xs text-mc-text-secondary">{phase.iterations} iteration(s) • {phase.activitiesCount} event(s)</span>
+                    <summary className="cursor-pointer text-sm flex flex-col sm:flex-row sm:items-center sm:justify-between items-start gap-1.5 sm:gap-2">
+                      <span className="font-medium text-mc-text">
+                        {toTitleCaseLabel(phase.step)}
+                        {historicalPhaseSteps.has(phase.step) ? ' (Current)' : ''}
+                      </span>
+                      <span className="text-xs text-mc-text-secondary">{phase.iterations} attempt(s) • {phase.activitiesCount} log entr{phase.activitiesCount === 1 ? 'y' : 'ies'}</span>
                     </summary>
                     <div className="mt-2 space-y-1">
                       {phase.highlights.map((line) => (
@@ -383,13 +392,17 @@ export function DeliverablesList({ taskId }: DeliverablesListProps) {
 
             {historicalPhaseSummaries.length > 0 && (
               <div>
-                <div className="text-xs font-medium text-mc-text-secondary mb-1">Historical Attempts (before last resume)</div>
+                <div className="text-xs font-medium text-mc-text-secondary mb-1">Previous Runs (before last resume)</div>
+                <div className="text-[11px] text-mc-text-secondary mb-1">These are earlier attempts from before the latest resume/re-dispatch.</div>
                 <div className="space-y-2">
                   {historicalPhaseSummaries.map((phase) => (
                     <details key={`historical-${phase.step}`} className="rounded border border-mc-border bg-mc-bg-secondary/70 px-3 py-2">
-                      <summary className="cursor-pointer text-sm flex items-center justify-between gap-2">
-                        <span className="font-medium text-mc-text">{toTitleCaseLabel(phase.step)}</span>
-                        <span className="text-xs text-mc-text-secondary">{phase.iterations} iteration(s) • {phase.activitiesCount} event(s)</span>
+                      <summary className="cursor-pointer text-sm flex flex-col sm:flex-row sm:items-center sm:justify-between items-start gap-1.5 sm:gap-2">
+                        <span className="font-medium text-mc-text">
+                          {toTitleCaseLabel(phase.step)}
+                          {currentPhaseSteps.has(phase.step) ? ' (Previous)' : ''}
+                        </span>
+                        <span className="text-xs text-mc-text-secondary">{phase.iterations} attempt(s) • {phase.activitiesCount} log entr{phase.activitiesCount === 1 ? 'y' : 'ies'}</span>
                       </summary>
                       <div className="mt-2 space-y-1">
                         {phase.highlights.map((line) => (
@@ -429,7 +442,7 @@ export function DeliverablesList({ taskId }: DeliverablesListProps) {
         <div className="p-3 bg-mc-bg rounded-lg border border-mc-border space-y-3">
           <div>
             <h4 className="font-medium text-mc-text">Changes</h4>
-            <p className="text-xs text-mc-text-secondary mt-1">
+            <p className="text-xs text-mc-text-secondary mt-1 break-words">
               Workspace: {changes.workspace.name || 'Unknown'}
               {changes.workspace.repo ? ` (${changes.workspace.repo})` : ''}
             </p>
@@ -441,7 +454,7 @@ export function DeliverablesList({ taskId }: DeliverablesListProps) {
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-2 text-xs">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
             <div className="p-2 rounded bg-mc-bg-tertiary">
               <div className="text-mc-text-secondary">Sessions</div>
               <div className="font-medium text-mc-text mt-0.5">{changes.summary.sessions_count}</div>
@@ -496,7 +509,7 @@ export function DeliverablesList({ taskId }: DeliverablesListProps) {
         <div
           key={deliverable.id}
           onClick={() => handleOpen(deliverable)}
-          className="flex gap-3 p-3 bg-mc-bg rounded-lg border border-mc-border hover:border-mc-accent transition-colors cursor-pointer"
+          className="flex flex-col sm:flex-row gap-3 p-3 bg-mc-bg rounded-lg border border-mc-border hover:border-mc-accent transition-colors cursor-pointer"
         >
           {/* Icon */}
           <div className="flex-shrink-0 text-mc-accent">
@@ -506,7 +519,7 @@ export function DeliverablesList({ taskId }: DeliverablesListProps) {
           {/* Content */}
           <div className="flex-1 min-w-0">
             {/* Title - clickable */}
-            <div className="flex items-start justify-between gap-2">
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
               {deliverable.deliverable_type === 'url' && deliverable.path ? (
                 <a
                   href={deliverable.path}
@@ -521,7 +534,7 @@ export function DeliverablesList({ taskId }: DeliverablesListProps) {
               ) : (
                 <h4 className="font-medium text-mc-text">{deliverable.title}</h4>
               )}
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1 self-start sm:self-auto">
                 {/* Preview button for previewable files */}
                 {deliverable.deliverable_type === 'file' && isPreviewable(deliverable.path) && (
                   <button
@@ -563,7 +576,7 @@ export function DeliverablesList({ taskId }: DeliverablesListProps) {
             )}
 
             {/* Metadata */}
-            <div className="flex items-center gap-4 mt-2 text-xs text-mc-text-secondary">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-xs text-mc-text-secondary">
               <span className="capitalize">{deliverable.deliverable_type}</span>
               <span>•</span>
               <span>{formatTimestamp(deliverable.created_at)}</span>

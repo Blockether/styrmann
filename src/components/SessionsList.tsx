@@ -160,24 +160,6 @@ export function SessionsList({ taskId }: SessionsListProps) {
     });
   };
 
-  const handleMarkComplete = async (sessionId: string) => {
-    try {
-      const res = await fetch(`/api/openclaw/sessions/${sessionId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          status: 'completed',
-          ended_at: new Date().toISOString(),
-        }),
-      });
-      if (res.ok) {
-        loadSessions();
-      }
-    } catch (error) {
-      console.error('Failed to mark session complete:', error);
-    }
-  };
-
   const handleResumeInterrupted = async (sessionId: string) => {
     try {
       const resumeRes = await fetch(`/api/tasks/${taskId}/sessions/${encodeURIComponent(sessionId)}/resume`, {
@@ -343,15 +325,6 @@ export function SessionsList({ taskId }: SessionsListProps) {
 
           {/* Action Buttons */}
           <div className="flex flex-col gap-1 items-end">
-            {session.status === 'active' && (
-              <button
-                onClick={() => handleMarkComplete(session.openclaw_session_id)}
-                className="px-2 py-1 text-[11px] border border-mc-border rounded bg-mc-bg hover:bg-mc-bg-tertiary text-mc-text-secondary whitespace-nowrap"
-                title="Mark session as ended"
-              >
-                End
-              </button>
-            )}
             {session.status === 'interrupted' && (
               <button
                 onClick={() => handleResumeInterrupted(session.openclaw_session_id)}

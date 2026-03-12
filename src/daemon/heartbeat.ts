@@ -11,18 +11,39 @@ interface AgentInfo {
   updated_at?: string;
 }
 
-const STALE_THRESHOLD_MS = 60 * 60 * 1000; // 60 minutes
+interface SessionInfo {
+  agent_id?: string;
+  status?: string;
+}
+
+const STALE_THRESHOLD_MS = Number.parseInt(process.env.MC_AGENT_STALE_THRESHOLD_MS || '3600000', 10);
 
 export function startHeartbeat(config: DaemonConfig, stats: DaemonStats): () => void {
   async function tick() {
     try {
-      const res = await mcFetch('/api/agents');
-      if (!res.ok) {
-        log.warn(`Failed to fetch agents: ${res.status}`);
+      const [agentsRes, sessionsRes] = await Promise.all([
+        mcFetch('/api/agents'),
+        mcFetch('/api/openclaw/sessions?session_type=subagent&status=active'),
+      ]);
+
+      if (!agentsRes.ok) {
+        log.warn(`Failed to fetch agents: ${agentsRes.status}`);
         return;
       }
 
-      const agents: AgentInfo[] = await res.json();
+      if (!sessionsRes.ok) {
+        log.warn(`Failed to fetch active sessions: ${sessionsRes.status}`);
+        return;
+      }
+
+      const agents: AgentInfo[] = await agentsRes.json();
+      const activeSessionsRaw = await sessionsRes.json();
+      const activeSessions = (Array.isArray(activeSessionsRaw) ? activeSessionsRaw : []) as SessionInfo[];
+      const activeSessionAgentIds = new Set(
+        activeSessions
+          .filter((session) => session.status === 'active' && typeof session.agent_id === 'string')
+          .map((session) => session.agent_id as string),
+      );
       const working = agents.filter(a => a.status === 'working');
       const standby = agents.filter(a => a.status === 'standby');
 
@@ -37,6 +58,10 @@ export function startHeartbeat(config: DaemonConfig, stats: DaemonStats): () => 
         if (!agent.updated_at) continue;
         const lastUpdate = new Date(agent.updated_at).getTime();
         if (now - lastUpdate > STALE_THRESHOLD_MS) {
+          if (activeSessionAgentIds.has(agent.id)) {
+            log.info(`Agent ${agent.name} (${agent.id}) has an active session, skipping stale standby recovery.`);
+            continue;
+          }
           log.warn(`Agent ${agent.name} (${agent.id}) stale — last update ${Math.round((now - lastUpdate) / 60000)}m ago. Setting standby.`);
           try {
             await mcFetch(`/api/agents/${agent.id}`, {

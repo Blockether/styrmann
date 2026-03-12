@@ -11,7 +11,7 @@ export async function GET(
     const { id: taskId } = await params;
     const db = getDb();
     const nowMs = Date.now();
-    const staleThresholdMs = Number.parseInt(process.env.MC_SESSION_STALE_THRESHOLD_MS || '300000', 10);
+    const staleThresholdMs = Number.parseInt(process.env.MC_SESSION_STALE_THRESHOLD_MS || '900000', 10);
 
     const sessions = db
       .prepare(
@@ -45,7 +45,7 @@ export async function GET(
       if (rawStatus === 'active' && hasEndedAt) {
         effectiveStatus = 'completed';
       } else if (rawStatus === 'active' && staleByInactivity) {
-        effectiveStatus = 'interrupted';
+        effectiveStatus = 'stale';
       }
       return {
         ...session,
