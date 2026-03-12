@@ -54,8 +54,8 @@ export function CreateMilestoneModal({ workspaceId, sprintId, agents, onClose, o
       });
 
       if (!res.ok) {
-        const data = await res.json().catch(() => ({ error: 'Failed to create milestone' }));
-        setError(data.error || 'Failed to create milestone');
+        const data = await res.json().catch(() => ({ error: 'We could not create this milestone.' }));
+        setError(data.error || 'We could not create this milestone. Please try again.');
         return;
       }
 
@@ -63,7 +63,7 @@ export function CreateMilestoneModal({ workspaceId, sprintId, agents, onClose, o
       onCreated(milestone?.id);
       onClose();
     } catch {
-      setError('Failed to create milestone');
+      setError('We could not create this milestone. Check your connection and try again.');
     } finally {
       setSubmitting(false);
     }
@@ -71,11 +71,11 @@ export function CreateMilestoneModal({ workspaceId, sprintId, agents, onClose, o
 
   return (
     <div data-component="src/components/CreateMilestoneModal" className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-hidden">
-      <div className="bg-mc-bg-secondary border border-mc-border rounded-lg w-full max-w-lg flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-gradient-to-br from-white via-[#fff8ea] to-[#f7efe0] border border-mc-border rounded-lg w-full max-w-lg flex flex-col overflow-hidden shadow-[0_24px_70px_-40px_rgba(90,65,10,0.45)]" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between p-4 border-b border-mc-border">
           <div className="flex items-center gap-2">
             <Target className="w-5 h-5 text-mc-accent" />
-            <h2 className="text-lg font-semibold">New Milestone</h2>
+            <h2 className="text-lg font-semibold">Create Milestone</h2>
           </div>
           <button onClick={onClose} className="p-1 hover:bg-mc-bg-tertiary rounded">
             <X className="w-5 h-5" />
@@ -84,15 +84,16 @@ export function CreateMilestoneModal({ workspaceId, sprintId, agents, onClose, o
 
         <form onSubmit={(e) => { e.preventDefault(); handleSubmit(); }} className="p-4 space-y-4 overflow-y-auto">
           <div>
-            <label className="block text-sm font-medium mb-1">Name <span className="text-mc-accent-red">*</span></label>
+            <label className="block text-sm font-medium mb-1">Milestone name <span className="text-mc-accent-red">*</span></label>
             <input
               type="text"
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
-              placeholder="e.g. Authentication System"
+              placeholder="Example: Authentication Rollout"
               className="w-full min-h-11 px-3 py-2 bg-mc-bg border border-mc-border rounded text-sm focus:outline-none focus:border-mc-accent"
               autoFocus
             />
+            <p className="text-xs text-mc-text-secondary mt-1">Use a short outcome-focused name your team will recognize quickly.</p>
           </div>
 
           <div>
@@ -100,7 +101,7 @@ export function CreateMilestoneModal({ workspaceId, sprintId, agents, onClose, o
             <textarea
               value={form.description}
               onChange={(e) => setForm({ ...form, description: e.target.value })}
-              placeholder="What does this milestone cover?"
+              placeholder="What should be complete when this milestone is done?"
               rows={3}
               className="w-full px-3 py-2 bg-mc-bg border border-mc-border rounded text-sm focus:outline-none focus:border-mc-accent resize-none"
             />
@@ -122,18 +123,18 @@ export function CreateMilestoneModal({ workspaceId, sprintId, agents, onClose, o
 
           {agents.length > 0 && (
             <div>
-              <label className="block text-sm font-medium mb-1">Coordinator Agent</label>
+              <label className="block text-sm font-medium mb-1">Coordinator agent</label>
               <select
                 value={form.coordinator_agent_id}
                 onChange={(e) => setForm({ ...form, coordinator_agent_id: e.target.value })}
                 className="w-full min-h-11 px-3 py-2 bg-mc-bg border border-mc-border rounded text-sm focus:outline-none focus:border-mc-accent"
               >
-                <option value="">No coordinator</option>
+                <option value="">No coordinator yet</option>
                 {agents.map((agent) => (
                   <option key={agent.id} value={agent.id}>{agent.name}</option>
                 ))}
               </select>
-              <p className="text-xs text-mc-text-secondary mt-1">Agent responsible for coordinating this milestone</p>
+              <p className="text-xs text-mc-text-secondary mt-1">Pick who keeps this milestone moving and unblocks follow-up work.</p>
             </div>
           )}
 
@@ -156,7 +157,7 @@ export function CreateMilestoneModal({ workspaceId, sprintId, agents, onClose, o
             className="flex items-center gap-2 px-4 min-h-9 bg-mc-accent text-white rounded text-sm font-medium hover:bg-mc-accent/90 disabled:opacity-50 transition-colors"
           >
             {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
-            Create Milestone
+            {submitting ? 'Creating milestone...' : 'Create Milestone'}
           </button>
         </div>
       </div>

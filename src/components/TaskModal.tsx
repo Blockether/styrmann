@@ -109,6 +109,9 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
   };
 
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showReworkDialog, setShowReworkDialog] = useState(false);
+  const [reworkReason, setReworkReason] = useState('');
 
   const uploadAttachedFiles = async (taskId: string): Promise<void> => {
     if (attachedFiles.length === 0) return;
@@ -157,8 +160,8 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
       });
 
       if (!res.ok) {
-        const errData = await res.json().catch(() => ({ error: 'Unknown error' }));
-        setSaveError(errData.error || `Save failed (${res.status})`);
+        const errData = await res.json().catch(() => ({ error: 'We could not save this task right now.' }));
+        setSaveError(errData.error || 'We could not save this task right now. Please try again.');
         return;
       }
 
@@ -220,14 +223,14 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
       }
     } catch (error) {
       console.error('Failed to save task:', error);
-      setSaveError(error instanceof Error ? error.message : 'Network error — please try again');
+      setSaveError(error instanceof Error ? error.message : 'We could not reach the server. Check your connection and try again.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleDelete = async () => {
-    if (!task || !confirm(`Delete "${task.title}"?`)) return;
+  const confirmDeleteTask = async () => {
+    if (!task) return;
 
     try {
       const res = await fetch(`/api/tasks/${task.id}`, { method: 'DELETE' });
@@ -235,11 +238,20 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
         useMissionControl.setState((state) => ({
           tasks: state.tasks.filter((t) => t.id !== task.id),
         }));
+        setShowDeleteConfirm(false);
         onClose();
+      } else {
+        setSaveError('We could not delete this task. Please try again.');
       }
     } catch (error) {
       console.error('Failed to delete task:', error);
+      setSaveError('We could not delete this task. Please try again.');
     }
+  };
+
+  const handleDelete = () => {
+    if (!task) return;
+    setShowDeleteConfirm(true);
   };
 
   const handleAcceptAndMerge = async () => {
@@ -255,7 +267,7 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
 
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setSaveError(data.error || data.message || `Accept failed (${res.status})`);
+        setSaveError(data.error || data.message || 'We could not accept this task. Please try again.');
         return;
       }
 
@@ -265,16 +277,23 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
 
       onClose();
     } catch (error) {
-      setSaveError(error instanceof Error ? error.message : 'Accept failed');
+      setSaveError(error instanceof Error ? error.message : 'We could not accept this task. Please try again.');
     } finally {
       setIsProcessingAcceptance(false);
     }
   };
 
-  const handleRaiseProblem = async () => {
+  const handleRaiseProblem = () => {
+    setReworkReason('');
+    setShowReworkDialog(true);
+  };
+
+  const submitReworkRequest = async () => {
     if (!task) return;
-    const reason = window.prompt('Describe the problem to send the task back for rework:');
-    if (!reason || !reason.trim()) return;
+    if (!reworkReason.trim()) {
+      setSaveError('Please describe what needs to be fixed before sending the task back.');
+      return;
+    }
 
     setIsProcessingAcceptance(true);
     setSaveError(null);
@@ -283,12 +302,12 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
       const res = await fetch(`/api/tasks/${task.id}/accept`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'reject', reason: reason.trim() }),
+        body: JSON.stringify({ action: 'reject', reason: reworkReason.trim() }),
       });
 
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setSaveError(data.error || data.message || `Reject failed (${res.status})`);
+        setSaveError(data.error || data.message || 'We could not send this task back for rework. Please try again.');
         return;
       }
 
@@ -298,9 +317,10 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
         updateTask(refreshedTask);
       }
 
+      setShowReworkDialog(false);
       onClose();
     } catch (error) {
-      setSaveError(error instanceof Error ? error.message : 'Reject failed');
+      setSaveError(error instanceof Error ? error.message : 'We could not send this task back for rework. Please try again.');
     } finally {
       setIsProcessingAcceptance(false);
     }
@@ -321,7 +341,7 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-mc-border flex-shrink-0">
           <h2 className="text-lg font-semibold">
-            {task ? task.title : 'Create New Task'}
+            {task ? task.title : 'Create Task'}
           </h2>
           <button
             onClick={onClose}
@@ -377,7 +397,7 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
               onChange={(e) => setForm({ ...form, description: e.target.value })}
               rows={3}
               className="w-full bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent resize-none"
-              placeholder="Add details..."
+              placeholder="Describe what success looks like, constraints, and key context."
             />
           </div>
 
@@ -395,7 +415,7 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
                 onDragOver={(e) => e.preventDefault()}
               >
                 <Upload className="w-6 h-6 mx-auto text-mc-text-secondary mb-2" />
-                <div className="text-sm text-mc-text-secondary">Drag files here or click to browse</div>
+                <div className="text-sm text-mc-text-secondary">Drop files here or click to upload</div>
                 <input
                   ref={taskFileInputRef}
                   type="file"
@@ -409,7 +429,7 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
                 />
               </div>
               <p className="text-xs text-mc-text-secondary">
-                Attached files are stored under this task&apos;s `.mission-control` resource directory and automatically ingested into dispatch prompts for agent runs.
+                We attach these files to the task context so agents can use them during execution.
               </p>
               {attachedFiles.length > 0 && (
                 <div className="space-y-1">
@@ -459,7 +479,7 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
                   type="text"
                   value={newCriteriaInput}
                   onChange={(e) => setNewCriteriaInput(e.target.value)}
-                  placeholder="Add acceptance criteria..."
+                  placeholder="Add a clear acceptance checkpoint..."
                   className="flex-1 min-h-10 bg-mc-bg border border-mc-border rounded px-3 py-1.5 text-sm focus:outline-none focus:border-mc-accent"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && newCriteriaInput.trim()) {
@@ -582,7 +602,7 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
                     onChange={(e) => setForm({ ...form, assigned_human_id: e.target.value })}
                     className="w-full min-h-10 bg-mc-bg border border-mc-border rounded px-3 py-1.5 text-sm focus:outline-none focus:border-mc-accent"
                   >
-                    <option value="">Select human</option>
+                    <option value="">Choose a human assignee</option>
                     {humans.map((human) => (
                       <option key={human.id} value={human.id}>{human.name} — {human.email}</option>
                     ))}
@@ -595,7 +615,7 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
                 </div>
               ) : (
                 <div className="text-xs text-mc-text-secondary bg-mc-bg border border-mc-border rounded px-3 py-2">
-                  AI tasks are planned by the orchestrator from existing agents and shared skills. Direct agent picking is removed from the overview form.
+                  AI tasks are assigned automatically by the orchestrator based on available roles and skills.
                 </div>
               )}
             </div>
@@ -613,14 +633,14 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
                 }}
                 className="w-full min-h-10 bg-mc-bg border border-mc-border rounded px-3 py-1.5 text-sm focus:outline-none focus:border-mc-accent"
               >
-                <option value="">No milestone</option>
+                <option value="">No milestone yet</option>
                 {milestones.map((milestone) => (
                   <option key={milestone.id} value={milestone.id}>
                     {milestone.name}
                   </option>
                 ))}
                 <option value="__add_new__" className="text-mc-accent">
-                  + Add new milestone...
+                  + Create new milestone...
                 </option>
               </select>
             </div>
@@ -628,7 +648,7 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
 
           {!task && form.assignee_type === 'ai' && (
             <div className="text-xs text-mc-text-secondary bg-mc-bg border border-mc-border rounded px-3 py-2">
-              AI tasks are planned automatically by the orchestrator using existing agents and linked skills. Manual workflow configuration is disabled.
+              The orchestration plan is generated automatically once this task is created.
             </div>
           )}
 
@@ -686,8 +706,8 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
                     disabled={isProcessingAcceptance}
                     className="min-h-11 px-3 py-2 border border-mc-accent-red text-mc-accent-red rounded text-sm font-medium hover:bg-mc-accent-red/10 disabled:opacity-50"
                   >
-                    <span className="hidden sm:inline">Raise Problem</span>
-                    <span className="sm:hidden">Problem</span>
+                    <span className="hidden sm:inline">Request Rework</span>
+                    <span className="sm:hidden">Rework</span>
                   </button>
                   <button
                     type="button"
@@ -695,7 +715,7 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
                     disabled={isProcessingAcceptance}
                     className="min-h-11 px-3 py-2 bg-mc-accent-green text-white rounded text-sm font-medium hover:bg-mc-accent-green/90 disabled:opacity-50"
                   >
-                    {isProcessingAcceptance ? 'Processing...' : 'Accept'}
+                    {isProcessingAcceptance ? 'Applying decision...' : 'Accept & Merge'}
                   </button>
                 </>
               )}
@@ -706,7 +726,7 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
                   className="min-h-11 flex items-center gap-1.5 px-3 py-2 border border-mc-accent text-mc-accent rounded text-sm font-medium hover:bg-mc-accent/10 disabled:opacity-50"
                 >
                   <Plus className="w-4 h-4" />
-                  <span className="hidden sm:inline">{isSubmitting ? 'Saving...' : 'Save & New'}</span>
+                  <span className="hidden sm:inline">{isSubmitting ? 'Creating...' : 'Create & Add Another'}</span>
                 </button>
               )}
               <button
@@ -715,12 +735,49 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
                 className="min-h-11 flex items-center gap-1.5 px-3 py-2 bg-mc-accent text-white rounded text-sm font-medium hover:bg-mc-accent/90 disabled:opacity-50"
               >
                 <Save className="w-4 h-4" />
-                <span className="hidden sm:inline">{isSubmitting ? 'Saving...' : 'Save'}</span>
+                <span className="hidden sm:inline">{isSubmitting ? (task ? 'Saving changes...' : 'Creating task...') : (task ? 'Save Changes' : 'Create Task')}</span>
               </button>
             </div>
           </div>
         )}
       </div>
+
+      {showDeleteConfirm && task && (
+        <div className="fixed inset-0 z-[60] bg-black/55 flex items-center justify-center p-4" onClick={() => setShowDeleteConfirm(false)}>
+          <div className="w-full max-w-md rounded-2xl border border-mc-border bg-gradient-to-br from-white via-[#fff8ea] to-[#f7efe0] shadow-[0_28px_70px_-40px_rgba(90,65,10,0.45)]" onClick={(event) => event.stopPropagation()}>
+            <div className="p-4 border-b border-mc-border">
+              <h3 className="text-base font-semibold text-mc-text">Delete task?</h3>
+              <p className="mt-2 text-sm text-mc-text-secondary">This will permanently remove <span className="font-medium text-mc-text">{task.title}</span> and related records. This action cannot be undone.</p>
+            </div>
+            <div className="p-4 flex items-center justify-end gap-2">
+              <button type="button" onClick={() => setShowDeleteConfirm(false)} className="min-h-11 px-4 py-2 border border-mc-border rounded text-sm text-mc-text-secondary hover:text-mc-text hover:bg-mc-bg">Keep Task</button>
+              <button type="button" onClick={confirmDeleteTask} className="min-h-11 px-4 py-2 bg-mc-accent-red text-white rounded text-sm font-medium hover:bg-mc-accent-red/90">Delete Task</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showReworkDialog && task && (
+        <div className="fixed inset-0 z-[60] bg-black/55 flex items-center justify-center p-4" onClick={() => setShowReworkDialog(false)}>
+          <div className="w-full max-w-lg rounded-2xl border border-mc-border bg-gradient-to-br from-white via-[#fff8ea] to-[#f7efe0] shadow-[0_28px_70px_-40px_rgba(90,65,10,0.45)]" onClick={(event) => event.stopPropagation()}>
+            <div className="p-4 border-b border-mc-border">
+              <h3 className="text-base font-semibold text-mc-text">Send task back for rework</h3>
+              <p className="mt-2 text-sm text-mc-text-secondary">Explain what needs to change so the assignee can fix it in one pass.</p>
+              <textarea
+                value={reworkReason}
+                onChange={(event) => setReworkReason(event.target.value)}
+                rows={4}
+                placeholder="Example: Login form passes tests but still breaks on mobile Safari when autofill is used."
+                className="mt-3 w-full rounded-xl border border-mc-border bg-mc-bg px-3 py-2 text-sm text-mc-text resize-none"
+              />
+            </div>
+            <div className="p-4 flex items-center justify-end gap-2">
+              <button type="button" onClick={() => setShowReworkDialog(false)} className="min-h-11 px-4 py-2 border border-mc-border rounded text-sm text-mc-text-secondary hover:text-mc-text hover:bg-mc-bg">Cancel</button>
+              <button type="button" onClick={submitReworkRequest} disabled={isProcessingAcceptance} className="min-h-11 px-4 py-2 bg-mc-accent-red text-white rounded text-sm font-medium hover:bg-mc-accent-red/90 disabled:opacity-50">{isProcessingAcceptance ? 'Sending request...' : 'Send Rework Request'}</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showMilestoneModal && (
         <CreateMilestoneModal

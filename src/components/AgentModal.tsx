@@ -130,6 +130,7 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated, initia
   const [filePreview, setFilePreview] = useState<FilePreview | null>(null);
   const [filePreviewContent, setFilePreviewContent] = useState<string | null>(null);
   const [filePreviewLoading, setFilePreviewLoading] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const filePreviewSrc = filePreview && agent
     ? `/api/agents/${agent.id}/workspace/file?scope=${filePreview.scope}&path=${encodeURIComponent(filePreview.path)}`
     : null;
@@ -209,7 +210,7 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated, initia
         }
       } catch (error) {
         if (!cancelled) {
-          setWorkspaceError(error instanceof Error ? error.message : 'Failed to load OpenClaw workspace');
+          setWorkspaceError(error instanceof Error ? error.message : 'We could not load this OpenClaw workspace. Please try again.');
         }
       } finally {
         if (!cancelled) {
@@ -267,7 +268,7 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated, initia
       } else if (messageFromApi) {
         setSkillsActionNotice(messageFromApi);
       } else {
-        setSkillsActionNotice('Skill action completed.');
+        setSkillsActionNotice('Skill links updated successfully.');
       }
 
       setSkillsInfo(payload.data || null);
@@ -275,11 +276,11 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated, initia
       if (refreshed.ok) {
         setSkillsBrowser(await refreshed.json());
       } else {
-        setWorkspaceError('Skill action succeeded, but skill folder refresh failed. Use Refresh to reload workspace files.');
+        setWorkspaceError('Skill links were updated, but we could not refresh the folder view. Click Refresh to reload.');
       }
     } catch (error) {
       setSkillsActionNotice(null);
-      setWorkspaceError(error instanceof Error ? error.message : 'Skill action failed');
+      setWorkspaceError(error instanceof Error ? error.message : 'We could not update skill links. Please try again.');
     } finally {
       setSkillsActionLoading(null);
     }
@@ -318,7 +319,7 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated, initia
           setFilePreviewContent(await res.text());
         }
       } catch (err) {
-        setFilePreviewContent(`Error: ${err instanceof Error ? err.message : 'Failed to load'}`);
+          setFilePreviewContent(`Error: ${err instanceof Error ? err.message : 'Could not load file preview.'}`);
       } finally {
         setFilePreviewLoading(false);
       }
@@ -363,8 +364,8 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated, initia
     }
   };
 
-  const handleDelete = async () => {
-    if (!agent || !confirm(`Delete ${agent.name}?`)) return;
+  const confirmDeleteAgent = async () => {
+    if (!agent) return;
 
     try {
       const res = await fetch(`/api/agents/${agent.id}`, { method: 'DELETE' });
@@ -375,10 +376,18 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated, initia
           selectedAgent: state.selectedAgent?.id === agent.id ? null : state.selectedAgent,
         }));
         onClose();
+      } else {
+        setWorkspaceError('We could not delete this agent. Please try again.');
       }
     } catch (error) {
       console.error('Failed to delete agent:', error);
+      setWorkspaceError('We could not delete this agent. Please try again.');
     }
+  };
+
+  const handleDelete = () => {
+    if (!agent) return;
+    setShowDeleteConfirm(true);
   };
 
   const tabs = useMemo(() => [
@@ -470,7 +479,7 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated, initia
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-mc-border flex-shrink-0">
           <h2 className="text-lg font-semibold">
-            {agent ? `Edit ${agent.name}` : 'Create New Agent'}
+            {agent ? `Edit ${agent.name}` : 'Create Agent'}
           </h2>
           <button
             onClick={onClose}
@@ -559,7 +568,7 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated, initia
                   )}
                 </label>
                 {modelsLoading ? (
-                  <div className="text-sm text-mc-text-secondary">Loading available models...</div>
+                  <div className="text-sm text-mc-text-secondary">Loading available models for this agent...</div>
                 ) : (
                   <select
                     value={form.model}
@@ -567,7 +576,7 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated, initia
                     disabled={isReadOnlySyncedAgent}
                     className="w-full min-h-11 bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent"
                   >
-                    <option value="">-- Use Default Model --</option>
+                    <option value="">Use workspace default model</option>
                     {availableModels.map((model) => (
                       <option key={model} value={model}>
                         {model}{defaultModel === model ? ' (Default)' : ''}
@@ -576,7 +585,7 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated, initia
                   </select>
                 )}
                 <p className="text-xs text-mc-text-secondary mt-1">
-                  AI model used by this agent. Leave empty to use OpenClaw default.
+                  Choose the model this agent should run. Leave empty to inherit the OpenClaw default.
                 </p>
               </div>
             </div>
@@ -586,7 +595,7 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated, initia
             <div className="space-y-4">
               {!agent ? (
                 <div className="rounded-lg border border-mc-border bg-mc-bg p-4 text-sm text-mc-text-secondary">
-                  Save the agent first to create and inspect its OpenClaw workspace.
+                  Save this agent first, then you can browse its OpenClaw workspace files and skills.
                 </div>
               ) : agent.source !== 'synced' ? (
                 <div className="rounded-lg border border-mc-border bg-mc-bg p-4 text-sm text-mc-text-secondary">
@@ -645,7 +654,7 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated, initia
                   {workspaceLoading ? (
                     <div className="flex items-center gap-2 text-sm text-mc-text-secondary">
                       <RefreshCw className="w-4 h-4 animate-spin" />
-                      Loading OpenClaw workspace...
+                      Loading OpenClaw workspace files...
                     </div>
                   ) : (
                     <div className="space-y-4">
@@ -664,7 +673,7 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated, initia
                               disabled={skillsActionLoading === 'sync_all:*'}
                               className="min-h-11 px-3 py-2 border border-mc-border rounded text-xs font-medium hover:bg-mc-bg-secondary disabled:opacity-50"
                             >
-                              {skillsActionLoading === 'sync_all:*' ? 'Syncing...' : 'Sync all links'}
+                              {skillsActionLoading === 'sync_all:*' ? 'Syncing links...' : 'Sync All Links'}
                             </button>
                           )}
                         </div>
@@ -828,7 +837,7 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated, initia
                 className="min-h-11 flex items-center gap-2 px-3 py-2 text-mc-accent-red hover:bg-mc-accent-red/10 rounded text-sm"
               >
                 <Trash2 className="w-4 h-4" />
-                Delete
+                Delete Agent
               </button>
             )}
           </div>
@@ -847,12 +856,27 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated, initia
                 className="min-h-11 flex items-center gap-2 px-4 py-2 bg-mc-accent text-white rounded text-sm font-medium hover:bg-mc-accent/90 disabled:opacity-50"
               >
                 <Save className="w-4 h-4" />
-                {isSubmitting ? 'Saving...' : 'Save'}
+                {isSubmitting ? 'Saving changes...' : (agent ? 'Save Agent' : 'Create Agent')}
               </button>
             )}
           </div>
         </div>
       </div>
+
+      {showDeleteConfirm && agent && (
+        <div className="fixed inset-0 z-[60] bg-black/55 flex items-center justify-center p-4" onClick={() => setShowDeleteConfirm(false)}>
+          <div className="w-full max-w-md rounded-2xl border border-mc-border bg-gradient-to-br from-white via-[#fff8ea] to-[#f7efe0] shadow-[0_28px_70px_-40px_rgba(90,65,10,0.45)]" onClick={(event) => event.stopPropagation()}>
+            <div className="p-4 border-b border-mc-border">
+              <h3 className="text-base font-semibold text-mc-text">Delete agent?</h3>
+              <p className="mt-2 text-sm text-mc-text-secondary">This removes <span className="font-medium text-mc-text">{agent.name}</span> from Mission Control. Existing task history remains, but this agent will no longer be assignable.</p>
+            </div>
+            <div className="p-4 flex items-center justify-end gap-2">
+              <button type="button" onClick={() => setShowDeleteConfirm(false)} className="min-h-11 px-4 py-2 border border-mc-border rounded text-sm text-mc-text-secondary hover:text-mc-text hover:bg-mc-bg">Keep Agent</button>
+              <button type="button" onClick={confirmDeleteAgent} className="min-h-11 px-4 py-2 bg-mc-accent-red text-white rounded text-sm font-medium hover:bg-mc-accent-red/90">Delete Agent</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* File Preview Overlay */}
       {filePreview && agent && (

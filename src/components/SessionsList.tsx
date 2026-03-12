@@ -6,7 +6,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { Bot, Circle, XCircle, Shield, AlertTriangle } from 'lucide-react';
+import { Bot, Circle, XCircle, Shield, AlertTriangle, Waypoints } from 'lucide-react';
 import { AgentInitials } from './AgentInitials';
 import { TraceViewerModal } from './TraceViewerModal';
 import { useTraceDeepLink } from '@/hooks/useTraceDeepLink';
@@ -131,6 +131,7 @@ export function SessionsList({ taskId }: SessionsListProps) {
   const staleCount = sessions.filter((session) => session.status === 'stale').length;
   const finishedCount = sessions.filter((session) => session.status === 'completed' || Boolean(session.ended_at)).length;
   const unfinishedCount = sessions.length - finishedCount;
+  const traceLinkedCount = sessions.filter((session) => Boolean(session.trace_url)).length;
 
   const formatDuration = (start: string, end?: string | null) => {
     const startTime = new Date(start).getTime();
@@ -193,7 +194,7 @@ export function SessionsList({ taskId }: SessionsListProps) {
   return (
     <div data-component="src/components/SessionsList" className="space-y-3 max-w-full overflow-x-hidden">
       <div className="p-3 rounded-lg border border-mc-border bg-mc-bg-secondary text-xs flex items-center justify-between gap-2 flex-wrap">
-        <span className="text-mc-text-secondary">OpenClaw session state</span>
+        <span className="text-mc-text-secondary">OpenClaw session state and trace readiness</span>
         <div className="flex flex-wrap items-center gap-2 justify-start">
           <span className="px-2 py-0.5 rounded border border-green-200 bg-green-50 text-green-700 whitespace-nowrap">Active: {activeCount}</span>
           <span className="px-2 py-0.5 rounded border border-mc-border bg-mc-bg text-mc-text-secondary whitespace-nowrap">Inactive: {inactiveCount}</span>
@@ -201,6 +202,7 @@ export function SessionsList({ taskId }: SessionsListProps) {
           <span className="px-2 py-0.5 rounded border border-yellow-200 bg-yellow-50 text-yellow-700 whitespace-nowrap">Stale: {staleCount}</span>
           <span className="px-2 py-0.5 rounded border border-mc-border bg-mc-bg text-mc-text-secondary whitespace-nowrap">Finished: {finishedCount}</span>
           <span className="px-2 py-0.5 rounded border border-mc-border bg-mc-bg text-mc-text-secondary whitespace-nowrap">Unfinished: {unfinishedCount}</span>
+          <span className="px-2 py-0.5 rounded border border-cyan-200 bg-cyan-50 text-cyan-700 whitespace-nowrap">Trace linked: {traceLinkedCount}</span>
         </div>
       </div>
 
@@ -270,8 +272,9 @@ export function SessionsList({ taskId }: SessionsListProps) {
                 <button
                   type="button"
                   onClick={() => openTrace(session.openclaw_session_id, taskId)}
-                  className="text-xs text-mc-accent hover:underline"
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs border border-cyan-200 bg-cyan-50 text-cyan-700 rounded hover:bg-cyan-100"
                 >
+                  <Waypoints className="w-3.5 h-3.5" />
                   View full trace
                 </button>
               </div>

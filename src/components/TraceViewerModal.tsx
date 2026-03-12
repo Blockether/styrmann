@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { X, Bot, User, Cpu, Clock3, MessageSquare, Shield, ArrowRight, ArrowDown, Wrench, Terminal } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { X, Bot, User, Cpu, Clock3, MessageSquare, Shield, ArrowRight, ArrowDown, Wrench, Terminal, Search, AlertTriangle, Copy, Check } from 'lucide-react';
 
 interface TraceMessage {
   role: string;
@@ -77,9 +77,9 @@ interface TraceViewerModalProps {
 }
 
 function formatTimestamp(value?: string | null): string {
-  if (!value) return 'n/a';
+  if (!value) return 'Not available';
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return 'n/a';
+  if (Number.isNaN(date.getTime())) return 'Not available';
   return date.toLocaleString('en-US', {
     month: 'short',
     day: 'numeric',
@@ -89,7 +89,7 @@ function formatTimestamp(value?: string | null): string {
 }
 
 function formatDuration(value?: number | null): string {
-  if (value === null || value === undefined) return 'n/a';
+  if (value === null || value === undefined) return 'Not available';
   if (value < 60) return `${value}s`;
   const minutes = Math.floor(value / 60);
   const seconds = value % 60;
@@ -136,6 +136,10 @@ export function TraceViewerModal({ taskId, sessionId, onClose }: TraceViewerModa
   const [data, setData] = useState<TracePayload | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
+  const [roleFilter, setRoleFilter] = useState('all');
+  const [errorsOnly, setErrorsOnly] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (!sessionId) {
@@ -171,11 +175,18 @@ export function TraceViewerModal({ taskId, sessionId, onClose }: TraceViewerModa
       }
     };
 
-    run().catch(() => {});
+    void run();
     return () => {
       isCancelled = true;
     };
   }, [taskId, sessionId]);
+
+  useEffect(() => {
+    setQuery('');
+    setRoleFilter('all');
+    setErrorsOnly(false);
+    setCopied(false);
+  }, [sessionId]);
 
   useEffect(() => {
     const prevBodyOverflow = document.body.style.overflow;
@@ -188,10 +199,38 @@ export function TraceViewerModal({ taskId, sessionId, onClose }: TraceViewerModa
     };
   }, []);
 
-  if (!sessionId) return null;
-
   const summary = data?.summary;
-  const previewMessages = data?.history || [];
+  const previewMessages = useMemo(() => data?.history ?? [], [data]);
+  const sessionLabel = data?.openclaw_session_id || sessionId;
+  const roleOptions = useMemo(() => {
+    const set = new Set(previewMessages.map((message) => roleLabel(message.role, message.tool_name)));
+    return ['all', ...Array.from(set)];
+  }, [previewMessages]);
+  const filteredMessages = useMemo(() => {
+    const trimmed = query.trim().toLowerCase();
+    return previewMessages.filter((message) => {
+      const label = roleLabel(message.role, message.tool_name);
+      if (roleFilter !== 'all' && label !== roleFilter) return false;
+      if (errorsOnly && message.is_error !== true) return false;
+      if (!trimmed) return true;
+      const content = `${message.content || ''} ${message.tool_name || ''} ${message.tool_result || ''}`.toLowerCase();
+      return content.includes(trimmed);
+    });
+  }, [errorsOnly, previewMessages, query, roleFilter]);
+  const errorCount = previewMessages.filter((message) => message.is_error).length;
+
+  async function copySessionId(): Promise<void> {
+    if (!sessionLabel) return;
+    try {
+      await navigator.clipboard.writeText(sessionLabel);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    } catch (copyError) {
+      console.error('Failed to copy session id:', copyError);
+    }
+  }
+
+  if (!sessionId) return null;
 
   return (
     <div
@@ -207,9 +246,19 @@ export function TraceViewerModal({ taskId, sessionId, onClose }: TraceViewerModa
           <div className="min-w-0">
             <div className="font-medium text-mc-text truncate">Session Trace</div>
             <div className="text-xs text-mc-text-secondary font-mono truncate">
-              {data?.openclaw_session_id || 'Loading...'}
+              {sessionLabel || 'Loading session ID...'}
             </div>
           </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => void copySessionId()}
+              className="inline-flex items-center gap-1 px-2 py-1 text-xs border border-mc-border rounded bg-mc-bg hover:bg-mc-bg-tertiary"
+              title="Copy session ID"
+            >
+              {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+              {copied ? 'Copied' : 'Copy ID'}
+            </button>
           <button
             type="button"
             onClick={onClose}
@@ -218,20 +267,21 @@ export function TraceViewerModal({ taskId, sessionId, onClose }: TraceViewerModa
           >
             <X className="w-4 h-4" />
           </button>
+          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          {loading && <div className="text-sm text-mc-text-secondary">Loading trace...</div>}
+          {loading && <div className="text-sm text-mc-text-secondary">Loading session timeline...</div>}
 
           {!loading && error && (
             <div className="p-3 border border-red-400/40 bg-red-500/10 text-sm text-red-400 rounded">
-              Failed to load trace{taskId ? ` for task \`${taskId}\`` : ''}: {error}
+              We could not load this session timeline{taskId ? ` for task \`${taskId}\`` : ''}. {error}
             </div>
           )}
 
           {!loading && !error && data && (
             <>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-xs">
                 <div className="p-2 rounded bg-mc-bg border border-mc-border">
                   <div className="text-mc-text-secondary flex items-center gap-1"><MessageSquare className="w-3 h-3" />Messages</div>
                   <div className="text-mc-text font-medium mt-0.5">{summary?.message_count ?? data.history.length}</div>
@@ -248,7 +298,28 @@ export function TraceViewerModal({ taskId, sessionId, onClose }: TraceViewerModa
                   <div className="text-mc-text-secondary">Ended</div>
                   <div className="text-mc-text font-medium mt-0.5">{formatTimestamp(summary?.ended_at)}</div>
                 </div>
+                <div className="p-2 rounded bg-mc-bg border border-mc-border">
+                  <div className="text-mc-text-secondary flex items-center gap-1"><AlertTriangle className="w-3 h-3" />Errors</div>
+                  <div className={`font-medium mt-0.5 ${errorCount > 0 ? 'text-red-600' : 'text-mc-text'}`}>{errorCount}</div>
+                </div>
               </div>
+
+              {summary?.role_counts && Object.keys(summary.role_counts).length > 0 && (
+                <div className="p-3 rounded border border-mc-border bg-mc-bg space-y-2">
+                  <div className="text-xs uppercase tracking-wide text-mc-text-secondary">Role distribution</div>
+                  <div className="flex flex-wrap gap-2">
+                    {Object.entries(summary.role_counts).map(([role, count]) => (
+                      <span key={role} className="inline-flex items-center gap-1 px-2 py-1 rounded border border-mc-border bg-mc-bg-secondary text-xs text-mc-text-secondary">
+                        <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] ${roleBadge(role)}`}>
+                          {roleIcon(role)}
+                          {roleLabel(role)}
+                        </span>
+                        {count}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {summary?.stage_flow && summary.stage_flow.length > 0 && (
                 <div className="p-3 rounded border border-mc-border bg-mc-bg space-y-2">
@@ -270,7 +341,7 @@ export function TraceViewerModal({ taskId, sessionId, onClose }: TraceViewerModa
                 <div className="p-3 rounded border border-amber-200 bg-amber-50 space-y-2">
                   <div className="text-xs uppercase tracking-wide text-amber-800 flex items-center gap-1.5">
                     <Shield className="w-3.5 h-3.5" />
-                    ACP Provenance
+                    Message Origin Chain
                   </div>
                   <div className="space-y-2">
                     {/* Provenance chain badges */}
@@ -296,16 +367,53 @@ export function TraceViewerModal({ taskId, sessionId, onClose }: TraceViewerModa
                       </div>
                     ))}
                     <div className="text-[11px] text-amber-700">
-                      {data.provenance.length} provenance {data.provenance.length === 1 ? 'record' : 'records'} detected in session messages
+                      Found {data.provenance.length} origin {data.provenance.length === 1 ? 'record' : 'records'} in this session.
                     </div>
                   </div>
                 </div>
               )}
 
               <div className="p-3 rounded border border-mc-border bg-mc-bg space-y-2">
-                <div className="text-xs uppercase tracking-wide text-mc-text-secondary">Trace preview ({previewMessages.length} messages)</div>
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <div className="text-xs uppercase tracking-wide text-mc-text-secondary">Timeline preview ({filteredMessages.length}/{previewMessages.length})</div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <label className="inline-flex items-center gap-1 px-2 py-1 rounded border border-mc-border bg-mc-bg-secondary text-xs text-mc-text-secondary">
+                      <input
+                        type="checkbox"
+                        checked={errorsOnly}
+                        onChange={(event) => setErrorsOnly(event.target.checked)}
+                      />
+                      Errors only
+                    </label>
+                    <select
+                      value={roleFilter}
+                      onChange={(event) => setRoleFilter(event.target.value)}
+                      className="px-2 py-1 rounded border border-mc-border bg-mc-bg-secondary text-xs text-mc-text"
+                    >
+                      {roleOptions.map((option) => (
+                        <option key={option} value={option}>
+                          {option === 'all' ? 'All roles' : option}
+                        </option>
+                      ))}
+                    </select>
+                    <label className="inline-flex items-center gap-1 px-2 py-1 rounded border border-mc-border bg-mc-bg-secondary text-xs text-mc-text-secondary min-w-[180px]">
+                      <Search className="w-3 h-3" />
+                      <input
+                        value={query}
+                        onChange={(event) => setQuery(event.target.value)}
+                        placeholder="Search messages"
+                        className="bg-transparent w-full outline-none text-mc-text placeholder:text-mc-text-secondary"
+                      />
+                    </label>
+                  </div>
+                </div>
                 <div className="space-y-2">
-                  {previewMessages.map((message, index) => {
+                  {filteredMessages.length === 0 && (
+                    <div className="p-3 rounded border border-mc-border bg-mc-bg-secondary text-xs text-mc-text-secondary">
+                      No messages match these filters.
+                    </div>
+                  )}
+                  {filteredMessages.map((message, index) => {
                     const isToolOutput = message.role === 'toolResult' || message.role === 'tool';
                     const isError = message.is_error === true;
                     // Visually connect tool results to preceding tool calls with left border
@@ -320,7 +428,7 @@ export function TraceViewerModal({ taskId, sessionId, onClose }: TraceViewerModa
                           </span>
                           {isError && <span className="text-[11px] text-red-600 font-medium">error</span>}
                         </div>
-                        <span className="text-[11px] text-mc-text-secondary flex-shrink-0">{formatTimestamp(message.timestamp)}</span>
+                        <span className="text-[11px] text-mc-text-secondary flex-shrink-0">#{index + 1} - {formatTimestamp(message.timestamp)}</span>
                       </div>
                       {message.content && isToolOutput ? (
                         <pre className={`text-xs p-1.5 mt-1 rounded font-mono whitespace-pre-wrap break-words overflow-x-auto max-h-48 ${isError ? 'bg-red-50 border border-red-200 text-red-800' : 'bg-mc-bg border border-mc-border text-mc-text-secondary'}`}>{message.content}</pre>
@@ -357,9 +465,9 @@ export function TraceViewerModal({ taskId, sessionId, onClose }: TraceViewerModa
                 </div>
               </div>
               <details className="p-3 rounded border border-mc-border bg-mc-bg">
-                <summary className="cursor-pointer text-sm text-mc-text">Technical details</summary>
+                <summary className="cursor-pointer text-sm text-mc-text">Debug details</summary>
                 <div className="mt-2 space-y-2 text-xs">
-                  <div className="text-mc-text-secondary">Session key: <span className="font-mono">{data.session_key || 'n/a'}</span></div>
+                  <div className="text-mc-text-secondary">Session key: <span className="font-mono">{data.session_key || 'Not available'}</span></div>
                   {data.session && (
                     <div className="text-mc-text-secondary break-words">
                       Session row: <span className="font-mono">{data.session.id}</span>
