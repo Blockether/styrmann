@@ -111,6 +111,9 @@ function buildTaskProblemStatementMarkdown(args: {
   currentStageLabel: string;
   currentStageStatus: string;
   nextStatus: string;
+  acceptanceCriteria: string[];
+  orchestratorPlanSummary: string[];
+  orchestratorParticipants: string[];
   planningSpecSection: string;
   agentInstructionsSection: string;
   knowledgeSection: string;
@@ -124,11 +127,26 @@ function buildTaskProblemStatementMarkdown(args: {
     currentStageLabel,
     currentStageStatus,
     nextStatus,
+    acceptanceCriteria,
+    orchestratorPlanSummary,
+    orchestratorParticipants,
     planningSpecSection,
     agentInstructionsSection,
     knowledgeSection,
     resourceSection,
   } = args;
+
+  const acceptanceSection = acceptanceCriteria.length > 0
+    ? `## Acceptance Criteria\n${acceptanceCriteria.map((item, index) => `${index + 1}. ${item}`).join('\n')}`
+    : '## Acceptance Criteria\nNo explicit acceptance criteria are stored yet.';
+
+  const orchestratorPlanSection = orchestratorPlanSummary.length > 0
+    ? `## Orchestrator Plan\n${orchestratorPlanSummary.map((item) => `- ${item}`).join('\n')}`
+    : '';
+
+  const participantsSection = orchestratorParticipants.length > 0
+    ? `## Orchestrator-Selected Participants\n${orchestratorParticipants.map((item) => `- ${item}`).join('\n')}`
+    : '';
 
   return [
     '# Task Problem Statement',
@@ -148,6 +166,10 @@ function buildTaskProblemStatementMarkdown(args: {
       ? task.description.trim()
       : 'No explicit description provided. Use title, planning specification, and role instructions as the task contract.',
     '',
+    acceptanceSection,
+    '',
+    orchestratorPlanSection,
+    participantsSection,
     planningSpecSection.trim().length > 0 ? `## Planning Specification\n${planningSpecSection.trim()}` : '',
     agentInstructionsSection.trim().length > 0 ? `## Role Instructions\n${agentInstructionsSection.trim()}` : '',
     knowledgeSection.trim().length > 0 ? `## Lessons Learned Context\n${knowledgeSection.trim()}` : '',
@@ -405,10 +427,15 @@ export async function dispatchTaskToAgent(taskId: string): Promise<DispatchResul
     };
     let planningSpecSection = '';
     let agentInstructionsSection = '';
+    let planningSpecData: Record<string, unknown> | null = null;
+    let planningAgentsData: Array<{ name?: string; role?: string; instructions?: string; agent_id?: string }> = [];
 
     if (rawTask.planning_spec) {
       try {
         const spec = JSON.parse(rawTask.planning_spec);
+        if (spec && typeof spec === 'object' && !Array.isArray(spec)) {
+          planningSpecData = spec as Record<string, unknown>;
+        }
         const specText = typeof spec === 'string' ? spec : (spec.spec_markdown || JSON.stringify(spec, null, 2));
         planningSpecSection = `\n---\n**PLANNING SPECIFICATION:**\n${specText}\n`;
       } catch {
@@ -420,6 +447,7 @@ export async function dispatchTaskToAgent(taskId: string): Promise<DispatchResul
       try {
         const agents = JSON.parse(rawTask.planning_agents);
         if (Array.isArray(agents)) {
+          planningAgentsData = agents as Array<{ name?: string; role?: string; instructions?: string; agent_id?: string }>;
           const myInstructions = agents.find(
             (a: { agent_id?: string; name?: string; instructions?: string }) =>
               a.agent_id === agent.id || a.name === agent.name
@@ -449,6 +477,42 @@ export async function dispatchTaskToAgent(taskId: string): Promise<DispatchResul
     } catch {
     }
     const resourceSection = buildResourceContext(task.id);
+    const acceptanceCriteriaRows = queryAll<{ description: string; is_met: number }>(
+      `SELECT description, is_met
+       FROM task_acceptance_criteria
+       WHERE task_id = ?
+       ORDER BY sort_order ASC, created_at ASC`,
+      [task.id],
+    );
+    const acceptanceCriteria = acceptanceCriteriaRows.map((row) => `${row.description}${row.is_met ? ' (already marked met)' : ''}`);
+    const orchestratorPlanSummary: string[] = [];
+    const specSummary = planningSpecData?.summary;
+    if (typeof specSummary === 'string' && specSummary.trim().length > 0) {
+      orchestratorPlanSummary.push(specSummary.trim());
+    }
+    const specSuccessCriteria = planningSpecData?.success_criteria;
+    if (Array.isArray(specSuccessCriteria)) {
+      for (const criterion of specSuccessCriteria) {
+        if (typeof criterion === 'string' && criterion.trim().length > 0) {
+          acceptanceCriteria.push(criterion.trim());
+        }
+      }
+    }
+    const specDeliverables = planningSpecData?.deliverables;
+    if (Array.isArray(specDeliverables) && specDeliverables.length > 0) {
+      const formatted = specDeliverables
+        .filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+        .map((item) => item.trim());
+      if (formatted.length > 0) {
+        orchestratorPlanSummary.push(`Expected deliverables: ${formatted.join('; ')}`);
+      }
+    }
+    const orchestratorParticipants = planningAgentsData
+      .map((entry) => {
+        const name = typeof entry.name === 'string' && entry.name.trim().length > 0 ? entry.name.trim() : 'Unnamed agent';
+        const role = typeof entry.role === 'string' && entry.role.trim().length > 0 ? entry.role.trim() : null;
+        return role ? `${name} (${role})` : name;
+      });
 
     const workflow = getTaskWorkflow(taskId);
     let currentStage: WorkflowStage | undefined;
@@ -599,6 +663,9 @@ If you need help or clarification, ask the orchestrator.`;
       currentStageLabel: roleLabel,
       currentStageStatus: task.status,
       nextStatus,
+      acceptanceCriteria: Array.from(new Set(acceptanceCriteria)),
+      orchestratorPlanSummary,
+      orchestratorParticipants,
       planningSpecSection,
       agentInstructionsSection,
       knowledgeSection,

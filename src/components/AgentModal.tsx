@@ -100,6 +100,17 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated, initia
   useEffect(() => {
     setActiveTab(initialTab);
   }, [initialTab]);
+
+  useEffect(() => {
+    const prevBodyOverflow = document.body.style.overflow;
+    const prevHtmlOverflow = document.documentElement.style.overflow;
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prevBodyOverflow;
+      document.documentElement.style.overflow = prevHtmlOverflow;
+    };
+  }, []);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [availableModels, setAvailableModels] = useState<string[]>([]);
   const [defaultModel, setDefaultModel] = useState<string>('');
@@ -449,7 +460,7 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated, initia
   );
 
   return (
-    <div data-component="src/components/AgentModal" className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-0 sm:p-4">
+    <div data-component="src/components/AgentModal" className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-0 sm:p-4 overflow-hidden">
       <div className="bg-mc-bg-secondary border border-mc-border rounded-none md:rounded-lg w-full md:w-4/5 xl:w-3/5 h-[95vh] flex flex-col overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-mc-border flex-shrink-0">
@@ -834,7 +845,7 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated, initia
 
       {/* File Preview Overlay */}
       {filePreview && agent && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[60] p-0 sm:p-4">
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[60] p-0 sm:p-4 overflow-hidden">
           <div className="bg-mc-bg-secondary border border-mc-border rounded-none md:rounded-lg w-full md:w-4/5 xl:w-3/5 h-[95vh] flex flex-col overflow-hidden">
             {/* Preview Header */}
             <div className="p-3 border-b border-mc-border flex items-center justify-between gap-2 flex-wrap bg-mc-bg-secondary">

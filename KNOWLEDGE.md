@@ -67,6 +67,8 @@ Also: `pending_dispatch` (transient, pre-dispatch state).
 
 **Task creation UI**: Manual agent loop configuration, task-level template picking, and direct execution settings are removed. The task modal now shows Overview, Activity, Sessions, and Deliverables tabs. Planning is merged into Activity: the workflow blueprint and runtime activity timeline are presented together, including current step and iteration context. The former Proposals tab is merged into this Activity view (learner proposals remain inline below the workflow plan diagram).
 
+**Task Activity tab policy**: Task-modal Activity renders raw `task_activities` directly. Presenter consolidation cards/labels are removed from the task Activity tab.
+
 **Replanning lock**: Regenerating/editing workflow plans is allowed only before execution starts (`planning`, `inbox`, `pending_dispatch`). Once a task enters runtime stages (`assigned`, `in_progress`, `testing`, `review`, `verification`, `done`), workflow-plan regenerate/edit endpoints return `409 REPLAN_LOCKED`, and Activity UI hides plan-edit controls.
 
 **Runtime communication updates**:
@@ -487,6 +489,7 @@ Webhook verification: `WEBHOOK_SECRET` env var, HMAC signature in `x-webhook-sig
 **Dispatch-generated task brief artifact**:
 - Before agent execution, dispatch writes `<output-directory>/task-problem-statement.md`.
 - The file is auto-registered as a `task_deliverables` file artifact (deduped by path), so each task has a canonical problem statement artifact from the start.
+- The generated task brief includes acceptance criteria and orchestrator planning context (when present).
 
 **Git repo handling**: repo validation uses git worktree detection (`git rev-parse --is-inside-work-tree`), not `.git` directory checks, so linked worktrees are supported.
 
@@ -517,6 +520,8 @@ Webhook verification: `WEBHOOK_SECRET` env var, HMAC signature in `x-webhook-sig
 - Trace API (`GET /api/tasks/{id}/sessions/{sessionId}/trace`) parses provenance from session history messages and stores records in `task_provenance` table.
 - Provenance API: `GET /api/tasks/{id}/provenance` returns all stored provenance records for a task.
 - TraceViewerModal displays provenance chain badges and Source Receipt details.
+- TraceViewerModal stage-flow uses a centered vertical sequence with down-arrow connectors.
+- Trace summary `stage_flow` extraction is strict (requires `stage`/`phase`/`step` tokens); summary highlights are not displayed in the trace modal.
 - SessionsList shows a provenance summary banner when records exist.
 
 **Completion format**: `TASK_COMPLETE: [summary] | deliverables: [paths] | verification: [how verified]`

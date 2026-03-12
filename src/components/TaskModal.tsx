@@ -42,6 +42,17 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
     }
   }, [activeTab]);
 
+  useEffect(() => {
+    const prevBodyOverflow = document.body.style.overflow;
+    const prevHtmlOverflow = document.documentElement.style.overflow;
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prevBodyOverflow;
+      document.documentElement.style.overflow = prevHtmlOverflow;
+    };
+  }, []);
+
   const [form, setForm] = useState({
     title: githubIssue?.title || task?.title || '',
     description: githubIssue?.body || task?.description || '',
@@ -305,7 +316,7 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
   ];
 
   return (
-    <div data-component="src/components/TaskModal" className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-0 sm:p-4">
+    <div data-component="src/components/TaskModal" className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-0 sm:p-4 overflow-hidden">
       <div className="bg-mc-bg-secondary border border-mc-border rounded-none md:rounded-lg w-full md:w-4/5 xl:w-3/5 h-[95vh] flex flex-col overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-mc-border flex-shrink-0">
@@ -545,18 +556,18 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
             <div className="space-y-3">
               <div>
                 <label className="block text-sm font-medium mb-1">Assignee Type</label>
-                <div className="inline-grid w-full max-w-xs grid-cols-2 gap-1 rounded-lg border border-mc-border bg-mc-bg p-1">
+                <div className="grid w-full grid-cols-2 gap-1 rounded-lg border border-mc-border bg-mc-bg p-1">
                   <button
                     type="button"
                     onClick={() => setForm({ ...form, assignee_type: 'ai', assigned_human_id: '' })}
-                    className={`min-h-9 w-full px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${form.assignee_type === 'ai' ? 'bg-mc-accent text-mc-bg' : 'text-mc-text-secondary hover:bg-mc-bg-tertiary'}`}
+                    className={`h-8 w-full px-3 py-1 rounded-md text-sm font-medium transition-colors ${form.assignee_type === 'ai' ? 'bg-mc-accent text-mc-bg' : 'text-mc-text-secondary hover:bg-mc-bg-tertiary'}`}
                   >
                     AI
                   </button>
                   <button
                     type="button"
                     onClick={() => setForm({ ...form, assignee_type: 'human', assigned_agent_id: '' })}
-                    className={`min-h-9 w-full px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${form.assignee_type === 'human' ? 'bg-mc-accent text-mc-bg' : 'text-mc-text-secondary hover:bg-mc-bg-tertiary'}`}
+                    className={`h-8 w-full px-3 py-1 rounded-md text-sm font-medium transition-colors ${form.assignee_type === 'human' ? 'bg-mc-accent text-mc-bg' : 'text-mc-text-secondary hover:bg-mc-bg-tertiary'}`}
                   >
                     Human
                   </button>

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { X, Bot, User, Cpu, Clock3, MessageSquare, ChevronRight, Shield, ArrowRight, Wrench, Terminal } from 'lucide-react';
+import { X, Bot, User, Cpu, Clock3, MessageSquare, Shield, ArrowRight, ArrowDown, Wrench, Terminal } from 'lucide-react';
 
 interface TraceMessage {
   role: string;
@@ -177,6 +177,17 @@ export function TraceViewerModal({ taskId, sessionId, onClose }: TraceViewerModa
     };
   }, [taskId, sessionId]);
 
+  useEffect(() => {
+    const prevBodyOverflow = document.body.style.overflow;
+    const prevHtmlOverflow = document.documentElement.style.overflow;
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prevBodyOverflow;
+      document.documentElement.style.overflow = prevHtmlOverflow;
+    };
+  }, []);
+
   if (!sessionId) return null;
 
   const summary = data?.summary;
@@ -185,7 +196,7 @@ export function TraceViewerModal({ taskId, sessionId, onClose }: TraceViewerModa
   return (
     <div
       data-component="src/components/TraceViewerModal"
-      className="fixed inset-0 z-[70] bg-black/50 flex items-center justify-center p-0 sm:p-4"
+      className="fixed inset-0 z-[70] bg-black/50 flex items-center justify-center p-0 sm:p-4 overflow-hidden"
       onClick={onClose}
     >
       <div
@@ -242,23 +253,14 @@ export function TraceViewerModal({ taskId, sessionId, onClose }: TraceViewerModa
               {summary?.stage_flow && summary.stage_flow.length > 0 && (
                 <div className="p-3 rounded border border-mc-border bg-mc-bg space-y-2">
                   <div className="text-xs uppercase tracking-wide text-mc-text-secondary">Stage flow</div>
-                  <div className="flex items-center flex-wrap gap-1.5 text-xs">
+                  <div className="text-xs text-mc-text space-y-1.5 flex flex-col items-center text-center">
                     {summary.stage_flow.map((stage, index) => (
-                      <div key={`${stage}-${index}`} className="flex items-center gap-1 text-mc-text">
-                        {index > 0 && <ChevronRight className="w-3 h-3 text-mc-text-secondary" />}
+                      <div key={`${stage}-${index}`} className="flex flex-col items-center">
                         <span className="px-2 py-1 rounded bg-mc-bg-tertiary border border-mc-border">{stage}</span>
+                        {index < summary.stage_flow.length - 1 && (
+                          <ArrowDown className="w-3 h-3 text-mc-text-secondary mt-1" />
+                        )}
                       </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {summary?.highlights && summary.highlights.length > 0 && (
-                <div className="p-3 rounded border border-mc-border bg-mc-bg space-y-2">
-                  <div className="text-xs uppercase tracking-wide text-mc-text-secondary">Highlights</div>
-                  <div className="space-y-1.5">
-                    {summary.highlights.map((line, index) => (
-                      <p key={`${line}-${index}`} className="text-sm text-mc-text">{line}</p>
                     ))}
                   </div>
                 </div>

@@ -245,7 +245,7 @@ function buildTraceSummary(
     : [];
 
   const stageNoise = /^(title|description|priority|task id|planning specification|your instructions|output directory|important|branch rule|workspace rule)$/i;
-  const stageSignal = /(stage|phase|step|review|verify|verification|test|testing|build|dispatch|planning|explore|consolidate|done|in_progress|assigned)/i;
+  const stageSignal = /\b(stage|phase|step)\b/i;
   const stageFlow = Array.from(
     new Set(stageMatches
       .map((item) => item.replace(/[\s:.-]+$/g, '').trim())

@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { format, formatDistanceToNow } from 'date-fns';
-import { Activity, Bot, ChevronDown, ChevronRight, Filter, Loader2 } from 'lucide-react';
-import type { PresentedTaskActivity, TaskActivity } from '@/lib/types';
+import { Activity, Filter, Loader2 } from 'lucide-react';
+import type { TaskActivity } from '@/lib/types';
 import { TraceViewerModal } from './TraceViewerModal';
 import { useTraceDeepLink } from '@/hooks/useTraceDeepLink';
 
@@ -12,7 +12,7 @@ interface ActivityLogProps {
 }
 
 interface ActivityResponse {
-  activities: PresentedTaskActivity[];
+  activities: TaskActivity[];
   raw_activities: TaskActivity[];
   filters: {
     agents: Array<{ id: string; name: string }>;
@@ -47,13 +47,12 @@ function getTraceSessionId(activity: TaskActivity): string | null {
 }
 
 export function ActivityLog({ taskId }: ActivityLogProps) {
-  const [activities, setActivities] = useState<PresentedTaskActivity[]>([]);
+  const [activities, setActivities] = useState<TaskActivity[]>([]);
   const [filters, setFilters] = useState<ActivityResponse['filters']>({ agents: [], workflow_steps: [] });
   const [loading, setLoading] = useState(true);
   const [agentFilter, setAgentFilter] = useState('all');
   const [stepFilter, setStepFilter] = useState('all');
   const [decisionOnly, setDecisionOnly] = useState(false);
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [openTraceOnFocus, setOpenTraceOnFocus] = useState(false);
   const { traceSessionId, openTrace, closeTrace } = useTraceDeepLink();
 
@@ -64,7 +63,6 @@ export function ActivityLog({ taskId }: ActivityLogProps) {
       setAgentFilter(custom.detail.agentId || 'all');
       setStepFilter(custom.detail.step || 'all');
       setDecisionOnly(Boolean(custom.detail.decisionOnly));
-      setExpanded(new Set());
       setOpenTraceOnFocus(true);
     };
 
@@ -78,7 +76,7 @@ export function ActivityLog({ taskId }: ActivityLogProps) {
       const res = await fetch(`/api/tasks/${taskId}/activities?limit=200`);
       const data = await res.json() as ActivityResponse;
       if (!res.ok) throw new Error('Failed to load activities');
-      setActivities(Array.isArray(data.activities) ? data.activities : []);
+      setActivities(Array.isArray(data.raw_activities) ? data.raw_activities : []);
       setFilters(data.filters || { agents: [], workflow_steps: [] });
     } catch (error) {
       console.error('Failed to load activities:', error);
@@ -106,8 +104,7 @@ export function ActivityLog({ taskId }: ActivityLogProps) {
   const visibleActivities = useMemo(() => {
     return activities.filter((activity) => {
       if (agentFilter !== 'all') {
-        const rawAgents = activity.raw_activities.map((raw) => raw.agent_id).filter(Boolean);
-        if (!rawAgents.includes(agentFilter)) return false;
+        if (activity.agent_id !== agentFilter) return false;
       }
       if (stepFilter !== 'all' && activity.workflow_step !== stepFilter) return false;
       if (decisionOnly && !activity.decision_event) return false;
@@ -116,23 +113,13 @@ export function ActivityLog({ taskId }: ActivityLogProps) {
   }, [activities, agentFilter, stepFilter, decisionOnly]);
 
   useEffect(() => {
-    if (visibleActivities.length === 0) return;
-    setExpanded((prev) => {
-      if (prev.size > 0) return prev;
-      return new Set([visibleActivities[0].id]);
-    });
-  }, [visibleActivities]);
-
-  useEffect(() => {
     if (!openTraceOnFocus || visibleActivities.length === 0) return;
     for (const activity of visibleActivities) {
-      for (const raw of activity.raw_activities) {
-        const traceId = getTraceSessionId(raw);
-        if (traceId) {
-          openTrace(traceId, taskId);
-          setOpenTraceOnFocus(false);
-          return;
-        }
+      const traceId = getTraceSessionId(activity);
+      if (traceId) {
+        openTrace(traceId, taskId);
+        setOpenTraceOnFocus(false);
+        return;
       }
     }
     setOpenTraceOnFocus(false);
@@ -151,7 +138,7 @@ export function ActivityLog({ taskId }: ActivityLogProps) {
       <div className="p-3 border-b border-mc-border bg-mc-bg-secondary flex items-center justify-between gap-2 flex-wrap rounded-lg">
         <div className="flex items-center gap-2 text-sm font-medium text-mc-text">
           <Activity className="w-4 h-4 text-mc-text-secondary" />
-          <span>Presenter Activity</span>
+          <span>Task Activity</span>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <div className="inline-flex items-center gap-2 text-xs text-mc-text-secondary px-2 py-1 border border-mc-border rounded">
@@ -179,80 +166,32 @@ export function ActivityLog({ taskId }: ActivityLogProps) {
 
       {visibleActivities.length === 0 ? (
         <div className="rounded-lg border border-mc-border bg-mc-bg-secondary p-6 text-sm text-mc-text-secondary">
-          No presenter summaries match the current filters.
+          No task activities match the current filters.
         </div>
       ) : (
         visibleActivities.map((activity) => {
-          const isExpanded = expanded.has(activity.id);
+          const metadata = parseMetadata(activity);
+          const traceId = getTraceSessionId(activity);
           return (
-            <div key={activity.id} className="rounded-lg border border-mc-border bg-mc-bg-secondary overflow-hidden">
-              <button
-                type="button"
-                onClick={() => setExpanded((prev) => {
-                  const next = new Set(prev);
-                  if (next.has(activity.id)) next.delete(activity.id);
-                  else next.add(activity.id);
-                  return next;
-                })}
-                className="w-full text-left p-4 hover:bg-mc-bg-tertiary/30 transition-colors"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-start gap-3 min-w-0">
-                    {isExpanded ? <ChevronDown className="w-4 h-4 mt-1 text-mc-text-secondary" /> : <ChevronRight className="w-4 h-4 mt-1 text-mc-text-secondary" />}
-                    <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-mc-accent/15 text-mc-accent border border-mc-border flex-shrink-0">
-                      <Bot className="w-3.5 h-3.5" />
-                    </span>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-xs px-2 py-0.5 rounded bg-mc-accent/15 text-mc-accent">Presenter</span>
-                        {activity.workflow_step && (
-                          <span className={`text-xs px-2 py-0.5 rounded border ${activity.workflow_step === 'failure' ? 'bg-red-100 text-red-700 border-red-200' : 'border-mc-border text-mc-text-secondary'}`}>
-                            {activity.workflow_step}
-                          </span>
-                        )}
-                        <span className="text-xs px-2 py-0.5 rounded border border-mc-border text-mc-text-secondary">{activity.summary_kind === 'live' ? 'live interpretation' : 'post-step consolidation'}</span>
-                        {activity.decision_event && <span className="text-xs px-2 py-0.5 rounded bg-amber-100 text-amber-700">decision</span>}
-                      </div>
-                      <div className="mt-2 text-sm text-mc-text">{activity.message}</div>
-                      <div className="mt-2 text-xs text-mc-text-secondary">
-                        {activity.raw_activities.length} technical event(s) consolidated · {formatDistanceToNow(new Date(activity.created_at), { addSuffix: true })}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </button>
-
-              {isExpanded && (
-                <div className="border-t border-mc-border p-4 space-y-3 bg-mc-bg">
-                  {[...activity.raw_activities]
-                    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-                    .map((raw) => {
-                    const metadata = parseMetadata(raw);
-                    const traceId = getTraceSessionId(raw);
-                    return (
-                      <div key={raw.id} className="rounded border border-mc-border bg-mc-bg-secondary p-3">
-                        <div className="flex items-center gap-2 flex-wrap text-xs text-mc-text-secondary">
-                          <span className="px-2 py-0.5 rounded bg-mc-bg border border-mc-border">{raw.activity_type}</span>
-                          {raw.agent?.name && <span>{raw.agent.name}</span>}
-                          {raw.workflow_step && <span>step {raw.workflow_step}</span>}
-                          {raw.decision_event && <span className="text-amber-700">decision event</span>}
-                          <span>{format(new Date(raw.created_at), 'yyyy-MM-dd HH:mm:ss')}</span>
-                        </div>
-                        <div className="mt-2 text-sm text-mc-text whitespace-pre-wrap break-words">{raw.message}</div>
-                        {traceId && (
-                          <button type="button" onClick={() => openTrace(traceId, taskId)} className="mt-2 text-xs text-mc-accent hover:underline">
-                            Open session trace
-                          </button>
-                        )}
-                        <details className="mt-2">
-                          <summary className="cursor-pointer text-xs text-mc-text-secondary hover:text-mc-text">Show technical details</summary>
-                          <pre className="mt-2 p-2 bg-mc-bg rounded text-[11px] overflow-x-auto font-mono whitespace-pre-wrap break-words">{JSON.stringify(metadata || {}, null, 2)}</pre>
-                        </details>
-                      </div>
-                    );
-                  })}
-                </div>
+            <div key={activity.id} className="rounded-lg border border-mc-border bg-mc-bg-secondary p-4">
+              <div className="flex items-center gap-2 flex-wrap text-xs text-mc-text-secondary">
+                <span className="px-2 py-0.5 rounded bg-mc-bg border border-mc-border">{activity.activity_type}</span>
+                {activity.agent?.name && <span>{activity.agent.name}</span>}
+                {activity.workflow_step && <span>step {activity.workflow_step}</span>}
+                {activity.decision_event && <span className="text-amber-700">decision event</span>}
+                <span>{formatDistanceToNow(new Date(activity.created_at), { addSuffix: true })}</span>
+              </div>
+              <div className="mt-2 text-sm text-mc-text whitespace-pre-wrap break-words">{activity.message}</div>
+              <div className="mt-2 text-xs text-mc-text-secondary">{format(new Date(activity.created_at), 'yyyy-MM-dd HH:mm:ss')}</div>
+              {traceId && (
+                <button type="button" onClick={() => openTrace(traceId, taskId)} className="mt-2 text-xs text-mc-accent hover:underline">
+                  Open session trace
+                </button>
               )}
+              <details className="mt-2">
+                <summary className="cursor-pointer text-xs text-mc-text-secondary hover:text-mc-text">Show technical details</summary>
+                <pre className="mt-2 p-2 bg-mc-bg rounded text-[11px] overflow-x-auto font-mono whitespace-pre-wrap break-words">{JSON.stringify(metadata || {}, null, 2)}</pre>
+              </details>
             </div>
           );
         })

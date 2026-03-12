@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { X, Loader2, Target } from 'lucide-react';
 import type { Agent, TaskPriority } from '@/lib/types';
 
@@ -21,6 +21,17 @@ export function CreateMilestoneModal({ workspaceId, sprintId, agents, onClose, o
     priority: 'normal' as TaskPriority,
     coordinator_agent_id: '',
   });
+
+  useEffect(() => {
+    const prevBodyOverflow = document.body.style.overflow;
+    const prevHtmlOverflow = document.documentElement.style.overflow;
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prevBodyOverflow;
+      document.documentElement.style.overflow = prevHtmlOverflow;
+    };
+  }, []);
 
   const handleSubmit = async () => {
     if (!form.name.trim()) return;
@@ -59,7 +70,7 @@ export function CreateMilestoneModal({ workspaceId, sprintId, agents, onClose, o
   };
 
   return (
-    <div data-component="src/components/CreateMilestoneModal" className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+    <div data-component="src/components/CreateMilestoneModal" className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-hidden">
       <div className="bg-mc-bg-secondary border border-mc-border rounded-lg w-full max-w-lg flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between p-4 border-b border-mc-border">
           <div className="flex items-center gap-2">
