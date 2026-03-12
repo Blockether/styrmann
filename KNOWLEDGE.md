@@ -67,6 +67,8 @@ Also: `pending_dispatch` (transient, pre-dispatch state).
 
 **Task creation UI**: Manual agent loop configuration, task-level template picking, and direct execution settings are removed. The task modal now shows Overview, Activity, Sessions, and Deliverables tabs. Planning is merged into Activity: the workflow blueprint and runtime activity timeline are presented together, including current step and iteration context. The former Proposals tab is merged into this Activity view (learner proposals remain inline below the workflow plan diagram).
 
+**Activity orchestration UX**: The Activity tab now presents a staged orchestration control room instead of a dense planning block. The workflow plan is split into an orchestration guide, participant roster, live runtime strip, and per-stage cards that explain owner, trigger phase, expected outcome, skill coverage, and failure loopback. Activity log cards and the task detail shell use the same cream/gold visual language so the whole task view reads as one continuous pipeline surface.
+
 **Task Activity tab policy**: Task-modal Activity renders raw `task_activities` directly. Presenter consolidation cards/labels are removed from the task Activity tab.
 
 **Deliverables UX**:
