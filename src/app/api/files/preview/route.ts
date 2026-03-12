@@ -46,7 +46,7 @@ const LIGHT_THEME_CSS = `
   .header .file-info { display: flex; align-items: center; gap: 8px; }
   .header .filename { color: #b8960c; font-weight: 600; }
   .header .size { color: #999; }
-  .content { max-width: 860px; }
+  .content { max-width: 860px; width: 100%; overflow-wrap: anywhere; word-break: break-word; }
   .content h1 { font-size: 1.6em; margin: 28px 0 16px; color: #333; border-bottom: 2px solid #e5d5b8; padding-bottom: 8px; }
   .content h2 { font-size: 1.3em; margin: 24px 0 12px; color: #333; border-bottom: 1px solid #e5d5b8; padding-bottom: 6px; }
   .content h3 { font-size: 1.1em; margin: 20px 0 8px; color: #444; }
@@ -64,6 +64,8 @@ const LIGHT_THEME_CSS = `
     background: #fff; color: #333; padding: 16px;
     border-radius: 8px; border: 1px solid #e5d5b8;
     overflow-x: auto; font-size: 13px; line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-word;
   }
   .content pre code { background: none; color: inherit; padding: 0; }
   .content blockquote {
@@ -73,7 +75,8 @@ const LIGHT_THEME_CSS = `
   .content ul, .content ol { padding-left: 24px; margin: 8px 0; }
   .content li { margin: 4px 0; }
   .content hr { border: none; border-top: 1px solid #e5d5b8; margin: 24px 0; }
-  .content table { border-collapse: collapse; width: 100%; margin: 16px 0; }
+  .content .table-scroll { overflow-x: auto; margin: 16px 0; border: 1px solid #e5d5b8; border-radius: 8px; background: #fff; }
+  .content table { border-collapse: collapse; width: max-content; min-width: 100%; margin: 0; }
   .content th {
     background: #fff; color: #333; font-weight: 600;
     padding: 10px 14px; border: 1px solid #e5d5b8; text-align: left;
@@ -87,7 +90,17 @@ const LIGHT_THEME_CSS = `
     overflow-x: auto; font-size: 13px; line-height: 1.5;
     white-space: pre-wrap; word-wrap: break-word;
   }
+  @media (max-width: 640px) {
+    body { padding: 16px; font-size: 14px; }
+    .header { margin: -16px -16px 16px; padding: 10px 12px; }
+    .content pre, pre.raw { padding: 12px; font-size: 12px; }
+    .content th, .content td { padding: 8px 10px; }
+  }
 `;
+
+function wrapMarkdownTables(html: string): string {
+  return html.replace(/<table>([\s\S]*?)<\/table>/g, '<div class="table-scroll" role="region" aria-label="Scrollable table" tabindex="0"><table>$1</table></div>');
+}
 
 export async function GET(request: NextRequest) {
   const filePath = request.nextUrl.searchParams.get('path');
@@ -174,7 +187,7 @@ export async function GET(request: NextRequest) {
     const escapedFileName = escapeHtml(fileName);
     const escapedContent = escapeHtml(content);
     const markdownHtml = isMarkdown
-      ? marked.parse(escapedContent, { gfm: true, breaks: true })
+      ? wrapMarkdownTables(String(marked.parse(escapedContent, { gfm: true, breaks: true })))
       : null;
     const bodyContent = isMarkdown
       ? `<div class="content">${typeof markdownHtml === 'string' ? markdownHtml : ''}</div>`

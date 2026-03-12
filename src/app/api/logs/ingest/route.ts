@@ -44,6 +44,7 @@ export async function POST(request: NextRequest) {
       INSERT OR IGNORE INTO agent_logs (id, agent_id, openclaw_session_id, task_id, role, content, content_hash, workspace_id, created_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
+    const touchSession = db.prepare('UPDATE openclaw_sessions SET updated_at = ? WHERE openclaw_session_id = ?');
 
     let stored = 0;
 
@@ -72,6 +73,8 @@ export async function POST(request: NextRequest) {
         );
 
         if (result.changes > 0) stored++;
+
+        touchSession.run(entry.created_at || new Date().toISOString(), entry.openclaw_session_id);
       }
     });
 

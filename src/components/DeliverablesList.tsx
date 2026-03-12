@@ -570,9 +570,20 @@ export function DeliverablesList({ taskId }: DeliverablesListProps) {
 
             {/* Description */}
             {deliverable.description && (
-              <p className="text-sm text-mc-text-secondary mt-1">
+              <p className="text-sm text-mc-text-secondary mt-1 break-words">
                 {deliverable.description}
               </p>
+            )}
+
+            {(deliverable.created_via_workflow_step || deliverable.created_via_agent_name) && (
+              <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-mc-text-secondary">
+                {deliverable.created_via_workflow_step && (
+                  <span>Stage: {toTitleCaseLabel(deliverable.created_via_workflow_step)}</span>
+                )}
+                {deliverable.created_via_agent_name && (
+                  <span>Agent: {deliverable.created_via_agent_name}</span>
+                )}
+              </div>
             )}
 
             {/* Metadata */}
@@ -580,6 +591,12 @@ export function DeliverablesList({ taskId }: DeliverablesListProps) {
               <span className="capitalize">{deliverable.deliverable_type}</span>
               <span>•</span>
               <span>{formatTimestamp(deliverable.created_at)}</span>
+              {deliverable.created_via_session_id && (
+                <>
+                  <span>•</span>
+                  <span className="break-all">Session: {deliverable.created_via_session_id}</span>
+                </>
+              )}
             </div>
           </div>
         </div>

@@ -7,6 +7,7 @@ import { queryAll, queryOne, run } from '@/lib/db';
 import { broadcast } from '@/lib/events';
 import { getMissionControlUrl } from '@/lib/config';
 import { getHimalayaStatus, sendHumanAssignmentEmail } from '@/lib/himalaya';
+import { finalizeOtherActiveSessionsForTask, finalizeSessionByOpenClawId } from '@/lib/session-lifecycle';
 import { checkTransitionEligibility, handleStageTransition, getTaskWorkflow, drainQueue } from '@/lib/workflow-engine';
 import { notifyLearner } from '@/lib/learner';
 import { captureTaskRunResult } from '@/lib/task-run-results';
@@ -150,7 +151,7 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params;
-    const body: UpdateTaskRequest & { updated_by_agent_id?: string } = await request.json();
+    const body: UpdateTaskRequest & { updated_by_agent_id?: string; updated_by_session_id?: string } = await request.json();
 
     // Validate input with Zod
     const validation = UpdateTaskSchema.safeParse(body);
@@ -390,6 +391,10 @@ export async function PATCH(
 
     run(`UPDATE tasks SET ${updates.join(', ')} WHERE id = ?`, values);
 
+    if (body.updated_by_session_id && nextStatus && nextStatus !== existing.status) {
+      finalizeSessionByOpenClawId(body.updated_by_session_id, 'completed', now);
+    }
+
     if (effectiveAssigneeType === 'ai' && shouldRegeneratePlan) {
       void generateTaskWorkflowPlan(id);
     }
@@ -512,6 +517,7 @@ export async function PATCH(
 
     // Drain the review queue when a task reaches 'done' (frees the verification slot)
     if (nextStatus === 'done' && existing.status !== 'done') {
+      finalizeOtherActiveSessionsForTask(id, null, 'completed');
       try {
         captureTaskRunResult(id);
       } catch (err) {

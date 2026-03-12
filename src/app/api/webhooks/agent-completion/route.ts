@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { createHmac } from 'crypto';
 import { queryOne, queryAll, run } from '@/lib/db';
 import { checkBuilderEvidence } from '@/lib/builder-evidence';
+import { finalizeSessionByOpenClawId } from '@/lib/session-lifecycle';
 import { checkTransitionEligibility } from '@/lib/workflow-engine';
 import type { Task, Agent, OpenClawSession } from '@/lib/types';
 
@@ -149,6 +150,17 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      const latestSession = queryOne<{ openclaw_session_id: string }>(
+        `SELECT openclaw_session_id FROM openclaw_sessions
+         WHERE task_id = ? AND agent_id = ? AND status = 'active'
+         ORDER BY updated_at DESC, created_at DESC
+         LIMIT 1`,
+        [task.id, task.assigned_agent_id || ''],
+      );
+      if (latestSession?.openclaw_session_id) {
+        finalizeSessionByOpenClawId(latestSession.openclaw_session_id, 'completed', now);
+      }
+
       return NextResponse.json({
         success: true,
         task_id: task.id,
@@ -183,13 +195,19 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Find active task for this agent
       const task = queryOne<Task & { assigned_agent_name?: string }>(
         `SELECT t.*, a.name as assigned_agent_name
          FROM tasks t
          LEFT JOIN agents a ON t.assigned_agent_id = a.id
+         WHERE t.id = ?
+         LIMIT 1`,
+        [session.task_id || '']
+      ) || queryOne<Task & { assigned_agent_name?: string }>(
+        `SELECT t.*, a.name as assigned_agent_name
+         FROM tasks t
+         LEFT JOIN agents a ON t.assigned_agent_id = a.id
          WHERE t.assigned_agent_id = ? 
-           AND t.status IN ('assigned', 'in_progress')
+           AND t.status IN ('assigned', 'in_progress', 'testing', 'review', 'verification')
          ORDER BY t.updated_at DESC
          LIMIT 1`,
         [session.agent_id]
@@ -267,6 +285,7 @@ export async function POST(request: NextRequest) {
         'UPDATE agents SET status = ?, updated_at = ? WHERE id = ?',
         ['standby', now, session.agent_id]
       );
+      finalizeSessionByOpenClawId(session.openclaw_session_id, 'completed', now);
 
       return NextResponse.json({
         success: true,

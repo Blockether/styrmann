@@ -538,6 +538,10 @@ export interface TaskDeliverable {
   path?: string;
   description?: string;
   openclaw_session_id?: string;
+  created_via_agent_id?: string | null;
+  created_via_agent_name?: string | null;
+  created_via_workflow_step?: string | null;
+  created_via_session_id?: string | null;
   created_at: string;
 }
 

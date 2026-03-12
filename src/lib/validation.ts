@@ -65,6 +65,7 @@ export const UpdateTaskSchema = z.object({
   milestone_id: z.string().optional().nullable(),
   due_date: z.string().optional().nullable(),
   updated_by_agent_id: z.string().uuid().optional(),
+  updated_by_session_id: z.string().optional(),
   tags: z.array(z.string()).optional(),
 });
 

@@ -8,6 +8,7 @@
 import { queryOne, queryAll, run } from '@/lib/db';
 import { getMissionControlUrl } from '@/lib/config';
 import { broadcast } from '@/lib/events';
+import { finalizeOtherActiveSessionsForTask } from '@/lib/session-lifecycle';
 import { createTaskActivity } from '@/lib/task-activity';
 import { evaluateAcceptanceGates } from '@/lib/acceptance-gates';
 import { validateStageGates } from '@/lib/stage-gates';
@@ -277,6 +278,8 @@ export async function handleStageTransition(
     'UPDATE tasks SET assigned_agent_id = ?, planning_dispatch_error = NULL, updated_at = ? WHERE id = ?',
     [roleAgent.id, now, taskId]
   );
+
+  finalizeOtherActiveSessionsForTask(taskId, roleAgent.id, 'interrupted');
 
   // Log the handoff
   createTaskActivity({

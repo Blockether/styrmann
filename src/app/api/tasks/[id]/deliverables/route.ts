@@ -31,7 +31,45 @@ export async function GET(
       ORDER BY created_at DESC
     `).all(taskId) as TaskDeliverable[];
 
-    return NextResponse.json(deliverables);
+    const enriched = deliverables.map((deliverable) => {
+      if (!deliverable.openclaw_session_id) {
+        return {
+          ...deliverable,
+          created_via_agent_id: null,
+          created_via_agent_name: null,
+          created_via_workflow_step: null,
+          created_via_session_id: null,
+        };
+      }
+
+      const session = db.prepare(`
+        SELECT s.openclaw_session_id, s.agent_id, a.name as agent_name
+        FROM openclaw_sessions s
+        LEFT JOIN agents a ON a.id = s.agent_id
+        WHERE s.openclaw_session_id = ?
+        LIMIT 1
+      `).get(deliverable.openclaw_session_id) as { openclaw_session_id?: string | null; agent_id?: string | null; agent_name?: string | null } | undefined;
+
+      const stepRow = db.prepare(`
+        SELECT json_extract(metadata, '$.workflow_step') as workflow_step
+        FROM task_activities
+        WHERE task_id = ?
+          AND activity_type = 'dispatch_invocation'
+          AND json_extract(metadata, '$.openclaw_session_id') = ?
+        ORDER BY created_at DESC
+        LIMIT 1
+      `).get(taskId, deliverable.openclaw_session_id) as { workflow_step?: string | null } | undefined;
+
+      return {
+        ...deliverable,
+        created_via_agent_id: session?.agent_id || null,
+        created_via_agent_name: session?.agent_name || null,
+        created_via_workflow_step: stepRow?.workflow_step || null,
+        created_via_session_id: session?.openclaw_session_id || deliverable.openclaw_session_id || null,
+      };
+    });
+
+    return NextResponse.json(enriched);
   } catch (error) {
     console.error('Error fetching deliverables:', error);
     return NextResponse.json(

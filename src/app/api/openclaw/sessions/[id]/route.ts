@@ -135,7 +135,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     // If status changed to completed, update the agent status too
     if (status === 'completed') {
       if (session.agent_id) {
-        db.prepare('UPDATE agents SET status = ? WHERE id = ?').run('idle', session.agent_id);
+        db.prepare('UPDATE agents SET status = ?, updated_at = ? WHERE id = ?').run('standby', new Date().toISOString(), session.agent_id);
       }
       if (session.task_id) {
         broadcast({

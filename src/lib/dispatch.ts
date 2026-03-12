@@ -11,7 +11,8 @@ import { createTaskActivity } from '@/lib/task-activity';
 import { getTaskWorkflow } from '@/lib/workflow-engine';
 import { getUnresolvedTaskDependencies } from '@/lib/task-dependencies';
 import { generateScopedApiToken } from '@/lib/scoped-api-tokens';
-import type { Task, Agent, OpenClawSession, WorkflowStage } from '@/lib/types';
+import { getTaskWorkflowPlan } from '@/lib/workflow-planning';
+import type { Task, Agent, OpenClawSession, WorkflowStage, WorkflowPlanParticipant, WorkflowPlanStep } from '@/lib/types';
 
 export interface DispatchResult {
   success: boolean;
@@ -103,6 +104,69 @@ function buildResourceContext(taskId: string): string {
   return `\n**TASK RESOURCES:**\n${list}${snippetSection}\nUse these resources as required input when implementing and verifying this task.`;
 }
 
+function formatPlanningSpecMarkdown(spec: Record<string, unknown> | null): string {
+  if (!spec) return '';
+
+  const lines: string[] = [];
+  if (typeof spec.summary === 'string' && spec.summary.trim().length > 0) {
+    lines.push('### Summary', spec.summary.trim(), '');
+  }
+
+  const deliverables = Array.isArray(spec.deliverables)
+    ? spec.deliverables.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+    : [];
+  if (deliverables.length > 0) {
+    lines.push('### Expected Deliverables', ...deliverables.map((item) => `- ${item}`), '');
+  }
+
+  const successCriteria = Array.isArray(spec.success_criteria)
+    ? spec.success_criteria.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+    : [];
+  if (successCriteria.length > 0) {
+    lines.push('### Success Criteria', ...successCriteria.map((item, index) => `${index + 1}. ${item}`), '');
+  }
+
+  const constraints = spec.constraints && typeof spec.constraints === 'object' && !Array.isArray(spec.constraints)
+    ? Object.entries(spec.constraints as Record<string, unknown>)
+        .filter(([, value]) => value !== null && value !== undefined && String(value).trim().length > 0)
+        .map(([key, value]) => `- ${key.replace(/_/g, ' ')}: ${String(value)}`)
+    : [];
+  if (constraints.length > 0) {
+    lines.push('### Constraints', ...constraints, '');
+  }
+
+  return lines.join('\n').trim();
+}
+
+function buildWorkflowDiagram(planSummary: string | null, participants: WorkflowPlanParticipant[], steps: WorkflowPlanStep[]): string | null {
+  const executionSteps = steps.filter((step) => step.agent_name || step.role || step.label);
+  if (executionSteps.length === 0 && participants.length === 0 && !planSummary) return null;
+
+  const lines: string[] = [];
+  if (planSummary) {
+    lines.push(planSummary.trim(), '');
+  }
+
+  if (participants.length > 0) {
+    lines.push('Planner');
+    const planner = participants.find((participant) => participant.planner);
+    lines.push(`- ${planner?.agent_name || 'Orchestrator'}`);
+    lines.push('');
+  }
+
+  lines.push('Execution Flow');
+  executionSteps.forEach((step, index) => {
+    const actor = step.agent_name || (step.role ? `${step.role} role` : 'System transition');
+    lines.push(`${index + 1}. ${step.label} -> ${actor} [${step.status}]`);
+  });
+
+  return ['```text', ...lines, '```'].join('\n');
+}
+
+function buildDeliverableDescription(agentName: string, workflowStep: string, source: string): string {
+  return `Created during ${workflowStep.replace(/_/g, ' ')} by ${agentName} via ${source}.`;
+}
+
 function buildTaskProblemStatementMarkdown(args: {
   task: Task;
   workspaceName?: string | null;
@@ -114,6 +178,7 @@ function buildTaskProblemStatementMarkdown(args: {
   acceptanceCriteria: string[];
   orchestratorPlanSummary: string[];
   orchestratorParticipants: string[];
+  orchestratorPlanDiagram: string | null;
   planningSpecSection: string;
   agentInstructionsSection: string;
   knowledgeSection: string;
@@ -130,6 +195,7 @@ function buildTaskProblemStatementMarkdown(args: {
     acceptanceCriteria,
     orchestratorPlanSummary,
     orchestratorParticipants,
+    orchestratorPlanDiagram,
     planningSpecSection,
     agentInstructionsSection,
     knowledgeSection,
@@ -142,6 +208,12 @@ function buildTaskProblemStatementMarkdown(args: {
 
   const orchestratorPlanSection = orchestratorPlanSummary.length > 0
     ? `## Orchestrator Plan\n${orchestratorPlanSummary.map((item) => `- ${item}`).join('\n')}`
+    : '';
+
+  const orchestratorDiagramSection = orchestratorPlanDiagram
+    ? `## Orchestrator Workflow Diagram\n\n\
+${orchestratorPlanDiagram}\n\n\
+`
     : '';
 
   const participantsSection = orchestratorParticipants.length > 0
@@ -169,6 +241,7 @@ function buildTaskProblemStatementMarkdown(args: {
     acceptanceSection,
     '',
     orchestratorPlanSection,
+    orchestratorDiagramSection,
     participantsSection,
     planningSpecSection.trim().length > 0 ? `## Planning Specification\n${planningSpecSection.trim()}` : '',
     agentInstructionsSection.trim().length > 0 ? `## Role Instructions\n${agentInstructionsSection.trim()}` : '',
@@ -184,8 +257,10 @@ function ensureProblemStatementArtifact(args: {
   taskProjectDir: string;
   content: string;
   openclawSessionId: string;
+  agentName: string;
+  workflowStep: string;
 }): string {
-  const { task, taskProjectDir, content, openclawSessionId } = args;
+  const { task, taskProjectDir, content, openclawSessionId, agentName, workflowStep } = args;
   mkdirSync(taskProjectDir, { recursive: true });
   const artifactPath = path.join(taskProjectDir, 'task-problem-statement.md');
   writeFileSync(artifactPath, content, 'utf-8');
@@ -206,7 +281,7 @@ function ensureProblemStatementArtifact(args: {
           task.id,
           'task-problem-statement.md',
           artifactPath,
-          'Task/problem statement generated by dispatch before agent execution.',
+          buildDeliverableDescription(agentName, workflowStep, 'dispatch initialization'),
           openclawSessionId,
           now,
         ],
@@ -220,7 +295,7 @@ function ensureProblemStatementArtifact(args: {
           task.id,
           'task-problem-statement.md',
           artifactPath,
-          'Task/problem statement generated by dispatch before agent execution.',
+          buildDeliverableDescription(agentName, workflowStep, 'dispatch initialization'),
           now,
         ],
       );
@@ -429,6 +504,7 @@ export async function dispatchTaskToAgent(taskId: string): Promise<DispatchResul
     let agentInstructionsSection = '';
     let planningSpecData: Record<string, unknown> | null = null;
     let planningAgentsData: Array<{ name?: string; role?: string; instructions?: string; agent_id?: string }> = [];
+    const workflowPlanData = getTaskWorkflowPlan(task.id)?.plan || null;
 
     if (rawTask.planning_spec) {
       try {
@@ -436,7 +512,14 @@ export async function dispatchTaskToAgent(taskId: string): Promise<DispatchResul
         if (spec && typeof spec === 'object' && !Array.isArray(spec)) {
           planningSpecData = spec as Record<string, unknown>;
         }
-        const specText = typeof spec === 'string' ? spec : (spec.spec_markdown || JSON.stringify(spec, null, 2));
+        const formattedSpec = typeof spec === 'string'
+          ? spec
+          : (typeof spec.spec_markdown === 'string' && spec.spec_markdown.trim().length > 0
+            ? spec.spec_markdown
+            : formatPlanningSpecMarkdown(planningSpecData));
+        const specText = formattedSpec && formattedSpec.trim().length > 0
+          ? formattedSpec
+          : JSON.stringify(spec, null, 2);
         planningSpecSection = `\n---\n**PLANNING SPECIFICATION:**\n${specText}\n`;
       } catch {
         planningSpecSection = `\n---\n**PLANNING SPECIFICATION:**\n${rawTask.planning_spec}\n`;
@@ -513,6 +596,11 @@ export async function dispatchTaskToAgent(taskId: string): Promise<DispatchResul
         const role = typeof entry.role === 'string' && entry.role.trim().length > 0 ? entry.role.trim() : null;
         return role ? `${name} (${role})` : name;
       });
+    const orchestratorPlanDiagram = buildWorkflowDiagram(
+      workflowPlanData?.summary || (typeof specSummary === 'string' ? specSummary : null),
+      workflowPlanData?.participants || [],
+      workflowPlanData?.steps || [],
+    );
 
     const workflow = getTaskWorkflow(taskId);
     let currentStage: WorkflowStage | undefined;
@@ -578,7 +666,7 @@ export async function dispatchTaskToAgent(taskId: string): Promise<DispatchResul
 2. Register deliverable: POST ${missionControlUrl}/api/tasks/${task.id}/deliverables${authHeader}
    Body: {"deliverable_type": "file", "title": "File name", "path": "${taskProjectDir}/filename.html"}
 3. Update status: PATCH ${missionControlUrl}/api/tasks/${task.id}${authHeader}
-   Body: {"status": "${nextStatus}"}
+   Body: {"status": "${nextStatus}", "updated_by_session_id": "${session.openclaw_session_id}"}
 
 Progress reporting rules:
 - Post at least one mid-run update using /activities with activity_type "updated" before completion.
@@ -599,12 +687,12 @@ Review the output directory for deliverables and run any applicable tests.
 1. POST ${missionControlUrl}/api/tasks/${task.id}/activities${authHeader}
    Body: {"activity_type": "completed", "message": "Tests passed: [summary]"}
 2. PATCH ${missionControlUrl}/api/tasks/${task.id}${authHeader}
-   Body: {"status": "${nextStatus}"}
+   Body: {"status": "${nextStatus}", "updated_by_session_id": "${session.openclaw_session_id}"}
 ${loopGuide}
 
 **If tests FAIL:**
 1. ${failEndpoint}${authHeader}
-   Body: {"reason": "Detailed description of what failed and what needs fixing"}
+   Body: {"reason": "Detailed description of what failed and what needs fixing", "openclaw_session_id": "${session.openclaw_session_id}"}
 
 Progress reporting rules:
 - Post at least one mid-run update using /activities with activity_type "updated".
@@ -621,12 +709,12 @@ Review deliverables, test results, and task requirements.
 1. POST ${missionControlUrl}/api/tasks/${task.id}/activities${authHeader}
    Body: {"activity_type": "completed", "message": "Verification passed: [summary]"}
 2. PATCH ${missionControlUrl}/api/tasks/${task.id}${authHeader}
-   Body: {"status": "${nextStatus}"}
+   Body: {"status": "${nextStatus}", "updated_by_session_id": "${session.openclaw_session_id}"}
 ${loopGuide}
 
 **If verification FAILS:**
 1. ${failEndpoint}${authHeader}
-   Body: {"reason": "Detailed description of what failed and what needs fixing"}
+   Body: {"reason": "Detailed description of what failed and what needs fixing", "openclaw_session_id": "${session.openclaw_session_id}"}
 
 Progress reporting rules:
 - Post at least one mid-run update using /activities with activity_type "updated".
@@ -637,7 +725,7 @@ Reply with: \`VERIFY_PASS: [summary]\` or \`VERIFY_FAIL: [what failed]\``;
     } else {
       completionInstructions = `**IMPORTANT:** After completing work:
 1. PATCH ${missionControlUrl}/api/tasks/${task.id}${authHeader}
-   Body: {"status": "${nextStatus}"}`;
+   Body: {"status": "${nextStatus}", "updated_by_session_id": "${session.openclaw_session_id}"}`;
     }
 
     const roleLabel = currentStage?.label || 'Task';
@@ -666,6 +754,7 @@ If you need help or clarification, ask the orchestrator.`;
       acceptanceCriteria: Array.from(new Set(acceptanceCriteria)),
       orchestratorPlanSummary,
       orchestratorParticipants,
+      orchestratorPlanDiagram,
       planningSpecSection,
       agentInstructionsSection,
       knowledgeSection,
@@ -676,6 +765,8 @@ If you need help or clarification, ask the orchestrator.`;
       taskProjectDir,
       content: taskProblemStatement,
       openclawSessionId: session.openclaw_session_id,
+      agentName: agent.name,
+      workflowStep: task.status === 'assigned' ? 'in_progress' : task.status,
     });
 
     try {

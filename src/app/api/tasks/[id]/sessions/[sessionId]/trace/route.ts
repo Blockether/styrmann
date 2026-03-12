@@ -399,6 +399,22 @@ export async function GET(request: Request, { params }: Params) {
     }
 
     const hasSessionIdColumn = tableHasColumn('task_deliverables', 'openclaw_session_id');
+    const dispatchActivity = queryOne<{ metadata: string | null }>(
+      `SELECT metadata FROM task_activities
+       WHERE task_id = ?
+         AND activity_type = 'dispatch_invocation'
+         AND json_extract(metadata, '$.openclaw_session_id') = ?
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      [taskId, session.openclaw_session_id],
+    );
+    const dispatchMetadata = parseToolInputObject(dispatchActivity?.metadata || '');
+    const workflowStep = typeof dispatchMetadata?.workflow_step === 'string' && dispatchMetadata.workflow_step.trim().length > 0
+      ? dispatchMetadata.workflow_step.trim()
+      : 'unknown stage';
+    const agentName = typeof session.agent_name === 'string' && session.agent_name.trim().length > 0
+      ? session.agent_name.trim()
+      : 'Unknown agent';
     const autoDeliverableCandidates = extractAutoDeliverableCandidates(history);
     for (const candidate of autoDeliverableCandidates) {
       const existing = hasSessionIdColumn
@@ -423,7 +439,7 @@ export async function GET(request: Request, { params }: Params) {
             taskId,
             candidate.title,
             candidate.path,
-            `Auto-captured from trace write operation (${candidate.sourceTool})`,
+            `Created during ${workflowStep.replace(/_/g, ' ')} by ${agentName} via ${candidate.sourceTool}.`,
             session.openclaw_session_id,
           ],
         );
@@ -437,7 +453,7 @@ export async function GET(request: Request, { params }: Params) {
             taskId,
             candidate.title,
             candidate.path,
-            `Auto-captured from trace write operation (${candidate.sourceTool})`,
+            `Created during ${workflowStep.replace(/_/g, ' ')} by ${agentName} via ${candidate.sourceTool}.`,
           ],
         );
       }
