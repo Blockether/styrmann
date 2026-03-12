@@ -304,7 +304,7 @@ export function AgentActivityDashboard({ workspace, embedded = false }: AgentAct
           <section className="bg-mc-bg-secondary border border-mc-border rounded-xl p-4">
             <div className="flex items-center gap-2 mb-3">
               <FileText className="w-4 h-4 text-mc-accent" />
-              <h2 className="font-semibold">Presenter Feed</h2>
+              <h2 className="font-semibold">Activity Summary Feed</h2>
             </div>
             <div className="space-y-2">
               {workspaceSummaries.map((entry) => {
@@ -472,7 +472,7 @@ export function AgentActivityDashboard({ workspace, embedded = false }: AgentAct
         <section className="bg-mc-bg-secondary border border-mc-border rounded-xl p-4">
           <div className="flex items-center gap-2 mb-3">
             <FileText className="w-4 h-4 text-mc-accent" />
-            <h2 className="font-semibold">Presenter Feed</h2>
+            <h2 className="font-semibold">Activity Summary Feed</h2>
           </div>
           <div className="space-y-2">
             {workspaceSummaries.map((entry) => {

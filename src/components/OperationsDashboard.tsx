@@ -9,30 +9,38 @@ import { SystemPanel } from './SystemPanel';
 type OperationsTab = 'system' | 'gateway' | 'agents' | 'humans';
 const TAB_ORDER: OperationsTab[] = ['system', 'gateway', 'agents', 'humans'];
 
-function resolveOperationsTabFromHash(hash: string): OperationsTab | null {
-  const normalized = hash.replace(/^#/, '').toLowerCase();
-  if (!normalized) return null;
-  if (normalized === 'system' || normalized === 'system-runtime') return 'system';
-  if (normalized === 'gateway' || normalized === 'openclaw') return 'gateway';
-  if (normalized === 'agents') return 'agents';
-  if (normalized === 'humans') return 'humans';
-  return null;
+function parseOperationsHash(hash: string): { tab: OperationsTab | null; agentId: string | null } {
+  const raw = hash.replace(/^#/, '');
+  const normalized = raw.toLowerCase();
+  if (!raw) return { tab: null, agentId: null };
+  if (normalized === 'system' || normalized === 'system-runtime') return { tab: 'system', agentId: null };
+  if (normalized === 'gateway' || normalized === 'openclaw') return { tab: 'gateway', agentId: null };
+  if (normalized === 'humans') return { tab: 'humans', agentId: null };
+  if (normalized === 'agents') return { tab: 'agents', agentId: null };
+  if (normalized.startsWith('agents/')) {
+    const agentId = decodeURIComponent(raw.slice('agents/'.length)).trim();
+    return { tab: 'agents', agentId: agentId || null };
+  }
+  return { tab: null, agentId: null };
 }
 
 export function OperationsDashboard() {
   const [activeTab, setActiveTab] = useState<OperationsTab>('gateway');
+  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
     const updateFromHash = (replaceIfMissing: boolean) => {
-      const resolved = resolveOperationsTabFromHash(window.location.hash);
-      if (resolved) {
-        setActiveTab(resolved);
+      const resolved = parseOperationsHash(window.location.hash);
+      if (resolved.tab) {
+        setActiveTab(resolved.tab);
+        setSelectedAgentId(resolved.tab === 'agents' ? resolved.agentId : null);
         return;
       }
 
       setActiveTab('gateway');
+      setSelectedAgentId(null);
       if (replaceIfMissing) {
         const url = new URL(window.location.href);
         url.hash = 'gateway';
@@ -47,13 +55,18 @@ export function OperationsDashboard() {
     return () => window.removeEventListener('hashchange', onHashChange);
   }, []);
 
-  const switchTab = useCallback((tab: OperationsTab) => {
+  const switchTab = useCallback((tab: OperationsTab, agentId?: string | null) => {
     setActiveTab(tab);
+    setSelectedAgentId(tab === 'agents' ? agentId || null : null);
     if (typeof window === 'undefined') return;
     const url = new URL(window.location.href);
-    url.hash = tab;
+    url.hash = tab === 'agents' && agentId ? `agents/${encodeURIComponent(agentId)}` : tab;
     window.history.pushState({}, '', url.toString());
   }, []);
+
+  const handleAgentRouteChange = useCallback((agentId: string | null) => {
+    switchTab('agents', agentId);
+  }, [switchTab]);
 
   const handleTabListKeyDown = useCallback((event: KeyboardEvent<HTMLDivElement>) => {
     const currentIndex = TAB_ORDER.indexOf(activeTab);
@@ -161,7 +174,7 @@ export function OperationsDashboard() {
             aria-labelledby="operations-tab-agents"
             className="rounded-xl border border-mc-border bg-mc-bg overflow-hidden"
           >
-            <OpenClawPanel embedded focusArea="agents" />
+            <OpenClawPanel embedded focusArea="agents" selectedAgentId={selectedAgentId} onSelectedAgentIdChange={handleAgentRouteChange} />
           </section>
         )}
 

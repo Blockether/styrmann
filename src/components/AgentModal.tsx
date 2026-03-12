@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { X, Save, Trash2, Folder, FileText, RefreshCw, ChevronRight, Link2, Link2Off, Eye, ArrowLeft, Download, ExternalLink } from 'lucide-react';
 import { useMissionControl } from '@/lib/store';
+import { DEFAULT_AGENT_ROLE_OPTIONS, formatAgentRoleLabel } from '@/lib/agent-roles';
 import type { Agent } from '@/lib/types';
 
 interface AgentModalProps {
@@ -144,6 +145,10 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated, initia
     model: agent?.model || '',
   });
   const userMdEnabled = canEditIdentityMd(agent);
+  const roleOptions = Array.from(new Set([
+    ...DEFAULT_AGENT_ROLE_OPTIONS,
+    ...(form.role && !DEFAULT_AGENT_ROLE_OPTIONS.includes(form.role as typeof DEFAULT_AGENT_ROLE_OPTIONS[number]) ? [form.role] : []),
+  ]));
 
   // Load available models from OpenClaw config
   useEffect(() => {
@@ -376,13 +381,13 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated, initia
     }
   };
 
-  const tabs = [
+  const tabs = useMemo(() => [
     { id: 'info', label: 'Info' },
     { id: 'workspace', label: 'Workspace' },
     { id: 'soul' as const, label: 'SOUL.md' },
     ...(userMdEnabled ? [{ id: 'user' as const, label: 'USER.md' }] : []),
     { id: 'agents', label: 'AGENTS.md' },
-  ] as const;
+  ] as const, [userMdEnabled]);
 
   useEffect(() => {
     if (!tabs.some((tab) => tab.id === activeTab)) {
@@ -513,15 +518,21 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated, initia
               {/* Role */}
               <div>
                 <label className="block text-sm font-medium mb-1">Role</label>
-                <input
-                  type="text"
+                <select
                   value={form.role}
                   onChange={(e) => setForm({ ...form, role: e.target.value })}
                   required
                   disabled={isReadOnlySyncedAgent}
                   className="w-full min-h-11 bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent"
-                  placeholder="e.g., Code & Automation"
-                />
+                >
+                  <option value="">Select a role</option>
+                  {roleOptions.map((role) => (
+                    <option key={role} value={role}>{formatAgentRoleLabel(role)}</option>
+                  ))}
+                </select>
+                <p className="text-xs text-mc-text-secondary mt-1">
+                  Roles use the Mission Control default team vocabulary so planning and warnings stay consistent.
+                </p>
               </div>
 
               <div>

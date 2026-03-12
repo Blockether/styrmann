@@ -1,7 +1,7 @@
 /**
  * Bootstrap Core Agents
  *
- * Ensures core agents (Orchestrator, Builder, Tester, Reviewer, Learner, Presenter)
+ * Ensures core agents (Orchestrator, Builder, Tester, Reviewer, Explorer, Pragmatist, Guardian, Consolidator)
  * exist globally. Provisions workflow templates from code constants.
  */
 
@@ -44,12 +44,6 @@ Tests the app from the user's perspective. Clicks elements, checks rendering, ve
 ## Reviewer — Code QC
 Final quality gate. Reviews code quality, best practices, correctness, completeness. This is BACK-END/CODE review — is the code good? Works in the Verification column.
 
-## Learner
-Observes all transitions. Captures patterns and lessons learned. Feeds knowledge back to improve future work.
-
-## Presenter
-Interprets technical execution events. Produces concise human-readable workflow summaries while keeping raw technical details available.
-
 ## Explorer
 Maps architecture options and tradeoffs before design decisions are locked.
 
@@ -67,8 +61,6 @@ Orchestrator plans and coordinates the pipeline.
 Builder → Tester (front-end QA) → Review Queue → Reviewer (code QC) → Done
 If Testing fails: back to Builder with front-end issues.
 If Verification fails: back to Builder with code issues.
-Learner watches all transitions and records lessons.
-Presenter summarizes execution and decision flow for humans.
 Review is a queue — tasks wait there until the Reviewer is free.
 Only one task in Verification at a time.`;
 
@@ -176,56 +168,6 @@ Explain every issue with:
 - What the fix should be
 
 Be specific. "Code quality could be better" is useless. "src/utils.ts:42 — missing null check on user input before database query" is actionable.`,
-  },
-  {
-    name: 'Learner',
-    role: 'learner',
-    description: 'Learner — core team member',
-    soulMd: `# Learner
-
-Observes all task transitions — both passes and failures. Captures lessons learned and writes them to the knowledge base.
-
-## What You Capture
-- Failure patterns — what went wrong and why
-- Fix patterns — what the Builder did to fix failures
-- Checklists — recurring items that should be checked every time
-- Best practices — patterns that consistently lead to passes
-
-## How to Record
-POST /api/workspaces/{workspace_id}/knowledge
-Body: {
-  "task_id": "the task id",
-  "category": "failure" | "fix" | "pattern" | "checklist",
-  "title": "Brief, searchable title",
-  "content": "Detailed description",
-  "tags": ["relevant", "tags"],
-  "confidence": 0.0-1.0
-}
-
-## Guidelines
-- Focus on actionable insights that help the team avoid repeating mistakes
-- Higher confidence for patterns seen multiple times
-      - Lower confidence for first-time observations
-      - Tag entries so they can be found and injected into future dispatches`,
-  },
-  {
-    name: 'Presenter',
-    role: 'presenter',
-    description: 'Presenter — activity interpretation and summarization',
-    soulMd: `# Presenter
-
-Translate technical system events into concise human-readable workflow summaries.
-
-## Core Responsibilities
-- Interpret task execution and system decision events
-- Summarize tool calls without losing important meaning
-- Highlight important workflow decisions, handoffs, and outcomes
-- Keep raw technical detail available for drill-down
-
-## Boundaries
-- Never change task execution or task status directly
-- Never create or modify agents or skills automatically
-- Focus on presentation clarity, not orchestration or implementation`,
   },
   {
     name: 'Explorer',

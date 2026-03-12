@@ -18,10 +18,12 @@ import {
   ShieldCheck,
   ShieldAlert,
   Wrench,
+  TriangleAlert,
 } from 'lucide-react';
 import { AgentModal } from './AgentModal';
 import { AgentLogsView } from './AgentLogsView';
 import { GatewayLogsView } from './GatewayLogsView';
+import { REQUIRED_DEFAULT_AGENT_ROLES, formatAgentRoleLabel } from '@/lib/agent-roles';
 import type { Agent } from '@/lib/types';
 
 interface OpenClawSession {
@@ -70,9 +72,11 @@ interface AuditResult {
 interface OpenClawPanelProps {
   embedded?: boolean;
   focusArea?: 'gateway' | 'agents';
+  selectedAgentId?: string | null;
+  onSelectedAgentIdChange?: (agentId: string | null) => void;
 }
 
-export function OpenClawPanel({ embedded = false, focusArea = 'gateway' }: OpenClawPanelProps) {
+export function OpenClawPanel({ embedded = false, focusArea = 'gateway', selectedAgentId = null, onSelectedAgentIdChange }: OpenClawPanelProps) {
   const [status, setStatus] = useState<OpenClawStatus | null>(null);
   const [models, setModels] = useState<OpenClawModels | null>(null);
   const [agents, setAgents] = useState<Agent[]>([]);
@@ -136,6 +140,21 @@ export function OpenClawPanel({ embedded = false, focusArea = 'gateway' }: OpenC
   };
 
   const agentCounts = { total: agents.length };
+  const missingDefaultRoles = REQUIRED_DEFAULT_AGENT_ROLES.filter(
+    (role) => !agents.some((agent) => agent.role === role)
+  );
+
+  useEffect(() => {
+    if (!selectedAgentId) {
+      setEditingAgent(null);
+      return;
+    }
+
+    const matched = agents.find((agent) => agent.id === selectedAgentId);
+    if (!matched) return;
+    setModalInitialTab(matched.source === 'synced' ? 'workspace' : 'info');
+    setEditingAgent((current) => (current?.id === matched.id ? current : matched));
+  }, [agents, selectedAgentId]);
 
   const toolbarInnerClass = embedded
     ? 'px-4 sm:px-6 py-3 flex items-center justify-between gap-2 flex-wrap'
@@ -269,16 +288,45 @@ export function OpenClawPanel({ embedded = false, focusArea = 'gateway' }: OpenC
           <div className="grid grid-cols-1 gap-6">
             {/* Card 2: Agents */}
             {isAgentsFocus && <div>
+              {missingDefaultRoles.length > 0 && (
+                <div className="mb-4 rounded-2xl border border-amber-300 bg-amber-50 p-4 shadow-[0_18px_36px_-34px_rgba(180,120,10,0.35)]">
+                  <div className="flex items-start gap-3">
+                    <div className="mt-0.5 rounded-full bg-amber-100 p-2 text-amber-700">
+                      <TriangleAlert className="h-4 w-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-sm font-semibold text-amber-900">Default team incomplete</div>
+                      <p className="mt-1 text-sm leading-6 text-amber-800">
+                        Mission Control is missing required default roles: {missingDefaultRoles.map((role) => formatAgentRoleLabel(role)).join(', ')}.
+                      </p>
+                      <p className="mt-1 text-xs leading-5 text-amber-700">
+                        Add or reassign these roles so workflow planning, staffing, and warning checks stay reliable.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
               <div className="mb-2 text-xs text-mc-text-secondary">{agentCounts.total} total</div>
               {agents.length > 0 ? (
                 <div className="bg-mc-bg overflow-hidden divide-y divide-mc-border">
                   {agents.map((agent) => (
                     <div key={agent.id} className="px-4 py-3 flex items-center gap-3">
-                      <span className="font-medium text-sm truncate flex-1 min-w-0">{agent.name}</span>
+                      <div className="min-w-0 flex-1">
+                        <button
+                          type="button"
+                          onClick={() => onSelectedAgentIdChange?.(agent.id)}
+                          className="max-w-full truncate text-left font-medium text-sm text-mc-text hover:text-mc-accent"
+                          title={`Open ${agent.name}`}
+                        >
+                          {agent.name}
+                        </button>
+                        <div className="mt-1 text-xs text-mc-text-secondary">{formatAgentRoleLabel(agent.role)}</div>
+                      </div>
                       <button
                         onClick={() => {
                           setModalInitialTab(agent.source === 'synced' ? 'workspace' : 'info');
                           setEditingAgent(agent);
+                          onSelectedAgentIdChange?.(agent.id);
                         }}
                         className="p-1 rounded hover:bg-mc-bg-tertiary text-mc-text-secondary hover:text-mc-text transition-colors flex-shrink-0"
                         title={`Configure ${agent.name}`}
@@ -581,6 +629,7 @@ export function OpenClawPanel({ embedded = false, focusArea = 'gateway' }: OpenC
             setEditingAgent(null);
             setCreatingAgent(false);
             setModalInitialTab('info');
+            onSelectedAgentIdChange?.(null);
             fetchData();
           }}
         />

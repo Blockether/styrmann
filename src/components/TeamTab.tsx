@@ -32,8 +32,6 @@ function compactRole(role: string): string {
   if (normalized.includes('builder')) return 'Builder';
   if (normalized.includes('tester')) return 'Tester';
   if (normalized.includes('reviewer')) return 'Reviewer';
-  if (normalized.includes('learner')) return 'Learner';
-
   const firstClause = role.split(/[—-]/)[0]?.trim() || role;
   return toTitleCase(firstClause).slice(0, 24);
 }
@@ -281,9 +279,6 @@ export function TeamTab({ taskId, workspaceId }: TeamTabProps) {
       {/* Role Assignments */}
       <div>
         <label className="block text-sm font-medium mb-2">Role Assignments</label>
-        <p className="mb-2 text-xs text-mc-text-secondary">
-          Optional <span className="font-medium text-mc-text">learner</span>: captures reusable lessons from stage transitions and syncs agent-scoped learnings into OpenClaw memory.
-        </p>
         <div className="space-y-3">
           {visibleRoles.map(role => {
             if (!role) return null;
@@ -337,27 +332,6 @@ export function TeamTab({ taskId, workspaceId }: TeamTabProps) {
               </select>
             </div>
           ))}
-
-          {!isTemplateLocked && !uniqueRoles.includes('learner') && (
-            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 opacity-60 hover:opacity-100 transition-opacity min-w-0">
-              <div className="sm:w-24 text-xs font-medium text-mc-text-secondary capitalize flex-shrink-0">
-                learner
-              </div>
-              <select
-                value={roles.find(r => r.role === 'learner')?.agent_id || ''}
-                onChange={(e) => handleRoleAgentChange('learner', e.target.value)}
-                disabled={assigneeType === 'human'}
-                className="flex-1 min-h-11 bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent min-w-0"
-              >
-                <option value="">Unassigned (optional)</option>
-                {agents.map(agent => (
-                  <option key={agent.id} value={agent.id}>
-                    {formatAgentLabel(agent.name, agent.role)}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
 
           {!isTemplateLocked && (
             <button
