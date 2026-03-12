@@ -60,8 +60,13 @@ export async function GET(
         LIMIT 1
       `).get(taskId, deliverable.openclaw_session_id) as { workflow_step?: string | null } | undefined;
 
+      const derivedDescription = session?.agent_name && stepRow?.workflow_step
+        ? `Created during ${String(stepRow.workflow_step).replace(/_/g, ' ')} by ${session.agent_name}${deliverable.description?.includes('dispatch') ? ' via dispatch initialization' : ' via captured task output'}.`
+        : deliverable.description;
+
       return {
         ...deliverable,
+        description: derivedDescription,
         created_via_agent_id: session?.agent_id || null,
         created_via_agent_name: session?.agent_name || null,
         created_via_workflow_step: stepRow?.workflow_step || null,

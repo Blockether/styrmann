@@ -72,6 +72,7 @@ Also: `pending_dispatch` (transient, pre-dispatch state).
 **Deliverables UX**:
 - Deliverables API enriches file/url/artifact entries with derived provenance (`created_via_agent_name`, `created_via_workflow_step`, `created_via_session_id`) using existing session/activity joins.
 - Deliverable cards show stage + agent provenance whenever an `openclaw_session_id` is available.
+- Generic legacy descriptions are replaced at read time with derived stage/agent provenance text when session/activity context exists.
 
 **Replanning lock**: Regenerating/editing workflow plans is allowed only before execution starts (`planning`, `inbox`, `pending_dispatch`). Once a task enters runtime stages (`assigned`, `in_progress`, `testing`, `review`, `verification`, `done`), workflow-plan regenerate/edit endpoints return `409 REPLAN_LOCKED`, and Activity UI hides plan-edit controls.
 
@@ -494,7 +495,7 @@ Webhook verification: `WEBHOOK_SECRET` env var, HMAC signature in `x-webhook-sig
 - Before agent execution, dispatch writes `<output-directory>/task-problem-statement.md`.
 - The file is auto-registered as a `task_deliverables` file artifact (deduped by path), so each task has a canonical problem statement artifact from the start.
 - The generated task brief includes acceptance criteria and orchestrator planning context (when present).
-- The orchestrator section renders a readable workflow diagram / participant plan instead of raw planning JSON where structured plan data is available.
+- The orchestrator section renders a Mermaid workflow diagram / participant plan instead of raw planning JSON where structured plan data is available.
 
 **Git repo handling**: repo validation uses git worktree detection (`git rev-parse --is-inside-work-tree`), not `.git` directory checks, so linked worktrees are supported.
 
@@ -528,7 +529,9 @@ Webhook verification: `WEBHOOK_SECRET` env var, HMAC signature in `x-webhook-sig
 - TraceViewerModal displays provenance chain badges and Source Receipt details.
 - TraceViewerModal stage-flow uses a centered vertical sequence with down-arrow connectors.
 - Trace summary `stage_flow` extraction is strict (requires `stage`/`phase`/`step` tokens); summary highlights are not displayed in the trace modal.
+- Trace normalization now filters placeholder assistant rows with no text/tool content and understands top-level OpenAI-style `tool_calls` in addition to block-based tool calls.
 - Markdown/text preview wraps prose for mobile while markdown tables are wrapped in horizontal scroll containers.
+- Markdown preview also renders Mermaid code blocks as diagrams via client-side Mermaid initialization.
 
 **Session finalization**:
 - Successful stage PATCH transitions can include `updated_by_session_id`; Mission Control finalizes that OpenClaw session immediately instead of letting it decay into `stale`.
@@ -536,6 +539,11 @@ Webhook verification: `WEBHOOK_SECRET` env var, HMAC signature in `x-webhook-sig
 - Workflow handoff finalizes other active task sessions as `interrupted` before dispatching the next agent.
 - Agent completion webhook finalizes the bound session as `completed` and no longer assumes only `assigned` / `in_progress` tasks are completable.
 - Agent log ingestion bumps `openclaw_sessions.updated_at`, so real transcript activity keeps live sessions from being mislabeled stale.
+
+**PI / ACP runtime contract**:
+- Mission Control's normal thread-bound execution path uses the OpenClaw ACP session runtime.
+- Dispatch prompts explicitly tell agents to use the Pi-style coding workflow inside that ACP session, while using Mission Control REST APIs for task/activity/deliverable updates.
+- Plain `pi` CLI is treated as a non-ACP fallback path rather than the primary Mission Control execution model.
 - SessionsList shows a provenance summary banner when records exist.
 
 **Completion format**: `TASK_COMPLETE: [summary] | deliverables: [paths] | verification: [how verified]`

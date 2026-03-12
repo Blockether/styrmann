@@ -153,11 +153,12 @@ If you're stuck or need clarification:
 
 ## API Integration
 
-Agents don't call Mission Control APIs directly. All interaction happens through:
+Agents receive work via OpenClaw ACP/session messages, but Mission Control-directed agents do call Mission Control APIs directly when instructed by dispatch. The expected contract is:
 
 1. **Receiving tasks** via OpenClaw session message
-2. **Reporting completion** via TASK_COMPLETE message
-3. **Asking questions** via normal conversation with the orchestrator
+2. **Reporting progress / deliverables / stage changes** via Mission Control REST APIs with scoped Bearer tokens
+3. **Using TASK_COMPLETE-style messages only when explicitly required by the current runtime/integration path**
+4. **Asking questions** via normal conversation with the orchestrator
 
 Mission Control handles:
 - Task routing

@@ -7,6 +7,7 @@ import { getStoredArtifactByPath } from '@/lib/task-run-results';
 export const dynamic = 'force-dynamic';
 
 const MAX_PREVIEW_SIZE = 1024 * 1024;
+const MERMAID_CDN = 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
 
 function escapeHtml(value: string): string {
   return value
@@ -77,6 +78,8 @@ const LIGHT_THEME_CSS = `
   .content hr { border: none; border-top: 1px solid #e5d5b8; margin: 24px 0; }
   .content .table-scroll { overflow-x: auto; margin: 16px 0; border: 1px solid #e5d5b8; border-radius: 8px; background: #fff; }
   .content table { border-collapse: collapse; width: max-content; min-width: 100%; margin: 0; }
+  .content .mermaid-wrapper { overflow-x: auto; margin: 16px 0; border: 1px solid #e5d5b8; border-radius: 8px; background: #fff; padding: 12px; }
+  .content pre.mermaid { background: transparent; border: 0; padding: 0; margin: 0; white-space: pre; word-break: normal; }
   .content th {
     background: #fff; color: #333; font-weight: 600;
     padding: 10px 14px; border: 1px solid #e5d5b8; text-align: left;
@@ -100,6 +103,22 @@ const LIGHT_THEME_CSS = `
 
 function wrapMarkdownTables(html: string): string {
   return html.replace(/<table>([\s\S]*?)<\/table>/g, '<div class="table-scroll" role="region" aria-label="Scrollable table" tabindex="0"><table>$1</table></div>');
+}
+
+function decodeHtmlEntities(value: string): string {
+  return value
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'");
+}
+
+function wrapMermaidBlocks(html: string): string {
+  return html.replace(/<pre><code class="language-mermaid">([\s\S]*?)<\/code><\/pre>/g, (_match, code) => {
+    const decoded = decodeHtmlEntities(String(code)).trim();
+    return `<div class="mermaid-wrapper"><pre class="mermaid">${decoded}</pre></div>`;
+  });
 }
 
 export async function GET(request: NextRequest) {
@@ -187,7 +206,7 @@ export async function GET(request: NextRequest) {
     const escapedFileName = escapeHtml(fileName);
     const escapedContent = escapeHtml(content);
     const markdownHtml = isMarkdown
-      ? wrapMarkdownTables(String(marked.parse(escapedContent, { gfm: true, breaks: true })))
+      ? wrapMermaidBlocks(wrapMarkdownTables(String(marked.parse(escapedContent, { gfm: true, breaks: true }))))
       : null;
     const bodyContent = isMarkdown
       ? `<div class="content">${typeof markdownHtml === 'string' ? markdownHtml : ''}</div>`
@@ -207,6 +226,10 @@ export async function GET(request: NextRequest) {
     </div>
   </div>
   ${bodyContent}
+  <script type="module">
+    import mermaid from '${MERMAID_CDN}';
+    mermaid.initialize({ startOnLoad: true, theme: 'neutral', securityLevel: 'loose' });
+  </script>
 </body></html>`;
 
     return new NextResponse(html, {

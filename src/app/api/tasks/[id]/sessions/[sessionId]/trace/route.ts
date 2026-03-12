@@ -77,6 +77,18 @@ function normalizeMessage(raw: unknown): TraceMessage {
     const tu = msg.tool_use as Record<string, unknown>;
     toolCalls.push({ id: tu.id ? String(tu.id) : undefined, name: String(tu.name || 'unknown'), input: tu.input ? JSON.stringify(tu.input, null, 2) : undefined });
   }
+  if (Array.isArray(msg.tool_calls) && toolCalls.length === 0) {
+    for (const call of msg.tool_calls as Array<Record<string, unknown>>) {
+      const fn = (call.function && typeof call.function === 'object') ? call.function as Record<string, unknown> : null;
+      toolCalls.push({
+        id: call.id ? String(call.id) : undefined,
+        name: String(fn?.name || call.name || 'unknown'),
+        input: typeof fn?.arguments === 'string'
+          ? String(fn.arguments)
+          : (call.arguments ? JSON.stringify(call.arguments, null, 2) : undefined),
+      });
+    }
+  }
   if (!toolResult && msg.tool_result) {
     toolResult = typeof msg.tool_result === 'string' ? msg.tool_result : JSON.stringify(msg.tool_result, null, 2);
   }
@@ -106,6 +118,13 @@ function normalizeMessage(raw: unknown): TraceMessage {
     provenance,
     receipt,
   };
+}
+
+function isMeaningfulTraceMessage(message: TraceMessage): boolean {
+  if (message.content.trim().length > 0) return true;
+  if (message.tool_result && message.tool_result.trim().length > 0) return true;
+  if (message.tool_calls && message.tool_calls.length > 0) return true;
+  return false;
 }
 
 function extractSessionMetadata(taskId: string, sessionId: string): {
@@ -360,7 +379,9 @@ export async function GET(request: Request, { params }: Params) {
       try {
         const rawMessages = await client.getSessionHistory(key);
         if (rawMessages.length > 0) {
-          history = rawMessages.map(normalizeMessage);
+          history = rawMessages
+            .map(normalizeMessage)
+            .filter((message) => isMeaningfulTraceMessage(message) || message.role !== 'assistant');
           resolvedSessionKey = key;
           break;
         }

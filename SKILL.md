@@ -59,5 +59,6 @@ Legacy route `GET/POST /api/tasks/{id}/subagent` remains for compatibility, but 
 
 ## Local Tools to Prefer
 
-- Use direct REST API calls only.
-- Use `/root/repos/blockether/mission-control/scripts/openclaw-acp` for ACP bridge calls with `--provenance meta+receipt` preconfigured.
+- Use Mission Control REST APIs directly for task/activity/deliverable updates.
+- For ACP session messaging, use `/root/repos/blockether/mission-control/scripts/openclaw-acp` (wrapper for `openclaw acp --provenance meta+receipt`).
+- Plain `pi` is a non-ACP fallback only; Mission Control's normal thread-bound flow uses ACP session runtime semantics.

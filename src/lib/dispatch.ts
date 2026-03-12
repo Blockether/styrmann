@@ -148,25 +148,42 @@ function buildWorkflowDiagram(planSummary: string | null, participants: Workflow
   const executionSteps = steps.filter((step) => step.agent_name || step.role || step.label);
   if (executionSteps.length === 0 && participants.length === 0 && !planSummary) return null;
 
-  const lines: string[] = [];
+  const sanitize = (value: string) => value.replace(/[^a-zA-Z0-9_]/g, '_');
+  const lines: string[] = ['```mermaid', 'flowchart TD'];
   if (planSummary) {
-    lines.push(planSummary.trim(), '');
+    lines.push(`  summary["${planSummary.trim().replace(/"/g, '\\"')}"]`);
   }
 
-  if (participants.length > 0) {
-    lines.push('Planner');
-    const planner = participants.find((participant) => participant.planner);
-    lines.push(`- ${planner?.agent_name || 'Orchestrator'}`);
-    lines.push('');
+  const planner = participants.find((participant) => participant.planner);
+  const firstNode = executionSteps[0] ? `step_0` : null;
+  if (planner) {
+    lines.push(`  planner["Planner: ${planner.agent_name.replace(/"/g, '\\"')}"]`);
+    if (firstNode) lines.push(`  planner --> ${firstNode}`);
+  }
+  if (planSummary && planner) {
+    lines.push('  summary --> planner');
+  } else if (planSummary && firstNode) {
+    lines.push(`  summary --> ${firstNode}`);
   }
 
-  lines.push('Execution Flow');
   executionSteps.forEach((step, index) => {
     const actor = step.agent_name || (step.role ? `${step.role} role` : 'System transition');
-    lines.push(`${index + 1}. ${step.label} -> ${actor} [${step.status}]`);
+    const label = `${step.label}\\n${actor}\\n[${step.status}]`.replace(/"/g, '\\"');
+    lines.push(`  step_${index}["${label}"]`);
+    if (index > 0) {
+      lines.push(`  step_${index - 1} --> step_${index}`);
+    }
+    const stepClass = sanitize(step.status);
+    lines.push(`  class step_${index} ${stepClass};`);
   });
 
-  return ['```text', ...lines, '```'].join('\n');
+  const uniqueStatuses = Array.from(new Set(executionSteps.map((step) => sanitize(step.status))));
+  for (const status of uniqueStatuses) {
+    lines.push(`  classDef ${status} fill:#fff7e6,stroke:#d4b35a,color:#333;`);
+  }
+
+  lines.push('```');
+  return lines.join('\n');
 }
 
 function buildDeliverableDescription(agentName: string, workflowStep: string, source: string): string {
@@ -744,6 +761,10 @@ ${task.due_date ? `**Due:** ${task.due_date}\n` : ''}
 **Task ID:** ${task.id}
 **Mission Control API base:** ${missionControlUrl}/api
 ${planningSpecSection}${agentInstructionsSection}${knowledgeSection}${resourceSection}
+**RUNTIME CONTRACT:**
+- This task runs in the OpenClaw ACP session runtime for this agent.
+- Use the plain Pi-style coding workflow inside that ACP session: inspect, edit, and verify with the runtime tools available to you.
+- Use the Mission Control REST API calls below for status, activity, and deliverable updates.
 ${acpSection}${isBuilder ? `**OUTPUT DIRECTORY:** ${taskProjectDir}\nCreate this directory and save all deliverables there. Do not write outside task-artifacts/${task.id}.\n` : `**OUTPUT DIRECTORY:** ${taskProjectDir}\nRead prior artifacts from task-artifacts/${task.id} if needed.\n`}
 ${completionInstructions}
 
