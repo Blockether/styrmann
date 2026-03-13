@@ -124,7 +124,7 @@ export async function POST(request: NextRequest) {
       logo_url || null
     );
 
-    // Clone workflow templates for the new workspace (agents come from OpenClaw sync)
+    // Clone workflow templates for the new workspace
     cloneWorkflowTemplates(db, id);
 
     const workspace = db.prepare('SELECT * FROM workspaces WHERE id = ?').get(id);

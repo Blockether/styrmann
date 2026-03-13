@@ -1,6 +1,6 @@
 /**
  * SessionsList Component
- * Displays OpenClaw sessions for a task
+ * Displays agent sessions for a task
  */
 
 'use client';
@@ -194,7 +194,7 @@ export function SessionsList({ taskId }: SessionsListProps) {
   return (
     <div data-component="src/components/SessionsList" className="space-y-3 max-w-full overflow-x-hidden">
       <div className="p-3 rounded-lg border border-mc-border bg-mc-bg-secondary text-xs flex items-center justify-between gap-2 flex-wrap">
-        <span className="text-mc-text-secondary">OpenClaw session state and trace readiness</span>
+        <span className="text-mc-text-secondary">Agent session state and trace readiness</span>
         <div className="flex flex-wrap items-center gap-2 justify-start">
           <span className="px-2 py-0.5 rounded border border-green-200 bg-green-50 text-green-700 whitespace-nowrap">Active: {activeCount}</span>
           <span className="px-2 py-0.5 rounded border border-mc-border bg-mc-bg text-mc-text-secondary whitespace-nowrap">Inactive: {inactiveCount}</span>
@@ -315,7 +315,7 @@ export function SessionsList({ taskId }: SessionsListProps) {
             )}
             {session.status === 'interrupted' && !session.resumed_via_session_continuation && (
               <div className="mt-2 text-xs text-orange-600">
-                Session heartbeat stopped. Resume will continue this exact session in OpenClaw.
+                Session heartbeat stopped. Resume will continue this exact session in OpenCode.
               </div>
             )}
             {session.status === 'interrupted' && session.resumed_via_session_continuation && (

@@ -154,7 +154,7 @@ export async function POST(
       : null;
     if (scopedSessionId && requestedSessionId && scopedSessionId !== requestedSessionId) {
       return NextResponse.json(
-        { error: 'openclaw_session_id does not match scoped token session' },
+        { error: 'session_id does not match scoped token session' },
         { status: 400 }
       );
     }

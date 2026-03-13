@@ -10,7 +10,7 @@
  *   - Organization stored in workspace.organization column
  *
  * Mission Control is discovered like any other repository.
- * The internal OpenClaw meta repository is modeled separately in the DB.
+ * The internal meta repository is modeled separately in the DB.
  *
  * Flat repos (no org parent) are ignored — only org/repo structure is discovered.
  * Templates are provisioned from code constants, not cloned from another workspace.

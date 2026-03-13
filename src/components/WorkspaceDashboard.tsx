@@ -245,7 +245,7 @@ function WorkspaceCard({ workspace, onDelete, onEdit }: { workspace: WorkspaceSt
         <div className="flex items-center gap-2 flex-wrap mb-3">
           {workspace.is_internal ? (
             <div className="inline-flex items-center rounded border border-mc-accent bg-mc-accent/10 px-2 py-0.5 text-[11px] text-mc-accent font-medium">
-              System / OpenClaw repository
+              System / Internal repository
             </div>
           ) : !workspace.github_repo ? (
             <div className="inline-flex items-center rounded border border-mc-border bg-mc-bg px-2 py-0.5 text-[11px] text-mc-text-secondary">
@@ -389,7 +389,7 @@ function EditWorkspaceModal({ workspace, onClose, onSaved }: { workspace: Worksp
         <form onSubmit={handleSubmit} autoComplete="off" className="p-6 space-y-4">
           {workspace.is_internal ? (
             <div className="rounded-lg border border-mc-accent bg-mc-accent/10 px-3 py-2 text-sm text-mc-text-secondary">
-              This is the internal OpenClaw meta repository. GitHub linking is disabled here.
+              This is an internal system repository. GitHub linking is disabled here.
             </div>
           ) : null}
 

@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
 
     const validRoles = ['user', 'assistant', 'system'];
 
-    // Prepare task_id lookup from openclaw_sessions
+    // Prepare task_id lookup from agent sessions
     const lookupTaskId = db.prepare(`
       SELECT task_id FROM openclaw_sessions
       WHERE openclaw_session_id = ? AND task_id IS NOT NULL

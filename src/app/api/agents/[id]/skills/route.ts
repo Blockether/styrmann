@@ -44,7 +44,7 @@ function resolveSharedRoot(): string {
   );
   const preferred = mainAgent?.agent_workspace_path ? join(mainAgent.agent_workspace_path, 'skills') : null;
   if (preferred && existsSync(preferred)) return preferred;
-  return '/root/.openclaw/workspace/skills';
+  return '/root/.opencode/workspace/skills';
 }
 
 function inspectSkills(agent: Pick<Agent, 'id' | 'name' | 'source' | 'gateway_agent_id' | 'agent_workspace_path'>) {
@@ -129,7 +129,7 @@ export async function GET(
       return NextResponse.json({ error: 'Agent not found' }, { status: 404 });
     }
     if (agent.source !== 'synced') {
-      return NextResponse.json({ error: 'Skill linking is available for synced OpenClaw agents only' }, { status: 400 });
+      return NextResponse.json({ error: 'Skill linking is available for synced agents only' }, { status: 400 });
     }
     return NextResponse.json(inspectSkills(agent));
   } catch (error) {
@@ -155,7 +155,7 @@ export async function POST(
       return NextResponse.json({ error: 'Agent not found' }, { status: 404 });
     }
     if (agent.source !== 'synced') {
-      return NextResponse.json({ error: 'Skill linking is available for synced OpenClaw agents only' }, { status: 400 });
+      return NextResponse.json({ error: 'Skill linking is available for synced agents only' }, { status: 400 });
     }
     if (agent.gateway_agent_id === 'main') {
       return NextResponse.json({ error: 'Main agent is the shared skill source and cannot link from itself' }, { status: 400 });

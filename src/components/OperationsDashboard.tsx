@@ -14,7 +14,7 @@ function parseOperationsHash(hash: string): { tab: OperationsTab | null; agentId
   if (!raw) return { tab: null, agentId: null };
   if (normalized === 'system' || normalized === 'system-runtime') return { tab: 'system', agentId: null };
   if (normalized === 'humans') return { tab: 'humans', agentId: null };
-  if (normalized === 'agents' || normalized === 'gateway' || normalized === 'openclaw') return { tab: 'agents', agentId: null };
+  if (normalized === 'agents' || normalized === 'gateway') return { tab: 'agents', agentId: null };
   if (normalized.startsWith('agents/')) {
     const agentId = decodeURIComponent(raw.slice('agents/'.length)).trim();
     return { tab: 'agents', agentId: agentId || null };

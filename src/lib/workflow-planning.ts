@@ -312,7 +312,7 @@ export async function generateTaskWorkflowPlan(taskId: string): Promise<{ plan: 
   const findings: TaskFinding[] = [];
   const proposals: CapabilityProposal[] = [];
   const metaWorkspace = queryOne<{ id: string; slug: string }>(
-    `SELECT id, slug FROM workspaces WHERE repo_kind = 'meta' OR slug = 'system-openclaw' ORDER BY created_at ASC LIMIT 1`,
+    `SELECT id, slug FROM workspaces WHERE repo_kind = 'meta' ORDER BY created_at ASC LIMIT 1`,
   );
 
   for (const stage of stages) {

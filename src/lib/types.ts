@@ -438,8 +438,6 @@ export interface AgentSession {
   updated_at: string;
 }
 
-export type OpenClawSession = AgentSession;
-
 export type ActivityType = 'spawned' | 'updated' | 'completed' | 'file_created' | 'status_changed' | 'dispatch_invocation' | 'test_passed' | 'test_failed' | 'activity_summary';
 
 export interface PresentedTaskActivity {
@@ -629,10 +627,6 @@ export interface AgentHistoryMessage {
   timestamp?: string;
 }
 
-export type OpenClawMessage = AgentMessage;
-export type OpenClawSessionInfo = AgentSessionInfo;
-export type OpenClawHistoryMessage = AgentHistoryMessage;
-
 export type AgentLogRole = 'user' | 'assistant' | 'system';
 
 export interface AgentLog {
@@ -652,8 +646,6 @@ export interface AgentLog {
 export interface AgentWithSession extends Agent {
   agentSession?: AgentSession | null;
 }
-
-export type AgentWithOpenClaw = AgentWithSession;
 
 // Real-time SSE event types
 export type SSEEventType =

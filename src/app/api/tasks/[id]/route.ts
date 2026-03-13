@@ -539,14 +539,14 @@ export async function DELETE(
       [id, 'dispatch_invocation'],
     );
 
-    const sessionKeyByOpenClawId = new Map<string, string>();
+    const sessionKeyBySessionId = new Map<string, string>();
     for (const row of dispatchMetadataRows) {
       const metadata = parseDispatchMetadata(row.metadata);
       if (!metadata) continue;
-      const openclawId = typeof metadata.openclaw_session_id === 'string' ? metadata.openclaw_session_id.trim() : '';
+      const sessionId = typeof metadata.openclaw_session_id === 'string' ? metadata.openclaw_session_id.trim() : '';
       const sessionKey = typeof metadata.session_key === 'string' ? metadata.session_key.trim() : '';
-      if (openclawId && sessionKey && !sessionKeyByOpenClawId.has(openclawId)) {
-        sessionKeyByOpenClawId.set(openclawId, sessionKey);
+      if (sessionId && sessionKey && !sessionKeyBySessionId.has(sessionId)) {
+        sessionKeyBySessionId.set(sessionId, sessionKey);
       }
     }
 

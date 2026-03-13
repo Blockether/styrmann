@@ -5,7 +5,7 @@ import { useCallback, useState } from 'react';
 /**
  * Syncs trace viewer open/close with the `?trace=` URL query parameter.
  *
- * The trace param is a plain openclaw_session_id (no encoding of full paths).
+ * The trace param is a plain session_id (no encoding of full paths).
  * URL shape: `?task=<id>&tab=sessions&trace=<sessionId>`
  *
  * Also tracks the associated taskId for trace resolution.

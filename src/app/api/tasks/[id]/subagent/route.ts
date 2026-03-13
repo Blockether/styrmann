@@ -1,6 +1,6 @@
 /**
  * Subagent Registration API
- * Register OpenClaw sub-agent sessions for tasks
+ * Register sub-agent sessions for tasks
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -24,7 +24,7 @@ export async function POST(
 
     if (!openclaw_session_id) {
       return NextResponse.json(
-        { error: 'openclaw_session_id is required' },
+        { error: 'session_id is required' },
         { status: 400 }
       );
     }
@@ -60,7 +60,7 @@ export async function POST(
       }
     }
 
-    // Insert OpenClaw session record
+    // Insert agent session record
     db.prepare(`
       INSERT INTO openclaw_sessions 
         (id, agent_id, openclaw_session_id, session_type, task_id, status)

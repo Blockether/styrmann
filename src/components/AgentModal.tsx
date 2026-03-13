@@ -546,7 +546,7 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated, initia
                   placeholder="What does this agent do?"
                 />
                 <p className="text-xs text-mc-text-secondary mt-1">
-                  For OpenClaw-synced agents, prompts belong in `AGENTS.md` (Agents tab).
+                  For synced agents, prompts belong in `AGENTS.md` (Agents tab).
                 </p>
               </div>
 
@@ -576,7 +576,7 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated, initia
                   </select>
                 )}
                 <p className="text-xs text-mc-text-secondary mt-1">
-                  Choose the model this agent should run. Leave empty to inherit the OpenClaw default.
+                  Choose the model this agent should run. Leave empty to use the workspace default.
                 </p>
               </div>
             </div>
@@ -586,20 +586,20 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated, initia
             <div className="space-y-4">
               {!agent ? (
                 <div className="rounded-lg border border-mc-border bg-mc-bg p-4 text-sm text-mc-text-secondary">
-                  Save this agent first, then you can browse its OpenClaw workspace files and skills.
+                  Save this agent first, then you can browse its workspace files and skills.
                 </div>
               ) : agent.source !== 'synced' ? (
                 <div className="rounded-lg border border-mc-border bg-mc-bg p-4 text-sm text-mc-text-secondary">
-                  This agent is local to Mission Control. OpenClaw workspace browsing is available for synced OpenClaw agents only.
+                  This agent is local to Mission Control. Workspace browsing is available for synced agents only.
                 </div>
               ) : (
                 <>
                   <div className="rounded-lg border border-mc-border bg-mc-bg p-4 space-y-2">
                     <div className="flex items-center justify-between gap-2 flex-wrap">
                       <div>
-                        <div className="text-sm font-medium text-mc-text">OpenClaw-backed agent</div>
+                        <div className="text-sm font-medium text-mc-text">Synced agent workspace</div>
                         <div className="text-xs text-mc-text-secondary mt-1">
-                          Inspect real OpenClaw files and manage skill links for this agent workspace.
+                          Inspect agent files and manage skill links for this agent workspace.
                         </div>
                       </div>
                       <button
@@ -645,7 +645,7 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated, initia
                   {workspaceLoading ? (
                     <div className="flex items-center gap-2 text-sm text-mc-text-secondary">
                       <RefreshCw className="w-4 h-4 animate-spin" />
-                      Loading OpenClaw workspace files...
+                      Loading workspace files...
                     </div>
                   ) : (
                     <div className="space-y-4">

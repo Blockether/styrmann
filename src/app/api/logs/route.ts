@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
  *
  * Query params:
  *   agent_id       - Filter by agent
- *   session_id     - Filter by OpenClaw session ID
+ *   session_id     - Filter by agent session ID
  *   role           - Filter by role (user|assistant|system)
  *   workspace_id   - Filter by workspace
  *   search         - Full-text search in content

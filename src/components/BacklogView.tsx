@@ -122,7 +122,7 @@ export function BacklogView({ workspaceId }: BacklogViewProps) {
     return result;
   }, [tasks, filterType, filterPriority, sortBy, sortDir, hideDone]);
 
-  const backlogTasks = useMemo(() => tasks.filter((t) => !t.milestone_id), [tasks]);
+  const backlogTasks = useMemo(() => tasks.filter((t) => !t.milestone_id && t.status !== 'done'), [tasks]);
   const urgentCount = useMemo(() => filteredTasks.filter((t) => t.priority === 'urgent').length, [filteredTasks]);
   const readyCount = useMemo(() => filteredTasks.filter((t) => t.status === 'assigned' || t.status === 'pending_dispatch').length, [filteredTasks]);
   const doneCount = useMemo(() => filteredTasks.filter((t) => t.status === 'done').length, [filteredTasks]);

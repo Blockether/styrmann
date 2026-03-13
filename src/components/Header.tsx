@@ -68,7 +68,7 @@ export function Header({ workspace, isPortrait = true, onMenuToggle, sidebarOpen
 
 
   const portraitWorkspaceHeader = !!workspace && isPortrait;
-  const topBarLogoSrc = workspace?.slug === 'system-openclaw' && workspace.logo_url
+  const topBarLogoSrc = workspace?.is_internal && workspace.logo_url
     ? workspace.logo_url
     : '/logo.png';
 

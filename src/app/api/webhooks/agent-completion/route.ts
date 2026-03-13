@@ -5,7 +5,7 @@ import { queryOne, queryAll, run } from '@/lib/db';
 import { checkBuilderEvidence } from '@/lib/builder-evidence';
 import { finalizeSessionById } from '@/lib/session-lifecycle';
 import { checkTransitionEligibility } from '@/lib/workflow-engine';
-import type { Task, Agent, OpenClawSession } from '@/lib/types';
+import type { Task, Agent, AgentSession } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
 /**
@@ -183,7 +183,7 @@ export async function POST(request: NextRequest) {
       const summary = completionMatch[1].trim();
 
       // Find agent by session
-      const session = queryOne<OpenClawSession>(
+      const session = queryOne<AgentSession>(
         'SELECT * FROM openclaw_sessions WHERE openclaw_session_id = ? AND status = ?',
         [body.session_id, 'active']
       );

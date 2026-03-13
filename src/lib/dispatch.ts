@@ -12,7 +12,7 @@ import { getUnresolvedTaskDependencies } from '@/lib/task-dependencies';
 import { generateScopedApiToken } from '@/lib/scoped-api-tokens';
 import { getTaskWorkflowPlan } from '@/lib/workflow-planning';
 import { finalizeOtherActiveSessionsForTask } from '@/lib/session-lifecycle';
-import type { Task, Agent, OpenClawSession, WorkflowStage, WorkflowPlanParticipant, WorkflowPlanStep } from '@/lib/types';
+import type { Task, Agent, AgentSession, WorkflowStage, WorkflowPlanParticipant, WorkflowPlanStep } from '@/lib/types';
 
 export interface DispatchResult {
   success: boolean;
@@ -276,11 +276,11 @@ function ensureProblemStatementArtifact(args: {
   task: Task;
   taskProjectDir: string;
   content: string;
-  openclawSessionId: string;
+  agentSessionId: string;
   agentName: string;
   workflowStep: string;
 }): string {
-  const { task, taskProjectDir, content, openclawSessionId, agentName, workflowStep } = args;
+  const { task, taskProjectDir, content, agentSessionId, agentName, workflowStep } = args;
   mkdirSync(taskProjectDir, { recursive: true });
   const artifactPath = path.join(taskProjectDir, 'task-problem-statement.md');
   writeFileSync(artifactPath, content, 'utf-8');
@@ -303,7 +303,7 @@ function ensureProblemStatementArtifact(args: {
           'task-problem-statement.md',
           artifactPath,
           buildDeliverableDescription(agentName, workflowStep, 'dispatch initialization'),
-          openclawSessionId,
+           agentSessionId,
           now,
         ],
       );
@@ -400,14 +400,14 @@ export async function dispatchTaskToAgent(taskId: string): Promise<DispatchResul
         agentId: agent.id,
         message: `Interrupted ${interruptedSessions.length} concurrent active session(s) before dispatch to ${agent.name}`,
         metadata: {
-          interrupted_openclaw_session_ids: interruptedSessions,
+          interrupted_session_ids: interruptedSessions,
           workflow_step: task.status === 'assigned' ? 'in_progress' : task.status,
           decision_event: true,
         },
       });
     }
 
-    let session = queryOne<OpenClawSession>(
+    let session = queryOne<AgentSession>(
       `SELECT * FROM openclaw_sessions
        WHERE agent_id = ? AND status = ? AND task_id = ?
        ORDER BY updated_at DESC, created_at DESC
@@ -416,7 +416,7 @@ export async function dispatchTaskToAgent(taskId: string): Promise<DispatchResul
     );
 
     if (!session) {
-      const interruptedSession = queryOne<OpenClawSession>(
+      const interruptedSession = queryOne<AgentSession>(
         `SELECT * FROM openclaw_sessions
          WHERE agent_id = ? AND status = ? AND task_id = ?
          ORDER BY updated_at DESC, created_at DESC
@@ -428,12 +428,12 @@ export async function dispatchTaskToAgent(taskId: string): Promise<DispatchResul
           'UPDATE openclaw_sessions SET status = ?, ended_at = NULL, updated_at = ? WHERE id = ?',
           ['active', now, interruptedSession.id],
         );
-        session = queryOne<OpenClawSession>('SELECT * FROM openclaw_sessions WHERE id = ?', [interruptedSession.id]);
+        session = queryOne<AgentSession>('SELECT * FROM openclaw_sessions WHERE id = ?', [interruptedSession.id]);
         createTaskActivity({
           taskId,
           activityType: 'status_changed',
           agentId: agent.id,
-          message: `Resuming interrupted OpenClaw session for ${agent.name}`,
+          message: `Resuming interrupted session for ${agent.name}`,
           metadata: {
             workflow_step: task.status === 'assigned' ? 'in_progress' : task.status,
             decision_event: true,
@@ -444,7 +444,7 @@ export async function dispatchTaskToAgent(taskId: string): Promise<DispatchResul
     }
 
     if (!session) {
-      const orphanSession = queryOne<OpenClawSession>(
+      const orphanSession = queryOne<AgentSession>(
         `SELECT * FROM openclaw_sessions
          WHERE agent_id = ? AND status = ? AND task_id IS NULL
          ORDER BY updated_at DESC, created_at DESC
@@ -456,21 +456,21 @@ export async function dispatchTaskToAgent(taskId: string): Promise<DispatchResul
           'UPDATE openclaw_sessions SET task_id = ?, session_type = ?, updated_at = ? WHERE id = ?',
           [task.id, 'subagent', now, orphanSession.id],
         );
-        session = queryOne<OpenClawSession>('SELECT * FROM openclaw_sessions WHERE id = ?', [orphanSession.id]);
+        session = queryOne<AgentSession>('SELECT * FROM openclaw_sessions WHERE id = ?', [orphanSession.id]);
       }
     }
 
     if (!session) {
       const sessionId = uuidv4();
-      const openclawSessionId = `mission-control-${normalizeSessionSlug(agent.name)}-${task.id.slice(0, 8)}`;
+      const agentSessionId = `mission-control-${normalizeSessionSlug(agent.name)}-${task.id.slice(0, 8)}`;
 
       run(
         `INSERT INTO openclaw_sessions (id, agent_id, openclaw_session_id, channel, status, session_type, task_id, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [sessionId, agent.id, openclawSessionId, 'mission-control', 'active', 'subagent', task.id, now, now]
+        [sessionId, agent.id, agentSessionId, 'mission-control', 'active', 'subagent', task.id, now, now]
       );
 
-      session = queryOne<OpenClawSession>('SELECT * FROM openclaw_sessions WHERE id = ?', [sessionId]);
+      session = queryOne<AgentSession>('SELECT * FROM openclaw_sessions WHERE id = ?', [sessionId]);
 
       run(
         `INSERT INTO events (id, type, agent_id, message, created_at)
@@ -785,7 +785,7 @@ If you need help or clarification, ask the orchestrator.`;
       task,
       taskProjectDir,
       content: taskProblemStatement,
-      openclawSessionId: session.openclaw_session_id,
+      agentSessionId: session.openclaw_session_id,
       agentName: agent.name,
       workflowStep: task.status === 'assigned' ? 'in_progress' : task.status,
     });
