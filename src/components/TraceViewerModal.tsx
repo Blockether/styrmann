@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { X, Bot, User, Cpu, Clock3, MessageSquare, Shield, ArrowRight, ArrowDown, Wrench, Terminal, Search, AlertTriangle, Copy, Check } from 'lucide-react';
+import { marked } from 'marked';
 
 interface TraceMessage {
   role: string;
@@ -130,6 +131,79 @@ function kindBadgeClass(kind: string): string {
   if (kind === 'external_user') return 'bg-amber-100 text-amber-800 border-amber-200';
   if (kind === 'inter_session') return 'bg-purple-100 text-purple-800 border-purple-200';
   return 'bg-gray-100 text-gray-700 border-gray-200';
+}
+
+function maybePrettyJson(raw: string): string | null {
+  const trimmed = raw.trim();
+  if (!(trimmed.startsWith('{') || trimmed.startsWith('['))) return null;
+  try {
+    const parsed = JSON.parse(trimmed);
+    return JSON.stringify(parsed, null, 2);
+  } catch {
+    return null;
+  }
+}
+
+function looksLikeMarkdown(raw: string): boolean {
+  const trimmed = raw.trim();
+  if (!trimmed) return false;
+  return (
+    /(^|\n)#{1,6}\s+/.test(trimmed)
+    || /(^|\n)-\s+/.test(trimmed)
+    || /(^|\n)\d+\.\s+/.test(trimmed)
+    || /```[\s\S]*```/.test(trimmed)
+    || /\*\*[^*]+\*\*/.test(trimmed)
+    || /\[[^\]]+\]\(([^)]+)\)/.test(trimmed)
+    || /(^|\n)>\s+/.test(trimmed)
+  );
+}
+
+function toSafeMarkdownHtml(raw: string): string {
+  const renderer = new marked.Renderer();
+  renderer.html = () => '';
+  renderer.link = ({ href, title, text }) => {
+    const url = href || '#';
+    const isSafe = /^(https?:|mailto:|\/)/i.test(url);
+    const safeHref = isSafe ? url : '#';
+    const titleAttr = title ? ` title="${title.replace(/"/g, '&quot;')}"` : '';
+    return `<a href="${safeHref}"${titleAttr} target="_blank" rel="noopener noreferrer nofollow">${text}</a>`;
+  };
+
+  return marked.parse(raw, {
+    async: false,
+    gfm: true,
+    breaks: true,
+    renderer,
+  }) as string;
+}
+
+function RenderTraceBody({
+  raw,
+  plainClassName,
+  jsonClassName,
+  markdownClassName,
+}: {
+  raw: string;
+  plainClassName: string;
+  jsonClassName: string;
+  markdownClassName: string;
+}) {
+  const json = maybePrettyJson(raw);
+  if (json) {
+    return <pre className={jsonClassName}>{json}</pre>;
+  }
+
+  if (looksLikeMarkdown(raw)) {
+    const html = toSafeMarkdownHtml(raw);
+    return (
+      <div
+        className={markdownClassName}
+        dangerouslySetInnerHTML={{ __html: html }}
+      />
+    );
+  }
+
+  return <pre className={plainClassName}>{raw}</pre>;
 }
 
 export function TraceViewerModal({ taskId, sessionId, onClose }: TraceViewerModalProps) {
@@ -431,9 +505,19 @@ export function TraceViewerModal({ taskId, sessionId, onClose }: TraceViewerModa
                         <span className="text-[11px] text-mc-text-secondary flex-shrink-0">#{index + 1} - {formatTimestamp(message.timestamp)}</span>
                       </div>
                       {message.content && isToolOutput ? (
-                        <pre className={`text-xs p-1.5 mt-1 rounded font-mono whitespace-pre-wrap break-words overflow-x-auto max-h-48 ${isError ? 'bg-red-50 border border-red-200 text-red-800' : 'bg-mc-bg border border-mc-border text-mc-text-secondary'}`}>{message.content}</pre>
+                        <RenderTraceBody
+                          raw={message.content}
+                          plainClassName={`text-xs p-1.5 mt-1 rounded font-mono whitespace-pre-wrap break-words overflow-x-auto max-h-48 ${isError ? 'bg-red-50 border border-red-200 text-red-800' : 'bg-mc-bg border border-mc-border text-mc-text-secondary'}`}
+                          jsonClassName={`text-xs p-1.5 mt-1 rounded font-mono whitespace-pre-wrap break-words overflow-x-auto max-h-48 ${isError ? 'bg-red-50 border border-red-200 text-red-800' : 'bg-mc-bg border border-mc-border text-mc-text-secondary'}`}
+                          markdownClassName={`text-xs p-2 mt-1 rounded whitespace-pre-wrap break-words overflow-x-auto max-h-48 [&_h1]:text-sm [&_h1]:font-semibold [&_h2]:text-sm [&_h2]:font-semibold [&_h3]:font-semibold [&_ul]:list-disc [&_ul]:pl-4 [&_ol]:list-decimal [&_ol]:pl-4 [&_code]:font-mono [&_code]:text-[11px] [&_pre]:font-mono [&_a]:text-cyan-700 [&_a]:underline ${isError ? 'bg-red-50 border border-red-200 text-red-800' : 'bg-mc-bg border border-mc-border text-mc-text'}`}
+                        />
                       ) : message.content ? (
-                        <p className="text-xs text-mc-text whitespace-pre-wrap break-words">{message.content}</p>
+                        <RenderTraceBody
+                          raw={message.content}
+                          plainClassName="text-xs text-mc-text whitespace-pre-wrap break-words"
+                          jsonClassName="text-xs p-1.5 mt-1 rounded font-mono whitespace-pre-wrap break-words overflow-x-auto max-h-48 bg-mc-bg border border-mc-border text-mc-text-secondary"
+                          markdownClassName="text-xs text-mc-text whitespace-pre-wrap break-words [&_h1]:text-sm [&_h1]:font-semibold [&_h2]:text-sm [&_h2]:font-semibold [&_h3]:font-semibold [&_ul]:list-disc [&_ul]:pl-4 [&_ol]:list-decimal [&_ol]:pl-4 [&_code]:font-mono [&_code]:text-[11px] [&_pre]:font-mono [&_a]:text-cyan-700 [&_a]:underline"
+                        />
                       ) : null}
                       {message.tool_calls && message.tool_calls.length > 0 && (
                         <div className="mt-1 space-y-1">
@@ -443,7 +527,12 @@ export function TraceViewerModal({ taskId, sessionId, onClose }: TraceViewerModa
                               <div className="min-w-0">
                                 <span className="font-mono font-medium text-mc-accent">{tc.name}</span>
                                 {tc.input && (
-                                  <pre className="mt-0.5 p-1.5 rounded bg-mc-bg border border-mc-border text-[11px] text-mc-text-secondary overflow-x-auto max-h-32 whitespace-pre-wrap break-words">{tc.input.length > 500 ? `${tc.input.slice(0, 500)}...` : tc.input}</pre>
+                                  <RenderTraceBody
+                                    raw={tc.input.length > 500 ? `${tc.input.slice(0, 500)}...` : tc.input}
+                                    plainClassName="mt-0.5 p-1.5 rounded bg-mc-bg border border-mc-border text-[11px] text-mc-text-secondary overflow-x-auto max-h-32 whitespace-pre-wrap break-words font-mono"
+                                    jsonClassName="mt-0.5 p-1.5 rounded bg-mc-bg border border-mc-border text-[11px] text-mc-text-secondary overflow-x-auto max-h-32 whitespace-pre-wrap break-words font-mono"
+                                    markdownClassName="mt-0.5 p-1.5 rounded bg-mc-bg border border-mc-border text-[11px] text-mc-text overflow-x-auto max-h-32 whitespace-pre-wrap break-words [&_ul]:list-disc [&_ul]:pl-4 [&_ol]:list-decimal [&_ol]:pl-4 [&_code]:font-mono [&_code]:text-[10px] [&_a]:text-cyan-700 [&_a]:underline"
+                                  />
                                 )}
                               </div>
                             </div>
@@ -453,7 +542,14 @@ export function TraceViewerModal({ taskId, sessionId, onClose }: TraceViewerModa
                       {message.tool_result && (
                         <div className="mt-1 flex items-start gap-1.5 text-xs">
                           <Terminal className="w-3 h-3 mt-0.5 text-emerald-600 flex-shrink-0" />
-                          <pre className="p-1.5 rounded bg-emerald-50 border border-emerald-200 text-[11px] text-emerald-800 overflow-x-auto max-h-32 whitespace-pre-wrap break-words min-w-0 flex-1">{message.tool_result.length > 500 ? `${message.tool_result.slice(0, 500)}...` : message.tool_result}</pre>
+                          <div className="min-w-0 flex-1">
+                            <RenderTraceBody
+                              raw={message.tool_result.length > 500 ? `${message.tool_result.slice(0, 500)}...` : message.tool_result}
+                              plainClassName="p-1.5 rounded bg-emerald-50 border border-emerald-200 text-[11px] text-emerald-800 overflow-x-auto max-h-32 whitespace-pre-wrap break-words font-mono"
+                              jsonClassName="p-1.5 rounded bg-emerald-50 border border-emerald-200 text-[11px] text-emerald-800 overflow-x-auto max-h-32 whitespace-pre-wrap break-words font-mono"
+                              markdownClassName="p-1.5 rounded bg-emerald-50 border border-emerald-200 text-[11px] text-emerald-900 overflow-x-auto max-h-32 whitespace-pre-wrap break-words [&_ul]:list-disc [&_ul]:pl-4 [&_ol]:list-decimal [&_ol]:pl-4 [&_code]:font-mono [&_code]:text-[10px] [&_a]:text-emerald-700 [&_a]:underline"
+                            />
+                          </div>
                         </div>
                       )}
                       {!message.content && !message.tool_calls?.length && !message.tool_result && (

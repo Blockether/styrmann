@@ -68,6 +68,9 @@ export function Header({ workspace, isPortrait = true, onMenuToggle, sidebarOpen
 
 
   const portraitWorkspaceHeader = !!workspace && isPortrait;
+  const topBarLogoSrc = workspace?.slug === 'system-openclaw' && workspace.logo_url
+    ? workspace.logo_url
+    : '/logo.png';
 
   const workspaceSwitcherDropdown = showWorkspaceSwitcher && (
     <div className="absolute top-full left-0 mt-1 w-44 sm:w-64 bg-mc-bg-secondary border border-mc-border rounded-lg shadow-lg z-50 py-1 max-h-64 overflow-y-auto">
@@ -170,7 +173,7 @@ export function Header({ workspace, isPortrait = true, onMenuToggle, sidebarOpen
             </button>
 
             <Link href="/" className="hidden sm:flex items-center gap-2 rounded px-1 py-1 transition-colors hover:bg-mc-bg-tertiary">
-              <Image src="/logo.png" alt="Styrmann" width={24} height={24} className="rounded" />
+              <Image src={topBarLogoSrc} alt="Styrmann" width={24} height={24} className="rounded" />
               <h1 className="font-semibold text-mc-text uppercase tracking-wider text-sm">Styrmann</h1>
             </Link>
 
