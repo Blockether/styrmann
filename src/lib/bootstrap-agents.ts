@@ -7,17 +7,17 @@
 
 import Database from 'better-sqlite3';
 import { getDb } from '@/lib/db';
-import { getMissionControlUrl } from '@/lib/config';
+import { getStyrmannUrl } from '@/lib/config';
 import { provisionWorkflowTemplates } from '@/lib/workflow-templates';
 
 // ── Agent Definitions ──────────────────────────────────────────────
 
-function sharedUserMd(missionControlUrl: string): string {
+function sharedUserMd(styrmannUrl: string): string {
   return `# User Context
 
 ## Operating Environment
 - Platform: Autensa multi-agent task orchestration
-- API Base: ${missionControlUrl}
+- API Base: ${styrmannUrl}
 - Tasks are dispatched automatically by the workflow engine
 - Communication via OpenCode ACP
 
@@ -231,8 +231,8 @@ Synthesize multi-agent architecture feedback into one recommendation.
  */
 export function bootstrapCoreAgents(): void {
   const db = getDb();
-  const missionControlUrl = getMissionControlUrl();
-  bootstrapCoreAgentsRaw(db, missionControlUrl);
+  const styrmannUrl = getStyrmannUrl();
+  bootstrapCoreAgentsRaw(db, styrmannUrl);
 }
 
 /**
@@ -246,7 +246,7 @@ export function bootstrapCoreAgents(): void {
  */
 export function bootstrapCoreAgentsRaw(
   db: Database.Database,
-  missionControlUrl: string,
+  styrmannUrl: string,
 ): void {
   const syncedCount = (db.prepare(
     "SELECT COUNT(*) as cnt FROM agents WHERE source = 'synced'"
@@ -256,7 +256,7 @@ export function bootstrapCoreAgentsRaw(
     return;
   }
 
-  const userMd = sharedUserMd(missionControlUrl);
+  const userMd = sharedUserMd(styrmannUrl);
   const now = new Date().toISOString();
 
   const insert = db.prepare(`

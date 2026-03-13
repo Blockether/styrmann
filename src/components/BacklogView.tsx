@@ -24,7 +24,7 @@ import {
   FunnelX,
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
-import { useMissionControl } from '@/lib/store';
+import { useStyrmann } from '@/lib/store';
 import type { Task, TaskType, TaskPriority, Milestone } from '@/lib/types';
 import { TaskModal } from '@/components/TaskModal';
 import { useTaskDeepLink } from '@/hooks/useTaskDeepLink';
@@ -46,7 +46,7 @@ interface BacklogViewProps {
 }
 
 export function BacklogView({ workspaceId }: BacklogViewProps) {
-  const { tasks } = useMissionControl();
+  const { tasks } = useStyrmann();
   // Sprints state removed - backlog shows tasks without milestones
   const [milestones, setMilestones] = useState<Milestone[]>([]);
   const [loading, setLoading] = useState(true);

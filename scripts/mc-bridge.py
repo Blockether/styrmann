@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-ARIA ↔ Mission Control Bridge
-Syncs agent activity with Mission Control via its REST API.
+ARIA ↔ Styrmann Bridge
+Syncs agent activity with Styrmann via its REST API.
 
 Usage:
   mc-bridge.py agent-start --agent "Researcher" --task "Research Axe 2" [--label "researcher-1900"]
@@ -26,27 +26,30 @@ import urllib.error
 BASE_URL = os.environ.get("MC_URL", "http://localhost:3000")
 WORKSPACE_ID = os.environ.get("MC_WORKSPACE", "default")
 
-# Label prefix → Mission Control agent name
+# Label prefix → Styrmann agent name
 LABEL_MAP = [
     # (prefix_list, agent_name)
-    (["researcher"],                       "Researcher"),
-    (["coder", "fix-", "dev-"],            "Coder"),
-    (["brainstorm"],                       "Brainstorm"),
-    (["qa", "test-"],                      "QA"),
-    (["linkedin", "writer"],               "LinkedIn Writer"),
-    (["synth", "brief", "morning"],        "Synthesizer"),
-    (["archiv", "journal"],                "Archivist"),
-    (["diving", "casar"],                  "Diving"),
-    (["home", "tv-", "sonos-"],            "Home"),
-    (["monitor"],                          "Monitor"),
+    (["researcher"], "Researcher"),
+    (["coder", "fix-", "dev-"], "Coder"),
+    (["brainstorm"], "Brainstorm"),
+    (["qa", "test-"], "QA"),
+    (["linkedin", "writer"], "LinkedIn Writer"),
+    (["synth", "brief", "morning"], "Synthesizer"),
+    (["archiv", "journal"], "Archivist"),
+    (["diving", "casar"], "Diving"),
+    (["home", "tv-", "sonos-"], "Home"),
+    (["monitor"], "Monitor"),
 ]
 
 # ---------------------------------------------------------------------------
 # HTTP helpers  (stdlib only – no requests/httpx)
 # ---------------------------------------------------------------------------
 
-def _request(method: str, path: str, body: dict | None = None, quiet: bool = False) -> dict | list | None:
-    """Make an HTTP request to Mission Control. Returns parsed JSON or None on error."""
+
+def _request(
+    method: str, path: str, body: dict | None = None, quiet: bool = False
+) -> dict | list | None:
+    """Make an HTTP request to Styrmann. Returns parsed JSON or None on error."""
     url = f"{BASE_URL}{path}"
     data = json.dumps(body).encode() if body else None
     req = urllib.request.Request(
@@ -66,7 +69,7 @@ def _request(method: str, path: str, body: dict | None = None, quiet: bool = Fal
         return None
     except urllib.error.URLError as e:
         if not quiet:
-            print(f"⚠️  Mission Control unreachable ({BASE_URL}): {e.reason}", file=sys.stderr)
+            print(f"⚠️  Styrmann unreachable ({BASE_URL}): {e.reason}", file=sys.stderr)
         return None
     except Exception as e:
         if not quiet:
@@ -77,17 +80,21 @@ def _request(method: str, path: str, body: dict | None = None, quiet: bool = Fal
 def api_get(path: str, quiet: bool = False):
     return _request("GET", path, quiet=quiet)
 
+
 def api_post(path: str, body: dict, quiet: bool = False):
     return _request("POST", path, body, quiet=quiet)
 
+
 def api_patch(path: str, body: dict, quiet: bool = False):
     return _request("PATCH", path, body, quiet=quiet)
+
 
 # ---------------------------------------------------------------------------
 # Agent resolution
 # ---------------------------------------------------------------------------
 
 _agent_cache: list | None = None
+
 
 def get_agents() -> list:
     global _agent_cache
@@ -98,7 +105,7 @@ def get_agents() -> list:
 
 
 def resolve_agent_name(label: str) -> str | None:
-    """Map a Clawdbot session label to a Mission Control agent name."""
+    """Map a Clawdbot session label to a Styrmann agent name."""
     label_lower = label.lower()
     for prefixes, agent_name in LABEL_MAP:
         for prefix in prefixes:
@@ -108,7 +115,7 @@ def resolve_agent_name(label: str) -> str | None:
 
 
 def find_agent(name: str) -> dict | None:
-    """Find an agent by name (case-insensitive) in Mission Control."""
+    """Find an agent by name (case-insensitive) in Styrmann."""
     agents = get_agents()
     name_lower = name.lower()
     for a in agents:
@@ -129,9 +136,11 @@ def find_agent_by_name_or_label(name_or_label: str) -> dict | None:
         return find_agent(mapped_name)
     return None
 
+
 # ---------------------------------------------------------------------------
 # Commands
 # ---------------------------------------------------------------------------
+
 
 def cmd_agent_start(args):
     """Agent starts working on a task."""
@@ -168,7 +177,7 @@ def cmd_agent_start(args):
         task_body["description"] = args.description
 
     task = api_post("/api/tasks", task_body)
-    if not task:
+    if not isinstance(task, dict) or "id" not in task:
         print("❌ Failed to create task", file=sys.stderr)
         sys.exit(1)
 
@@ -178,11 +187,15 @@ def cmd_agent_start(args):
     api_patch(f"/api/agents/{agent_id}", {"status": "working"})
 
     # 3. Log activity
-    api_post(f"/api/tasks/{task_id}/activities", {
-        "activity_type": "spawned",
-        "message": f"{agent_name} started working" + (f" (label: {args.label})" if args.label else ""),
-        "agent_id": agent_id,
-    })
+    api_post(
+        f"/api/tasks/{task_id}/activities",
+        {
+            "activity_type": "spawned",
+            "message": f"{agent_name} started working"
+            + (f" (label: {args.label})" if args.label else ""),
+            "agent_id": agent_id,
+        },
+    )
 
     # Output task ID (for ARIA to capture)
     print(task_id)
@@ -208,11 +221,14 @@ def cmd_agent_done(args):
 
     # 3. Log activity
     summary = args.summary or "Task completed"
-    api_post(f"/api/tasks/{task_id}/activities", {
-        "activity_type": "completed",
-        "message": f"{agent_name}: {summary}",
-        "agent_id": agent_id,
-    })
+    api_post(
+        f"/api/tasks/{task_id}/activities",
+        {
+            "activity_type": "completed",
+            "message": f"{agent_name}: {summary}",
+            "agent_id": agent_id,
+        },
+    )
 
     print(f"✅ {agent_name} → {target_status} | {summary}")
 
@@ -236,12 +252,15 @@ def cmd_agent_error(args):
 
     # 3. Log error activity
     error_msg = args.error or "Unknown error"
-    api_post(f"/api/tasks/{task_id}/activities", {
-        "activity_type": "status_changed",
-        "message": f"⚠️ {agent_name} error: {error_msg}",
-        "agent_id": agent_id,
-        "metadata": json.dumps({"error": error_msg}),
-    })
+    api_post(
+        f"/api/tasks/{task_id}/activities",
+        {
+            "activity_type": "status_changed",
+            "message": f"⚠️ {agent_name} error: {error_msg}",
+            "agent_id": agent_id,
+            "metadata": json.dumps({"error": error_msg}),
+        },
+    )
 
     print(f"⚠️ {agent_name} → review | Error: {error_msg}")
 
@@ -257,11 +276,14 @@ def cmd_agent_update(args):
     agent_name = agent["name"]
     task_id = args.task_id
 
-    api_post(f"/api/tasks/{task_id}/activities", {
-        "activity_type": "updated",
-        "message": f"{agent_name}: {args.message}",
-        "agent_id": agent_id,
-    })
+    api_post(
+        f"/api/tasks/{task_id}/activities",
+        {
+            "activity_type": "updated",
+            "message": f"{agent_name}: {args.message}",
+            "agent_id": agent_id,
+        },
+    )
 
     print(f"📝 {agent_name}: {args.message}")
 
@@ -271,14 +293,16 @@ def cmd_status(args):
     # Agents
     agents = get_agents()
     if not agents:
-        print("⚠️  No agents found (is Mission Control running?)")
+        print("⚠️  No agents found (is Styrmann running?)")
         return
 
     print("── Agents ──────────────────────────────────")
     for a in agents:
         emoji = a.get("avatar_emoji", "🤖")
         status = a.get("status", "?")
-        indicator = {"working": "🟢", "standby": "⚪", "offline": "🔴"}.get(status, "❓")
+        indicator = {"working": "🟢", "standby": "⚪", "offline": "🔴"}.get(
+            status, "❓"
+        )
         master = " 👑" if a.get("is_master") else ""
         print(f"  {indicator} {emoji} {a['name']:<20} {status}{master}")
 
@@ -289,7 +313,12 @@ def cmd_status(args):
         for t in tasks:
             status = t.get("status", "?")
             agent_name = t.get("assigned_agent_name", "unassigned")
-            emoji = {"in_progress": "🔧", "assigned": "📋", "review": "👀", "testing": "🧪"}.get(status, "❓")
+            emoji = {
+                "in_progress": "🔧",
+                "assigned": "📋",
+                "review": "👀",
+                "testing": "🧪",
+            }.get(status, "❓")
             print(f"  {emoji} [{status:<11}] {t['title'][:50]:<50} → {agent_name}")
             print(f"    id: {t['id']}")
     else:
@@ -303,7 +332,15 @@ def cmd_status(args):
             s = t.get("status", "?")
             by_status[s] = by_status.get(s, 0) + 1
         print("\n── Stats ───────────────────────────────────")
-        order = ["inbox", "planning", "assigned", "in_progress", "testing", "review", "done"]
+        order = [
+            "inbox",
+            "planning",
+            "assigned",
+            "in_progress",
+            "testing",
+            "review",
+            "done",
+        ]
         parts = []
         for s in order:
             if s in by_status:
@@ -321,7 +358,9 @@ def cmd_list_agents(args):
     print(f"{'Name':<20} {'ID':<38} {'Status':<10} {'Role'}")
     print("─" * 90)
     for a in agents:
-        print(f"{a['name']:<20} {a['id']:<38} {a.get('status', '?'):<10} {a.get('role', '')}")
+        print(
+            f"{a['name']:<20} {a['id']:<38} {a.get('status', '?'):<10} {a.get('role', '')}"
+        )
 
     # Show label mapping
     print("\n── Label Mapping ───────────────────────────")
@@ -335,9 +374,10 @@ def cmd_list_agents(args):
 # CLI Parser
 # ---------------------------------------------------------------------------
 
+
 def main():
     parser = argparse.ArgumentParser(
-        description="ARIA ↔ Mission Control Bridge",
+        description="ARIA ↔ Styrmann Bridge",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -357,7 +397,9 @@ Examples:
     p_start.add_argument("--task", required=True, help="Task title")
     p_start.add_argument("--label", help="Clawdbot session label (for mapping)")
     p_start.add_argument("--description", help="Task description")
-    p_start.add_argument("--priority", choices=["low", "normal", "high", "urgent"], default="normal")
+    p_start.add_argument(
+        "--priority", choices=["low", "normal", "high", "urgent"], default="normal"
+    )
     p_start.set_defaults(func=cmd_agent_start)
 
     # -- agent-done --
@@ -365,8 +407,12 @@ Examples:
     p_done.add_argument("--agent", required=True, help="Agent name or label prefix")
     p_done.add_argument("--task-id", required=True, help="Task ID")
     p_done.add_argument("--summary", help="Completion summary")
-    p_done.add_argument("--done", dest="force_done", action="store_true",
-                        help="Move directly to done (skip review)")
+    p_done.add_argument(
+        "--done",
+        dest="force_done",
+        action="store_true",
+        help="Move directly to done (skip review)",
+    )
     p_done.set_defaults(func=cmd_agent_done)
 
     # -- agent-error --
@@ -377,7 +423,9 @@ Examples:
     p_error.set_defaults(func=cmd_agent_error)
 
     # -- agent-update --
-    p_update = sub.add_parser("agent-update", help="Log progress without changing status")
+    p_update = sub.add_parser(
+        "agent-update", help="Log progress without changing status"
+    )
     p_update.add_argument("--agent", required=True, help="Agent name or label prefix")
     p_update.add_argument("--task-id", required=True, help="Task ID")
     p_update.add_argument("--message", required=True, help="Progress message")

@@ -9,7 +9,7 @@ export function getConfig() {
   };
 }
 
-export function shouldUseMissionControlToken(_mcUrl?: string): boolean {
+export function shouldUseStyrmannToken(_mcUrl?: string): boolean {
   return true;
 }
 

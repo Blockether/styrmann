@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import path from 'path';
 import { dispatchToOpenCode } from '@/lib/acp/client';
 import { broadcast } from '@/lib/events';
-import { getMissionControlUrl } from '@/lib/config';
+import { getStyrmannUrl } from '@/lib/config';
 import { ensureTaskWorktree, getTaskPipelineDir, getWorkspaceRepoPath, isGitWorkTree } from '@/lib/git-repo';
 import { createTaskActivity } from '@/lib/task-activity';
 import { getTaskWorkflow } from '@/lib/workflow-engine';
@@ -47,13 +47,13 @@ function resourcePathFromPreviewUrl(url: string): string | null {
   }
 }
 
-function getExternalMissionControlUrl(missionControlUrl: string): string {
+function getExternalStyrmannUrl(styrmannUrl: string): string {
   try {
-    const parsed = new URL(missionControlUrl);
+    const parsed = new URL(styrmannUrl);
     if (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1' || parsed.hostname === '::1') {
    return process.env.STYRMAN_URL || 'https://control.blockether.com';
     }
-    return missionControlUrl;
+    return styrmannUrl;
   } catch {
   return process.env.STYRMAN_URL || 'https://control.blockether.com';
   }
@@ -192,7 +192,7 @@ function buildDeliverableDescription(agentName: string, workflowStep: string, so
 function buildTaskProblemStatementMarkdown(args: {
   task: Task;
   workspaceName?: string | null;
-  missionControlUrl: string;
+  styrmannUrl: string;
   outputDirectory: string;
   currentStageLabel: string;
   currentStageStatus: string;
@@ -208,7 +208,7 @@ function buildTaskProblemStatementMarkdown(args: {
   const {
     task,
     workspaceName,
-    missionControlUrl,
+    styrmannUrl,
     outputDirectory,
     currentStageLabel,
     currentStageStatus,
@@ -249,7 +249,7 @@ ${orchestratorPlanDiagram}\n\n\
     `- Priority: ${task.priority.toUpperCase()}`,
     `- Current stage: ${currentStageLabel} (${currentStageStatus})`,
     `- Next status target: ${nextStatus}`,
-    `- Mission Control API: ${missionControlUrl}/api`,
+    `- Styrmann API: ${styrmannUrl}/api`,
     `- Output directory: ${outputDirectory}`,
     task.due_date ? `- Due date: ${task.due_date}` : '',
     '',
@@ -486,7 +486,7 @@ export async function dispatchTaskToAgent(taskId: string): Promise<DispatchResul
     const worktree = hasGitWorktree ? ensureTaskWorktree(repoPath, task.id, task.title) : null;
     const taskProjectDir = getTaskPipelineDir(worktree?.worktreePath || repoPath, task.id);
     mkdirSync(taskProjectDir, { recursive: true });
-    const missionControlUrl = getExternalMissionControlUrl(getMissionControlUrl());
+    const styrmannUrl = getExternalStyrmannUrl(getStyrmannUrl());
     const activeAcpBinding = queryOne<{
       acp_session_key: string;
       acp_agent_id: string;
@@ -620,7 +620,7 @@ export async function dispatchTaskToAgent(taskId: string): Promise<DispatchResul
     const isTester = currentStage?.role === 'tester';
     const isVerifier = currentStage?.role === 'verifier' || currentStage?.role === 'reviewer';
     const nextStatus = nextStage?.status || 'review';
-    const failEndpoint = `POST ${missionControlUrl}/api/tasks/${task.id}/fail`;
+    const failEndpoint = `POST ${styrmannUrl}/api/tasks/${task.id}/fail`;
     const acpSection = activeAcpBinding
       ? `\n**ACP CONTEXT:**\n- ACP session key: ${activeAcpBinding.acp_session_key}\n- ACP agent: ${activeAcpBinding.acp_agent_id}\n- Discord thread: ${activeAcpBinding.discord_thread_id}\nUse this as supervisor context if your runtime can access ACP bindings.\n`
       : '';
@@ -658,12 +658,12 @@ export async function dispatchTaskToAgent(taskId: string): Promise<DispatchResul
 - This workspace runs without a git worktree branch requirement.
 - Still write deliverables under ${taskProjectDir}`;
 
-      completionInstructions = `**IMPORTANT:** Use Mission Control direct REST API.
-1. Log activity: POST ${missionControlUrl}/api/tasks/${task.id}/activities${authHeader}
+completionInstructions = `**IMPORTANT:** Use Styrmann direct REST API.
+1. Log activity: POST ${styrmannUrl}/api/tasks/${task.id}/activities${authHeader}
    Body: {"activity_type": "completed", "message": "Description of what was done", "metadata": ${branchMetadata}}
-2. Register deliverable: POST ${missionControlUrl}/api/tasks/${task.id}/deliverables${authHeader}
+2. Register deliverable: POST ${styrmannUrl}/api/tasks/${task.id}/deliverables${authHeader}
    Body: {"deliverable_type": "file", "title": "File name", "path": "${taskProjectDir}/filename.html"}
-3. Update status: PATCH ${missionControlUrl}/api/tasks/${task.id}${authHeader}
+3. Update status: PATCH ${styrmannUrl}/api/tasks/${task.id}${authHeader}
    Body: {"status": "${nextStatus}", "updated_by_session_id": "${session.session_id}"}
 
 Progress reporting rules:
@@ -682,9 +682,9 @@ When complete, reply with:
 Review the output directory for deliverables and run any applicable tests.
 
 **If tests PASS:**
-1. POST ${missionControlUrl}/api/tasks/${task.id}/activities${authHeader}
+1. POST ${styrmannUrl}/api/tasks/${task.id}/activities${authHeader}
    Body: {"activity_type": "completed", "message": "Tests passed: [summary]"}
-2. PATCH ${missionControlUrl}/api/tasks/${task.id}${authHeader}
+2. PATCH ${styrmannUrl}/api/tasks/${task.id}${authHeader}
    Body: {"status": "${nextStatus}", "updated_by_session_id": "${session.session_id}"}
 ${loopGuide}
 
@@ -704,9 +704,9 @@ Reply with: \`TEST_PASS: [summary]\` or \`TEST_FAIL: [what failed]\``;
 Review deliverables, test results, and task requirements.
 
 **If verification PASSES:**
-1. POST ${missionControlUrl}/api/tasks/${task.id}/activities${authHeader}
+1. POST ${styrmannUrl}/api/tasks/${task.id}/activities${authHeader}
    Body: {"activity_type": "completed", "message": "Verification passed: [summary]"}
-2. PATCH ${missionControlUrl}/api/tasks/${task.id}${authHeader}
+2. PATCH ${styrmannUrl}/api/tasks/${task.id}${authHeader}
    Body: {"status": "${nextStatus}", "updated_by_session_id": "${session.session_id}"}
 ${loopGuide}
 
@@ -722,7 +722,7 @@ ${loopGuide}
 Reply with: \`VERIFY_PASS: [summary]\` or \`VERIFY_FAIL: [what failed]\``;
     } else {
       completionInstructions = `**IMPORTANT:** After completing work:
-1. PATCH ${missionControlUrl}/api/tasks/${task.id}${authHeader}
+1. PATCH ${styrmannUrl}/api/tasks/${task.id}${authHeader}
    Body: {"status": "${nextStatus}", "updated_by_session_id": "${session.session_id}"}`;
     }
 
@@ -734,12 +734,12 @@ ${task.description ? `**Description:** ${task.description}\n` : ''}
 **Priority:** ${task.priority.toUpperCase()}
 ${task.due_date ? `**Due:** ${task.due_date}\n` : ''}
 **Task ID:** ${task.id}
-**Mission Control API base:** ${missionControlUrl}/api
+**Styrmann API base:** ${styrmannUrl}/api
 ${planningSpecSection}${agentInstructionsSection}${resourceSection}
 **RUNTIME CONTRACT:**
 - This task runs in an OpenCode session for this agent.
 - Inspect, edit, and verify using the runtime tools available to you.
-- Use the Mission Control REST API calls below for status, activity, and deliverable updates.
+- Use the Styrmann REST API calls below for status, activity, and deliverable updates.
 ${acpSection}${isBuilder ? `**OUTPUT DIRECTORY:** ${taskProjectDir}\nCreate this directory and save all deliverables there. Do not write outside task-artifacts/${task.id}.\n` : `**OUTPUT DIRECTORY:** ${taskProjectDir}\nRead prior artifacts from task-artifacts/${task.id} if needed.\n`}
 ${completionInstructions}
 
@@ -748,7 +748,7 @@ If you need help or clarification, ask the orchestrator.`;
     const taskProblemStatement = buildTaskProblemStatementMarkdown({
       task,
       workspaceName: workspace?.name || null,
-      missionControlUrl,
+      styrmannUrl,
       outputDirectory: taskProjectDir,
       currentStageLabel: roleLabel,
       currentStageStatus: task.status === 'assigned' ? 'in_progress' : task.status,

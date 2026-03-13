@@ -13,7 +13,7 @@ import { ParetoView } from '@/components/ParetoView';
 import { SSEDebugPanel } from '@/components/SSEDebugPanel';
 import { GithubIssuesView } from '@/components/GithubIssuesView';
 import { TaskModal } from '@/components/TaskModal';
-import { useMissionControl } from '@/lib/store';
+import { useStyrmann } from '@/lib/store';
 import { useSSE } from '@/hooks/useSSE';
 import { debug } from '@/lib/debug';
 import type { Task, Workspace, GitHubIssue } from '@/lib/types';
@@ -32,7 +32,7 @@ export default function WorkspacePage() {
   const params = useParams();
   const slug = params.slug as string;
 
-  const { setAgents, setTasks, setIsOnline, setIsLoading, isLoading } = useMissionControl();
+  const { setAgents, setTasks, setIsOnline, setIsLoading, isLoading } = useStyrmann();
 
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [notFound, setNotFound] = useState(false);
@@ -140,7 +140,7 @@ export default function WorkspacePage() {
         const res = await fetch(`/api/tasks?workspace_id=${workspaceId}`);
         if (res.ok) {
           const newTasks: Task[] = await res.json();
-          const currentTasks = useMissionControl.getState().tasks;
+          const currentTasks = useStyrmann.getState().tasks;
 
           const hasChanges =
             newTasks.length !== currentTasks.length ||

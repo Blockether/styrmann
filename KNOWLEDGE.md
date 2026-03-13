@@ -1,4 +1,4 @@
-# KNOWLEDGE.md -- Styrmann (formerly Mission Control)
+# KNOWLEDGE.md -- Styrmann
 
 Last updated: 2026-03-13
 
@@ -265,18 +265,18 @@ The Strict template is the default. Per-task workflow plans persist selected par
 
 **Bootstrap policy**: `bootstrapCoreAgentsRaw()` is a fallback for fresh installs without an OpenClaw gateway. It bootstraps 8 local fallback agents globally: Orchestrator, Builder, Tester, Reviewer, Explorer, Pragmatist, Guardian, and Consolidator. If any synced agents exist, bootstrap is skipped entirely — synced agents ARE the real team. Workflow planning handles missing roles via `task_findings` and `capability_proposals` rather than creating new agents.
 
-**OpenClaw prompt source policy**: Mission Control treats workspace `AGENTS.md` as the canonical agent instruction source and `SOUL.md` as identity/personality context. `system.md` in agent directories is considered legacy and is auto-migrated into workspace `AGENTS.md` + `SOUL.md` when detected, then removed. Framework-level duplicate system prompt injection is intentionally avoided.
-**Memory handling**: Memory is handled natively by OpenClaw's lossless memory system. Mission Control no longer runs its own memory consolidation pipeline, vector search, agent filesystem sync, or workspace knowledge API. The `/api/memory/*` endpoints and daemon consolidation job have been removed.
+**OpenClaw prompt source policy**: Styrmann treats workspace `AGENTS.md` as the canonical agent instruction source and `SOUL.md` as identity/personality context. `system.md` in agent directories is considered legacy and is auto-migrated into workspace `AGENTS.md` + `SOUL.md` when detected, then removed. Framework-level duplicate system prompt injection is intentionally avoided.
+**Memory handling**: Memory is handled natively by OpenClaw's lossless memory system. Styrmann no longer runs its own memory consolidation pipeline, vector search, agent filesystem sync, or workspace knowledge API. The `/api/memory/*` endpoints and daemon consolidation job have been removed.
 
 **Agent fields**: name, role, description, status (standby/working/offline), model, source (local/gateway/synced), gateway_agent_id, session_key_prefix, agent_dir, agent_workspace_path, soul_md, user_md, agents_md. **API enrichment**: `GET /api/agents` returns `active_task_count` (number of active tasks) and `current_task_title` (title of in-progress task, if any) for each agent.
 
 **Prompts stored in files**: soul_md, user_md, agents_md are read from OpenClaw agent workspace directories on disk. Double binding -- files are the source of truth, DB reflects them.
 
-**Workspace visibility**: Synced OpenClaw agents expose their real filesystem paths via `agent_dir` and `agent_workspace_path`. Mission Control includes a read-only browser endpoint for these roots so the agent modal can inspect the actual workspace/config directories and installed `skills/` entries on disk.
+**Workspace visibility**: Synced OpenClaw agents expose their real filesystem paths via `agent_dir` and `agent_workspace_path`. Styrmann includes a read-only browser endpoint for these roots so the agent modal can inspect the actual workspace/config directories and installed `skills/` entries on disk.
 
 **OpenClaw modal policy**: Synced OpenClaw agents are inspected read-only in the Agent modal. The Operations/OpenClaw view is now a management entrypoint, not a direct prompt editor for synced agents. `/operations#agents/{agentId}` hash routes open agent-specific modals directly, the role field is selected from the canonical default role list, and the Agents panel shows a warning banner when required default roles are missing.
 
-**Skill linking policy**: Main OpenClaw agent skills are treated as the shared source. Sub-agents link skills via symlinks into their workspace `skills/` directories (no copy). Mission Control exposes `/api/agents/{id}/skills` for listing and link/unlink/sync actions. Workflow planning reads these linked skills when choosing which existing agent should run each step.
+**Skill linking policy**: Main OpenClaw agent skills are treated as the shared source. Sub-agents link skills via symlinks into their workspace `skills/` directories (no copy). Styrmann exposes `/api/agents/{id}/skills` for listing and link/unlink/sync actions. Workflow planning reads these linked skills when choosing which existing agent should run each step.
 
 ### Presenter Role
 
@@ -296,7 +296,7 @@ The Presenter is a core role that interprets technical execution data without ch
 
 - `humans` table stores assignable humans with `name`, `email`, and `is_active`.
 - Migration seeds `Karol <karol@blockether.com>` and `Alex <alex@blockether.com>` as initial human assignees.
-- `workspaces.himalaya_account` selects which Himalaya account Mission Control uses for human-assignment email delivery.
+- `workspaces.himalaya_account` selects which Himalaya account Styrmann uses for human-assignment email delivery.
 - `workspaces.coordinator_email` is used as the sender address in those emails.
 - `GET /api/system/himalaya` reports CLI availability, configured accounts, selected account, and whether `himalaya account doctor` passes.
 - Human-assigned tasks suppress AI dispatch and disable Team-tab role mapping until switched back to `ai`.
@@ -564,16 +564,16 @@ Webhook verification: `STYRMAN_WEBHOOK_SECRET` env var, HMAC signature in `x-web
 - Markdown preview also renders Mermaid code blocks as diagrams via client-side Mermaid initialization.
 
 **Session finalization**:
-- Successful stage PATCH transitions can include `updated_by_session_id`; Mission Control finalizes that OpenClaw session immediately instead of letting it decay into `stale`.
+- Successful stage PATCH transitions can include `updated_by_session_id`; Styrmann finalizes that OpenClaw session immediately instead of letting it decay into `stale`.
 - Stage failure endpoint accepts `openclaw_session_id` and marks that session `interrupted` before fail-loopback.
 - Workflow handoff finalizes other active task sessions as `interrupted` before dispatching the next agent.
 - Agent completion webhook finalizes the bound session as `completed` and no longer assumes only `assigned` / `in_progress` tasks are completable.
 - Agent log ingestion bumps `openclaw_sessions.updated_at`, so real transcript activity keeps live sessions from being mislabeled stale.
 
 **PI / ACP runtime contract**:
-- Mission Control's normal thread-bound execution path uses the OpenClaw ACP session runtime.
-- Dispatch prompts explicitly tell agents to use the Pi-style coding workflow inside that ACP session, while using Mission Control REST APIs for task/activity/deliverable updates.
-- Plain `pi` CLI is treated as a non-ACP fallback path rather than the primary Mission Control execution model.
+- Styrmann's normal thread-bound execution path uses the OpenClaw ACP session runtime.
+- Dispatch prompts explicitly tell agents to use the Pi-style coding workflow inside that ACP session, while using Styrmann REST APIs for task/activity/deliverable updates.
+- Plain `pi` CLI is treated as a non-ACP fallback path rather than the primary Styrmann execution model.
 - SessionsList shows a provenance summary banner when records exist.
 
 **Completion format**: `TASK_COMPLETE: [summary] | deliverables: [paths] | verification: [how verified]`
@@ -616,7 +616,7 @@ Agents without direct filesystem access use upload/download endpoints:
 10. **Story points computed, not stored**: `story_points` on a milestone is computed at read time via `SUM(task.effort)`. It is never persisted in the database.
 11. **Milestone dependencies are informational in v1**: The `milestone_dependencies` table exists and is queryable, but no blocking behavior is enforced. Dependencies are for planning visibility only.
 
-12. **Repo-driven workspaces**: Standard repositories auto-discover from git repos at `/root/repos/{org}/{repo}`. On DB init, `discoverRepoWorkspaces()` scans for org directories containing git repos and creates/syncs a workspace per repo. Slug format: `{org}-{repo}` (e.g., `blockether-mission-control`). Mission Control is treated like any other discovered repository. The `default` workspace is reserved for the internal OpenClaw meta repository rooted at `/root/.openclaw`. Repositories are grouped by organization in the UI, with the meta repository under `System`.
+12. **Repo-driven workspaces**: Standard repositories auto-discover from git repos at `/root/repos/{org}/{repo}`. On DB init, `discoverRepoWorkspaces()` scans for org directories containing git repos and creates/syncs a workspace per repo. Slug format: `{org}-{repo}` (e.g., `blockether-mission-control`). Styrmann is treated like any other discovered repository. The `default` workspace is reserved for the internal OpenClaw meta repository rooted at `/root/.openclaw`. Repositories are grouped by organization in the UI, with the meta repository under `System`.
 13. **Workflow templates in code, not DB-cloned**: Template definitions (Simple, Standard, Strict, Auto-Train, Architecture) live in `src/lib/workflow-templates.ts` as TypeScript constants. New workspaces get templates provisioned from code, not cloned from another workspace's DB rows.
 14. **LLM-powered skill selection**: Workflow planning uses LLM inference to intelligently select the most relevant skills per agent per task step, rather than assigning all available skills. Falls back to rule-based selection when LLM is unavailable.
 15. **Standardized file upload UX**: Active file input areas across the UI use a consistent drag-and-drop zone pattern with Upload icon, dashed border, and "Drop file or click to browse" text.
@@ -664,7 +664,7 @@ scripts/check.sh                                   # Full pre-deploy (lint + val
 
 ### Rationale
 
-The Next.js server handles HTTP request/response cycles but has no built-in mechanism for background loops — polling for assigned tasks, monitoring agent health, or running scheduled jobs. A separate daemon process (`tsx src/daemon/index.ts`) fills this gap. It communicates with Mission Control exclusively via HTTP API (never imports Next.js internals or accesses the DB directly), making it safe to run, restart, or kill independently.
+The Next.js server handles HTTP request/response cycles but has no built-in mechanism for background loops — polling for assigned tasks, monitoring agent health, or running scheduled jobs. A separate daemon process (`tsx src/daemon/index.ts`) fills this gap. It communicates with Styrmann exclusively via HTTP API (never imports Next.js internals or accesses the DB directly), making it safe to run, restart, or kill independently.
 
 ### Architecture
 

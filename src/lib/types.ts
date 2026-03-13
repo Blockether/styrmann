@@ -1,4 +1,4 @@
-// Core types for Mission Control
+// Core types for Styrmann
 
 export type AgentStatus = 'standby' | 'working' | 'offline';
 

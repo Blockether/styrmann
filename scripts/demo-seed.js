@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Demo Seed Script — Creates a realistic workspace with agents and tasks
- * for the Mission Control live demo.
+ * for the Styrmann live demo.
  * 
  * Usage: node scripts/demo-seed.js [--db path/to/db]
  */

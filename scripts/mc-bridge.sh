@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# ARIA ↔ Mission Control Bridge (thin bash wrapper)
+# ARIA ↔ Styrmann Bridge (thin bash wrapper)
 #
 # Usage:
 #   mc-bridge.sh agent-start --agent "Researcher" --task "Research Axe 2" [--label "researcher-1900"]
@@ -44,7 +44,7 @@ mc_patch() {
 find_agent_id() {
   local name="$1"
   local agents
-  agents=$(mc_get "/api/agents") || { echo "⚠️  Mission Control unreachable" >&2; return 1; }
+agents=$(mc_get "/api/agents") || { echo "⚠️  Styrmann unreachable" >&2; return 1; }
   echo "$agents" | python3 -c "
 import json, sys
 agents = json.load(sys.stdin)
@@ -174,7 +174,7 @@ cmd_agent_error() {
 cmd_status() {
   local agents tasks
 
-  agents=$(mc_get "/api/agents") || { echo "⚠️  Mission Control unreachable at $MC_URL" >&2; exit 1; }
+agents=$(mc_get "/api/agents") || { echo "⚠️  Styrmann unreachable at $MC_URL" >&2; exit 1; }
 
   echo "── Agents ──────────────────────────────────"
   echo "$agents" | python3 -c "
@@ -218,7 +218,7 @@ case "${1:-}" in
   agent-error) shift; cmd_agent_error "$@";;
   status)      shift; cmd_status "$@";;
   *)
-    echo "ARIA ↔ Mission Control Bridge (bash)"
+echo "ARIA ↔ Styrmann Bridge (bash)"
     echo ""
     echo "Usage:"
     echo "  $0 agent-start --agent NAME --task TITLE [--label LABEL]"

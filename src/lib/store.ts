@@ -4,7 +4,7 @@ import { create } from 'zustand';
 import { debug } from './debug';
 import type { Agent, Task, Conversation, Message, Event, TaskStatus, AgentSession } from './types';
 
-interface MissionControlState {
+interface StyrmannState {
   // Data
   agents: Agent[];
   tasks: Task[];
@@ -51,7 +51,7 @@ interface MissionControlState {
   addAgentMessage: (message: Message) => void;
 }
 
-export const useMissionControl = create<MissionControlState>((set) => ({
+export const useStyrmann = create<StyrmannState>((set) => ({
   // Initial state
   agents: [],
   tasks: [],

@@ -5,7 +5,7 @@ import { existsSync, rmSync } from 'fs';
 import path from 'path';
 import { queryAll, queryOne, run } from '@/lib/db';
 import { broadcast } from '@/lib/events';
-import { getMissionControlUrl } from '@/lib/config';
+import { getStyrmannUrl } from '@/lib/config';
 import { notify } from '@/lib/notify';
 import { finalizeOtherActiveSessionsForTask, finalizeSessionById } from '@/lib/session-lifecycle';
 import { checkTransitionEligibility, handleStageTransition, getTaskWorkflow, drainQueue } from '@/lib/workflow-engine';
@@ -25,9 +25,9 @@ type DispatchMetadata = {
   session_id?: unknown;
 };
 
-function withinMissionControlRoot(candidate: string, missionControlRoot: string): boolean {
+function withinStyrmannRoot(candidate: string, styrmannRoot: string): boolean {
   const resolvedCandidate = path.resolve(candidate);
-  const resolvedRoot = path.resolve(missionControlRoot);
+  const resolvedRoot = path.resolve(styrmannRoot);
   return resolvedCandidate === resolvedRoot || resolvedCandidate.startsWith(`${resolvedRoot}${path.sep}`);
 }
 
@@ -401,7 +401,7 @@ export async function PATCH(
           task_id: id,
           title: task?.title || existing.title,
           message: `Task assigned to ${humanToNotify.name}`,
-          url: `${getMissionControlUrl()}/workspace/${workspace?.slug || existing.workspace_id}`,
+          url: `${getStyrmannUrl()}/workspace/${workspace?.slug || existing.workspace_id}`,
           metadata: {
             assignee_name: humanToNotify.name,
             assignee_email: humanToNotify.email,
@@ -418,7 +418,7 @@ export async function PATCH(
         task_id: id,
         title: task?.title || existing.title,
         message: `Task status changed from ${existing.status} to ${nextStatus}`,
-        url: `${getMissionControlUrl()}/workspace/${workspace?.slug || existing.workspace_id}`,
+        url: `${getStyrmannUrl()}/workspace/${workspace?.slug || existing.workspace_id}`,
         metadata: {
           previous_status: existing.status,
           next_status: nextStatus,
@@ -553,7 +553,7 @@ export async function DELETE(
 
     const repoPath = getWorkspaceRepoPath(workspace?.local_path || workspace?.github_repo || null);
     if (repoPath && existsSync(repoPath)) {
-      const missionControlRoot = path.join(repoPath, '.mission-control');
+        const styrmannRoot = path.join(repoPath, '.mission-control');
       const candidatePaths = new Set<string>();
 
       candidatePaths.add(getTaskPipelineDir(repoPath, id));
@@ -573,7 +573,7 @@ export async function DELETE(
       for (const rawCandidate of candidatePaths) {
         if (!rawCandidate) continue;
         const resolvedCandidate = path.resolve(rawCandidate);
-        if (!withinMissionControlRoot(resolvedCandidate, missionControlRoot)) continue;
+          if (!withinStyrmannRoot(resolvedCandidate, styrmannRoot)) continue;
         if (!existsSync(resolvedCandidate)) continue;
 
         const isWorktreePath = resolvedCandidate.includes(`${path.sep}worktrees${path.sep}`);

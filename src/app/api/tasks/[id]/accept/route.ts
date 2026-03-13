@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { execFileSync } from 'child_process';
 import { queryOne, run } from '@/lib/db';
 import { getWorkspaceRepoPath, isGitWorkTree, getTaskBranchName } from '@/lib/git-repo';
-import { getMissionControlUrl } from '@/lib/config';
+import { getStyrmannUrl } from '@/lib/config';
 import { notify } from '@/lib/notify';
 import { createTaskActivity } from '@/lib/task-activity';
 import { checkTransitionEligibility, handleStageFailure, drainQueue } from '@/lib/workflow-engine';
@@ -247,7 +247,7 @@ export async function POST(
       task_id: taskId,
       title: updatedTask?.title || task.title,
       message: `Task accepted and merged: ${branch} -> ${defaultBranch}`,
-      url: `${getMissionControlUrl()}/workspace/${workspaceLink?.slug || task.workspace_id}`,
+      url: `${getStyrmannUrl()}/workspace/${workspaceLink?.slug || task.workspace_id}`,
       metadata: {
         branch,
         base_branch: defaultBranch,

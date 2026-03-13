@@ -2,7 +2,7 @@
  * File Download API
  * Returns file content over HTTP from the server filesystem.
  * This enables remote agents to read files from
- * the Mission Control server.
+ * the Styrmann server.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -107,7 +107,7 @@ export async function GET(request: NextRequest) {
           headers: {
             'Content-Type': contentType,
             'Content-Length': String(storedSize),
-            'X-Mission-Control-Stored-Snapshot': 'true',
+            'X-Styrmann-Stored-Snapshot': 'true',
           },
         });
       }

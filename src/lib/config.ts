@@ -5,17 +5,17 @@
  * Client-side config stored in localStorage.
  */
 
-export interface MissionControlConfig {
-  missionControlUrl: string;
+export interface StyrmannConfig {
+  styrmannUrl: string;
 }
 
-const DEFAULT_CONFIG: MissionControlConfig = {
-  missionControlUrl: typeof window !== 'undefined' ? window.location.origin : 'http://localhost:4000',
+const DEFAULT_CONFIG: StyrmannConfig = {
+  styrmannUrl: typeof window !== 'undefined' ? window.location.origin : 'http://localhost:4000',
 };
 
-const CONFIG_KEY = 'mission-control-config';
+const CONFIG_KEY = 'styrmann-config';
 
-export function getConfig(): MissionControlConfig {
+export function getConfig(): StyrmannConfig {
   if (typeof window === 'undefined') {
     return DEFAULT_CONFIG;
   }
@@ -33,16 +33,16 @@ export function getConfig(): MissionControlConfig {
   return DEFAULT_CONFIG;
 }
 
-export function updateConfig(updates: Partial<MissionControlConfig>): void {
+export function updateConfig(updates: Partial<StyrmannConfig>): void {
   if (typeof window === 'undefined') {
     throw new Error('Cannot update config on server side');
   }
 
-  if (updates.missionControlUrl !== undefined) {
+  if (updates.styrmannUrl !== undefined) {
     try {
-      new URL(updates.missionControlUrl);
+      new URL(updates.styrmannUrl);
     } catch {
-      throw new Error('Invalid Mission Control URL');
+      throw new Error('Invalid Styrmann URL');
     }
   }
 
@@ -65,12 +65,12 @@ export function resetConfig(): void {
   localStorage.removeItem(CONFIG_KEY);
 }
 
-export function getMissionControlUrl(): string {
+export function getStyrmannUrl(): string {
   if (typeof window === 'undefined') {
   return process.env.STYRMAN_URL || 'https://control.blockether.com';
   }
 
-  return getConfig().missionControlUrl;
+  return getConfig().styrmannUrl;
 }
 
 export function getProjectsPath(): string {

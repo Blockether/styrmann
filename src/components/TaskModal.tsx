@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { X, Save, Trash2, Activity, Package, Bot, Plus, Upload } from 'lucide-react';
-import { useMissionControl } from '@/lib/store';
+import { useStyrmann } from '@/lib/store';
 import { useScrollLock } from '@/hooks/useScrollLock';
 import { DeliverablesList } from './DeliverablesList';
 import { SessionsList } from './SessionsList';
@@ -24,7 +24,7 @@ interface TaskModalProps {
 }
 
 export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaultSprintId, defaultMilestoneId, githubIssue, defaultTab, onTabChange }: TaskModalProps) {
-  const { agents, addTask, updateTask, addEvent } = useMissionControl();
+  const { agents, addTask, updateTask, addEvent } = useStyrmann();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isProcessingAcceptance, setIsProcessingAcceptance] = useState(false);
   const [showMilestoneModal, setShowMilestoneModal] = useState(false);
@@ -231,7 +231,7 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
     try {
       const res = await fetch(`/api/tasks/${task.id}`, { method: 'DELETE' });
       if (res.ok) {
-        useMissionControl.setState((state) => ({
+        useStyrmann.setState((state) => ({
           tasks: state.tasks.filter((t) => t.id !== task.id),
         }));
         setShowDeleteConfirm(false);

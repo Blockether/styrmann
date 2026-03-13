@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { ChevronRight, ChevronLeft, ChevronDown, ListTodo, Inbox, BarChart3, X, CircleDot, Clock, Settings2, Bot } from 'lucide-react';
-import { useMissionControl } from '@/lib/store';
+import { useStyrmann } from '@/lib/store';
 import type { Sprint } from '@/lib/types';
 import type { DashboardView } from './Header';
 
@@ -34,7 +34,7 @@ export function AgentsSidebar({
   open = false,
   onClose
 }: AgentsSidebarProps) {
-  const { setSelectedSprintId } = useMissionControl();
+  const { setSelectedSprintId } = useStyrmann();
   const [isMinimized, setIsMinimized] = useState(true);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [completedSprints, setCompletedSprints] = useState<Sprint[]>([]);

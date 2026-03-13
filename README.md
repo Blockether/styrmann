@@ -3,7 +3,7 @@
 </p>
 
 <div align="center">
-<i>Styrmann</i> - Mission control for orchestrating agent and human delivery.
+<i>Styrmann</i> - Control room for orchestrating agent and human delivery.
 <br/>
 <sub>Backlog and sprint management · Orchestration pipelines · Agent sessions and traces · Deliverables and acceptance flow · Real-time updates.</sub>
 </div>

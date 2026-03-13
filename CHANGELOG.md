@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to Mission Control will be documented in this file.
+All notable changes to Styrmann will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -74,7 +74,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - **Strict template defaults** — Strict workflow is now default, with review as queue stage and verification owned by the `reviewer` role.
 - **Workspace initialization** — New workspaces can clone workflow templates and bootstrap core agents automatically.
-- **Project branding/docs** — Updated project branding to Autensa (formerly Mission Control) and added explicit privacy-first statement in docs.
+- **Project branding/docs** — Updated project branding to Autensa (formerly Styrmann) and added explicit privacy-first statement in docs.
 
 ### Fixed
 - **Role mismatch** — Fixed strict template verification role (`verifier` → `reviewer`).
@@ -108,7 +108,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Gateway Agent Discovery** — Import existing agents from your OpenClaw Gateway into Mission Control. New "Import from Gateway" button in the agent sidebar opens a discovery modal that lists all Gateway agents, shows which are already imported, and lets you bulk-import with one click. Imported agents display a `GW` badge for provenance tracking. ([#22](https://github.com/crshdn/mission-control/issues/22) — thanks [@markphelps](https://github.com/markphelps)!)
+- **Gateway Agent Discovery** — Import existing agents from your OpenClaw Gateway into Styrmann. New "Import from Gateway" button in the agent sidebar opens a discovery modal that lists all Gateway agents, shows which are already imported, and lets you bulk-import with one click. Imported agents display a `GW` badge for provenance tracking. ([#22](https://github.com/crshdn/mission-control/issues/22) — thanks [@markphelps](https://github.com/markphelps)!)
 - **Docker Support** — Production-ready multi-stage Dockerfile, docker-compose.yml with persistent volumes, and `.dockerignore`. Runs as non-root, uses `dumb-init` for signal handling, includes health checks. ([#21](https://github.com/crshdn/mission-control/pull/21) — thanks [@muneale](https://github.com/muneale)!)
 - **Agent Protocol Conventions** — Added `PROGRESS_UPDATE` and `BLOCKED` message formats to the Agent Protocol docs to prevent agent stalling. ([#24](https://github.com/crshdn/mission-control/pull/24) — thanks [@nice-and-precise](https://github.com/nice-and-precise)!)
 
@@ -135,7 +135,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **Ed25519 Device Identity** — Gateway pairing now uses Ed25519 key-based device identity for secure handshakes.
-- **ARIA Hook** — Real-time agent tracking bridge between ARIA and Mission Control (`scripts/aria-mc-hook.sh`).
+- **ARIA Hook** — Real-time agent tracking bridge between ARIA and Styrmann (`scripts/aria-mc-hook.sh`).
 - **Planning Poll Endpoint** — New `POST /api/tasks/[id]/planning/poll` for long-poll planning updates.
 - **Retry Dispatch** — New `POST /api/tasks/[id]/planning/retry-dispatch` to retry failed task dispatches.
 - **Auto-Dispatch Module** — `src/lib/auto-dispatch.ts` for automatic task assignment after planning.
@@ -145,7 +145,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **Node.js v25 Support** — Updated `better-sqlite3` to v12.6.2 for Node v25 compatibility.
-- **Default Port** — Mission Control now defaults to port 4000 (previously 3000).
+- **Default Port** — Styrmann now defaults to port 4000 (previously 3000).
 - **Improved Planning Tab** — Enhanced UI with better question rendering, progress tracking, and error handling.
 - **Agent Sidebar Improvements** — Better status display, model selection, and agent management.
 - **Activity Log Overhaul** — Cleaner timeline UI with better type icons and formatting.
@@ -170,7 +170,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### 🎉 First Official Release
 
-This is the first stable, tested, and working release of Mission Control.
+This is the first stable, tested, and working release of Styrmann.
 
 ### Added
 

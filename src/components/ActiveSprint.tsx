@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { Plus, ChevronDown, CheckCircle2, Loader2, Flag, Calendar, ChevronRight, ArrowRightLeft, LayoutList, Columns3, GripVertical, Target, AlertCircle, Crown, Bug, Lightbulb, Wrench, BookOpen, FlaskConical, Zap } from 'lucide-react';
-import { useMissionControl } from '@/lib/store';
+import { useStyrmann } from '@/lib/store';
 import { triggerAutoDispatch, shouldTriggerAutoDispatch } from '@/lib/auto-dispatch';
 import type { Task, TaskStatus, TaskType, Sprint, Milestone, Agent } from '@/lib/types';
 import { TaskModal } from './TaskModal';
@@ -79,7 +79,7 @@ function getTaskAssigneePresentation(task: Task): { badge: string; name: string 
 }
 
 export function ActiveSprint({ workspaceId, mobileMode = false, isPortrait = true }: ActiveSprintProps) {
-  const { tasks: storeTasks, updateTaskStatus, addEvent, selectedSprintId: storeSelectedSprintId, setSelectedSprintId: setStoreSelectedSprintId } = useMissionControl();
+  const { tasks: storeTasks, updateTaskStatus, addEvent, selectedSprintId: storeSelectedSprintId, setSelectedSprintId: setStoreSelectedSprintId } = useStyrmann();
   const [sprints, setSprints] = useState<Sprint[]>([]);
   const [milestones, setMilestones] = useState<Milestone[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);

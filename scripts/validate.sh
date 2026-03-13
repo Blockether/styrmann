@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Mission Control - Environment & Service Validation
+# Styrmann - Environment & Service Validation
 # Usage: ./scripts/validate.sh
 #
 # Checks database, environment, and service health.
@@ -32,7 +32,7 @@ TOTAL=5
 ERRORS=0
 WARNINGS=0
 
-echo -e "${BOLD}Mission Control - Validation${NC}"
+echo -e "${BOLD}Styrmann - Validation${NC}"
 echo "================================================"
 
 # -- Step 1: Environment file ----------------------------------------------

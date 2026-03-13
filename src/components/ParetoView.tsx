@@ -9,7 +9,7 @@ import {
   AlertCircle,
   Target,
 } from 'lucide-react';
-import { useMissionControl } from '@/lib/store';
+import { useStyrmann } from '@/lib/store';
 import { TaskModal } from '@/components/TaskModal';
 import { useTaskDeepLink } from '@/hooks/useTaskDeepLink';
 import type { Task, TaskType } from '@/lib/types';
@@ -42,7 +42,7 @@ interface ParetoViewProps {
 }
 
 export function ParetoView({ workspaceId }: ParetoViewProps) {
-  const { tasks } = useMissionControl();
+  const { tasks } = useStyrmann();
   const [hoveredTask, setHoveredTask] = useState<Task | null>(null);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const { linkedTask, initialTab, openTask, closeTask, updateTab } = useTaskDeepLink();

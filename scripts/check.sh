@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Mission Control - Pre-Deploy Check
+# Styrmann - Pre-Deploy Check
 # Usage: ./scripts/check.sh
 #
 # Runs lint, validate, and build in sequence.
@@ -32,7 +32,7 @@ for arg in "$@"; do
   esac
 done
 
-echo -e "${BOLD}Mission Control - Pre-Deploy Check${NC}"
+echo -e "${BOLD}Styrmann - Pre-Deploy Check${NC}"
 echo "================================================"
 echo ""
 

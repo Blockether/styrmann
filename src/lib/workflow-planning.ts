@@ -413,7 +413,7 @@ export async function generateTaskWorkflowPlan(taskId: string): Promise<{ plan: 
       title: finding.finding_type === 'missing_agent'
         ? `Capability proposal: add ${role} agent archetype`
         : `Capability proposal: add ${role} shared skill`,
-      detail: `Mission Control recorded this gap in the meta repository as a proposal only. No automatic system change has been made. Add a loop policy for this capability: explicit retry criteria, retry limit, and clear loop-exit evidence. ${finding.detail}`,
+      detail: `Styrmann recorded this gap in the meta repository as a proposal only. No automatic system change has been made. Add a loop policy for this capability: explicit retry criteria, retry limit, and clear loop-exit evidence. ${finding.detail}`,
       target_name: String(role),
       meta_workspace_id: metaWorkspace?.id || null,
       meta_workspace_slug: metaWorkspace?.slug || null,

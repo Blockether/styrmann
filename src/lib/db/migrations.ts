@@ -617,8 +617,8 @@ const migrations: Migration[] = [
       console.log('[Migration 013] Strict template is now default with reviewer role');
 
       // 4. Bootstrap core agents globally (default workspace)
-  const missionControlUrl = process.env.STYRMAN_URL || 'http://localhost:4000';
-      bootstrapCoreAgentsRaw(db, missionControlUrl);
+  const styrmannUrl = process.env.STYRMAN_URL || 'http://localhost:4000';
+      bootstrapCoreAgentsRaw(db, styrmannUrl);
 
       console.log('[Migration 013] Fresh start complete');
     }
@@ -1683,7 +1683,7 @@ const migrations: Migration[] = [
     id: '037',
     name: 'create_openclaw_meta_repository',
     up: (db) => {
-      console.log('[Migration 037] Creating OpenClaw meta repository and decoupling Mission Control...');
+      console.log('[Migration 037] Creating OpenClaw meta repository and decoupling Styrmann...');
 
       const workspaceInfo = db.prepare("PRAGMA table_info(workspaces)").all() as { name: string }[];
       const workspaceCols = new Set(workspaceInfo.map((col) => col.name));
@@ -1699,10 +1699,10 @@ const migrations: Migration[] = [
       }
 
       const metaWorkspaceId = 'default';
-      const missionControlWorkspaceId = 'workspace-mission-control';
-      const missionControlRepo = 'https://github.com/Blockether/mission-control';
-      const missionControlSlug = 'blockether-mission-control';
-      const missionControlPath = '/root/repos/blockether/mission-control';
+      const styrmannWorkspaceId = 'workspace-mission-control';
+      const styrmannRepo = 'https://github.com/Blockether/mission-control';
+      const styrmannSlug = 'blockether-mission-control';
+      const styrmannPath = '/root/repos/blockether/mission-control';
       const now = new Date().toISOString();
 
       db.prepare(`
@@ -1728,13 +1728,13 @@ const migrations: Migration[] = [
         metaWorkspaceId,
       );
 
-      const existingMissionControl = db.prepare(
+      const existingStyrmann = db.prepare(
         `SELECT id FROM workspaces WHERE id = ? OR github_repo = ? OR slug = ? OR local_path = ? LIMIT 1`
-      ).get(missionControlWorkspaceId, missionControlRepo, missionControlSlug, missionControlPath) as { id: string } | undefined;
+      ).get(styrmannWorkspaceId, styrmannRepo, styrmannSlug, styrmannPath) as { id: string } | undefined;
 
-      const resolvedMissionControlWorkspaceId = existingMissionControl?.id || missionControlWorkspaceId;
+      const resolvedStyrmannWorkspaceId = existingStyrmann?.id || styrmannWorkspaceId;
 
-      if (existingMissionControl) {
+      if (existingStyrmann) {
         db.prepare(`
           UPDATE workspaces
           SET name = ?,
@@ -1749,13 +1749,13 @@ const migrations: Migration[] = [
               updated_at = datetime('now')
           WHERE id = ?
         `).run(
-          'Mission Control',
-          missionControlSlug,
-          'Mission Control product repository.',
-          missionControlRepo,
-          missionControlPath,
+          'Styrmann',
+          styrmannSlug,
+          'Styrmann product repository.',
+          styrmannRepo,
+          styrmannPath,
           'blockether',
-          resolvedMissionControlWorkspaceId,
+          resolvedStyrmannWorkspaceId,
         );
       } else {
         db.prepare(`
@@ -1763,34 +1763,34 @@ const migrations: Migration[] = [
             id, name, slug, description, icon, github_repo, is_internal, repo_kind, local_path, organization, created_at, updated_at
           ) VALUES (?, ?, ?, ?, ?, ?, 0, 'standard', ?, ?, ?, ?)
         `).run(
-          resolvedMissionControlWorkspaceId,
-          'Mission Control',
-          missionControlSlug,
-          'Mission Control product repository.',
+          resolvedStyrmannWorkspaceId,
+          'Styrmann',
+          styrmannSlug,
+          'Styrmann product repository.',
           'BL',
-          missionControlRepo,
-          missionControlPath,
+          styrmannRepo,
+          styrmannPath,
           'blockether',
           now,
           now,
         );
       }
 
-      db.prepare(`UPDATE tasks SET workspace_id = ? WHERE workspace_id = ?`).run(resolvedMissionControlWorkspaceId, metaWorkspaceId);
-      db.prepare(`UPDATE sprints SET workspace_id = ? WHERE workspace_id = ?`).run(resolvedMissionControlWorkspaceId, metaWorkspaceId);
-      db.prepare(`UPDATE milestones SET workspace_id = ? WHERE workspace_id = ?`).run(resolvedMissionControlWorkspaceId, metaWorkspaceId);
-      db.prepare(`UPDATE github_issues SET workspace_id = ? WHERE workspace_id = ?`).run(resolvedMissionControlWorkspaceId, metaWorkspaceId);
-      db.prepare(`UPDATE tags SET workspace_id = ? WHERE workspace_id = ?`).run(resolvedMissionControlWorkspaceId, metaWorkspaceId);
-      db.prepare(`UPDATE workflow_templates SET workspace_id = ? WHERE workspace_id = ?`).run(resolvedMissionControlWorkspaceId, metaWorkspaceId);
-      db.prepare(`UPDATE knowledge_entries SET workspace_id = ? WHERE workspace_id = ?`).run(resolvedMissionControlWorkspaceId, metaWorkspaceId);
-      db.prepare(`UPDATE acp_bindings SET workspace_id = ? WHERE workspace_id = ?`).run(resolvedMissionControlWorkspaceId, metaWorkspaceId);
-      db.prepare(`UPDATE agent_logs SET workspace_id = ? WHERE workspace_id = ?`).run(resolvedMissionControlWorkspaceId, metaWorkspaceId);
-      db.prepare(`UPDATE agents SET workspace_id = ? WHERE workspace_id = ? AND COALESCE(source, 'local') NOT IN ('synced', 'gateway')`).run(resolvedMissionControlWorkspaceId, metaWorkspaceId);
+      db.prepare(`UPDATE tasks SET workspace_id = ? WHERE workspace_id = ?`).run(resolvedStyrmannWorkspaceId, metaWorkspaceId);
+      db.prepare(`UPDATE sprints SET workspace_id = ? WHERE workspace_id = ?`).run(resolvedStyrmannWorkspaceId, metaWorkspaceId);
+      db.prepare(`UPDATE milestones SET workspace_id = ? WHERE workspace_id = ?`).run(resolvedStyrmannWorkspaceId, metaWorkspaceId);
+      db.prepare(`UPDATE github_issues SET workspace_id = ? WHERE workspace_id = ?`).run(resolvedStyrmannWorkspaceId, metaWorkspaceId);
+      db.prepare(`UPDATE tags SET workspace_id = ? WHERE workspace_id = ?`).run(resolvedStyrmannWorkspaceId, metaWorkspaceId);
+      db.prepare(`UPDATE workflow_templates SET workspace_id = ? WHERE workspace_id = ?`).run(resolvedStyrmannWorkspaceId, metaWorkspaceId);
+      db.prepare(`UPDATE knowledge_entries SET workspace_id = ? WHERE workspace_id = ?`).run(resolvedStyrmannWorkspaceId, metaWorkspaceId);
+      db.prepare(`UPDATE acp_bindings SET workspace_id = ? WHERE workspace_id = ?`).run(resolvedStyrmannWorkspaceId, metaWorkspaceId);
+      db.prepare(`UPDATE agent_logs SET workspace_id = ? WHERE workspace_id = ?`).run(resolvedStyrmannWorkspaceId, metaWorkspaceId);
+      db.prepare(`UPDATE agents SET workspace_id = ? WHERE workspace_id = ? AND COALESCE(source, 'local') NOT IN ('synced', 'gateway')`).run(resolvedStyrmannWorkspaceId, metaWorkspaceId);
 
       provisionWorkflowTemplates(db, metaWorkspaceId);
 
       console.log(`[Migration 037] Meta repository: ${metaWorkspaceId} -> system-openclaw`);
-      console.log(`[Migration 037] Mission Control workspace: ${resolvedMissionControlWorkspaceId} -> ${missionControlSlug}`);
+      console.log(`[Migration 037] Styrmann workspace: ${resolvedStyrmannWorkspaceId} -> ${styrmannSlug}`);
     }
   },
   {
@@ -2000,8 +2000,8 @@ const migrations: Migration[] = [
     name: 'bootstrap_presenter_agent',
     up: (db) => {
       // Agents are global — bootstrap once into 'default', not per-workspace.
-  const missionControlUrl = process.env.STYRMAN_URL || 'http://localhost:4000';
-      bootstrapCoreAgentsRaw(db, missionControlUrl);
+  const styrmannUrl = process.env.STYRMAN_URL || 'http://localhost:4000';
+      bootstrapCoreAgentsRaw(db, styrmannUrl);
     }
   },
   {

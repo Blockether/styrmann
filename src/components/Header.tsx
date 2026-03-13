@@ -9,7 +9,7 @@ import {
   ChevronDown,
   Check,
 } from 'lucide-react';
-import { useMissionControl } from '@/lib/store';
+import { useStyrmann } from '@/lib/store';
 import { format } from 'date-fns';
 import type { Workspace } from '@/lib/types';
 
@@ -21,7 +21,7 @@ interface HeaderProps {
 }
 
 export function Header({ workspace, isPortrait = true }: HeaderProps) {
-  const { isOnline } = useMissionControl();
+  const { isOnline } = useStyrmann();
   const [currentTime, setCurrentTime] = useState(new Date());
   const [showWorkspaceSwitcher, setShowWorkspaceSwitcher] = useState(false);
   const [allWorkspaces, setAllWorkspaces] = useState<Workspace[]>([]);

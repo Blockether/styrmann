@@ -6,7 +6,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { useMissionControl } from '@/lib/store';
+import { useStyrmann } from '@/lib/store';
 import { debug } from '@/lib/debug';
 import type { SSEEvent, Task } from '@/lib/types';
 
@@ -22,7 +22,7 @@ export function useSSE() {
     setIsOnline,
     selectedTask,
     setSelectedTask,
-  } = useMissionControl();
+  } = useStyrmann();
 
   // Update ref when selectedTask changes (outside the SSE effect)
   useEffect(() => {

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────────────
-# ARIA → Mission Control Hook
+# ARIA → Styrmann Hook
 # One-liner wrapper for ARIA to notify MC when agents spawn/finish.
 #
 # Usage:
@@ -156,7 +156,7 @@ case "$CMD" in
     ;;
 
   *)
-    echo "ARIA → Mission Control Hook"
+echo "ARIA → Styrmann Hook"
     echo ""
     echo "Usage:"
     echo "  $0 start   <label> <task-title>           → returns task_id"

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Mission Control - Lint & Type Check
+# Styrmann - Lint & Type Check
 # Usage: ./scripts/lint.sh [--fix]
 #
 # Runs ESLint and TypeScript type checking.
@@ -39,7 +39,7 @@ fail() { echo -e "    ${RED}FAIL${NC} $1"; }
 TOTAL=2
 ERRORS=0
 
-echo -e "${BOLD}Mission Control - Lint & Type Check${NC}"
+echo -e "${BOLD}Styrmann - Lint & Type Check${NC}"
 echo "================================================"
 
 # -- Step 1: ESLint --------------------------------------------------------

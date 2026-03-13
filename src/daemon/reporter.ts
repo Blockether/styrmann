@@ -8,7 +8,7 @@ const log = createLogger('reporter');
 /**
  * Stats reporter module.
  *
- * Periodically pushes the daemon's in-memory stats snapshot to Mission Control
+ * Periodically pushes the daemon's in-memory stats snapshot to Styrmann
  * via POST /api/daemon/stats. MC stores the latest snapshot and serves it to
  * the UI via GET /api/daemon/stats.
  *

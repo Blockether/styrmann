@@ -30,7 +30,7 @@ export async function fetchRepoMeta(githubRepo: string): Promise<GitHubRepoMeta 
   const token = process.env.GITHUB_TOKEN;
   const headers: Record<string, string> = {
     Accept: 'application/vnd.github.v3+json',
-    'User-Agent': 'Blockether-MissionControl',
+    'User-Agent': 'Blockether-Styrmann',
   };
   if (token) {
     headers.Authorization = `Bearer ${token}`;

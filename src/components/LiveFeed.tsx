@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { ChevronRight, ChevronLeft, Clock } from 'lucide-react';
-import { useMissionControl } from '@/lib/store';
+import { useStyrmann } from '@/lib/store';
 import type { Event } from '@/lib/types';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -14,7 +14,7 @@ interface LiveFeedProps {
 }
 
 export function LiveFeed({ mobileMode = false, isPortrait = true }: LiveFeedProps) {
-  const { events } = useMissionControl();
+  const { events } = useStyrmann();
   const [filter, setFilter] = useState<FeedFilter>('all');
   const [isMinimized, setIsMinimized] = useState(true);
 

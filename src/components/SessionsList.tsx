@@ -6,7 +6,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { Bot, Circle, XCircle, Shield, AlertTriangle, Waypoints } from 'lucide-react';
+import { Bot, Circle, XCircle, Shield, AlertTriangle, Waypoints, CheckCircle2 } from 'lucide-react';
 import { AgentInitials } from './AgentInitials';
 import { TraceViewerModal } from './TraceViewerModal';
 import { useTraceDeepLink } from '@/hooks/useTraceDeepLink';
@@ -96,7 +96,8 @@ export function SessionsList({ taskId }: SessionsListProps) {
       case 'active':
         return <Circle className="w-4 h-4 text-green-500 fill-current animate-pulse" />;
       case 'completed':
-        return <Circle className="w-4 h-4 text-mc-text-secondary" />;
+      case 'finished':
+        return <CheckCircle2 className="w-4 h-4 text-green-600" />;
       case 'interrupted':
         return <AlertTriangle className="w-4 h-4 text-orange-500" />;
       case 'stale':
@@ -113,7 +114,8 @@ export function SessionsList({ taskId }: SessionsListProps) {
       case 'active':
         return 'Running';
       case 'completed':
-        return 'Ended';
+      case 'finished':
+        return 'Completed';
       case 'interrupted':
         return 'Interrupted';
       case 'stale':
@@ -126,12 +128,8 @@ export function SessionsList({ taskId }: SessionsListProps) {
   };
 
   const activeCount = sessions.filter((session) => session.is_active).length;
-  const inactiveCount = sessions.length - activeCount;
   const interruptedCount = sessions.filter((session) => session.status === 'interrupted').length;
-  const staleCount = sessions.filter((session) => session.status === 'stale').length;
-  const finishedCount = sessions.filter((session) => session.status === 'completed' || Boolean(session.ended_at)).length;
-  const unfinishedCount = sessions.length - finishedCount;
-  const traceLinkedCount = sessions.filter((session) => Boolean(session.trace_url)).length;
+  const finishedCount = sessions.filter((session) => session.status === 'completed' || session.status === 'finished' || Boolean(session.ended_at)).length;
 
   const formatDuration = (start: string, end?: string | null) => {
     const startTime = new Date(start).getTime();
@@ -194,15 +192,17 @@ export function SessionsList({ taskId }: SessionsListProps) {
   return (
     <div data-component="src/components/SessionsList" className="space-y-3 max-w-full overflow-x-hidden">
       <div className="p-3 rounded-lg border border-mc-border bg-mc-bg-secondary text-xs flex items-center justify-between gap-2 flex-wrap">
-        <span className="text-mc-text-secondary">Agent session state and trace readiness</span>
+        <span className="text-mc-text-secondary">{sessions.length} session{sessions.length !== 1 ? 's' : ''}</span>
         <div className="flex flex-wrap items-center gap-2 justify-start">
-          <span className="px-2 py-0.5 rounded border border-green-200 bg-green-50 text-green-700 whitespace-nowrap">Active: {activeCount}</span>
-          <span className="px-2 py-0.5 rounded border border-mc-border bg-mc-bg text-mc-text-secondary whitespace-nowrap">Inactive: {inactiveCount}</span>
-          <span className="px-2 py-0.5 rounded border border-orange-200 bg-orange-50 text-orange-700 whitespace-nowrap">Interrupted: {interruptedCount}</span>
-          <span className="px-2 py-0.5 rounded border border-yellow-200 bg-yellow-50 text-yellow-700 whitespace-nowrap">Stale: {staleCount}</span>
-          <span className="px-2 py-0.5 rounded border border-mc-border bg-mc-bg text-mc-text-secondary whitespace-nowrap">Finished: {finishedCount}</span>
-          <span className="px-2 py-0.5 rounded border border-mc-border bg-mc-bg text-mc-text-secondary whitespace-nowrap">Unfinished: {unfinishedCount}</span>
-          <span className="px-2 py-0.5 rounded border border-cyan-200 bg-cyan-50 text-cyan-700 whitespace-nowrap">Trace linked: {traceLinkedCount}</span>
+          {activeCount > 0 && (
+            <span className="px-2 py-0.5 rounded border border-green-200 bg-green-50 text-green-700 whitespace-nowrap">{activeCount} running</span>
+          )}
+          {interruptedCount > 0 && (
+            <span className="px-2 py-0.5 rounded border border-orange-200 bg-orange-50 text-orange-700 whitespace-nowrap">{interruptedCount} interrupted</span>
+          )}
+          {finishedCount > 0 && (
+            <span className="px-2 py-0.5 rounded border border-mc-border bg-mc-bg text-mc-text-secondary whitespace-nowrap">Finished: {finishedCount}</span>
+          )}
         </div>
       </div>
 
@@ -252,9 +252,21 @@ export function SessionsList({ taskId }: SessionsListProps) {
                 <span className="text-xs text-mc-text-secondary capitalize whitespace-nowrap">
                   {getStatusLabel(session.status)}
                 </span>
-                <span className={`text-[11px] px-1.5 py-0.5 rounded border whitespace-nowrap ${session.is_active ? 'border-green-200 bg-green-50 text-green-700' : 'border-mc-border bg-mc-bg text-mc-text-secondary'}`}>
-                  {session.is_active ? 'active' : 'inactive'}
-                </span>
+                {session.is_active && (
+                  <span className="text-[11px] px-1.5 py-0.5 rounded border border-green-200 bg-green-50 text-green-700 whitespace-nowrap">
+                    active
+                  </span>
+                )}
+                {session.status === 'interrupted' && !session.is_active && (
+                  <span className="text-[11px] px-1.5 py-0.5 rounded border border-orange-200 bg-orange-50 text-orange-700 whitespace-nowrap">
+                    interrupted
+                  </span>
+                )}
+                {session.status === 'stale' && !session.is_active && (
+                  <span className="text-[11px] px-1.5 py-0.5 rounded border border-yellow-200 bg-yellow-50 text-yellow-700 whitespace-nowrap">
+                    stale
+                  </span>
+                )}
                 {session.resumed_via_session_continuation && session.is_active && (
                   <span className="text-[11px] px-1.5 py-0.5 rounded border border-cyan-200 bg-cyan-50 text-cyan-700 whitespace-nowrap">
                     resumed via continuation
@@ -287,7 +299,7 @@ export function SessionsList({ taskId }: SessionsListProps) {
               </span>
               <span>•</span>
               <span>Started {formatTimestamp(session.created_at)}</span>
-              {typeof session.inactivity_minutes === 'number' && (
+              {typeof session.inactivity_minutes === 'number' && (session.status === 'active' || session.status === 'stale') && (
                 <>
                   <span>•</span>
                   <span>Idle {session.inactivity_minutes}m</span>
@@ -310,7 +322,7 @@ export function SessionsList({ taskId }: SessionsListProps) {
 
             {session.status === 'stale' && (
               <div className="mt-2 text-xs text-mc-accent-yellow">
-                No explicit session end was recorded; task/activity suggests this run is no longer active.
+                Session ended without confirmation.
               </div>
             )}
             {session.status === 'interrupted' && !session.resumed_via_session_continuation && (

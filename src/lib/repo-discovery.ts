@@ -6,10 +6,10 @@
  *
  * Structure: /root/repos/{org}/{repo}/.git
  *   - Slug format: {org}-{repo} (e.g., blockether-mission-control)
- *   - Display name: {Org}/{Repo} (e.g., Blockether/Mission Control)
+ *   - Display name: {Org}/{Repo} (e.g., Blockether/Styrmann)
  *   - Organization stored in workspace.organization column
  *
- * Mission Control is discovered like any other repository.
+ * Styrmann is discovered like any other repository.
  * The internal meta repository is modeled separately in the DB.
  *
  * Flat repos (no org parent) are ignored — only org/repo structure is discovered.

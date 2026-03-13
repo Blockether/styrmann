@@ -20,8 +20,8 @@ export async function triggerAutoDispatch(options: AutoDispatchOptions): Promise
   }
 
   try {
-    const missionControlUrl = getMissionControlUrl();
-    const dispatchRes = await fetch(`${missionControlUrl}/api/tasks/${taskId}/dispatch`, {
+    const styrmannUrl = getStyrmannUrl();
+    const dispatchRes = await fetch(`${styrmannUrl}/api/tasks/${taskId}/dispatch`, {
       method: 'POST',
     });
 
@@ -55,4 +55,4 @@ export function shouldTriggerAutoDispatch(
 
   return wasNotInProgress && isNowInProgress && hasAssignedAgent;
 }
-import { getMissionControlUrl } from '@/lib/config';
+import { getStyrmannUrl } from '@/lib/config';

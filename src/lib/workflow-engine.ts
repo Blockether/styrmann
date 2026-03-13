@@ -6,7 +6,7 @@
  */
 
 import { queryOne, queryAll, run } from '@/lib/db';
-import { getMissionControlUrl } from '@/lib/config';
+import { getStyrmannUrl } from '@/lib/config';
 import { broadcast } from '@/lib/events';
 import { finalizeOtherActiveSessionsForTask } from '@/lib/session-lifecycle';
 import { createTaskActivity } from '@/lib/task-activity';
@@ -299,14 +299,14 @@ export async function handleStageTransition(
   }
 
   // Dispatch to the agent
-  const missionControlUrl = getMissionControlUrl();
+  const styrmannUrl = getStyrmannUrl();
   try {
     const internalToken = process.env.STYRMAN_API_TOKEN?.trim();
     const headers: Record<string, string> = {};
     if (internalToken) {
       headers.Authorization = `Bearer ${internalToken}`;
     }
-    const dispatchRes = await fetch(`${missionControlUrl}/api/tasks/${taskId}/dispatch`, {
+    const dispatchRes = await fetch(`${styrmannUrl}/api/tasks/${taskId}/dispatch`, {
       method: 'POST',
       headers,
     });

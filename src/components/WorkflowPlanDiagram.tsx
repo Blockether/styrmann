@@ -81,7 +81,7 @@ function participantTone(participant: WorkflowPlanParticipant): string {
 
 function stepPurpose(step: WorkflowPlanStep): string {
   if (step.kind === 'queue') {
-    return 'Mission Control advances the task once the prior stage has produced enough evidence.';
+    return 'Styrmann advances the task once the prior stage has produced enough evidence.';
   }
   if (step.kind === 'verification') {
     return 'This stage pressure-tests the previous output before the pipeline moves forward.';

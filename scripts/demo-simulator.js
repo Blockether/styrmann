@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Demo Simulator — Runs in the background and generates realistic
- * agent activity for the Mission Control live demo.
+ * agent activity for the Styrmann live demo.
  * 
  * Usage: node scripts/demo-simulator.js [--db path/to/db] [--interval 15000]
  * 

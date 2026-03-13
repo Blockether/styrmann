@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Mission Control CLI wrapper — example/template
+# Styrmann CLI wrapper — example/template
 #
 # Install:
 #   sudo cp scripts/mc.sh.example /usr/local/bin/mc

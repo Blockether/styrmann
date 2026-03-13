@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
 import { queryAll, queryOne, run } from '@/lib/db';
 import { broadcast } from '@/lib/events';
-import { getMissionControlUrl } from '@/lib/config';
+import { getStyrmannUrl } from '@/lib/config';
 import { notify } from '@/lib/notify';
 import { CreateTaskSchema } from '@/lib/validation';
 import { generateTaskWorkflowPlan } from '@/lib/workflow-planning';
@@ -259,7 +259,7 @@ export async function POST(request: NextRequest) {
         task_id: id,
         title: validatedData.title,
         message: `Task assigned to ${assignedHuman.name}`,
-        url: `${getMissionControlUrl()}/workspace/${workspace?.slug || workspaceId}`,
+        url: `${getStyrmannUrl()}/workspace/${workspace?.slug || workspaceId}`,
         metadata: {
           assignee_name: assignedHuman.name,
           assignee_email: assignedHuman.email,

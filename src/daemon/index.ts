@@ -1,5 +1,5 @@
 import { createLogger } from './logger';
-import { getConfig, shouldUseMissionControlToken } from './bridge';
+import { getConfig, shouldUseStyrmannToken } from './bridge';
 import { startHeartbeat } from './heartbeat';
 import { startDispatcher } from './dispatcher';
 import { startScheduler } from './scheduler';
@@ -15,12 +15,12 @@ const log = createLogger('daemon');
 async function main() {
   const { mcUrl, mcToken } = getConfig();
 
-  if (shouldUseMissionControlToken(mcUrl) && !mcToken) {
+  if (shouldUseStyrmannToken(mcUrl) && !mcToken) {
     log.error('STYRMAN_API_TOKEN is required. Set it as an environment variable.');
     process.exit(1);
   }
 
-  log.info('Starting Mission Control daemon');
+  log.info('Starting Styrmann daemon');
   log.info(`MC URL: ${mcUrl}`);
 
   const stats: DaemonStats = {

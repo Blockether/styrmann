@@ -15,15 +15,15 @@ export function startHealthCheck(config: DaemonConfig, stats: DaemonStats): () =
 
       if (online !== lastOnline) {
         if (online) {
-          log.info('Mission Control is reachable');
+          log.info('Styrmann is reachable');
         } else {
-          log.warn(`Mission Control unreachable (${res.status})`);
+          log.warn(`Styrmann unreachable (${res.status})`);
         }
         lastOnline = online;
       }
     } catch (err) {
       if (lastOnline) {
-        log.error('Mission Control connection lost:', err);
+        log.error('Styrmann connection lost:', err);
         lastOnline = false;
       }
     }

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { X, Save, Trash2, Folder, FileText, RefreshCw, ChevronRight, Link2, Link2Off, Eye, ArrowLeft, Download, ExternalLink } from 'lucide-react';
-import { useMissionControl } from '@/lib/store';
+import { useStyrmann } from '@/lib/store';
 import { useScrollLock } from '@/hooks/useScrollLock';
 import { DEFAULT_AGENT_ROLE_OPTIONS, formatAgentRoleLabel } from '@/lib/agent-roles';
 import type { Agent } from '@/lib/types';
@@ -89,7 +89,7 @@ interface FilePreview {
 }
 
 export function AgentModal({ agent, onClose, workspaceId, onAgentCreated, initialTab = 'info' }: AgentModalProps) {
-  const { addAgent, updateAgent, agents } = useMissionControl();
+  const { addAgent, updateAgent, agents } = useStyrmann();
   const [activeTab, setActiveTab] = useState<'info' | 'workspace' | 'soul' | 'user' | 'agents'>(initialTab);
   const contentRef = useRef<HTMLFormElement>(null);
 
@@ -354,7 +354,7 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated, initia
       const res = await fetch(`/api/agents/${agent.id}`, { method: 'DELETE' });
       if (res.ok) {
         // Remove from store
-        useMissionControl.setState((state) => ({
+        useStyrmann.setState((state) => ({
           agents: state.agents.filter((a) => a.id !== agent.id),
           selectedAgent: state.selectedAgent?.id === agent.id ? null : state.selectedAgent,
         }));
@@ -523,7 +523,7 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated, initia
                   ))}
                 </select>
                 <p className="text-xs text-mc-text-secondary mt-1">
-                  Roles use the Mission Control default team vocabulary so planning and warnings stay consistent.
+                  Roles use the Styrmann default team vocabulary so planning and warnings stay consistent.
                 </p>
               </div>
 
@@ -582,7 +582,7 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated, initia
                 </div>
               ) : agent.source !== 'synced' ? (
                 <div className="rounded-lg border border-mc-border bg-mc-bg p-4 text-sm text-mc-text-secondary">
-                  This agent is local to Mission Control. Workspace browsing is available for synced agents only.
+                  This agent is local to Styrmann. Workspace browsing is available for synced agents only.
                 </div>
               ) : (
                 <>
@@ -851,7 +851,7 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated, initia
           <div className="w-full max-w-md rounded-2xl border border-mc-border bg-gradient-to-br from-white via-[#fff8ea] to-[#f7efe0] shadow-[0_28px_70px_-40px_rgba(90,65,10,0.45)]" onClick={(event) => event.stopPropagation()}>
             <div className="p-4 border-b border-mc-border">
               <h3 className="text-base font-semibold text-mc-text">Delete agent?</h3>
-              <p className="mt-2 text-sm text-mc-text-secondary">This removes <span className="font-medium text-mc-text">{agent.name}</span> from Mission Control. Existing task history remains, but this agent will no longer be assignable.</p>
+              <p className="mt-2 text-sm text-mc-text-secondary">This removes <span className="font-medium text-mc-text">{agent.name}</span> from Styrmann. Existing task history remains, but this agent will no longer be assignable.</p>
             </div>
             <div className="p-4 flex items-center justify-end gap-2">
               <button type="button" onClick={() => setShowDeleteConfirm(false)} className="min-h-11 px-4 py-2 border border-mc-border rounded text-sm text-mc-text-secondary hover:text-mc-text hover:bg-mc-bg">Keep Agent</button>

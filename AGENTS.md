@@ -1,4 +1,4 @@
-# AGENTS.md -- Mission Control (Blockether Fork)
+# AGENTS.md -- Styrmann (Blockether Fork)
 
 ## Ground Rules
 
