@@ -212,7 +212,8 @@ export function ActiveSprint({ workspaceId, mobileMode = false, isPortrait = tru
   const activeSprint = sprints.find((s) => s.status === 'active');
   const completedSprintTasks = sprintTasks.filter((task) => DONE_STATUSES.includes(task.status)).length;
   const completionPercent = sprintTasks.length > 0 ? Math.round((completedSprintTasks / sprintTasks.length) * 100) : 0;
-  const blockedSprintTasks = sprintTasks.filter((task) => Boolean(task.planning_dispatch_error)).length;
+  const DONE_OR_TERMINAL = [...DONE_STATUSES, 'cancelled'];
+  const blockedSprintTasks = sprintTasks.filter((task) => Boolean(task.planning_dispatch_error) && !DONE_OR_TERMINAL.includes(task.status)).length;
 
   const updateTaskStatusWithPersist = async (task: Task, targetStatus: TaskStatus) => {
     if (task.status === targetStatus) return;

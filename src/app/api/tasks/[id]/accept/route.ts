@@ -202,9 +202,16 @@ export async function POST(
       ? `Force-accepted by human (${unmetCount} criteria overridden) and merged: ${branch} -> ${defaultBranch}`
       : `Accepted by human and merged: ${branch} -> ${defaultBranch}`;
     run(
-      'UPDATE tasks SET status = ?, status_reason = ?, updated_at = ? WHERE id = ?',
+      'UPDATE tasks SET status = ?, status_reason = ?, planning_dispatch_error = NULL, updated_at = ? WHERE id = ?',
       ['done', statusReason, now, taskId],
     );
+
+    if (unmetCount > 0) {
+      run(
+        'UPDATE task_acceptance_criteria SET is_met = 1 WHERE task_id = ? AND is_met = 0',
+        [taskId],
+      );
+    }
 
     createTaskActivity({
       taskId,
