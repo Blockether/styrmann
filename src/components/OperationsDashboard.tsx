@@ -1,25 +1,20 @@
 'use client';
 
 import { useCallback, useEffect, useState, type KeyboardEvent } from 'react';
-import { Activity, Bot, Mail } from 'lucide-react';
+import { Activity, Mail } from 'lucide-react';
 import { HumanManagementPanel } from './HumanManagementPanel';
 import { SystemPanel } from './SystemPanel';
 
-type OperationsTab = 'system' | 'agents' | 'humans';
-const TAB_ORDER: OperationsTab[] = ['system', 'agents', 'humans'];
+type OperationsTab = 'system' | 'humans';
+const TAB_ORDER: OperationsTab[] = ['system', 'humans'];
 
-function parseOperationsHash(hash: string): { tab: OperationsTab | null; agentId: string | null } {
+function parseOperationsHash(hash: string): { tab: OperationsTab | null } {
   const raw = hash.replace(/^#/, '');
   const normalized = raw.toLowerCase();
-  if (!raw) return { tab: null, agentId: null };
-  if (normalized === 'system' || normalized === 'system-runtime') return { tab: 'system', agentId: null };
-  if (normalized === 'humans') return { tab: 'humans', agentId: null };
-  if (normalized === 'agents' || normalized === 'gateway') return { tab: 'agents', agentId: null };
-  if (normalized.startsWith('agents/')) {
-    const agentId = decodeURIComponent(raw.slice('agents/'.length)).trim();
-    return { tab: 'agents', agentId: agentId || null };
-  }
-  return { tab: null, agentId: null };
+  if (!raw) return { tab: null };
+  if (normalized === 'system' || normalized === 'system-runtime') return { tab: 'system' };
+  if (normalized === 'humans') return { tab: 'humans' };
+  return { tab: null };
 }
 
 export function OperationsDashboard() {
@@ -100,17 +95,6 @@ export function OperationsDashboard() {
             </button>
             <button
               role="tab"
-              aria-selected={activeTab === 'agents'}
-              aria-controls="operations-panel-agents"
-              id="operations-tab-agents"
-              onClick={() => switchTab('agents')}
-              className={`inline-flex items-center justify-center gap-2 px-3 min-h-11 border-b-2 transition-colors whitespace-nowrap ${activeTab === 'agents' ? 'border-mc-accent text-mc-text' : 'border-transparent text-mc-text-secondary hover:text-mc-text'}`}
-            >
-              <Bot className="h-4 w-4" />
-              <span>Agents</span>
-            </button>
-            <button
-              role="tab"
               aria-selected={activeTab === 'humans'}
               aria-controls="operations-panel-humans"
               id="operations-tab-humans"
@@ -132,17 +116,6 @@ export function OperationsDashboard() {
             className="rounded-xl border border-mc-border bg-mc-bg overflow-hidden"
           >
             <SystemPanel embedded />
-          </section>
-        )}
-
-        {activeTab === 'agents' && (
-          <section
-            id="operations-panel-agents"
-            role="tabpanel"
-            aria-labelledby="operations-tab-agents"
-            className="rounded-xl border border-mc-border bg-mc-bg overflow-hidden p-4"
-          >
-            <p className="text-sm text-mc-text-secondary">Agent management is available in the sidebar. Agents are defined by semantic roles and dispatched via OpenCode.</p>
           </section>
         )}
 
