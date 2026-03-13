@@ -139,11 +139,11 @@ export async function DELETE(
     }
 
     const taskIds = db.prepare('SELECT id FROM tasks WHERE workspace_id = ?').all(id) as { id: string }[];
-    const ids = taskIds.map(t => t.id);
+    const tIds = taskIds.map(t => t.id);
 
     const cascade = db.transaction(() => {
-      for (const taskId of ids) {
-        db.prepare('DELETE FROM task_run_screenshots WHERE task_id = ?').run(taskId);
+      for (const taskId of tIds) {
+        db.prepare('DELETE FROM task_run_result_artifacts WHERE task_id = ?').run(taskId);
         db.prepare('DELETE FROM task_run_results WHERE task_id = ?').run(taskId);
         db.prepare('DELETE FROM task_acceptance_criteria WHERE task_id = ?').run(taskId);
         db.prepare('DELETE FROM task_deliverables WHERE task_id = ?').run(taskId);
@@ -155,12 +155,15 @@ export async function DELETE(
         db.prepare('DELETE FROM task_dependencies WHERE task_id = ? OR depends_on_task_id = ?').run(taskId, taskId);
         db.prepare('DELETE FROM task_tags WHERE task_id = ?').run(taskId);
         db.prepare('DELETE FROM task_roles WHERE task_id = ?').run(taskId);
-        db.prepare('DELETE FROM agent_sessions WHERE task_id = ?').run(taskId);
+        db.prepare('DELETE FROM task_provenance WHERE task_id = ?').run(taskId);
+        db.prepare('DELETE FROM openclaw_sessions WHERE task_id = ?').run(taskId);
         db.prepare('DELETE FROM planning_questions WHERE task_id = ?').run(taskId);
+        db.prepare('DELETE FROM events WHERE task_id = ?').run(taskId);
       }
       db.prepare('DELETE FROM task_workflow_plans WHERE workspace_id = ?').run(id);
       db.prepare('DELETE FROM task_findings WHERE workspace_id = ?').run(id);
       db.prepare('DELETE FROM capability_proposals WHERE workspace_id = ?').run(id);
+      db.prepare('DELETE FROM agent_logs WHERE workspace_id = ?').run(id);
       db.prepare('DELETE FROM tasks WHERE workspace_id = ?').run(id);
       db.prepare('DELETE FROM milestone_dependencies WHERE milestone_id IN (SELECT id FROM milestones WHERE workspace_id = ?)').run(id);
       db.prepare('DELETE FROM milestones WHERE workspace_id = ?').run(id);
@@ -168,14 +171,13 @@ export async function DELETE(
       db.prepare('DELETE FROM tags WHERE workspace_id = ?').run(id);
       db.prepare('DELETE FROM github_issues WHERE workspace_id = ?').run(id);
       db.prepare('DELETE FROM workflow_templates WHERE workspace_id = ?').run(id);
-      db.prepare('DELETE FROM events WHERE task_id IN (SELECT id FROM tasks WHERE workspace_id = ?)').run(id);
       db.prepare('DELETE FROM acp_bindings WHERE workspace_id = ?').run(id);
       db.prepare('DELETE FROM workspaces WHERE id = ?').run(id);
     });
 
     cascade();
 
-    return NextResponse.json({ success: true, deleted_tasks: ids.length });
+    return NextResponse.json({ success: true, deleted_tasks: tIds.length });
   } catch (error) {
     console.error('Failed to delete workspace:', error);
     return NextResponse.json({ error: 'Failed to delete workspace' }, { status: 500 });
