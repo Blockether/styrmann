@@ -23,7 +23,6 @@ CREATE TABLE IF NOT EXISTS workspaces (
   local_path TEXT,
   owner_email TEXT,
   coordinator_email TEXT,
-  himalaya_account TEXT,
   logo_url TEXT,
   organization TEXT,
   created_at TEXT DEFAULT (datetime('now')),

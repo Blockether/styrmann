@@ -2,12 +2,19 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { CheckCircle2, Mail, Plus, Trash2, UserRound, XCircle } from 'lucide-react';
-import type { HimalayaStatus, Human, Workspace } from '@/lib/types';
+import type { Human, Workspace } from '@/lib/types';
+
+interface NotifyStatus {
+  script_configured: boolean;
+  script_path: string | null;
+  webhook_configured: boolean;
+  webhook_url: string | null;
+}
 
 export function HumanManagementPanel() {
   const [humans, setHumans] = useState<Human[]>([]);
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
-  const [himalaya, setHimalaya] = useState<HimalayaStatus | null>(null);
+  const [notifyStatus, setNotifyStatus] = useState<NotifyStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [savingConfig, setSavingConfig] = useState(false);
   const [savingHuman, setSavingHuman] = useState(false);
@@ -15,27 +22,25 @@ export function HumanManagementPanel() {
   const [newHumanName, setNewHumanName] = useState('');
   const [newHumanEmail, setNewHumanEmail] = useState('');
   const [coordinatorEmail, setCoordinatorEmail] = useState('');
-  const [himalayaAccount, setHimalayaAccount] = useState('');
 
   const loadData = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [humansRes, workspaceRes, himalayaRes] = await Promise.all([
+      const [humansRes, workspaceRes, notifyRes] = await Promise.all([
         fetch('/api/humans'),
         fetch('/api/workspaces/default'),
-        fetch('/api/system/himalaya'),
+        fetch('/api/system/notify'),
       ]);
 
       const humansData = humansRes.ok ? await humansRes.json() : [];
       const workspaceData = workspaceRes.ok ? await workspaceRes.json() : null;
-      const himalayaData = himalayaRes.ok ? await himalayaRes.json() : null;
+      const notifyData = notifyRes.ok ? await notifyRes.json() : null;
 
       setHumans(Array.isArray(humansData) ? humansData : []);
       setWorkspace(workspaceData);
-      setHimalaya(himalayaData);
+      setNotifyStatus(notifyData);
       setCoordinatorEmail(workspaceData?.coordinator_email || '');
-      setHimalayaAccount(workspaceData?.himalaya_account || himalayaData?.default_account || '');
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : 'Failed to load human routing settings');
     } finally {
@@ -56,7 +61,6 @@ export function HumanManagementPanel() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           coordinator_email: coordinatorEmail.trim() || null,
-          himalaya_account: himalayaAccount.trim() || null,
         }),
       });
       if (!res.ok) {
@@ -109,7 +113,8 @@ export function HumanManagementPanel() {
     }
   };
 
-  const himalayaOk = Boolean(himalaya?.installed && himalaya?.configured && himalaya?.healthy_account && coordinatorEmail.trim());
+  const notifyConfigured = Boolean(notifyStatus?.script_configured || notifyStatus?.webhook_configured);
+  const notificationsReady = Boolean(notifyConfigured && coordinatorEmail.trim());
 
   return (
     <div data-component="src/components/HumanManagementPanel" className="rounded-xl border border-mc-border bg-mc-bg overflow-hidden">
@@ -120,21 +125,21 @@ export function HumanManagementPanel() {
             <span>Human Assignment Routing</span>
           </div>
           <p className="mt-1 text-sm text-mc-text-secondary">
-            Manage human assignees and the coordinator sender settings used for Himalaya email delivery.
+            Manage human assignees and the coordinator sender settings used for task notifications.
           </p>
         </div>
       </div>
 
       <div className="p-4 space-y-4">
-        <div className={`rounded-lg border px-3 py-3 text-sm ${himalayaOk ? 'border-green-200 bg-green-50 text-green-700' : 'border-red-200 bg-red-50 text-red-700'}`}>
+        <div className={`rounded-lg border px-3 py-3 text-sm ${notificationsReady ? 'border-green-200 bg-green-50 text-green-700' : 'border-red-200 bg-red-50 text-red-700'}`}>
           <div className="flex items-center gap-2 font-medium">
-            {himalayaOk ? <CheckCircle2 className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
-            <span>{himalayaOk ? 'Human email routing ready' : 'Human email routing needs attention'}</span>
+            {notificationsReady ? <CheckCircle2 className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
+            <span>{notificationsReady ? 'Human notifications ready' : 'Human notifications need attention'}</span>
           </div>
           <div className="mt-1 text-xs break-all">
-            {himalayaOk
-              ? `Account ${himalaya?.configured_account} will send from ${coordinatorEmail.trim()}`
-              : (himalaya?.error || 'Set coordinator email and a healthy Himalaya account before assigning tasks to humans.')}
+            {notificationsReady
+              ? `Notifications will send from ${coordinatorEmail.trim()} using configured script/webhook integrations.`
+              : 'Set coordinator email and configure MC_NOTIFY_SCRIPT and/or MC_NOTIFY_WEBHOOK before assigning tasks to humans.'}
           </div>
         </div>
 
@@ -154,19 +159,6 @@ export function HumanManagementPanel() {
                 placeholder="michal@blockether.com"
                 className="w-full min-h-11 bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent"
               />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Himalaya Account</label>
-              <select
-                value={himalayaAccount}
-                onChange={(e) => setHimalayaAccount(e.target.value)}
-                className="w-full min-h-11 bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent"
-              >
-                <option value="">Use default Himalaya account</option>
-                {(himalaya?.accounts || []).map((account) => (
-                  <option key={account.name} value={account.name}>{account.name}</option>
-                ))}
-              </select>
             </div>
             <button
               onClick={saveConfig}

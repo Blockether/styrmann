@@ -9,6 +9,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 import { FileText, Link as LinkIcon, Package, ExternalLink, Eye, Download, X } from 'lucide-react';
 import { debug } from '@/lib/debug';
 import { summarizeTaskActivity } from '@/lib/activity-presentation';
+import { useScrollLock } from '@/hooks/useScrollLock';
 import type { Task, TaskActivity, TaskDeliverable } from '@/lib/types';
 
 interface DeliverablesListProps {
@@ -85,6 +86,8 @@ export function DeliverablesList({ taskId }: DeliverablesListProps) {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewTitle, setPreviewTitle] = useState('');
   const [previewUrl, setPreviewUrl] = useState('');
+
+  useScrollLock(previewOpen);
 
   const loadDeliverables = useCallback(async () => {
     try {

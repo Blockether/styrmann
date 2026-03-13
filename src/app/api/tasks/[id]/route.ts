@@ -6,7 +6,7 @@ import path from 'path';
 import { queryAll, queryOne, run } from '@/lib/db';
 import { broadcast } from '@/lib/events';
 import { getMissionControlUrl } from '@/lib/config';
-import { getHimalayaStatus, sendHumanAssignmentEmail } from '@/lib/himalaya';
+import { notify } from '@/lib/notify';
 import { finalizeOtherActiveSessionsForTask, finalizeSessionById } from '@/lib/session-lifecycle';
 import { checkTransitionEligibility, handleStageTransition, getTaskWorkflow, drainQueue } from '@/lib/workflow-engine';
 import { captureTaskRunResult } from '@/lib/task-run-results';
@@ -14,7 +14,7 @@ import { checkBuilderEvidence } from '@/lib/builder-evidence';
 import { UpdateTaskSchema } from '@/lib/validation';
 import { generateTaskWorkflowPlan } from '@/lib/workflow-planning';
 import { getTaskPipelineDir, getTaskWorktreePath, getWorkspaceRepoPath } from '@/lib/git-repo';
-import type { Task, UpdateTaskRequest, Agent, Human } from '@/lib/types';
+import type { Task, UpdateTaskRequest, Human } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
 
@@ -394,29 +394,37 @@ export async function PATCH(
 
     if (effectiveAssigneeType === 'human' && (validatedData.assigned_human_id !== undefined || validatedData.assignee_type === 'human')) {
       const humanToNotify = assignedHuman || (effectiveAssignedHumanId ? queryOne<Human>('SELECT * FROM humans WHERE id = ? AND is_active = 1', [effectiveAssignedHumanId]) || null : null);
-      const workspace = queryOne<{ name: string; slug: string; coordinator_email?: string | null; himalaya_account?: string | null }>('SELECT name, slug, coordinator_email, himalaya_account FROM workspaces WHERE id = ?', [existing.workspace_id]);
-      if (!workspace?.coordinator_email) {
-        return NextResponse.json({ error: 'Workspace coordinator email is not configured' }, { status: 409 });
+      if (humanToNotify) {
+        const workspace = queryOne<{ slug: string | null }>('SELECT slug FROM workspaces WHERE id = ?', [existing.workspace_id]);
+        notify({
+          event: 'task_assigned',
+          task_id: id,
+          title: task?.title || existing.title,
+          message: `Task assigned to ${humanToNotify.name}`,
+          url: `${getMissionControlUrl()}/workspace/${workspace?.slug || existing.workspace_id}`,
+          metadata: {
+            assignee_name: humanToNotify.name,
+            assignee_email: humanToNotify.email,
+            workspace_id: existing.workspace_id,
+          },
+        });
       }
-      const himalaya = getHimalayaStatus(workspace.himalaya_account || null);
-      if (!himalaya.installed || !himalaya.configured || !himalaya.configured_account || !himalaya.healthy_account) {
-        return NextResponse.json({ error: himalaya.error || 'Himalaya is not configured correctly' }, { status: 409 });
-      }
-      if (!humanToNotify) {
-        return NextResponse.json({ error: 'No active human selected for human assignment' }, { status: 409 });
-      }
-      const sent = sendHumanAssignmentEmail({
-        account: himalaya.configured_account,
-        fromEmail: workspace.coordinator_email,
-        toEmail: humanToNotify.email,
-        taskTitle: task?.title || existing.title,
-        taskDescription: task?.description || existing.description || null,
-        workspaceName: workspace.name,
-        taskUrl: `${getMissionControlUrl()}/workspace/${workspace.slug}`,
+    }
+
+    if (nextStatus && nextStatus !== existing.status) {
+      const workspace = queryOne<{ slug: string | null }>('SELECT slug FROM workspaces WHERE id = ?', [existing.workspace_id]);
+      notify({
+        event: 'task_status_changed',
+        task_id: id,
+        title: task?.title || existing.title,
+        message: `Task status changed from ${existing.status} to ${nextStatus}`,
+        url: `${getMissionControlUrl()}/workspace/${workspace?.slug || existing.workspace_id}`,
+        metadata: {
+          previous_status: existing.status,
+          next_status: nextStatus,
+          workspace_id: existing.workspace_id,
+        },
       });
-      if (!sent.ok) {
-        return NextResponse.json({ error: sent.error || 'Failed to send assignment email' }, { status: 502 });
-      }
     }
 
     // Broadcast task update via SSE
@@ -533,28 +541,10 @@ export async function DELETE(
       return NextResponse.json({ error: 'Task not found' }, { status: 404 });
     }
 
-    const sessionRows = queryAll<{ session_id: string }>(
-      'SELECT session_id FROM sessions WHERE task_id = ?',
-      [id],
-    );
-
     const dispatchMetadataRows = queryAll<{ metadata: string | null }>(
       'SELECT metadata FROM task_activities WHERE task_id = ? AND activity_type = ? ORDER BY created_at DESC LIMIT 200',
       [id, 'dispatch_invocation'],
     );
-
-    const sessionKeyBySessionId = new Map<string, string>();
-    for (const row of dispatchMetadataRows) {
-      const metadata = parseDispatchMetadata(row.metadata);
-      if (!metadata) continue;
-      const sessionId = typeof metadata.session_id === 'string' ? metadata.session_id.trim() : '';
-      const sessionKey = typeof metadata.session_key === 'string' ? metadata.session_key.trim() : '';
-      if (sessionId && sessionKey && !sessionKeyBySessionId.has(sessionId)) {
-        sessionKeyBySessionId.set(sessionId, sessionKey);
-      }
-    }
-
-
 
     const workspace = queryOne<{ local_path: string | null; github_repo: string | null }>(
       'SELECT local_path, github_repo FROM workspaces WHERE id = ?',

@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { X, Loader2, Target } from 'lucide-react';
+import { useScrollLock } from '@/hooks/useScrollLock';
 import type { TaskPriority } from '@/lib/types';
 
 interface CreateMilestoneModalProps {
@@ -20,16 +21,7 @@ export function CreateMilestoneModal({ workspaceId, sprintId, onClose, onCreated
     priority: 'normal' as TaskPriority,
   });
 
-  useEffect(() => {
-    const prevBodyOverflow = document.body.style.overflow;
-    const prevHtmlOverflow = document.documentElement.style.overflow;
-    document.body.style.overflow = 'hidden';
-    document.documentElement.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = prevBodyOverflow;
-      document.documentElement.style.overflow = prevHtmlOverflow;
-    };
-  }, []);
+  useScrollLock(true);
 
   const handleSubmit = async () => {
     if (!form.name.trim()) return;

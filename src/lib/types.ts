@@ -272,7 +272,6 @@ export interface Workspace {
   local_path?: string;
   owner_email?: string;
   coordinator_email?: string;
-  himalaya_account?: string;
   logo_url?: string;
   organization?: string;
   created_at: string;
@@ -291,7 +290,6 @@ export interface WorkspaceStats {
   local_path?: string;
   owner_email?: string;
   coordinator_email?: string;
-  himalaya_account?: string;
   logo_url?: string;
   organization?: string;
   taskCounts: {
@@ -588,16 +586,6 @@ export interface Human {
   is_active: number;
   created_at: string;
   updated_at: string;
-}
-
-export interface HimalayaStatus {
-  installed: boolean;
-  configured: boolean;
-  accounts: { name: string; backend?: string; default?: boolean }[];
-  default_account?: string | null;
-  configured_account?: string | null;
-  healthy_account?: boolean;
-  error?: string | null;
 }
 
 export interface SendMessageRequest {

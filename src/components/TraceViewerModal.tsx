@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { X, Bot, User, Cpu, Clock3, MessageSquare, Shield, ArrowRight, ArrowDown, Wrench, Terminal, Search, AlertTriangle, Copy, Check } from 'lucide-react';
 import { marked } from 'marked';
+import { useScrollLock } from '@/hooks/useScrollLock';
 
 interface TraceMessage {
   role: string;
@@ -262,16 +263,7 @@ export function TraceViewerModal({ taskId, sessionId, onClose }: TraceViewerModa
     setCopied(false);
   }, [sessionId]);
 
-  useEffect(() => {
-    const prevBodyOverflow = document.body.style.overflow;
-    const prevHtmlOverflow = document.documentElement.style.overflow;
-    document.body.style.overflow = 'hidden';
-    document.documentElement.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = prevBodyOverflow;
-      document.documentElement.style.overflow = prevHtmlOverflow;
-    };
-  }, []);
+  useScrollLock(Boolean(sessionId));
 
   const summary = data?.summary;
   const previewMessages = useMemo(() => data?.history ?? [], [data]);

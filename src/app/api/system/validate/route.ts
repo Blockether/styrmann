@@ -3,8 +3,6 @@ import { existsSync } from 'fs';
 import { readFileSync } from 'fs';
 import { execSync } from 'child_process';
 import path from 'path';
-import { getDb } from '@/lib/db';
-import { getHimalayaStatus } from '@/lib/himalaya';
 import type { ValidationCheck, ValidationResult } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
@@ -227,49 +225,6 @@ export async function POST() {
         repair_prompt: 'Could not reach the Styrmann web server. Restart: sudo systemctl restart mission-control. Then verify: curl -s -o /dev/null -w "%{http_code}" http://localhost:4000',
       };
     }
-  }));
-
-  checks.push(check('Himalaya CLI', 'system', () => {
-    const db = getDb();
-    const workspace = db.prepare("SELECT coordinator_email, himalaya_account FROM workspaces WHERE id = 'default'").get() as { coordinator_email?: string | null; himalaya_account?: string | null } | undefined;
-    const status = getHimalayaStatus(workspace?.himalaya_account || null);
-    if (!status.installed) {
-      return {
-        status: 'fail',
-        message: 'Himalaya CLI not installed',
-        repairable: true,
-        repair_prompt: 'Install Himalaya CLI and configure at least one account before assigning tasks to humans.',
-      };
-    }
-    if (!status.configured) {
-      return {
-        status: 'warn',
-        message: 'Himalaya CLI installed but no accounts configured',
-        repairable: true,
-        repair_prompt: 'Run himalaya account configure or provide a valid config.toml so Styrmann can send assignment emails.',
-      };
-    }
-    if (!workspace?.coordinator_email) {
-      return {
-        status: 'warn',
-        message: 'Coordinator sender email is not configured for the default workspace',
-        repairable: true,
-        repair_prompt: 'Set coordinator_email on the default workspace and choose a Himalaya account so Styrmann knows which sender address to use.',
-      };
-    }
-    if (!status.healthy_account) {
-      return {
-        status: 'warn',
-        message: status.error || 'Configured Himalaya account failed doctor checks',
-        repairable: true,
-        repair_prompt: 'Fix the selected Himalaya account credentials or pick another configured account in workspace settings.',
-      };
-    }
-    return {
-      status: 'pass',
-      message: `Himalaya ready (${status.configured_account})`,
-      details: `Sender: ${workspace.coordinator_email}`,
-    };
   }));
 
   checks.push(check('OpenCode CLI', 'system', () => {

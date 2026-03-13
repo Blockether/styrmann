@@ -3,11 +3,12 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { X, Save, Trash2, Activity, Package, Bot, Plus, Upload } from 'lucide-react';
 import { useMissionControl } from '@/lib/store';
+import { useScrollLock } from '@/hooks/useScrollLock';
 import { DeliverablesList } from './DeliverablesList';
 import { SessionsList } from './SessionsList';
 import { PlanningTab } from './PlanningTab';
 import { CreateMilestoneModal } from './CreateMilestoneModal';
-import type { Task, TaskPriority, TaskStatus, TaskType, GitHubIssue, Human, HimalayaStatus } from '@/lib/types';
+import type { Task, TaskPriority, TaskStatus, TaskType, GitHubIssue, Human } from '@/lib/types';
 
 type TabType = 'overview' | 'activity' | 'deliverables' | 'sessions';
 
@@ -42,16 +43,7 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
     }
   }, [activeTab]);
 
-  useEffect(() => {
-    const prevBodyOverflow = document.body.style.overflow;
-    const prevHtmlOverflow = document.documentElement.style.overflow;
-    document.body.style.overflow = 'hidden';
-    document.documentElement.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = prevBodyOverflow;
-      document.documentElement.style.overflow = prevHtmlOverflow;
-    };
-  }, []);
+  useScrollLock(true);
 
   const [form, setForm] = useState({
     title: githubIssue?.title || task?.title || '',
@@ -73,7 +65,6 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
   const [milestones, setMilestones] = useState<{ id: string; name: string }[]>([]);
   const [humans, setHumans] = useState<Human[]>([]);
-  const [himalayaStatus, setHimalayaStatus] = useState<HimalayaStatus | null>(null);
   const resolvedWorkspaceId = workspaceId || task?.workspace_id || 'default';
 
   const loadMilestones = useCallback(async () => {
@@ -96,7 +87,6 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
     fetch('/api/humans').then((res) => res.json()).then((data) => {
       if (Array.isArray(data)) setHumans(data);
     }).catch(() => {});
-    fetch('/api/system/himalaya').then((res) => res.json()).then((data) => setHimalayaStatus(data)).catch(() => {});
   }, []);
 
   const resolveStatus = (): TaskStatus => {
@@ -658,11 +648,6 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
                       <option key={human.id} value={human.id}>{human.name} — {human.email}</option>
                     ))}
                   </select>
-                  {himalayaStatus && (!himalayaStatus.installed || !himalayaStatus.configured || !himalayaStatus.healthy_account) && (
-                    <div className="mt-2 text-xs text-mc-accent-red bg-red-500/10 border border-red-500/30 rounded px-3 py-2">
-                      Human assignment mail is not ready: {himalayaStatus.error || 'Himalaya is not configured.'}
-                    </div>
-                  )}
                 </div>
               ) : (
                 <div className="text-xs text-mc-text-secondary bg-mc-bg border border-mc-border rounded px-3 py-2">

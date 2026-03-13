@@ -65,7 +65,6 @@ export async function GET(request: NextRequest) {
           local_path: workspace.local_path,
           owner_email: workspace.owner_email,
           coordinator_email: workspace.coordinator_email,
-          himalaya_account: workspace.himalaya_account,
           logo_url: workspace.logo_url,
           organization: workspace.organization,
           taskCounts: counts,
@@ -87,7 +86,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { name, description, icon, github_repo, owner_email, coordinator_email, himalaya_account, logo_url } = body;
+    const { name, description, icon, github_repo, owner_email, coordinator_email, logo_url } = body;
 
     if (!name || typeof name !== 'string' || name.trim().length === 0) {
       return NextResponse.json({ error: 'Name is required' }, { status: 400 });
@@ -109,8 +108,8 @@ export async function POST(request: NextRequest) {
     }
 
     db.prepare(`
-      INSERT INTO workspaces (id, name, slug, description, icon, github_repo, owner_email, coordinator_email, himalaya_account, logo_url)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO workspaces (id, name, slug, description, icon, github_repo, owner_email, coordinator_email, logo_url)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id,
       name.trim(),
@@ -120,7 +119,6 @@ export async function POST(request: NextRequest) {
       github_repo || null,
       owner_email || null,
       coordinator_email || null,
-      himalaya_account || null,
       logo_url || null
     );
 

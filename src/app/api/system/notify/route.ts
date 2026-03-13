@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
+import { getNotifyStatus } from '@/lib/notify';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
-  return NextResponse.json({ error: 'Removed. Use /api/system/notify' }, { status: 404 });
+  return NextResponse.json(getNotifyStatus());
 }

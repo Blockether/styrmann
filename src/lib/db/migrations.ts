@@ -1643,14 +1643,9 @@ const migrations: Migration[] = [
   },
   {
     id: '036',
-    name: 'add_human_assignments_and_himalaya_workspace_config',
+    name: 'add_human_assignments_and_workspace_config',
     up: (db) => {
-      console.log('[Migration 036] Adding human assignment support and Himalaya workspace config...');
-
-      const workspaceInfo = db.prepare("PRAGMA table_info(workspaces)").all() as { name: string }[];
-      if (!workspaceInfo.some((col) => col.name === 'himalaya_account')) {
-        db.exec(`ALTER TABLE workspaces ADD COLUMN himalaya_account TEXT`);
-      }
+      console.log('[Migration 036] Adding human assignment support and workspace config...');
 
       db.exec(`
         CREATE TABLE IF NOT EXISTS humans (

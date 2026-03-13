@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { queryAll, queryOne, run } from '@/lib/db';
 import { broadcast } from '@/lib/events';
 import { getMissionControlUrl } from '@/lib/config';
-import { getHimalayaStatus, sendHumanAssignmentEmail } from '@/lib/himalaya';
+import { notify } from '@/lib/notify';
 import { CreateTaskSchema } from '@/lib/validation';
 import { generateTaskWorkflowPlan } from '@/lib/workflow-planning';
 import { inferEffortImpact } from '@/lib/task-scoring';
@@ -253,27 +253,19 @@ export async function POST(request: NextRequest) {
     }
 
     if (assigneeType === 'human' && assignedHuman) {
-      const workspace = queryOne<{ name: string; slug: string; coordinator_email?: string | null; himalaya_account?: string | null }>('SELECT name, slug, coordinator_email, himalaya_account FROM workspaces WHERE id = ?', [workspaceId]);
-      const himalaya = getHimalayaStatus(workspace?.himalaya_account || null);
-      if (!workspace?.coordinator_email) {
-        return NextResponse.json({ error: 'Workspace coordinator email is not configured' }, { status: 409 });
-      }
-      if (!himalaya.installed || !himalaya.configured || !himalaya.configured_account || !himalaya.healthy_account) {
-        return NextResponse.json({ error: himalaya.error || 'Himalaya is not configured correctly' }, { status: 409 });
-      }
-
-      const sendResult = sendHumanAssignmentEmail({
-        account: himalaya.configured_account,
-        fromEmail: workspace.coordinator_email,
-        toEmail: assignedHuman.email,
-        taskTitle: validatedData.title,
-        taskDescription: validatedData.description || null,
-        workspaceName: workspace.name,
-        taskUrl: `${getMissionControlUrl()}/workspace/${workspace.slug}`,
+      const workspace = queryOne<{ slug: string | null }>('SELECT slug FROM workspaces WHERE id = ?', [workspaceId]);
+      notify({
+        event: 'task_assigned',
+        task_id: id,
+        title: validatedData.title,
+        message: `Task assigned to ${assignedHuman.name}`,
+        url: `${getMissionControlUrl()}/workspace/${workspace?.slug || workspaceId}`,
+        metadata: {
+          assignee_name: assignedHuman.name,
+          assignee_email: assignedHuman.email,
+          workspace_id: workspaceId,
+        },
       });
-      if (!sendResult.ok) {
-        return NextResponse.json({ error: sendResult.error || 'Failed to send assignment email' }, { status: 502 });
-      }
 
       run(
         `INSERT INTO events (id, type, task_id, message, created_at)

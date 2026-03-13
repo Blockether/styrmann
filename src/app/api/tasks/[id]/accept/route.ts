@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { execFileSync } from 'child_process';
 import { queryOne, run } from '@/lib/db';
 import { getWorkspaceRepoPath, isGitWorkTree, getTaskBranchName } from '@/lib/git-repo';
+import { getMissionControlUrl } from '@/lib/config';
+import { notify } from '@/lib/notify';
 import { createTaskActivity } from '@/lib/task-activity';
 import { checkTransitionEligibility, handleStageFailure, drainQueue } from '@/lib/workflow-engine';
 import { captureTaskRunResult } from '@/lib/task-run-results';
@@ -239,6 +241,19 @@ export async function POST(
     );
 
     const updatedTask = queryOne<Task>('SELECT * FROM tasks WHERE id = ?', [taskId]);
+    const workspaceLink = queryOne<{ slug: string | null }>('SELECT slug FROM workspaces WHERE id = ?', [task.workspace_id]);
+    notify({
+      event: 'task_accepted',
+      task_id: taskId,
+      title: updatedTask?.title || task.title,
+      message: `Task accepted and merged: ${branch} -> ${defaultBranch}`,
+      url: `${getMissionControlUrl()}/workspace/${workspaceLink?.slug || task.workspace_id}`,
+      metadata: {
+        branch,
+        base_branch: defaultBranch,
+        force_accepted: forceAccept,
+      },
+    });
 
     return NextResponse.json({
       success: true,

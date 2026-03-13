@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { X, Save, Trash2, Folder, FileText, RefreshCw, ChevronRight, Link2, Link2Off, Eye, ArrowLeft, Download, ExternalLink } from 'lucide-react';
 import { useMissionControl } from '@/lib/store';
+import { useScrollLock } from '@/hooks/useScrollLock';
 import { DEFAULT_AGENT_ROLE_OPTIONS, formatAgentRoleLabel } from '@/lib/agent-roles';
 import type { Agent } from '@/lib/types';
 
@@ -102,16 +103,7 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated, initia
     setActiveTab(initialTab);
   }, [initialTab]);
 
-  useEffect(() => {
-    const prevBodyOverflow = document.body.style.overflow;
-    const prevHtmlOverflow = document.documentElement.style.overflow;
-    document.body.style.overflow = 'hidden';
-    document.documentElement.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = prevBodyOverflow;
-      document.documentElement.style.overflow = prevHtmlOverflow;
-    };
-  }, []);
+  useScrollLock(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [availableModels, setAvailableModels] = useState<string[]>([]);
   const [defaultModel, setDefaultModel] = useState<string>('');
