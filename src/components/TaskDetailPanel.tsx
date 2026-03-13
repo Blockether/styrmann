@@ -45,6 +45,7 @@ const TASK_TYPE_COLORS: Record<TaskType, string> = {
   chore: 'bg-mc-text-secondary text-white',
   documentation: 'bg-mc-accent-purple text-white',
   research: 'bg-mc-accent-green text-white',
+  spike: 'bg-orange-500 text-white',
 };
 
 const TASK_TYPE_LABELS: Record<TaskType, string> = {
@@ -53,6 +54,7 @@ const TASK_TYPE_LABELS: Record<TaskType, string> = {
   chore: 'chore',
   documentation: 'documentation',
   research: 'research',
+  spike: 'spike',
 };
 
 const PRIORITY_COLORS: Record<TaskPriority, string> = {

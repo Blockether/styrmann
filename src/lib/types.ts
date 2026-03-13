@@ -20,7 +20,7 @@ export type EventType =
   | 'agent_joined'
   | 'system';
 
-export type TaskType = 'bug' | 'feature' | 'chore' | 'documentation' | 'research';
+export type TaskType = 'bug' | 'feature' | 'chore' | 'documentation' | 'research' | 'spike';
 
 export type SprintStatus = 'planning' | 'active' | 'completed' | 'cancelled';
 

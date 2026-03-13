@@ -2156,6 +2156,62 @@ const migrations: Migration[] = [
         db.exec("ALTER TABLE task_deliverables ADD COLUMN source TEXT DEFAULT 'agent'");
       }
     }
+  },
+  {
+    id: '050',
+    name: 'add_spike_task_type',
+    up: (db) => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS tasks_new AS SELECT * FROM tasks WHERE 0;
+      `);
+      db.exec(`DROP TABLE IF EXISTS tasks_new`);
+
+      const cols = (db.prepare(`PRAGMA table_info(tasks)`).all() as { name: string; type: string; notnull: number; dflt_value: string | null; pk: number }[]);
+      const hasCheck = cols.find(c => c.name === 'task_type');
+      if (!hasCheck) return;
+
+      db.exec(`
+        CREATE TABLE tasks_rebuild (
+          id TEXT PRIMARY KEY,
+          title TEXT NOT NULL,
+          description TEXT,
+          status TEXT DEFAULT 'inbox' CHECK (status IN ('pending_dispatch', 'planning', 'inbox', 'assigned', 'in_progress', 'testing', 'review', 'verification', 'done')),
+          priority TEXT DEFAULT 'normal' CHECK (priority IN ('low', 'normal', 'high', 'urgent')),
+          task_type TEXT DEFAULT 'feature' CHECK (task_type IN ('bug', 'feature', 'chore', 'documentation', 'research', 'spike')),
+          effort INTEGER CHECK (effort IS NULL OR (effort >= 1 AND effort <= 5)),
+          impact INTEGER CHECK (impact IS NULL OR (impact >= 1 AND impact <= 5)),
+          assigned_agent_id TEXT REFERENCES agents(id) ON DELETE SET NULL,
+          created_by_agent_id TEXT REFERENCES agents(id) ON DELETE SET NULL,
+          workspace_id TEXT REFERENCES workspaces(id) ON DELETE CASCADE,
+          milestone_id TEXT REFERENCES milestones(id) ON DELETE SET NULL,
+          github_issue_id TEXT REFERENCES github_issues(id) ON DELETE SET NULL,
+          business_id TEXT DEFAULT 'default',
+          due_date TEXT,
+          workflow_template_id TEXT REFERENCES workflow_templates(id) ON DELETE SET NULL,
+          planning_session_key TEXT,
+          planning_messages TEXT,
+          planning_complete INTEGER DEFAULT 0,
+          planning_spec TEXT,
+          planning_agents TEXT,
+          planning_dispatch_error TEXT,
+          status_reason TEXT,
+          created_at TEXT DEFAULT (datetime('now')),
+          updated_at TEXT DEFAULT (datetime('now')),
+          assignee_type TEXT DEFAULT 'ai' CHECK (assignee_type IN ('ai', 'human')),
+          assigned_human_id TEXT,
+          workflow_plan_id TEXT
+        );
+        INSERT INTO tasks_rebuild SELECT * FROM tasks;
+        DROP TABLE tasks;
+        ALTER TABLE tasks_rebuild RENAME TO tasks;
+        CREATE INDEX IF NOT EXISTS idx_tasks_workspace ON tasks(workspace_id);
+        CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
+        CREATE INDEX IF NOT EXISTS idx_tasks_agent ON tasks(assigned_agent_id);
+        CREATE INDEX IF NOT EXISTS idx_tasks_milestone ON tasks(milestone_id);
+        CREATE INDEX IF NOT EXISTS idx_tasks_type ON tasks(task_type);
+        CREATE INDEX IF NOT EXISTS idx_tasks_business ON tasks(business_id);
+      `);
+    }
   }
 ];
 

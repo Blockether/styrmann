@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { Plus, ChevronDown, CheckCircle2, Loader2, Flag, Calendar, ChevronRight, ArrowRightLeft, LayoutList, Columns3, GripVertical, Target, AlertCircle, Crown, Bug, Lightbulb, Wrench, BookOpen, FlaskConical } from 'lucide-react';
+import { Plus, ChevronDown, CheckCircle2, Loader2, Flag, Calendar, ChevronRight, ArrowRightLeft, LayoutList, Columns3, GripVertical, Target, AlertCircle, Crown, Bug, Lightbulb, Wrench, BookOpen, FlaskConical, Zap } from 'lucide-react';
 import { useMissionControl } from '@/lib/store';
 import { triggerAutoDispatch, shouldTriggerAutoDispatch } from '@/lib/auto-dispatch';
 import type { Task, TaskStatus, TaskType, Sprint, Milestone, Agent } from '@/lib/types';
@@ -62,6 +62,7 @@ const TASK_TYPE_CONFIG: Record<TaskType, { icon: typeof Bug; color: string }> = 
   chore: { icon: Wrench, color: 'text-blue-500' },
   documentation: { icon: BookOpen, color: 'text-green-500' },
   research: { icon: FlaskConical, color: 'text-purple-500' },
+  spike: { icon: Zap, color: 'text-orange-500' },
 };
 
 function getTaskAssigneePresentation(task: Task): { badge: string; name: string | null } | null {

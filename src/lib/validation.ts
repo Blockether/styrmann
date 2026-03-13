@@ -15,7 +15,7 @@ const TaskStatus = z.enum([
 
 const TaskPriority = z.enum(['low', 'normal', 'high', 'urgent']);
 
-const TaskType = z.enum(['bug', 'feature', 'chore', 'documentation', 'research']);
+const TaskType = z.enum(['bug', 'feature', 'chore', 'documentation', 'research', 'spike']);
 
 const ActivityType = z.enum([
   'spawned',

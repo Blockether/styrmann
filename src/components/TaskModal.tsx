@@ -569,6 +569,7 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
                 <option value="chore">Chore</option>
                 <option value="documentation">Documentation</option>
                 <option value="research">Research</option>
+                <option value="spike">Spike</option>
               </select>
             </div>
 

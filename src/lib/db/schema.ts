@@ -118,7 +118,7 @@ CREATE TABLE IF NOT EXISTS tasks (
   description TEXT,
   status TEXT DEFAULT 'inbox' CHECK (status IN ('pending_dispatch', 'planning', 'inbox', 'assigned', 'in_progress', 'testing', 'review', 'verification', 'done')),
   priority TEXT DEFAULT 'normal' CHECK (priority IN ('low', 'normal', 'high', 'urgent')),
-  task_type TEXT DEFAULT 'feature' CHECK (task_type IN ('bug', 'feature', 'chore', 'documentation', 'research')),
+  task_type TEXT DEFAULT 'feature' CHECK (task_type IN ('bug', 'feature', 'chore', 'documentation', 'research', 'spike')),
   effort INTEGER CHECK (effort IS NULL OR (effort >= 1 AND effort <= 5)),
   impact INTEGER CHECK (impact IS NULL OR (impact >= 1 AND impact <= 5)),
   assignee_type TEXT DEFAULT 'ai' CHECK (assignee_type IN ('ai', 'human')),
