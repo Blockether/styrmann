@@ -19,7 +19,7 @@
 <div align="center">
 <h3>
 
-[Rationale](#rationale) • [Quick Start](#quick-start) • [Architecture](#architecture) • [Scripts](#scripts) • [Documentation](#documentation)
+[Rationale](#rationale) · [Quick Start](#quick-start) · [Architecture](#architecture) · [Scripts](#scripts) · [Documentation](#documentation)
 
 </h3>
 </div>
@@ -27,10 +27,10 @@
 ## Rationale
 
 Styrmann is a focused, self-hosted control room for software execution.
-It connects your workspace, OpenClaw agents, and human reviewers in one operational loop so planning, execution, and acceptance stay in sync.
+It connects your workspace, OpenCode agents, and human reviewers in one operational loop so planning, execution, and acceptance stay in sync.
 
 - Sprint and backlog views with milestone-based execution planning
-- Session-aware orchestration with OpenClaw trace visibility
+- Session-aware orchestration with trace visibility
 - Deliverable and acceptance workflow with clear audit trail
 - Real-time updates over SSE for status and activity surfaces
 - Security primitives: Bearer auth, webhook verification, strict API validation
@@ -48,9 +48,8 @@ cp .env.example .env.local
 Configure `.env.local`:
 
 ```env
-OPENCLAW_GATEWAY_URL=ws://127.0.0.1:18789
-OPENCLAW_GATEWAY_TOKEN=your-token
 MC_API_TOKEN=optional-api-token
+WEBHOOK_SECRET=optional-webhook-secret
 ```
 
 Run locally:
@@ -67,7 +66,7 @@ Open `http://localhost:4000`.
 Browser (SSE)
   -> Styrmann (Next.js, React, TypeScript)
   -> SQLite state + workflow engine
-  -> OpenClaw Gateway (WebSocket)
+  -> OpenCode ACP (Agent Communication Protocol)
   -> Model providers
 ```
 
@@ -93,8 +92,6 @@ Core stack:
 
 | Variable | Required | Description |
 |----------|:--------:|-------------|
-| `OPENCLAW_GATEWAY_URL` | Yes | OpenClaw gateway WebSocket URL |
-| `OPENCLAW_GATEWAY_TOKEN` | Yes | Gateway authentication token |
 | `MC_API_TOKEN` | No | API Bearer auth token |
 | `WEBHOOK_SECRET` | No | HMAC verification secret |
 | `DATABASE_PATH` | No | SQLite path (default: `./styrmann.db`) |

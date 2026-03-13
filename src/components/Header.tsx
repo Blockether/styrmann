@@ -6,13 +6,8 @@ import Link from 'next/link';
 import {
   LayoutGrid,
   Folder,
-  Menu,
-  X,
   ChevronDown,
   Check,
-  Activity,
-  Bot,
-  Mail,
 } from 'lucide-react';
 import { useMissionControl } from '@/lib/store';
 import { format } from 'date-fns';
@@ -23,11 +18,9 @@ export type DashboardView = 'sprint' | 'backlog' | 'pareto' | 'issues';
 interface HeaderProps {
   workspace?: Workspace;
   isPortrait?: boolean;
-  onMenuToggle?: () => void;
-  sidebarOpen?: boolean;
 }
 
-export function Header({ workspace, isPortrait = true, onMenuToggle, sidebarOpen }: HeaderProps) {
+export function Header({ workspace, isPortrait = true }: HeaderProps) {
   const { isOnline } = useMissionControl();
   const [currentTime, setCurrentTime] = useState(new Date());
   const [showWorkspaceSwitcher, setShowWorkspaceSwitcher] = useState(false);
@@ -82,14 +75,6 @@ export function Header({ workspace, isPortrait = true, onMenuToggle, sidebarOpen
         <LayoutGrid className="w-4 h-4" />
         All Workspaces
       </Link>
-      <Link
-        href="/operations"
-        onClick={() => setShowWorkspaceSwitcher(false)}
-        className="flex items-center gap-2 px-3 py-2 text-sm text-mc-text-secondary hover:bg-mc-bg-tertiary transition-colors"
-      >
-        <Activity className="w-4 h-4" />
-        Operations
-      </Link>
       <div className="border-t border-mc-border my-1" />
       {allWorkspaces.map((ws) => (
         <Link
@@ -124,13 +109,6 @@ export function Header({ workspace, isPortrait = true, onMenuToggle, sidebarOpen
         <>
           <div className="flex items-center justify-between gap-2 min-w-0">
             <div className="flex items-center gap-2 min-w-0 flex-1">
-              <button
-                onClick={onMenuToggle}
-                className="lg:hidden min-h-11 min-w-11 p-2 hover:bg-mc-bg-tertiary rounded text-mc-text-secondary shrink-0"
-                title="Menu"
-              >
-                {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-              </button>
               <div ref={switcherRef} className="relative min-w-0">
               <button
                 onClick={() => setShowWorkspaceSwitcher(!showWorkspaceSwitcher)}
@@ -164,14 +142,6 @@ export function Header({ workspace, isPortrait = true, onMenuToggle, sidebarOpen
       ) : (
         <>
           <div className="flex items-center gap-2 md:gap-4 min-w-0">
-            <button
-              onClick={onMenuToggle}
-              className="lg:hidden min-h-11 min-w-11 p-2 hover:bg-mc-bg-tertiary rounded text-mc-text-secondary shrink-0"
-              title="Menu"
-            >
-              {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-            </button>
-
             <Link href="/" className="hidden sm:flex items-center gap-2 rounded px-1 py-1 transition-colors hover:bg-mc-bg-tertiary">
               <Image src={topBarLogoSrc} alt="Styrmann" width={24} height={24} className="rounded" />
               <h1 className="font-semibold text-mc-text uppercase tracking-wider text-sm">Styrmann</h1>
@@ -205,24 +175,6 @@ export function Header({ workspace, isPortrait = true, onMenuToggle, sidebarOpen
 
 
           <div className="flex items-center gap-2 md:gap-4">
-            {workspace && (
-              <div className="flex items-center gap-2">
-                <Link
-                  href="/operations#agents"
-                  className="inline-flex items-center gap-2 px-2.5 py-1.5 border border-mc-border rounded bg-mc-bg hover:bg-mc-bg-tertiary transition-colors text-sm text-mc-text"
-                >
-                  <Bot className="w-4 h-4 text-mc-accent" />
-                  <span className="hidden md:inline">Manage Agents</span>
-                </Link>
-                <Link
-                  href="/operations#humans"
-                  className="inline-flex items-center gap-2 px-2.5 py-1.5 border border-mc-border rounded bg-mc-bg hover:bg-mc-bg-tertiary transition-colors text-sm text-mc-text"
-                >
-                  <Mail className="w-4 h-4 text-mc-accent" />
-                  <span className="hidden md:inline">Manage Humans</span>
-                </Link>
-              </div>
-            )}
             <span className="hidden md:block text-mc-text-secondary text-sm font-mono">{format(currentTime, 'HH:mm:ss')}</span>
             <span
               title={isOnline ? "System Online" : "System Offline"}

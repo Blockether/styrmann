@@ -6,7 +6,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { ChevronLeft } from 'lucide-react';
 import { Header, type DashboardView } from '@/components/Header';
-import { AgentsSidebar } from '@/components/AgentsSidebar';
+
 import { ActiveSprint } from '@/components/ActiveSprint';
 import { BacklogView } from '@/components/BacklogView';
 import { ParetoView } from '@/components/ParetoView';
@@ -37,7 +37,7 @@ export default function WorkspacePage() {
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [view, setView] = useState<DashboardView>(getInitialView);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+
   const [isPortrait, setIsPortrait] = useState(true);
   const [githubIssueForTask, setGithubIssueForTask] = useState<GitHubIssue | null>(null);
 
@@ -215,29 +215,9 @@ export default function WorkspacePage() {
       <Header 
         workspace={workspace} 
         isPortrait={isPortrait} 
-        onMenuToggle={() => setSidebarOpen(!sidebarOpen)}
-        sidebarOpen={sidebarOpen}
       />
 
-      <div className="hidden lg:flex flex-1 overflow-hidden">
-        <AgentsSidebar 
-          workspaceId={workspace.id} 
-          activeView={view} 
-          onViewChange={handleViewChange} 
-        />
-        <main id="main-content" className="flex-1 min-w-0 overflow-hidden flex flex-col">{renderView()}</main>
-      </div>
-
-      <div className="lg:hidden flex-1 overflow-hidden pb-[env(safe-area-inset-bottom)]">
-        <AgentsSidebar
-          workspaceId={workspace.id}
-          activeView={view}
-          onViewChange={handleViewChange}
-          open={sidebarOpen}
-          onClose={() => setSidebarOpen(false)}
-        />
-        <main id="main-content" className="h-full overflow-hidden flex flex-col">{renderView()}</main>
-      </div>
+      <main id="main-content" className="flex-1 min-w-0 overflow-hidden flex flex-col">{renderView()}</main>
 
       <SSEDebugPanel />
       {githubIssueForTask && (

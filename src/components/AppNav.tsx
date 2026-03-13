@@ -3,11 +3,10 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { LayoutGrid, Activity } from 'lucide-react';
+import { LayoutGrid } from 'lucide-react';
 
 const NAV_ITEMS = [
   { href: '/', label: 'Workspaces', icon: LayoutGrid },
-  { href: '/operations', label: 'Operations', icon: Activity },
 ] as const;
 
 export function AppNav() {
