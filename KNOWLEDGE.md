@@ -1,23 +1,50 @@
-# KNOWLEDGE.md -- Mission Control
+# KNOWLEDGE.md -- Styrmann (formerly Mission Control)
 
-Last updated: 2026-03-12
+Last updated: 2026-03-13
 
 ---
 
 ## Architecture
 
-Next.js 16 App Router dashboard connected to OpenClaw Gateway via WebSocket.
-SQLite database (better-sqlite3). Real-time updates via SSE.
+Styrmann is a self-contained control plane for orchestrating agent and human delivery. It dispatches tasks to OpenCode agent sessions via CLI spawn. No external gateway required.
 
 ```
-Browser <-- SSE -- Mission Control (Next.js, port 4000) -- WebSocket --> OpenClaw Gateway (port 18789)
-                          |                                                    |
-                      SQLite DB                                         AI Providers
+Browser <-- SSE -- Styrmann (Next.js, port 4000) -- child_process.spawn --> OpenCode CLI
+                          |
+                      SQLite DB
 ```
 
 **Tech stack**: Next.js 16, React 19, TypeScript 5.9, SQLite (better-sqlite3), Zustand, Tailwind CSS 4, Zod, Lucide React, SSE. ESLint 9 (flat config).
 
 **Service**: systemd unit `mission-control`, Rocky Linux, port 4000, URL https://control.blockether.com.
+
+### OpenCode ACP Integration
+
+Agent dispatch uses OpenCode CLI (not OpenClaw Gateway WebSocket):
+- `src/lib/acp/client.ts` — `dispatchToOpenCode()` spawns `opencode --session {key}` and writes task message to stdin
+- Session key format: `{agent.session_key_prefix}{session_id}` (e.g. `agent:main:mission-control-builder-abc12345`)
+- Process runs detached (fire-and-forget); OpenCode handles its own lifecycle
+- Agent system prompts embedded in `src/lib/agent-prompts.ts` — no external prompt storage
+
+### Semantic Agent Roles
+
+Eight roles defined in `src/lib/agent-roles.ts` with system prompts in `src/lib/agent-prompts.ts`:
+- `orchestrator` — coordinates multi-agent workflows, plans, delegates
+- `builder` — implements features, writes code, creates deliverables
+- `tester` — runs tests, verifies correctness
+- `reviewer` — reviews code quality, architecture, security
+- `explorer` — researches, investigates, gathers information
+- `pragmatist` — practical solutions, trade-off analysis
+- `guardian` — security, compliance, risk assessment
+- `consolidator` — merges work, resolves conflicts, integrates
+
+### Architectural Rationale (OpenClaw Removal)
+
+OpenClaw Gateway was removed because:
+- OpenClaw harness is designed for conventional workflows, not coding agents
+- OpenClaw requires external configuration and maintenance outside the repository
+- OpenCode ACP makes Styrmann fully plug-and-play — no external dependencies
+- OpenCode provides more powerful agent execution
 
 ---
 
