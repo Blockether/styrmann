@@ -1134,8 +1134,10 @@ const migrations: Migration[] = [
     name: 'add_task_id_to_agent_logs',
     up: (db) => {
       console.log('[Migration 024] Adding task_id to agent_logs + backfill...');
-      // Add task_id column
-      db.exec(`ALTER TABLE agent_logs ADD COLUMN task_id TEXT REFERENCES tasks(id) ON DELETE SET NULL`);
+      const hasColumn = db.prepare(`SELECT COUNT(*) as cnt FROM pragma_table_info('agent_logs') WHERE name = 'task_id'`).get() as { cnt: number };
+      if (!hasColumn.cnt) {
+        db.exec(`ALTER TABLE agent_logs ADD COLUMN task_id TEXT REFERENCES tasks(id) ON DELETE SET NULL`);
+      }
       db.exec(`CREATE INDEX IF NOT EXISTS idx_agent_logs_task ON agent_logs(task_id)`);
       // Backfill: derive task_id from openclaw_sessions where session matches
       db.exec(`
