@@ -291,34 +291,19 @@ function ensureProblemStatementArtifact(args: {
     const deliverableId = uuidv4();
     const now = new Date().toISOString();
 
-    try {
-      run(
-        `INSERT INTO task_deliverables (id, task_id, deliverable_type, title, path, description, session_id, created_at)
-         VALUES (?, ?, 'file', ?, ?, ?, ?, ?)`,
-        [
-          deliverableId,
-          task.id,
-          'task-problem-statement.md',
-          artifactPath,
-          buildDeliverableDescription(agentName, workflowStep, 'dispatch initialization'),
-           agentSessionId,
-          now,
-        ],
-      );
-    } catch {
-      run(
-        `INSERT INTO task_deliverables (id, task_id, deliverable_type, title, path, description, created_at)
-         VALUES (?, ?, 'file', ?, ?, ?, ?)`,
-        [
-          deliverableId,
-          task.id,
-          'task-problem-statement.md',
-          artifactPath,
-          buildDeliverableDescription(agentName, workflowStep, 'dispatch initialization'),
-          now,
-        ],
-      );
-    }
+    run(
+      `INSERT INTO task_deliverables (id, task_id, deliverable_type, title, path, description, session_id, source, created_at)
+       VALUES (?, ?, 'file', ?, ?, ?, ?, 'system', ?)`,
+      [
+        deliverableId,
+        task.id,
+        'task-problem-statement.md',
+        artifactPath,
+        buildDeliverableDescription(agentName, workflowStep, 'dispatch initialization'),
+        agentSessionId,
+        now,
+      ],
+    );
 
     const created = queryOne<{ id: string; task_id: string; deliverable_type: string; title: string; path: string | null; description: string | null; session_id?: string | null; created_at: string }>(
       'SELECT * FROM task_deliverables WHERE id = ?',
@@ -460,6 +445,20 @@ export async function dispatchTaskToAgent(taskId: string): Promise<DispatchResul
 
     if (!session) {
       return { success: false, error: 'Failed to create agent session' };
+    }
+
+    const DISPATCH_GUARD_MS = 30 * 60 * 1000;
+    if (session.last_dispatched_at) {
+      const lastDispatchMs = new Date(session.last_dispatched_at).getTime();
+      const elapsedMs = Date.now() - lastDispatchMs;
+      if (elapsedMs < DISPATCH_GUARD_MS) {
+        const elapsedMin = Math.round(elapsedMs / 60000);
+        const guardMin = Math.round(DISPATCH_GUARD_MS / 60000);
+        return {
+          success: false,
+          error: `Dispatch skipped: session was dispatched ${elapsedMin}m ago (guard=${guardMin}m). Agent may still be running.`,
+        };
+      }
     }
 
     const priorityLabel = {
@@ -780,6 +779,11 @@ If you need help or clarification, ask the orchestrator.`;
         outputDir: taskProjectDir,
       });
 
+      run(
+        'UPDATE sessions SET last_dispatched_at = ?, dispatch_pid = ?, updated_at = ? WHERE id = ?',
+        [now, dispatchResult.pid || null, now, session.id],
+      );
+
       createTaskActivity({
         taskId: task.id,
         activityType: 'dispatch_invocation',
@@ -796,6 +800,7 @@ If you need help or clarification, ask the orchestrator.`;
           worktree_path: worktree?.worktreePath || null,
           base_branch: worktree?.defaultBranch || null,
           provenance: dispatchResult.success,
+          dispatch_pid: dispatchResult.pid || null,
           invocation: taskMessage,
           workflow_step: task.status === 'assigned' ? 'in_progress' : task.status,
           decision_event: true,
@@ -804,6 +809,8 @@ If you need help or clarification, ask the orchestrator.`;
 
       if (task.status === 'assigned') {
         run('UPDATE tasks SET status = ?, updated_at = ? WHERE id = ?', ['in_progress', now, taskId]);
+      } else {
+        run('UPDATE tasks SET updated_at = ? WHERE id = ?', [now, taskId]);
       }
 
       const updatedTask = queryOne<Task>('SELECT * FROM tasks WHERE id = ?', [taskId]);

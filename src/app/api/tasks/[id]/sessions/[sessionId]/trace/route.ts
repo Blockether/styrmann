@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { queryOne, queryAll, run } from '@/lib/db';
-import { broadcast } from '@/lib/events';
+import { existsSync, readFileSync } from 'fs';
 import type { InputProvenance, SourceReceipt } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
@@ -8,7 +8,6 @@ export const dynamic = 'force-dynamic';
 type Params = { params: Promise<{ id: string; sessionId: string }> };
 
 type TraceMessage = { role: string; content: string; tool_calls?: { id?: string; name: string; input?: string }[]; tool_result?: string; tool_name?: string; tool_call_id?: string; is_error?: boolean; timestamp?: string; provenance?: InputProvenance | null; receipt?: SourceReceipt | null };
-type AutoDeliverableCandidate = { path: string; title: string; sourceTool: string };
 
 const SOURCE_RECEIPT_RE = /\[Source Receipt\]\n([\s\S]*?)\n\[\/?Source Receipt\]/;
 
@@ -130,6 +129,7 @@ function extractSessionMetadata(taskId: string, sessionId: string): {
   session_id: string;
   session_key: string;
   output_directory: string;
+  trace_path: string;
   invocation: string;
   created_at: string;
 } | null {
@@ -150,6 +150,7 @@ function extractSessionMetadata(taskId: string, sessionId: string): {
           session_id: String(parsed.session_id || ''),
           session_key: String(parsed.session_key || ''),
           output_directory: String(parsed.output_directory || ''),
+          trace_path: String(parsed.trace_path || ''),
           invocation: String(parsed.invocation || ''),
         };
       } catch {
@@ -159,13 +160,87 @@ function extractSessionMetadata(taskId: string, sessionId: string): {
     .find((row) => row && row.session_id === sessionId) || null;
 }
 
-function tableHasColumn(table: string, column: string): boolean {
+interface OpenCodeEvent {
+  type: string;
+  timestamp: number;
+  sessionID?: string;
+  part?: {
+    type: string;
+    text?: string;
+    tool?: string;
+    callID?: string;
+    state?: {
+      status?: string;
+      input?: Record<string, unknown>;
+      output?: string;
+      metadata?: Record<string, unknown>;
+      time?: { start?: number; end?: number };
+    };
+    reason?: string;
+    cost?: number;
+    tokens?: Record<string, unknown>;
+  };
+}
+
+function parseJsonlTraceFile(tracePath: string): TraceMessage[] {
+  if (!tracePath || !existsSync(tracePath)) return [];
+
+  let raw: string;
   try {
-    const rows = queryAll<{ name: string }>(`PRAGMA table_info(${table})`);
-    return rows.some((row) => row.name === column);
+    raw = readFileSync(tracePath, 'utf-8');
   } catch {
-    return false;
+    return [];
   }
+
+  const messages: TraceMessage[] = [];
+
+  for (const line of raw.split('\n')) {
+    if (!line.trim()) continue;
+    let event: OpenCodeEvent;
+    try {
+      event = JSON.parse(line) as OpenCodeEvent;
+    } catch {
+      continue;
+    }
+
+    const ts = typeof event.timestamp === 'number'
+      ? new Date(event.timestamp).toISOString()
+      : undefined;
+
+    if (event.type === 'text' && event.part?.text) {
+      messages.push({
+        role: 'assistant',
+        content: event.part.text,
+        timestamp: ts,
+      });
+    } else if (event.type === 'tool_use' && event.part?.tool) {
+      const input = event.part.state?.input;
+      const output = event.part.state?.output;
+      messages.push({
+        role: 'assistant',
+        content: '',
+        tool_calls: [{
+          id: event.part.callID,
+          name: event.part.tool,
+          input: input ? JSON.stringify(input, null, 2) : undefined,
+        }],
+        timestamp: ts,
+      });
+      if (output !== undefined) {
+        const outputStr = typeof output === 'string' ? output : JSON.stringify(output, null, 2);
+        messages.push({
+          role: 'tool',
+          content: '',
+          tool_result: outputStr.length > 8000 ? outputStr.slice(0, 8000) + '\n...[truncated]' : outputStr,
+          tool_name: event.part.tool,
+          tool_call_id: event.part.callID,
+          timestamp: ts,
+        });
+      }
+    }
+  }
+
+  return messages;
 }
 
 function parseToolInputObject(input?: string): Record<string, unknown> | null {
@@ -178,53 +253,6 @@ function parseToolInputObject(input?: string): Record<string, unknown> | null {
   } catch {
   }
   return null;
-}
-
-function isWriteTool(toolName: string): boolean {
-  const name = toolName.toLowerCase();
-  return name === 'write'
-    || name.endsWith('.write')
-    || name.includes('write_file')
-    || name.includes('writefile');
-}
-
-function extractFilePathFromToolInput(input?: string): string | null {
-  const obj = parseToolInputObject(input);
-  if (!obj) return null;
-  const keys = ['filePath', 'file_path', 'path', 'targetPath', 'target_path', 'filename'];
-  for (const key of keys) {
-    const value = obj[key];
-    if (typeof value === 'string' && value.trim().length > 0) {
-      return value.trim();
-    }
-  }
-  return null;
-}
-
-function titleFromPath(filePath: string): string {
-  const normalized = filePath.replace(/\\/g, '/');
-  const segments = normalized.split('/').filter(Boolean);
-  return segments[segments.length - 1] || filePath;
-}
-
-function extractAutoDeliverableCandidates(history: TraceMessage[]): AutoDeliverableCandidate[] {
-  const byPath = new Map<string, AutoDeliverableCandidate>();
-  for (const msg of history) {
-    if (msg.role !== 'assistant' || !msg.tool_calls || msg.tool_calls.length === 0) continue;
-    for (const call of msg.tool_calls) {
-      if (!isWriteTool(call.name)) continue;
-      const filePath = extractFilePathFromToolInput(call.input);
-      if (!filePath) continue;
-      if (!byPath.has(filePath)) {
-        byPath.set(filePath, {
-          path: filePath,
-          title: titleFromPath(filePath),
-          sourceTool: call.name,
-        });
-      }
-    }
-  }
-  return Array.from(byPath.values());
 }
 
 function buildTraceSummary(
@@ -371,6 +399,16 @@ export async function GET(request: Request, { params }: Params) {
       .map((log) => normalizeMessage({ role: log.role, content: log.content, timestamp: log.created_at }))
       .filter((message) => isMeaningfulTraceMessage(message) || message.role !== 'assistant');
 
+    let historySource = history.length > 0 ? 'agent_logs' : 'none';
+
+    if (history.length === 0 && invocation?.trace_path) {
+      const jsonlMessages = parseJsonlTraceFile(invocation.trace_path);
+      if (jsonlMessages.length > 0) {
+        history = jsonlMessages.filter((msg) => isMeaningfulTraceMessage(msg));
+        historySource = 'trace_file';
+      }
+    }
+
     const emptyHighlights: string[] = [];
     if (history.length === 0) {
       emptyHighlights.push('No trace messages available for this session. Agent activity is tracked via task activities.');
@@ -395,85 +433,6 @@ export async function GET(request: Request, { params }: Params) {
       if ((msg.role === 'toolResult' || msg.role === 'tool') && msg.tool_call_id && !msg.tool_name) {
         const name = toolCallMap.get(msg.tool_call_id);
         if (name) msg.tool_name = name;
-      }
-    }
-
-    const hasSessionIdColumn = tableHasColumn('task_deliverables', 'session_id');
-    const dispatchActivity = queryOne<{ metadata: string | null }>(
-      `SELECT metadata FROM task_activities
-       WHERE task_id = ?
-         AND activity_type = 'dispatch_invocation'
-         AND json_extract(metadata, '$.session_id') = ?
-       ORDER BY created_at DESC
-       LIMIT 1`,
-      [taskId, session.session_id],
-    );
-    const dispatchMetadata = parseToolInputObject(dispatchActivity?.metadata || '');
-    const workflowStep = typeof dispatchMetadata?.workflow_step === 'string' && dispatchMetadata.workflow_step.trim().length > 0
-      ? dispatchMetadata.workflow_step.trim()
-      : 'unknown stage';
-    const agentName = typeof session.agent_name === 'string' && session.agent_name.trim().length > 0
-      ? session.agent_name.trim()
-      : 'Unknown agent';
-    const autoDeliverableCandidates = extractAutoDeliverableCandidates(history);
-    for (const candidate of autoDeliverableCandidates) {
-      const existing = hasSessionIdColumn
-        ? queryOne<{ id: string }>(
-          'SELECT id FROM task_deliverables WHERE task_id = ? AND session_id = ? AND path = ? LIMIT 1',
-          [taskId, session.session_id, candidate.path],
-        )
-        : queryOne<{ id: string }>(
-          'SELECT id FROM task_deliverables WHERE task_id = ? AND path = ? LIMIT 1',
-          [taskId, candidate.path],
-        );
-      if (existing) continue;
-
-      const deliverableId = crypto.randomUUID();
-      if (hasSessionIdColumn) {
-        run(
-          `INSERT INTO task_deliverables
-            (id, task_id, deliverable_type, title, path, description, session_id)
-           VALUES (?, ?, 'file', ?, ?, ?, ?)`,
-          [
-            deliverableId,
-            taskId,
-            candidate.title,
-            candidate.path,
-            `Created during ${workflowStep.replace(/_/g, ' ')} by ${agentName} via ${candidate.sourceTool}.`,
-            session.session_id,
-          ],
-        );
-      } else {
-        run(
-          `INSERT INTO task_deliverables
-            (id, task_id, deliverable_type, title, path, description)
-           VALUES (?, ?, 'file', ?, ?, ?)`,
-          [
-            deliverableId,
-            taskId,
-            candidate.title,
-            candidate.path,
-            `Created during ${workflowStep.replace(/_/g, ' ')} by ${agentName} via ${candidate.sourceTool}.`,
-          ],
-        );
-      }
-
-      const created = queryOne<{
-        id: string;
-        task_id: string;
-        deliverable_type: string;
-        title: string;
-        path: string | null;
-        description: string | null;
-        session_id?: string | null;
-        created_at: string;
-      }>('SELECT * FROM task_deliverables WHERE id = ?', [deliverableId]);
-
-      if (created) {
-        broadcast({
-          type: 'deliverable_added',
-          payload: created,
-        });
       }
     }
 
@@ -528,7 +487,8 @@ export async function GET(request: Request, { params }: Params) {
       },
       diagnostics: {
         resolved_session_key: resolvedSessionKey,
-        history_source: history.length > 0 ? 'agent_logs' : 'none',
+        history_source: historySource,
+        trace_path: invocation?.trace_path || null,
       },
       invocation,
       summary: buildTraceSummary(history, invocation?.invocation || null, {

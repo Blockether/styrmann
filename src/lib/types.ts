@@ -434,6 +434,8 @@ export interface AgentSession {
   session_type: 'persistent' | 'subagent';
   task_id?: string;
   ended_at?: string;
+  last_dispatched_at?: string;
+  dispatch_pid?: number;
   created_at: string;
   updated_at: string;
 }
@@ -483,6 +485,7 @@ export interface TaskDeliverable {
   path?: string;
   description?: string;
   session_id?: string;
+  source?: 'agent' | 'system';
   created_via_agent_id?: string | null;
   created_via_agent_name?: string | null;
   created_via_workflow_step?: string | null;

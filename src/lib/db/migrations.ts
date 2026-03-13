@@ -2133,6 +2133,29 @@ const migrations: Migration[] = [
       db.exec('CREATE UNIQUE INDEX idx_agent_logs_content_hash ON agent_logs(content_hash)');
       db.exec('CREATE INDEX idx_deliverables_session ON task_deliverables(session_id)');
     }
+  },
+  {
+    id: '048',
+    name: 'add_session_dispatch_tracking',
+    up: (db) => {
+      const cols = (db.prepare(`PRAGMA table_info(sessions)`).all() as { name: string }[]).map(c => c.name);
+      if (!cols.includes('last_dispatched_at')) {
+        db.exec('ALTER TABLE sessions ADD COLUMN last_dispatched_at TEXT');
+      }
+      if (!cols.includes('dispatch_pid')) {
+        db.exec('ALTER TABLE sessions ADD COLUMN dispatch_pid INTEGER');
+      }
+    }
+  },
+  {
+    id: '049',
+    name: 'add_deliverable_source',
+    up: (db) => {
+      const cols = (db.prepare(`PRAGMA table_info(task_deliverables)`).all() as { name: string }[]).map(c => c.name);
+      if (!cols.includes('source')) {
+        db.exec("ALTER TABLE task_deliverables ADD COLUMN source TEXT DEFAULT 'agent'");
+      }
+    }
   }
 ];
 

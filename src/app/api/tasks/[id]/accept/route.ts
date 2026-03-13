@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { execFileSync } from 'child_process';
 import { queryOne, run } from '@/lib/db';
-import { getWorkspaceRepoPath, isGitWorkTree } from '@/lib/git-repo';
+import { getWorkspaceRepoPath, isGitWorkTree, getTaskBranchName } from '@/lib/git-repo';
 import { createTaskActivity } from '@/lib/task-activity';
 import { checkTransitionEligibility, handleStageFailure, drainQueue } from '@/lib/workflow-engine';
 import { captureTaskRunResult } from '@/lib/task-run-results';
@@ -35,6 +35,7 @@ export async function POST(
       action?: 'accept' | 'reject';
       reason?: string;
       branch?: string;
+      force?: boolean;
     };
 
     const action = body.action || 'accept';
@@ -61,16 +62,22 @@ export async function POST(
       }, { status: result.success ? 200 : 500 });
     }
 
+    const forceAccept = body.force === true;
+
     const unmetCount = queryOne<{ count: number }>(
       'SELECT COUNT(*) as count FROM task_acceptance_criteria WHERE task_id = ? AND is_met = 0',
       [taskId],
     )?.count || 0;
-    if (unmetCount > 0) {
-      return NextResponse.json({ error: `Acceptance criteria incomplete (${unmetCount} unmet)` }, { status: 409 });
+    if (unmetCount > 0 && !forceAccept) {
+      return NextResponse.json({
+        error: `Acceptance criteria incomplete (${unmetCount} unmet)`,
+        unmet_count: unmetCount,
+        hint: 'Pass { "force": true } to override criteria gate as human reviewer.',
+      }, { status: 409 });
     }
 
     const eligibility = checkTransitionEligibility(taskId, 'done');
-    if (!eligibility.ok) {
+    if (!eligibility.ok && !forceAccept) {
       return NextResponse.json(
         {
           error: eligibility.code === 'dependency_blocked'
@@ -87,18 +94,19 @@ export async function POST(
               missing_acceptance_criteria: eligibility.missing_acceptance_criteria || [],
             },
           },
+          hint: 'Pass { "force": true } to override gates as human reviewer.',
         },
         { status: 409 },
       );
     }
 
-    const workspace = queryOne<{ github_repo?: string | null; workspace_id: string }>(
-      `SELECT w.github_repo as github_repo, t.workspace_id as workspace_id
+    const workspace = queryOne<{ github_repo?: string | null; local_path?: string | null; workspace_id: string }>(
+      `SELECT w.github_repo as github_repo, w.local_path as local_path, t.workspace_id as workspace_id
        FROM tasks t JOIN workspaces w ON w.id = t.workspace_id
        WHERE t.id = ?`,
       [taskId],
     );
-    const repoPath = getWorkspaceRepoPath(workspace?.github_repo || null);
+    const repoPath = workspace?.local_path || getWorkspaceRepoPath(workspace?.github_repo || null);
     if (!repoPath || !isGitWorkTree(repoPath)) {
       return NextResponse.json({ error: 'Workspace repo unavailable for merge' }, { status: 400 });
     }
@@ -114,7 +122,7 @@ export async function POST(
 
     const branch = (body.branch && body.branch.trim())
       || parseBranchFromMetadata(latestBranch?.metadata)
-      || `task/${taskId}`;
+      || getTaskBranchName(taskId, task.title);
 
     try {
       runGit(repoPath, ['rev-parse', '--verify', branch]);
@@ -159,22 +167,57 @@ export async function POST(
       );
     }
 
+    // Push merged default branch to origin
+    try {
+      runGit(repoPath, ['push', 'origin', defaultBranch]);
+    } catch (pushError) {
+      console.error('[Accept] Failed to push to origin after merge:', pushError);
+    }
+
+    // Push the task branch to origin (needed for upstream PR)
+    try {
+      runGit(repoPath, ['push', 'origin', branch]);
+    } catch {
+      // Branch may already be pushed or remote may not exist — not fatal
+    }
+
+    // Detect if workspace is a fork (has upstream remote)
+    let upstreamRepo: string | null = null;
+    let originRepo: string | null = null;
+    try {
+      upstreamRepo = runGit(repoPath, ['remote', 'get-url', 'upstream']);
+    } catch {
+      // No upstream remote — not a fork
+    }
+    try {
+      originRepo = runGit(repoPath, ['remote', 'get-url', 'origin']);
+    } catch {
+      // No origin remote
+    }
+
+    const isFork = Boolean(upstreamRepo);
+
     const now = new Date().toISOString();
+    const statusReason = forceAccept
+      ? `Force-accepted by human (${unmetCount} criteria overridden) and merged: ${branch} -> ${defaultBranch}`
+      : `Accepted by human and merged: ${branch} -> ${defaultBranch}`;
     run(
       'UPDATE tasks SET status = ?, status_reason = ?, updated_at = ? WHERE id = ?',
-      ['done', `Accepted by human and merged: ${branch} -> ${defaultBranch}`, now, taskId],
+      ['done', statusReason, now, taskId],
     );
 
     createTaskActivity({
       taskId,
       activityType: 'status_changed',
-      message: `Human acceptance merged ${branch} into ${defaultBranch}`,
+      message: `Human acceptance merged ${branch} into ${defaultBranch}${forceAccept ? ` (force-accepted, ${unmetCount} criteria overridden)` : ''}`,
       metadata: {
         branch,
         base_branch: defaultBranch,
         action: 'accept_merge',
         workflow_step: task.status,
         decision_event: true,
+        force_accepted: forceAccept,
+        unmet_criteria_overridden: forceAccept ? unmetCount : 0,
       },
     });
 
@@ -197,6 +240,9 @@ export async function POST(
       branch,
       base: defaultBranch,
       task: updatedTask,
+      is_fork: isFork,
+      upstream_repo: upstreamRepo,
+      origin_repo: originRepo,
     });
   } catch (error) {
     console.error('Failed to process task acceptance:', error);

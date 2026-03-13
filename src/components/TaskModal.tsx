@@ -112,6 +112,11 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showReworkDialog, setShowReworkDialog] = useState(false);
   const [reworkReason, setReworkReason] = useState('');
+  const [showUpstreamDialog, setShowUpstreamDialog] = useState(false);
+  const [upstreamInfo, setUpstreamInfo] = useState<{ upstream_repo: string; branch: string } | null>(null);
+  const [isCreatingPr, setIsCreatingPr] = useState(false);
+  const [upstreamPrUrl, setUpstreamPrUrl] = useState<string | null>(null);
+  const [upstreamError, setUpstreamError] = useState<string | null>(null);
 
   const uploadAttachedFiles = async (taskId: string): Promise<void> => {
     if (attachedFiles.length === 0) return;
@@ -263,10 +268,18 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
       const res = await fetch(`/api/tasks/${task.id}/accept`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'accept' }),
+        body: JSON.stringify({ action: 'accept', force: true }),
       });
 
-      const data = await res.json().catch(() => ({}));
+      const data = await res.json().catch(() => ({})) as {
+        success?: boolean;
+        error?: string;
+        message?: string;
+        task?: Task;
+        is_fork?: boolean;
+        upstream_repo?: string;
+        branch?: string;
+      };
       if (!res.ok) {
         setSaveError(data.error || data.message || 'We could not accept this task. Please try again.');
         return;
@@ -276,11 +289,47 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
         updateTask(data.task);
       }
 
-      onClose();
+      if (data.is_fork && data.upstream_repo && data.branch) {
+        setUpstreamInfo({ upstream_repo: data.upstream_repo, branch: data.branch });
+        setShowUpstreamDialog(true);
+      } else {
+        onClose();
+      }
     } catch (error) {
       setSaveError(error instanceof Error ? error.message : 'We could not accept this task. Please try again.');
     } finally {
       setIsProcessingAcceptance(false);
+    }
+  };
+
+  const handleProposeUpstream = async () => {
+    if (!task || !upstreamInfo) return;
+    setIsCreatingPr(true);
+    setUpstreamError(null);
+    try {
+      const res = await fetch(`/api/tasks/${task.id}/propose-upstream`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ branch: upstreamInfo.branch }),
+      });
+
+      const data = await res.json().catch(() => ({})) as {
+        success?: boolean;
+        pr_url?: string;
+        error?: string;
+      };
+      if (!res.ok) {
+        setUpstreamError(data.error || 'Failed to create upstream PR.');
+        return;
+      }
+
+      if (data.pr_url) {
+        setUpstreamPrUrl(data.pr_url);
+      }
+    } catch (error) {
+      setUpstreamError(error instanceof Error ? error.message : 'Failed to create upstream PR.');
+    } finally {
+      setIsCreatingPr(false);
     }
   };
 
@@ -775,6 +824,57 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
             <div className="p-4 flex items-center justify-end gap-2">
               <button type="button" onClick={() => setShowReworkDialog(false)} className="min-h-11 px-4 py-2 border border-mc-border rounded text-sm text-mc-text-secondary hover:text-mc-text hover:bg-mc-bg">Cancel</button>
               <button type="button" onClick={submitReworkRequest} disabled={isProcessingAcceptance} className="min-h-11 px-4 py-2 bg-mc-accent-red text-white rounded text-sm font-medium hover:bg-mc-accent-red/90 disabled:opacity-50">{isProcessingAcceptance ? 'Sending request...' : 'Send Rework Request'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showUpstreamDialog && task && (
+        <div className="fixed inset-0 z-[60] bg-black/55 flex items-center justify-center p-4" onClick={() => { setShowUpstreamDialog(false); onClose(); }}>
+          <div className="w-full max-w-lg rounded-2xl border border-mc-border bg-gradient-to-br from-white via-[#fff8ea] to-[#f7efe0] shadow-[0_28px_70px_-40px_rgba(90,65,10,0.45)]" onClick={(event) => event.stopPropagation()}>
+            <div className="p-4 border-b border-mc-border">
+              {upstreamPrUrl ? (
+                <>
+                  <h3 className="text-base font-semibold text-mc-text">PR Created</h3>
+                  <p className="mt-2 text-sm text-mc-text-secondary">
+                    Pull request successfully created on the upstream repository.
+                  </p>
+                  <a
+                    href={upstreamPrUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-3 inline-flex items-center gap-1.5 text-sm text-mc-accent hover:text-mc-accent/80 hover:underline break-all"
+                  >
+                    {upstreamPrUrl}
+                  </a>
+                </>
+              ) : (
+                <>
+                  <h3 className="text-base font-semibold text-mc-text">Propose PR Upstream</h3>
+                  <p className="mt-2 text-sm text-mc-text-secondary">
+                    This workspace is a fork. Would you like to create a pull request to the upstream repository?
+                  </p>
+                  {upstreamInfo && (
+                    <div className="mt-3 p-2 rounded-lg bg-mc-bg-tertiary text-xs space-y-1">
+                      <div className="text-mc-text-secondary">Upstream: <span className="font-mono text-mc-text">{upstreamInfo.upstream_repo}</span></div>
+                      <div className="text-mc-text-secondary">Branch: <span className="font-mono text-mc-text">{upstreamInfo.branch}</span></div>
+                    </div>
+                  )}
+                  {upstreamError && (
+                    <div className="mt-3 p-2 rounded-lg bg-red-50 border border-red-200 text-xs text-red-700">{upstreamError}</div>
+                  )}
+                </>
+              )}
+            </div>
+            <div className="p-4 flex items-center justify-end gap-2 border-t border-mc-border">
+              {upstreamPrUrl ? (
+                <button type="button" onClick={() => { setShowUpstreamDialog(false); onClose(); }} className="min-h-11 px-4 py-2 bg-mc-accent text-white rounded text-sm font-medium hover:bg-mc-accent/90">Done</button>
+              ) : (
+                <>
+                  <button type="button" onClick={() => { setShowUpstreamDialog(false); onClose(); }} className="min-h-11 px-4 py-2 border border-mc-border rounded text-sm text-mc-text-secondary hover:text-mc-text hover:bg-mc-bg">Skip</button>
+                  <button type="button" onClick={handleProposeUpstream} disabled={isCreatingPr} className="min-h-11 px-4 py-2 bg-mc-accent text-white rounded text-sm font-medium hover:bg-mc-accent/90 disabled:opacity-50">{isCreatingPr ? 'Creating PR...' : 'Create PR'}</button>
+                </>
+              )}
             </div>
           </div>
         </div>

@@ -41,14 +41,23 @@ export async function GET(
 ) {
   try {
     const { id: taskId } = await params;
+    const sourceFilter = request.nextUrl.searchParams.get('source');
     const db = getDb();
 
-    const deliverables = db.prepare(`
-      SELECT *
-      FROM task_deliverables
-      WHERE task_id = ?
-      ORDER BY created_at DESC
-    `).all(taskId) as TaskDeliverable[];
+    const validSources = ['agent', 'system'];
+    const deliverables = sourceFilter && validSources.includes(sourceFilter)
+      ? db.prepare(`
+          SELECT *
+          FROM task_deliverables
+          WHERE task_id = ? AND (source = ? OR (source IS NULL AND ? = 'agent'))
+          ORDER BY created_at DESC
+        `).all(taskId, sourceFilter, sourceFilter) as TaskDeliverable[]
+      : db.prepare(`
+          SELECT *
+          FROM task_deliverables
+          WHERE task_id = ?
+          ORDER BY created_at DESC
+        `).all(taskId) as TaskDeliverable[];
 
     const enriched = deliverables.map((deliverable) => {
       const fallbackSessionId = db.prepare(`

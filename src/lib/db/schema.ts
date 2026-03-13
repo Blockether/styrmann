@@ -357,6 +357,8 @@ CREATE TABLE IF NOT EXISTS sessions (
   session_type TEXT DEFAULT 'persistent',
   task_id TEXT REFERENCES tasks(id),
   ended_at TEXT,
+  last_dispatched_at TEXT,
+  dispatch_pid INTEGER,
   created_at TEXT DEFAULT (datetime('now')),
   updated_at TEXT DEFAULT (datetime('now'))
 );
@@ -433,6 +435,7 @@ CREATE TABLE IF NOT EXISTS task_deliverables (
   path TEXT,
   description TEXT,
   session_id TEXT,
+  source TEXT DEFAULT 'agent',
   created_at TEXT DEFAULT (datetime('now'))
 );
 

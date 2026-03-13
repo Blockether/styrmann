@@ -458,8 +458,14 @@ export function DeliverablesList({ taskId }: DeliverablesListProps) {
             <div className="p-2 rounded bg-mc-bg-tertiary">
               <div className="text-mc-text-secondary">Sessions</div>
               <div className="font-medium text-mc-text mt-0.5">{changes.summary.sessions_count}</div>
-              <div className="text-[11px] text-mc-text-secondary mt-1">
-                interrupted {changes.summary.interruptions_count || 0} • stale {changes.summary.stales_count || 0} • finished {changes.summary.finished_count || 0} • unfinished {changes.summary.unfinished_count || 0}
+              <div className="text-[11px] text-mc-text-secondary mt-1 flex flex-wrap gap-x-1.5 gap-y-0.5">
+                <span>interrupted {changes.summary.interruptions_count || 0}</span>
+                <span className="hidden sm:inline">•</span>
+                <span>stale {changes.summary.stales_count || 0}</span>
+                <span className="hidden sm:inline">•</span>
+                <span>finished {changes.summary.finished_count || 0}</span>
+                <span className="hidden sm:inline">•</span>
+                <span>unfinished {changes.summary.unfinished_count || 0}</span>
               </div>
             </div>
             <div className="p-2 rounded bg-mc-bg-tertiary">
@@ -477,11 +483,11 @@ export function DeliverablesList({ taskId }: DeliverablesListProps) {
           </div>
 
           {changes.changed_files.length > 0 && (
-            <div>
+            <div className="min-w-0 overflow-hidden">
               <div className="text-xs font-medium text-mc-text-secondary mb-1">Changed files</div>
               <div className="space-y-1 max-h-32 overflow-y-auto">
                 {changes.changed_files.slice(0, 12).map((filePath) => (
-                  <div key={filePath} className="text-xs font-mono text-mc-text-secondary truncate">
+                  <div key={filePath} className="text-xs font-mono text-mc-text-secondary truncate" title={filePath}>
                     {filePath}
                   </div>
                 ))}
@@ -490,13 +496,13 @@ export function DeliverablesList({ taskId }: DeliverablesListProps) {
           )}
 
           {changes.commits.length > 0 && (
-            <div>
+            <div className="min-w-0 overflow-hidden">
               <div className="text-xs font-medium text-mc-text-secondary mb-1">Recent commits</div>
-              <div className="space-y-1.5 max-h-32 overflow-y-auto">
+              <div className="space-y-1 max-h-32 overflow-y-auto">
                 {changes.commits.slice(0, 8).map((commit) => (
-                  <div key={`${commit.hash}-${commit.subject}`} className="text-xs">
-                    <div className="font-mono text-mc-accent">{commit.hash}</div>
-                    <div className="text-mc-text truncate">{commit.subject}</div>
+                  <div key={`${commit.hash}-${commit.subject}`} className="text-xs flex items-baseline gap-1.5 min-w-0">
+                    <span className="font-mono text-mc-accent flex-shrink-0">{commit.hash}</span>
+                    <span className="text-mc-text truncate">{commit.subject}</span>
                   </div>
                 ))}
               </div>
@@ -509,16 +515,13 @@ export function DeliverablesList({ taskId }: DeliverablesListProps) {
         <div
           key={deliverable.id}
           onClick={() => handleOpen(deliverable)}
-          className="flex flex-col sm:flex-row gap-3 p-3 bg-mc-bg rounded-lg border border-mc-border hover:border-mc-accent transition-colors cursor-pointer"
+          className="flex gap-2.5 sm:gap-3 p-3 bg-mc-bg rounded-lg border border-mc-border hover:border-mc-accent transition-colors cursor-pointer"
         >
-          {/* Icon */}
-          <div className="flex-shrink-0 text-mc-accent">
+          <div className="flex-shrink-0 text-mc-accent mt-0.5">
             {getDeliverableIcon(deliverable.deliverable_type)}
           </div>
 
-          {/* Content */}
           <div className="flex-1 min-w-0">
-            {/* Title - clickable */}
             <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
               {deliverable.deliverable_type === 'url' && deliverable.path ? (
                 <a
@@ -526,40 +529,37 @@ export function DeliverablesList({ taskId }: DeliverablesListProps) {
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={(e) => e.stopPropagation()}
-                  className="font-medium text-mc-accent hover:text-mc-accent/80 hover:underline flex items-center gap-1.5"
+                  className="font-medium text-mc-accent hover:text-mc-accent/80 hover:underline flex items-center gap-1.5 min-w-0 break-words"
                 >
-                  {deliverable.title}
-                  <ExternalLink className="w-3.5 h-3.5" />
+                  <span className="truncate">{deliverable.title}</span>
+                  <ExternalLink className="w-3.5 h-3.5 flex-shrink-0" />
                 </a>
               ) : (
-                <h4 className="font-medium text-mc-text">{deliverable.title}</h4>
+                <h4 className="font-medium text-mc-text break-words">{deliverable.title}</h4>
               )}
               <div className="flex items-center gap-1 self-start sm:self-auto">
-                {/* Preview button for previewable files */}
                 {deliverable.deliverable_type === 'file' && isPreviewable(deliverable.path) && (
                   <button
                     onClick={(e) => { e.stopPropagation(); void handlePreview(deliverable); }}
-                    className="flex-shrink-0 p-1.5 hover:bg-mc-bg-tertiary rounded text-mc-accent-cyan"
+                    className="flex-shrink-0 min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 p-2.5 sm:p-1.5 hover:bg-mc-bg-tertiary rounded text-mc-accent-cyan flex items-center justify-center"
                     title="Preview in browser"
                   >
                     <Eye className="w-4 h-4" />
                   </button>
                 )}
-                {/* Download button for files */}
                 {deliverable.deliverable_type === 'file' && deliverable.path && (
                   <button
                     onClick={(e) => { e.stopPropagation(); handleDownload(deliverable); }}
-                    className="flex-shrink-0 p-1.5 hover:bg-mc-bg-tertiary rounded text-mc-text-secondary hover:text-mc-accent"
+                    className="flex-shrink-0 min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 p-2.5 sm:p-1.5 hover:bg-mc-bg-tertiary rounded text-mc-text-secondary hover:text-mc-accent flex items-center justify-center"
                     title="Download file"
                   >
                     <Download className="w-4 h-4" />
                   </button>
                 )}
-                {/* Open/Reveal button */}
                 {deliverable.path && (
                   <button
                     onClick={(e) => { e.stopPropagation(); handleOpen(deliverable); }}
-                    className="flex-shrink-0 p-1.5 hover:bg-mc-bg-tertiary rounded text-mc-accent"
+                    className="flex-shrink-0 min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 p-2.5 sm:p-1.5 hover:bg-mc-bg-tertiary rounded text-mc-accent flex items-center justify-center"
                     title={deliverable.deliverable_type === 'url' ? 'Open URL' : 'Open file'}
                   >
                     <ExternalLink className="w-4 h-4" />
@@ -587,14 +587,14 @@ export function DeliverablesList({ taskId }: DeliverablesListProps) {
             )}
 
             {/* Metadata */}
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-xs text-mc-text-secondary">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-xs text-mc-text-secondary min-w-0">
               <span className="capitalize">{deliverable.deliverable_type}</span>
-              <span>•</span>
+              <span className="hidden sm:inline">•</span>
               <span>{formatTimestamp(deliverable.created_at)}</span>
               {deliverable.created_via_session_id && (
                 <>
-                  <span>•</span>
-                  <span className="break-all">Session: {deliverable.created_via_session_id}</span>
+                  <span className="hidden sm:inline">•</span>
+                  <span className="truncate max-w-[200px] sm:max-w-none" title={deliverable.created_via_session_id}>Session: {deliverable.created_via_session_id}</span>
                 </>
               )}
             </div>
@@ -609,7 +609,7 @@ export function DeliverablesList({ taskId }: DeliverablesListProps) {
               <div className="text-sm font-medium text-mc-text truncate">{previewTitle}</div>
               <div className="text-xs text-mc-text-secondary">Preview</div>
             </div>
-            <button className="p-1.5 rounded hover:bg-mc-bg" onClick={() => setPreviewOpen(false)}>
+            <button className="flex-shrink-0 min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 p-2.5 sm:p-1.5 rounded hover:bg-mc-bg flex items-center justify-center" onClick={() => setPreviewOpen(false)}>
               <X className="w-4 h-4" />
             </button>
           </div>
