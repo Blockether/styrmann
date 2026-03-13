@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import path from 'path';
 import { getDb } from '@/lib/db';
-import { getOpenClawClient, sendMessageWithProvenance } from '@/lib/openclaw/client';
+import { dispatchToOpenCode } from '@/lib/acp/client';
 import { createTaskActivity } from '@/lib/task-activity';
 
 export const dynamic = 'force-dynamic';
@@ -92,22 +92,18 @@ export async function POST(_request: NextRequest, { params }: Params) {
         ? metadata.session_key.trim()
         : `${session.session_key_prefix || 'agent:main:'}${session.openclaw_session_id}`;
 
-    const resumeMessage = `[Mission Control] Resume previous interrupted session for task "${task.title}" and continue from the latest context. Do not restart from scratch; continue the active iteration and report progress.`;
+    const resumeMessage = `[Styrmann] Resume previous interrupted session for task "${task.title}" and continue from the latest context. Do not restart from scratch; continue the active iteration and report progress.`;
 
-    let provenance = false;
-    try {
-      const client = getOpenClawClient();
-      if (!client.isConnected()) {
-        await client.connect();
-      }
-      const result = await sendMessageWithProvenance(sessionKey, resumeMessage, {
-        cwd: resolveCwd(metadata),
-        timeoutMs: 30000,
-      });
-      provenance = result.provenance;
-    } catch (error) {
+    const result = await dispatchToOpenCode({
+      sessionKey,
+      message: resumeMessage,
+      cwd: resolveCwd(metadata),
+      timeoutMs: 30000,
+    });
+
+    if (!result.success) {
       return NextResponse.json(
-        { error: error instanceof Error ? error.message : 'Failed to resume OpenClaw session' },
+        { error: result.error || 'Failed to resume OpenCode session' },
         { status: 502 },
       );
     }
@@ -122,7 +118,7 @@ export async function POST(_request: NextRequest, { params }: Params) {
         decision_event: true,
         openclaw_session_id: session.openclaw_session_id,
         resume_mode: 'session_continue',
-        provenance,
+        pid: result.pid,
       },
     });
 
@@ -132,7 +128,7 @@ export async function POST(_request: NextRequest, { params }: Params) {
       session: updated,
       resume: {
         session_key: sessionKey,
-        provenance,
+        pid: result.pid,
       },
     });
   } catch (error) {

@@ -1,22 +1,20 @@
 'use client';
 
 import { useCallback, useEffect, useState, type KeyboardEvent } from 'react';
-import { Activity, Bot, Cpu, Mail } from 'lucide-react';
-import { OpenClawPanel } from './OpenClawPanel';
+import { Activity, Bot, Mail } from 'lucide-react';
 import { HumanManagementPanel } from './HumanManagementPanel';
 import { SystemPanel } from './SystemPanel';
 
-type OperationsTab = 'system' | 'gateway' | 'agents' | 'humans';
-const TAB_ORDER: OperationsTab[] = ['system', 'gateway', 'agents', 'humans'];
+type OperationsTab = 'system' | 'agents' | 'humans';
+const TAB_ORDER: OperationsTab[] = ['system', 'agents', 'humans'];
 
 function parseOperationsHash(hash: string): { tab: OperationsTab | null; agentId: string | null } {
   const raw = hash.replace(/^#/, '');
   const normalized = raw.toLowerCase();
   if (!raw) return { tab: null, agentId: null };
   if (normalized === 'system' || normalized === 'system-runtime') return { tab: 'system', agentId: null };
-  if (normalized === 'gateway' || normalized === 'openclaw') return { tab: 'gateway', agentId: null };
   if (normalized === 'humans') return { tab: 'humans', agentId: null };
-  if (normalized === 'agents') return { tab: 'agents', agentId: null };
+  if (normalized === 'agents' || normalized === 'gateway' || normalized === 'openclaw') return { tab: 'agents', agentId: null };
   if (normalized.startsWith('agents/')) {
     const agentId = decodeURIComponent(raw.slice('agents/'.length)).trim();
     return { tab: 'agents', agentId: agentId || null };
@@ -25,8 +23,7 @@ function parseOperationsHash(hash: string): { tab: OperationsTab | null; agentId
 }
 
 export function OperationsDashboard() {
-  const [activeTab, setActiveTab] = useState<OperationsTab>('gateway');
-  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<OperationsTab>('system');
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -35,15 +32,13 @@ export function OperationsDashboard() {
       const resolved = parseOperationsHash(window.location.hash);
       if (resolved.tab) {
         setActiveTab(resolved.tab);
-        setSelectedAgentId(resolved.tab === 'agents' ? resolved.agentId : null);
         return;
       }
 
-      setActiveTab('gateway');
-      setSelectedAgentId(null);
+      setActiveTab('system');
       if (replaceIfMissing) {
         const url = new URL(window.location.href);
-        url.hash = 'gateway';
+        url.hash = 'system';
         window.history.replaceState({}, '', url.toString());
       }
     };
@@ -55,18 +50,13 @@ export function OperationsDashboard() {
     return () => window.removeEventListener('hashchange', onHashChange);
   }, []);
 
-  const switchTab = useCallback((tab: OperationsTab, agentId?: string | null) => {
+  const switchTab = useCallback((tab: OperationsTab) => {
     setActiveTab(tab);
-    setSelectedAgentId(tab === 'agents' ? agentId || null : null);
     if (typeof window === 'undefined') return;
     const url = new URL(window.location.href);
-    url.hash = tab === 'agents' && agentId ? `agents/${encodeURIComponent(agentId)}` : tab;
+    url.hash = tab;
     window.history.pushState({}, '', url.toString());
   }, []);
-
-  const handleAgentRouteChange = useCallback((agentId: string | null) => {
-    switchTab('agents', agentId);
-  }, [switchTab]);
 
   const handleTabListKeyDown = useCallback((event: KeyboardEvent<HTMLDivElement>) => {
     const currentIndex = TAB_ORDER.indexOf(activeTab);
@@ -97,50 +87,39 @@ export function OperationsDashboard() {
             onKeyDown={handleTabListKeyDown}
             className="flex items-end gap-1 overflow-x-auto border-b border-mc-border"
           >
-              <button
-                role="tab"
-                aria-selected={activeTab === 'system'}
-                aria-controls="operations-panel-system"
-                id="operations-tab-system"
-                onClick={() => switchTab('system')}
-                className={`inline-flex items-center justify-center gap-2 px-3 min-h-11 border-b-2 transition-colors whitespace-nowrap ${activeTab === 'system' ? 'border-mc-accent text-mc-text' : 'border-transparent text-mc-text-secondary hover:text-mc-text'}`}
-              >
-                <Activity className="h-4 w-4" />
-                <span>System</span>
-              </button>
-              <button
-                role="tab"
-                aria-selected={activeTab === 'gateway'}
-                aria-controls="operations-panel-gateway"
-                id="operations-tab-gateway"
-                onClick={() => switchTab('gateway')}
-                className={`inline-flex items-center justify-center gap-2 px-3 min-h-11 border-b-2 transition-colors whitespace-nowrap ${activeTab === 'gateway' ? 'border-mc-accent text-mc-text' : 'border-transparent text-mc-text-secondary hover:text-mc-text'}`}
-              >
-                <Cpu className="h-4 w-4" />
-                <span>Gateway</span>
-              </button>
-              <button
-                role="tab"
-                aria-selected={activeTab === 'agents'}
-                aria-controls="operations-panel-agents"
-                id="operations-tab-agents"
-                onClick={() => switchTab('agents')}
-                className={`inline-flex items-center justify-center gap-2 px-3 min-h-11 border-b-2 transition-colors whitespace-nowrap ${activeTab === 'agents' ? 'border-mc-accent text-mc-text' : 'border-transparent text-mc-text-secondary hover:text-mc-text'}`}
-              >
-                <Bot className="h-4 w-4" />
-                <span>Agents</span>
-              </button>
-              <button
-                role="tab"
-                aria-selected={activeTab === 'humans'}
-                aria-controls="operations-panel-humans"
-                id="operations-tab-humans"
-                onClick={() => switchTab('humans')}
-                className={`inline-flex items-center justify-center gap-2 px-3 min-h-11 border-b-2 transition-colors whitespace-nowrap ${activeTab === 'humans' ? 'border-mc-accent text-mc-text' : 'border-transparent text-mc-text-secondary hover:text-mc-text'}`}
-              >
-                <Mail className="h-4 w-4" />
-                <span>Humans</span>
-              </button>
+            <button
+              role="tab"
+              aria-selected={activeTab === 'system'}
+              aria-controls="operations-panel-system"
+              id="operations-tab-system"
+              onClick={() => switchTab('system')}
+              className={`inline-flex items-center justify-center gap-2 px-3 min-h-11 border-b-2 transition-colors whitespace-nowrap ${activeTab === 'system' ? 'border-mc-accent text-mc-text' : 'border-transparent text-mc-text-secondary hover:text-mc-text'}`}
+            >
+              <Activity className="h-4 w-4" />
+              <span>System</span>
+            </button>
+            <button
+              role="tab"
+              aria-selected={activeTab === 'agents'}
+              aria-controls="operations-panel-agents"
+              id="operations-tab-agents"
+              onClick={() => switchTab('agents')}
+              className={`inline-flex items-center justify-center gap-2 px-3 min-h-11 border-b-2 transition-colors whitespace-nowrap ${activeTab === 'agents' ? 'border-mc-accent text-mc-text' : 'border-transparent text-mc-text-secondary hover:text-mc-text'}`}
+            >
+              <Bot className="h-4 w-4" />
+              <span>Agents</span>
+            </button>
+            <button
+              role="tab"
+              aria-selected={activeTab === 'humans'}
+              aria-controls="operations-panel-humans"
+              id="operations-tab-humans"
+              onClick={() => switchTab('humans')}
+              className={`inline-flex items-center justify-center gap-2 px-3 min-h-11 border-b-2 transition-colors whitespace-nowrap ${activeTab === 'humans' ? 'border-mc-accent text-mc-text' : 'border-transparent text-mc-text-secondary hover:text-mc-text'}`}
+            >
+              <Mail className="h-4 w-4" />
+              <span>Humans</span>
+            </button>
           </div>
 
         </section>
@@ -156,25 +135,14 @@ export function OperationsDashboard() {
           </section>
         )}
 
-        {activeTab === 'gateway' && (
-          <section
-            id="operations-panel-gateway"
-            role="tabpanel"
-            aria-labelledby="operations-tab-gateway"
-            className="rounded-xl border border-mc-border bg-mc-bg overflow-hidden"
-          >
-            <OpenClawPanel embedded focusArea="gateway" />
-          </section>
-        )}
-
         {activeTab === 'agents' && (
           <section
             id="operations-panel-agents"
             role="tabpanel"
             aria-labelledby="operations-tab-agents"
-            className="rounded-xl border border-mc-border bg-mc-bg overflow-hidden"
+            className="rounded-xl border border-mc-border bg-mc-bg overflow-hidden p-4"
           >
-            <OpenClawPanel embedded focusArea="agents" selectedAgentId={selectedAgentId} onSelectedAgentIdChange={handleAgentRouteChange} />
+            <p className="text-sm text-mc-text-secondary">Agent management is available in the sidebar. Agents are defined by semantic roles and dispatched via OpenCode.</p>
           </section>
         )}
 

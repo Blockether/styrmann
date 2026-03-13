@@ -13,7 +13,6 @@ import { captureTaskRunResult } from '@/lib/task-run-results';
 import { checkBuilderEvidence } from '@/lib/builder-evidence';
 import { UpdateTaskSchema } from '@/lib/validation';
 import { generateTaskWorkflowPlan } from '@/lib/workflow-planning';
-import { getOpenClawClient } from '@/lib/openclaw/client';
 import { getTaskPipelineDir, getTaskWorktreePath, getWorkspaceRepoPath } from '@/lib/git-repo';
 import type { Task, UpdateTaskRequest, Agent, Human } from '@/lib/types';
 
@@ -25,43 +24,6 @@ type DispatchMetadata = {
   session_key?: unknown;
   openclaw_session_id?: unknown;
 };
-
-async function terminateGatewaySession(openclawSessionId: string, sessionKey?: string): Promise<boolean> {
-  const client = getOpenClawClient();
-  if (!client.isConnected()) {
-    try {
-      await client.connect();
-    } catch {
-      return false;
-    }
-  }
-
-  const keys = new Set<string>();
-  if (sessionKey && sessionKey.trim().length > 0) keys.add(sessionKey.trim());
-  if (openclawSessionId && openclawSessionId.trim().length > 0) keys.add(openclawSessionId.trim());
-
-  for (const key of keys) {
-    try {
-      await client.call('sessions.delete', {
-        key,
-        deleteTranscript: true,
-        emitLifecycleHooks: true,
-      });
-      return true;
-    } catch {
-    }
-  }
-
-  try {
-    const fallbackTarget = sessionKey || openclawSessionId;
-    await client.call('chat.send', {
-      sessionKey: fallbackTarget,
-      message: '[Mission Control] Stop this session now. Task was deleted.',
-    });
-  } catch {
-  }
-  return false;
-}
 
 function withinMissionControlRoot(candidate: string, missionControlRoot: string): boolean {
   const resolvedCandidate = path.resolve(candidate);
@@ -588,10 +550,7 @@ export async function DELETE(
       }
     }
 
-    for (const row of sessionRows) {
-      if (!row.openclaw_session_id) continue;
-      await terminateGatewaySession(row.openclaw_session_id, sessionKeyByOpenClawId.get(row.openclaw_session_id));
-    }
+
 
     const workspace = queryOne<{ local_path: string | null; github_repo: string | null }>(
       'SELECT local_path, github_repo FROM workspaces WHERE id = ?',

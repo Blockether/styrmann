@@ -1,25 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb, queryAll, queryOne, run } from '@/lib/db';
-import { getOpenClawClient } from '@/lib/openclaw/client';
 import { broadcast } from '@/lib/events';
 import { extractJSON } from '@/lib/planning-utils';
-// File system imports removed - using OpenClaw API instead
 
 export const dynamic = 'force-dynamic';
 
-// Default planning session prefix for OpenClaw
-// Can be overridden per-agent via the session_key_prefix column on agents table
 const DEFAULT_SESSION_KEY_PREFIX = 'agent:main:';
 
-// GET /api/tasks/[id]/planning - Get planning state
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: taskId } = await params;
 
   try {
-    // Get task
     const task = getDb().prepare('SELECT * FROM tasks WHERE id = ?').get(taskId) as {
       id: string;
       title: string;
@@ -31,20 +25,17 @@ export async function GET(
       planning_spec?: string;
       planning_agents?: string;
     } | undefined;
-    
+
     if (!task) {
       return NextResponse.json({ error: 'Task not found' }, { status: 404 });
     }
 
-    // Parse planning messages from JSON
-    const messages = task.planning_messages ? JSON.parse(task.planning_messages) : [];
+    const messages = task.planning_messages ? JSON.parse(task.planning_messages) as unknown[] : [];
 
-    // Find the latest question (last assistant message with question structure)
-    const lastAssistantMessage = [...messages].reverse().find((m: { role: string }) => m.role === 'assistant');
+    const lastAssistantMessage = [...messages].reverse().find((m) => (m as { role: string }).role === 'assistant') as { role: string; content: string } | undefined;
     let currentQuestion = null;
 
     if (lastAssistantMessage) {
-      // Use extractJSON to handle code blocks and surrounding text
       const parsed = extractJSON(lastAssistantMessage.content);
       if (parsed && 'question' in parsed) {
         currentQuestion = parsed;
@@ -67,15 +58,13 @@ export async function GET(
   }
 }
 
-// POST /api/tasks/[id]/planning - Start planning session
 export async function POST(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: taskId } = await params;
 
   try {
-    // Get task
     const task = getDb().prepare('SELECT * FROM tasks WHERE id = ?').get(taskId) as {
       id: string;
       title: string;
@@ -90,13 +79,10 @@ export async function POST(
       return NextResponse.json({ error: 'Task not found' }, { status: 404 });
     }
 
-    // Check if planning already started
     if (task.planning_session_key) {
       return NextResponse.json({ error: 'Planning already started', sessionKey: task.planning_session_key }, { status: 400 });
     }
 
-    // Check if there are other orchestrators available before starting planning with the default master agent
-    // Get the default master agent for this workspace
     const defaultMaster = queryOne<{ id: string; session_key_prefix?: string }>(
       `SELECT id, session_key_prefix FROM agents WHERE role = 'orchestrator' ORDER BY created_at ASC LIMIT 1`,
     );
@@ -119,15 +105,12 @@ export async function POST(
         error: 'Other orchestrators available',
         message: `There ${otherOrchestrators.length === 1 ? 'is' : 'are'} ${otherOrchestrators.length} other orchestrator${otherOrchestrators.length === 1 ? '' : 's'} available: ${otherOrchestrators.map(o => o.name).join(', ')}. Please assign this task to them directly.`,
         otherOrchestrators,
-      }, { status: 409 }); // 409 Conflict
+      }, { status: 409 });
     }
 
-    // Create session key for this planning task
-    // Use the master agent's session_key_prefix if set, otherwise default to 'agent:main:'
     const planningPrefix = (defaultMaster?.session_key_prefix || DEFAULT_SESSION_KEY_PREFIX) + 'planning:';
     const sessionKey = `${planningPrefix}${taskId}`;
 
-    // Build the initial planning prompt
     const planningPrompt = `PLANNING REQUEST
 
 Task Title: ${task.title}
@@ -151,20 +134,6 @@ Respond with ONLY valid JSON in this format:
   ]
 }`;
 
-    // Connect to OpenClaw and send the planning request
-    const client = getOpenClawClient();
-    if (!client.isConnected()) {
-      await client.connect();
-    }
-
-    // Send planning request to the planning session
-    await client.call('chat.send', {
-      sessionKey: sessionKey,
-      message: planningPrompt,
-      idempotencyKey: `planning-start-${taskId}-${Date.now()}`,
-    });
-
-    // Store the session key and initial message
     const messages = [{ role: 'user', content: planningPrompt, timestamp: Date.now() }];
 
     getDb().prepare(`
@@ -173,13 +142,11 @@ Respond with ONLY valid JSON in this format:
       WHERE id = ?
     `).run(sessionKey, JSON.stringify(messages), taskId);
 
-    // Return immediately - frontend will poll for updates
-    // This eliminates the aggressive polling loop that was making 30+ OpenClaw API calls
     return NextResponse.json({
       success: true,
       sessionKey,
       messages,
-      note: 'Planning started. Poll GET endpoint for updates.',
+      note: 'Planning session created. Dispatch to orchestrator via OpenCode ACP to begin.',
     });
   } catch (error) {
     console.error('Failed to start planning:', error);
@@ -187,15 +154,13 @@ Respond with ONLY valid JSON in this format:
   }
 }
 
-// DELETE /api/tasks/[id]/planning - Cancel planning session
 export async function DELETE(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: taskId } = await params;
 
   try {
-    // Get task to check session key
     const task = queryOne<{
       id: string;
       planning_session_key?: string;
@@ -209,7 +174,6 @@ export async function DELETE(
       return NextResponse.json({ error: 'Task not found' }, { status: 404 });
     }
 
-    // Clear planning-related fields
     run(`
       UPDATE tasks
       SET planning_session_key = NULL,
@@ -222,12 +186,11 @@ export async function DELETE(
       WHERE id = ?
     `, [taskId]);
 
-    // Broadcast task update
     const updatedTask = queryOne('SELECT * FROM tasks WHERE id = ?', [taskId]);
     if (updatedTask) {
       broadcast({
         type: 'task_updated',
-        payload: updatedTask as any, // Cast to any to satisfy SSEEvent payload union type
+        payload: updatedTask as Parameters<typeof broadcast>[0]['payload'],
       });
     }
 

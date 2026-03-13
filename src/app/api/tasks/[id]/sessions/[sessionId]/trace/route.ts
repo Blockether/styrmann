@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { getOpenClawClient } from '@/lib/openclaw/client';
 import { queryOne, queryAll, run } from '@/lib/db';
 import { broadcast } from '@/lib/events';
 import type { InputProvenance, SourceReceipt } from '@/lib/types';
@@ -358,43 +357,23 @@ export async function GET(request: Request, { params }: Params) {
       return NextResponse.json({ error: 'Task session not found' }, { status: 404 });
     }
 
-    const client = getOpenClawClient();
-    if (!client.isConnected()) {
-      await client.connect();
-    }
+    const resolvedSessionKey = invocation?.session_key
+      || `${session.session_key_prefix || 'agent:main:'}${session.openclaw_session_id}`;
 
-    const candidateKeys = Array.from(
-      new Set([
-        invocation?.session_key,
-        `${session.session_key_prefix || 'agent:main:'}${session.openclaw_session_id}`,
-        sessionId,
-        session.openclaw_session_id,
-      ].filter(Boolean)),
-    ) as string[];
+    const rawLogs = queryAll<{ role: string; content: string; created_at: string }>(
+      `SELECT role, content, created_at FROM agent_logs
+       WHERE session_id = ? OR session_id = ?
+       ORDER BY created_at ASC`,
+      [session.openclaw_session_id, resolvedSessionKey],
+    );
 
-    let history: TraceMessage[] = [];
-    let resolvedSessionKey: string | null = null;
-
-    for (const key of candidateKeys) {
-      try {
-        const rawMessages = await client.getSessionHistory(key);
-        if (rawMessages.length > 0) {
-          history = rawMessages
-            .map(normalizeMessage)
-            .filter((message) => isMeaningfulTraceMessage(message) || message.role !== 'assistant');
-          resolvedSessionKey = key;
-          break;
-        }
-        // Track first key even if empty (fallback)
-        if (!resolvedSessionKey) resolvedSessionKey = key;
-      } catch {
-        // Key not found in gateway, try next
-      }
-    }
+    let history: TraceMessage[] = rawLogs
+      .map((log) => normalizeMessage({ role: log.role, content: log.content, timestamp: log.created_at }))
+      .filter((message) => isMeaningfulTraceMessage(message) || message.role !== 'assistant');
 
     const emptyHighlights: string[] = [];
     if (history.length === 0) {
-      emptyHighlights.push('No messages were returned from OpenClaw history for this session key.');
+      emptyHighlights.push('No trace messages available for this session. Agent activity is tracked via task activities.');
       if (!invocation) {
         emptyHighlights.push('No dispatch invocation record exists for this task/session pair.');
       }
@@ -548,9 +527,8 @@ export async function GET(request: Request, { params }: Params) {
         ended_at: session.ended_at || null,
       },
       diagnostics: {
-        candidate_session_keys: candidateKeys,
         resolved_session_key: resolvedSessionKey,
-        history_source: history.length > 0 ? 'gateway' : 'none',
+        history_source: history.length > 0 ? 'agent_logs' : 'none',
       },
       invocation,
       summary: buildTraceSummary(history, invocation?.invocation || null, {

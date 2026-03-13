@@ -1,28 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
 import { queryAll, queryOne, run } from '@/lib/db';
-import { readAgentMdFromDisk, createAgentInOpenClawConfig, readOpenClawConfig, resolveAgents } from '@/lib/openclaw/config';
-import { ensureSynced } from '@/lib/openclaw/sync';
-import { syncAgentsWithRpcCheck } from '@/lib/openclaw/sync';
 import type { Agent, AgentStatus, CreateAgentRequest } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
-// GET /api/agents - List all agents
+
 export async function GET(_request: NextRequest) {
   try {
-    ensureSynced();
     const agents = queryAll<Agent>(`
       SELECT * FROM agents ORDER BY CASE WHEN role = 'orchestrator' THEN 0 ELSE 1 END, name ASC
     `);
-for (const agent of agents) {
-      if (agent.source === 'synced') {
-const mdFiles = readAgentMdFromDisk(agent.agent_workspace_path, agent.gateway_agent_id);
-agent.soul_md = mdFiles.soul_md ?? undefined;
-agent.user_md = mdFiles.user_md ?? undefined;
-agent.agents_md = mdFiles.agents_md ?? undefined;
-agent.memory_md = mdFiles.memory_md ?? undefined;
-      }
-      // Get active tasks for this agent (with workspace name + deliverable count)
+    for (const agent of agents) {
       const activeTasks = queryAll<{
         id: string;
         title: string;
@@ -47,14 +35,12 @@ agent.memory_md = mdFiles.memory_md ?? undefined;
       const hasInProgress = activeTasks.some(t => t.status === 'in_progress');
       if (hasInProgress) {
         agent.current_task_title = activeTasks.find(t => t.status === 'in_progress')!.title;
-        // Reconcile: if agent has in_progress tasks, status must be 'working'
         if (agent.status !== 'working') {
           agent.status = 'working' as AgentStatus;
           run('UPDATE agents SET status = ?, updated_at = ? WHERE id = ?',
             ['working', new Date().toISOString(), agent.id]);
         }
       } else if (activeTasks.length > 0 && agent.status === 'standby') {
-        // Has assigned/testing/review tasks but not in_progress — still working
         agent.status = 'working' as AgentStatus;
         run('UPDATE agents SET status = ?, updated_at = ? WHERE id = ?',
           ['working', new Date().toISOString(), agent.id]);
@@ -65,35 +51,6 @@ agent.memory_md = mdFiles.memory_md ?? undefined;
     console.error('Failed to fetch agents:', error);
     return NextResponse.json({ error: 'Failed to fetch agents' }, { status: 500 });
   }
-}
-
-function normalizeAgentIdPart(input: string): string {
-  return input
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 48) || 'agent';
-}
-
-function nextGatewayAgentId(baseName: string): string {
-  const config = readOpenClawConfig();
-  const existingIds = new Set<string>();
-
-  if (config) {
-    for (const agent of resolveAgents(config)) {
-      existingIds.add(agent.id);
-    }
-  }
-
-  const base = normalizeAgentIdPart(baseName);
-  if (!existingIds.has(base)) return base;
-
-  for (let i = 2; i < 1000; i += 1) {
-    const candidate = `${base}-${i}`;
-    if (!existingIds.has(candidate)) return candidate;
-  }
-
-  return `${base}-${Date.now()}`;
 }
 
 export async function POST(request: NextRequest) {
@@ -121,36 +78,23 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const gatewayAgentId = nextGatewayAgentId(body.name);
-    const created = createAgentInOpenClawConfig({
-      id: gatewayAgentId,
-      name: body.name,
-      role: body.role,
-      model: body.model,
-      soulMd: body.soul_md,
-      userMd: body.user_md,
-      agentsMd: body.agents_md,
-      memoryMd: body.memory_md,
-    });
+    const agentId = uuidv4();
+    const now = new Date().toISOString();
 
-    if (!created.ok) {
-      return NextResponse.json({ error: created.error || 'Failed to create OpenClaw agent' }, { status: 500 });
-    }
-
-    await syncAgentsWithRpcCheck();
-
-    const agent = queryOne<Agent>('SELECT * FROM agents WHERE gateway_agent_id = ?', [gatewayAgentId]);
-    if (!agent) {
-      return NextResponse.json({ error: 'Agent created in OpenClaw config but not synced to Mission Control' }, { status: 500 });
-    }
+    run(
+      `INSERT INTO agents (id, name, role, model, soul_md, user_md, agents_md, memory_md, status, source, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'standby', 'local', ?, ?)`,
+      [agentId, body.name, body.role, body.model || null, body.soul_md || null, body.user_md || null, body.agents_md || null, body.memory_md || null, now, now]
+    );
 
     run(
       `INSERT INTO events (id, type, agent_id, message, created_at)
        VALUES (?, ?, ?, ?, ?)`,
-      [uuidv4(), 'agent_joined', agent.id, `${body.name} created in OpenClaw and synced`, new Date().toISOString()]
+      [uuidv4(), 'agent_joined', agentId, `${body.name} created`, now]
     );
 
-    return NextResponse.json({ ...agent, created_via: 'openclaw_config_sync' }, { status: 201 });
+    const agent = queryOne<Agent>('SELECT * FROM agents WHERE id = ?', [agentId]);
+    return NextResponse.json(agent, { status: 201 });
   } catch (error) {
     console.error('Failed to create agent:', error);
     return NextResponse.json({ error: 'Failed to create agent' }, { status: 500 });

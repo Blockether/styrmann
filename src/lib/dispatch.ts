@@ -2,7 +2,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { queryOne, queryAll, run } from '@/lib/db';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import path from 'path';
-import { getOpenClawClient, sendMessageWithProvenance } from '@/lib/openclaw/client';
+import { dispatchToOpenCode } from '@/lib/acp/client';
 import { broadcast } from '@/lib/events';
 import { getMissionControlUrl } from '@/lib/config';
 import { ensureTaskWorktree, getTaskPipelineDir, getWorkspaceRepoPath, isGitWorkTree } from '@/lib/git-repo';
@@ -390,16 +390,6 @@ export async function dispatchTaskToAgent(taskId: string): Promise<DispatchResul
       }
     }
 
-    const client = getOpenClawClient();
-    if (!client.isConnected()) {
-      try {
-        await client.connect();
-      } catch (err) {
-        console.error('Failed to connect to OpenClaw Gateway:', err);
-        return { success: false, error: 'Failed to connect to OpenClaw Gateway' };
-      }
-    }
-
     const now = new Date().toISOString();
 
     const interruptedSessions = finalizeOtherActiveSessionsForTask(task.id, agent.id, 'interrupted');
@@ -652,7 +642,7 @@ export async function dispatchTaskToAgent(taskId: string): Promise<DispatchResul
     const nextStatus = nextStage?.status || 'review';
     const failEndpoint = `POST ${missionControlUrl}/api/tasks/${task.id}/fail`;
     const acpSection = activeAcpBinding
-      ? `\n**ACP CONTEXT:**\n- ACP session key: ${activeAcpBinding.acp_session_key}\n- ACP agent: ${activeAcpBinding.acp_agent_id}\n- Discord thread: ${activeAcpBinding.discord_thread_id}\n- **ACP Provenance mode:** meta+receipt\n- When sending messages via ACP bridge, always use: \`openclaw acp --provenance meta+receipt\` (or the \`openclaw-acp\` alias)\n- This attaches InputProvenance metadata and Source Receipt blocks to messages for traceability\nUse this as supervisor context if your runtime can access ACP bindings.\n`
+      ? `\n**ACP CONTEXT:**\n- ACP session key: ${activeAcpBinding.acp_session_key}\n- ACP agent: ${activeAcpBinding.acp_agent_id}\n- Discord thread: ${activeAcpBinding.discord_thread_id}\nUse this as supervisor context if your runtime can access ACP bindings.\n`
       : '';
 
     const scopedApiToken = generateScopedApiToken({
@@ -767,8 +757,8 @@ ${task.due_date ? `**Due:** ${task.due_date}\n` : ''}
 **Mission Control API base:** ${missionControlUrl}/api
 ${planningSpecSection}${agentInstructionsSection}${resourceSection}
 **RUNTIME CONTRACT:**
-- This task runs in the OpenClaw ACP session runtime for this agent.
-- Use the plain Pi-style coding workflow inside that ACP session: inspect, edit, and verify with the runtime tools available to you.
+- This task runs in an OpenCode session for this agent.
+- Inspect, edit, and verify using the runtime tools available to you.
 - Use the Mission Control REST API calls below for status, activity, and deliverable updates.
 ${acpSection}${isBuilder ? `**OUTPUT DIRECTORY:** ${taskProjectDir}\nCreate this directory and save all deliverables there. Do not write outside task-artifacts/${task.id}.\n` : `**OUTPUT DIRECTORY:** ${taskProjectDir}\nRead prior artifacts from task-artifacts/${task.id} if needed.\n`}
 ${completionInstructions}
@@ -804,10 +794,10 @@ If you need help or clarification, ask the orchestrator.`;
       const prefix = agent.session_key_prefix || 'agent:main:';
       const sessionKey = `${prefix}${session.openclaw_session_id}`;
       const traceUrl = `/api/tasks/${task.id}/sessions/${encodeURIComponent(session.openclaw_session_id)}/trace`;
-      // Send dispatch via ACP bridge with provenance (falls back to direct RPC)
-      const { provenance } = await sendMessageWithProvenance(sessionKey, taskMessage, {
+      const dispatchResult = await dispatchToOpenCode({
+        sessionKey,
+        message: taskMessage,
         cwd: worktree?.worktreePath || repoPath,
-        timeoutMs: 30000,
       });
 
       createTaskActivity({
@@ -824,7 +814,7 @@ If you need help or clarification, ask the orchestrator.`;
           branch: worktree?.branchName || null,
           worktree_path: worktree?.worktreePath || null,
           base_branch: worktree?.defaultBranch || null,
-          provenance,
+          provenance: dispatchResult.success,
           invocation: taskMessage,
           workflow_step: task.status === 'assigned' ? 'in_progress' : task.status,
           decision_event: true,
