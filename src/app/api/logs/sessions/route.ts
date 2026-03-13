@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
 
     const sessions = db.prepare(`
       SELECT
-        l.openclaw_session_id,
+        l.session_id,
         l.agent_id,
         a.name as agent_name,
         COUNT(*) as log_count,
@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
       FROM agent_logs l
       LEFT JOIN agents a ON l.agent_id = a.id
       ${where}
-      GROUP BY l.openclaw_session_id
+      GROUP BY l.session_id
       ORDER BY MAX(l.created_at) DESC
     `).all(...params);
 

@@ -347,11 +347,11 @@ CREATE TABLE IF NOT EXISTS businesses (
   created_at TEXT DEFAULT (datetime('now'))
 );
 
--- OpenClaw session mapping
-CREATE TABLE IF NOT EXISTS openclaw_sessions (
+-- Agent session mapping
+CREATE TABLE IF NOT EXISTS sessions (
   id TEXT PRIMARY KEY,
   agent_id TEXT REFERENCES agents(id),
-  openclaw_session_id TEXT NOT NULL,
+  session_id TEXT NOT NULL,
   channel TEXT,
   status TEXT DEFAULT 'active',
   session_type TEXT DEFAULT 'persistent',
@@ -432,7 +432,7 @@ CREATE TABLE IF NOT EXISTS task_deliverables (
   title TEXT NOT NULL,
   path TEXT,
   description TEXT,
-  openclaw_session_id TEXT,
+  session_id TEXT,
   created_at TEXT DEFAULT (datetime('now'))
 );
 
@@ -443,8 +443,7 @@ CREATE TABLE IF NOT EXISTS task_run_results (
   status TEXT NOT NULL,
   summary TEXT,
   agent_id TEXT REFERENCES agents(id),
-  openclaw_session_id TEXT,
-  completed_activity_id TEXT REFERENCES task_activities(id) ON DELETE SET NULL,
+  session_id TEXT,
   metadata TEXT,
   created_at TEXT DEFAULT (datetime('now')),
   UNIQUE(task_id, run_number)
@@ -498,7 +497,7 @@ CREATE INDEX IF NOT EXISTS idx_task_run_results_task ON task_run_results(task_id
 CREATE INDEX IF NOT EXISTS idx_task_run_result_artifacts_run ON task_run_result_artifacts(task_run_result_id);
 CREATE INDEX IF NOT EXISTS idx_task_run_result_artifacts_task ON task_run_result_artifacts(task_id);
 CREATE INDEX IF NOT EXISTS idx_task_run_result_artifacts_path ON task_run_result_artifacts(normalized_path, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_openclaw_sessions_task ON openclaw_sessions(task_id);
+CREATE INDEX IF NOT EXISTS idx_sessions_task ON sessions(task_id);
 CREATE INDEX IF NOT EXISTS idx_planning_questions_task ON planning_questions(task_id, sort_order);
 CREATE INDEX IF NOT EXISTS idx_workflow_templates_workspace ON workflow_templates(workspace_id);
 CREATE INDEX IF NOT EXISTS idx_task_roles_task ON task_roles(task_id);
@@ -549,7 +548,7 @@ CREATE INDEX IF NOT EXISTS idx_scheduled_job_runs_job ON scheduled_job_runs(job_
 CREATE TABLE IF NOT EXISTS agent_logs (
   id TEXT PRIMARY KEY,
   agent_id TEXT REFERENCES agents(id) ON DELETE CASCADE,
-  openclaw_session_id TEXT NOT NULL,
+  session_id TEXT NOT NULL,
   task_id TEXT REFERENCES tasks(id) ON DELETE SET NULL,
   role TEXT NOT NULL CHECK (role IN ('user', 'assistant', 'system')),
   content TEXT NOT NULL,
@@ -558,7 +557,7 @@ CREATE TABLE IF NOT EXISTS agent_logs (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_agent_logs_agent ON agent_logs(agent_id);
-CREATE INDEX IF NOT EXISTS idx_agent_logs_session ON agent_logs(openclaw_session_id);
+CREATE INDEX IF NOT EXISTS idx_agent_logs_session ON agent_logs(session_id);
 CREATE INDEX IF NOT EXISTS idx_agent_logs_created ON agent_logs(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_agent_logs_role ON agent_logs(role);
 CREATE INDEX IF NOT EXISTS idx_agent_logs_workspace ON agent_logs(workspace_id);

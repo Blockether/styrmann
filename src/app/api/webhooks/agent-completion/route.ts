@@ -150,15 +150,15 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      const latestSession = queryOne<{ openclaw_session_id: string }>(
-        `SELECT openclaw_session_id FROM openclaw_sessions
+      const latestSession = queryOne<{ session_id: string }>(
+        `SELECT session_id FROM sessions
          WHERE task_id = ? AND agent_id = ? AND status = 'active'
          ORDER BY updated_at DESC, created_at DESC
          LIMIT 1`,
         [task.id, task.assigned_agent_id || ''],
       );
-      if (latestSession?.openclaw_session_id) {
-        finalizeSessionById(latestSession.openclaw_session_id, 'completed', now);
+      if (latestSession?.session_id) {
+        finalizeSessionById(latestSession.session_id, 'completed', now);
       }
 
       return NextResponse.json({
@@ -184,7 +184,7 @@ export async function POST(request: NextRequest) {
 
       // Find agent by session
       const session = queryOne<AgentSession>(
-        'SELECT * FROM openclaw_sessions WHERE openclaw_session_id = ? AND status = ?',
+        'SELECT * FROM sessions WHERE session_id = ? AND status = ?',
         [body.session_id, 'active']
       );
 
@@ -285,7 +285,7 @@ export async function POST(request: NextRequest) {
         'UPDATE agents SET status = ?, updated_at = ? WHERE id = ?',
         ['standby', now, session.agent_id]
       );
-      finalizeSessionById(session.openclaw_session_id, 'completed', now);
+      finalizeSessionById(session.session_id, 'completed', now);
 
       return NextResponse.json({
         success: true,

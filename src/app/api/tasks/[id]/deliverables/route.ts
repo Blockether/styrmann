@@ -52,17 +52,17 @@ export async function GET(
 
     const enriched = deliverables.map((deliverable) => {
       const fallbackSessionId = db.prepare(`
-        SELECT json_extract(metadata, '$.openclaw_session_id') as openclaw_session_id
+        SELECT json_extract(metadata, '$.session_id') as session_id
         FROM task_activities
         WHERE task_id = ?
           AND activity_type = 'dispatch_invocation'
-          AND json_extract(metadata, '$.openclaw_session_id') IS NOT NULL
+          AND json_extract(metadata, '$.session_id') IS NOT NULL
           AND created_at <= ?
         ORDER BY created_at DESC
         LIMIT 1
-      `).get(taskId, deliverable.created_at) as { openclaw_session_id?: string | null } | undefined;
+      `).get(taskId, deliverable.created_at) as { session_id?: string | null } | undefined;
 
-      const effectiveSessionId = deliverable.openclaw_session_id || fallbackSessionId?.openclaw_session_id || null;
+      const effectiveSessionId = deliverable.session_id || fallbackSessionId?.session_id || null;
       if (!effectiveSessionId) {
         return {
           ...deliverable,
@@ -73,7 +73,7 @@ export async function GET(
         };
       }
 
-      const inferredSession = !deliverable.openclaw_session_id && Boolean(fallbackSessionId?.openclaw_session_id);
+      const inferredSession = !deliverable.session_id && Boolean(fallbackSessionId?.session_id);
       if (inferredSession) {
         return {
           ...deliverable,
@@ -85,19 +85,19 @@ export async function GET(
       }
 
       const session = db.prepare(`
-        SELECT s.openclaw_session_id, s.agent_id, a.name as agent_name
-        FROM openclaw_sessions s
+        SELECT s.session_id, s.agent_id, a.name as agent_name
+        FROM sessions s
         LEFT JOIN agents a ON a.id = s.agent_id
-        WHERE s.openclaw_session_id = ?
+        WHERE s.session_id = ?
         LIMIT 1
-      `).get(effectiveSessionId) as { openclaw_session_id?: string | null; agent_id?: string | null; agent_name?: string | null } | undefined;
+      `).get(effectiveSessionId) as { session_id?: string | null; agent_id?: string | null; agent_name?: string | null } | undefined;
 
       const stepRow = db.prepare(`
         SELECT json_extract(metadata, '$.workflow_step') as workflow_step
         FROM task_activities
         WHERE task_id = ?
           AND activity_type = 'dispatch_invocation'
-          AND json_extract(metadata, '$.openclaw_session_id') = ?
+          AND json_extract(metadata, '$.session_id') = ?
         ORDER BY created_at DESC
         LIMIT 1
       `).get(taskId, effectiveSessionId) as { workflow_step?: string | null } | undefined;
@@ -112,7 +112,7 @@ export async function GET(
         created_via_agent_id: session?.agent_id || null,
         created_via_agent_name: session?.agent_name || null,
         created_via_workflow_step: stepRow?.workflow_step || null,
-        created_via_session_id: session?.openclaw_session_id || effectiveSessionId,
+        created_via_session_id: session?.session_id || effectiveSessionId,
       };
     });
 
@@ -147,10 +147,10 @@ export async function POST(
       );
     }
 
-    const { deliverable_type, title, path, description, openclaw_session_id } = validation.data;
+    const { deliverable_type, title, path, description, session_id } = validation.data;
     const scopedSessionId = deriveScopedSessionId(request, taskId);
-    const requestedSessionId = typeof openclaw_session_id === 'string' && openclaw_session_id.trim().length > 0
-      ? openclaw_session_id.trim()
+    const requestedSessionId = typeof session_id === 'string' && session_id.trim().length > 0
+      ? session_id.trim()
       : null;
     if (scopedSessionId && requestedSessionId && scopedSessionId !== requestedSessionId) {
       return NextResponse.json(
@@ -179,14 +179,14 @@ export async function POST(
     let linkedSessionId = resolvedSessionId;
     if (linkedSessionId) {
       const sessionExists = db.prepare(
-        'SELECT 1 FROM openclaw_sessions WHERE openclaw_session_id = ? AND task_id = ? LIMIT 1'
+        'SELECT 1 FROM sessions WHERE session_id = ? AND task_id = ? LIMIT 1'
       ).get(linkedSessionId, taskId) as { 1?: number } | undefined;
       if (!sessionExists) linkedSessionId = null;
     }
 
     // Insert deliverable
     db.prepare(`
-      INSERT INTO task_deliverables (id, task_id, deliverable_type, title, path, description, openclaw_session_id)
+      INSERT INTO task_deliverables (id, task_id, deliverable_type, title, path, description, session_id)
       VALUES (?, ?, ?, ?, ?, ?, ?)
     `).run(
       id,

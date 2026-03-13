@@ -20,9 +20,9 @@ export async function POST(
     const { id: taskId } = await params;
     const body = await request.json();
     
-    const { openclaw_session_id, agent_name } = body;
+    const { session_id, agent_name } = body;
 
-    if (!openclaw_session_id) {
+    if (!session_id) {
       return NextResponse.json(
         { error: 'session_id is required' },
         { status: 400 }
@@ -62,13 +62,13 @@ export async function POST(
 
     // Insert agent session record
     db.prepare(`
-      INSERT INTO openclaw_sessions 
-        (id, agent_id, openclaw_session_id, session_type, task_id, status)
+      INSERT INTO sessions 
+        (id, agent_id, session_id, session_type, task_id, status)
       VALUES (?, ?, ?, ?, ?, ?)
     `).run(
       sessionId,
       agentId,
-      openclaw_session_id,
+      session_id,
       'subagent',
       taskId,
       'active'
@@ -76,7 +76,7 @@ export async function POST(
 
     // Get the created session
     const session = db.prepare(`
-      SELECT * FROM openclaw_sessions WHERE id = ?
+      SELECT * FROM sessions WHERE id = ?
     `).get(sessionId);
 
     // Broadcast agent spawned event
@@ -84,7 +84,7 @@ export async function POST(
       type: 'agent_spawned',
       payload: {
         taskId,
-        sessionId: openclaw_session_id,
+        sessionId: session_id,
         agentName: agent_name,
       },
     });
@@ -115,7 +115,7 @@ export async function GET(
       SELECT 
         s.*,
         a.name as agent_name
-      FROM openclaw_sessions s
+      FROM sessions s
       LEFT JOIN agents a ON s.agent_id = a.id
       WHERE s.task_id = ? AND s.session_type = 'subagent'
       ORDER BY s.created_at DESC

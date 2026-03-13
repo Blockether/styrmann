@@ -172,8 +172,8 @@ export async function GET(
 
     let sessions = db
       .prepare(
-        `SELECT id, openclaw_session_id, status, created_at, ended_at
-         FROM openclaw_sessions
+        `SELECT id, session_id, status, created_at, ended_at
+         FROM sessions
          WHERE task_id = ?
          ORDER BY created_at DESC`,
       )
@@ -183,21 +183,21 @@ export async function GET(
       const fallbackSessions = db
         .prepare(
           `SELECT
-             json_extract(metadata, '$.openclaw_session_id') as openclaw_session_id,
+             json_extract(metadata, '$.session_id') as session_id,
              MAX(created_at) as created_at
            FROM task_activities
            WHERE task_id = ?
              AND activity_type = 'dispatch_invocation'
              AND metadata IS NOT NULL
-           GROUP BY json_extract(metadata, '$.openclaw_session_id')`,
+           GROUP BY json_extract(metadata, '$.session_id')`,
         )
-        .all(taskId) as Array<{ openclaw_session_id?: string | null; created_at?: string | null }>;
+        .all(taskId) as Array<{ session_id?: string | null; created_at?: string | null }>;
 
       sessions = fallbackSessions
-        .filter((row) => typeof row.openclaw_session_id === 'string' && row.openclaw_session_id.length > 0)
+        .filter((row) => typeof row.session_id === 'string' && row.session_id.length > 0)
         .map((row) => ({
-          id: `fallback-${row.openclaw_session_id}`,
-          openclaw_session_id: row.openclaw_session_id,
+          id: `fallback-${row.session_id}`,
+          session_id: row.session_id,
           status: 'active',
           created_at: row.created_at,
           ended_at: null,

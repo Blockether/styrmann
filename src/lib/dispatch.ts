@@ -293,7 +293,7 @@ function ensureProblemStatementArtifact(args: {
 
     try {
       run(
-        `INSERT INTO task_deliverables (id, task_id, deliverable_type, title, path, description, openclaw_session_id, created_at)
+        `INSERT INTO task_deliverables (id, task_id, deliverable_type, title, path, description, session_id, created_at)
          VALUES (?, ?, 'file', ?, ?, ?, ?, ?)`,
         [
           deliverableId,
@@ -320,7 +320,7 @@ function ensureProblemStatementArtifact(args: {
       );
     }
 
-    const created = queryOne<{ id: string; task_id: string; deliverable_type: string; title: string; path: string | null; description: string | null; openclaw_session_id?: string | null; created_at: string }>(
+    const created = queryOne<{ id: string; task_id: string; deliverable_type: string; title: string; path: string | null; description: string | null; session_id?: string | null; created_at: string }>(
       'SELECT * FROM task_deliverables WHERE id = ?',
       [deliverableId],
     );
@@ -387,7 +387,7 @@ export async function dispatchTaskToAgent(taskId: string): Promise<DispatchResul
     }
 
     let session = queryOne<AgentSession>(
-      `SELECT * FROM openclaw_sessions
+      `SELECT * FROM sessions
        WHERE agent_id = ? AND status = ? AND task_id = ?
        ORDER BY updated_at DESC, created_at DESC
        LIMIT 1`,
@@ -396,7 +396,7 @@ export async function dispatchTaskToAgent(taskId: string): Promise<DispatchResul
 
     if (!session) {
       const interruptedSession = queryOne<AgentSession>(
-        `SELECT * FROM openclaw_sessions
+        `SELECT * FROM sessions
          WHERE agent_id = ? AND status = ? AND task_id = ?
          ORDER BY updated_at DESC, created_at DESC
          LIMIT 1`,
@@ -404,10 +404,10 @@ export async function dispatchTaskToAgent(taskId: string): Promise<DispatchResul
       );
       if (interruptedSession) {
         run(
-          'UPDATE openclaw_sessions SET status = ?, ended_at = NULL, updated_at = ? WHERE id = ?',
+          'UPDATE sessions SET status = ?, ended_at = NULL, updated_at = ? WHERE id = ?',
           ['active', now, interruptedSession.id],
         );
-        session = queryOne<AgentSession>('SELECT * FROM openclaw_sessions WHERE id = ?', [interruptedSession.id]);
+        session = queryOne<AgentSession>('SELECT * FROM sessions WHERE id = ?', [interruptedSession.id]);
         createTaskActivity({
           taskId,
           activityType: 'status_changed',
@@ -416,7 +416,7 @@ export async function dispatchTaskToAgent(taskId: string): Promise<DispatchResul
           metadata: {
             workflow_step: task.status === 'assigned' ? 'in_progress' : task.status,
             decision_event: true,
-            openclaw_session_id: interruptedSession.openclaw_session_id,
+            session_id: interruptedSession.session_id,
           },
         });
       }
@@ -424,7 +424,7 @@ export async function dispatchTaskToAgent(taskId: string): Promise<DispatchResul
 
     if (!session) {
       const orphanSession = queryOne<AgentSession>(
-        `SELECT * FROM openclaw_sessions
+        `SELECT * FROM sessions
          WHERE agent_id = ? AND status = ? AND task_id IS NULL
          ORDER BY updated_at DESC, created_at DESC
          LIMIT 1`,
@@ -432,10 +432,10 @@ export async function dispatchTaskToAgent(taskId: string): Promise<DispatchResul
       );
       if (orphanSession) {
         run(
-          'UPDATE openclaw_sessions SET task_id = ?, session_type = ?, updated_at = ? WHERE id = ?',
+          'UPDATE sessions SET task_id = ?, session_type = ?, updated_at = ? WHERE id = ?',
           [task.id, 'subagent', now, orphanSession.id],
         );
-        session = queryOne<AgentSession>('SELECT * FROM openclaw_sessions WHERE id = ?', [orphanSession.id]);
+        session = queryOne<AgentSession>('SELECT * FROM sessions WHERE id = ?', [orphanSession.id]);
       }
     }
 
@@ -444,12 +444,12 @@ export async function dispatchTaskToAgent(taskId: string): Promise<DispatchResul
       const agentSessionId = `mission-control-${normalizeSessionSlug(agent.name)}-${task.id.slice(0, 8)}`;
 
       run(
-        `INSERT INTO openclaw_sessions (id, agent_id, openclaw_session_id, channel, status, session_type, task_id, created_at, updated_at)
+        `INSERT INTO sessions (id, agent_id, session_id, channel, status, session_type, task_id, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [sessionId, agent.id, agentSessionId, 'mission-control', 'active', 'subagent', task.id, now, now]
       );
 
-      session = queryOne<AgentSession>('SELECT * FROM openclaw_sessions WHERE id = ?', [sessionId]);
+      session = queryOne<AgentSession>('SELECT * FROM sessions WHERE id = ?', [sessionId]);
 
       run(
         `INSERT INTO events (id, type, agent_id, message, created_at)
@@ -627,7 +627,7 @@ export async function dispatchTaskToAgent(taskId: string): Promise<DispatchResul
     const scopedApiToken = generateScopedApiToken({
       taskId: task.id,
       workspaceId: task.workspace_id,
-      sessionId: session.openclaw_session_id,
+      sessionId: session.session_id,
       ttlSeconds: 6 * 60 * 60,
       scopes: [
         `task:${task.id}:read`,
@@ -663,7 +663,7 @@ export async function dispatchTaskToAgent(taskId: string): Promise<DispatchResul
 2. Register deliverable: POST ${missionControlUrl}/api/tasks/${task.id}/deliverables${authHeader}
    Body: {"deliverable_type": "file", "title": "File name", "path": "${taskProjectDir}/filename.html"}
 3. Update status: PATCH ${missionControlUrl}/api/tasks/${task.id}${authHeader}
-   Body: {"status": "${nextStatus}", "updated_by_session_id": "${session.openclaw_session_id}"}
+   Body: {"status": "${nextStatus}", "updated_by_session_id": "${session.session_id}"}
 
 Progress reporting rules:
 - Post at least one mid-run update using /activities with activity_type "updated" before completion.
@@ -684,12 +684,12 @@ Review the output directory for deliverables and run any applicable tests.
 1. POST ${missionControlUrl}/api/tasks/${task.id}/activities${authHeader}
    Body: {"activity_type": "completed", "message": "Tests passed: [summary]"}
 2. PATCH ${missionControlUrl}/api/tasks/${task.id}${authHeader}
-   Body: {"status": "${nextStatus}", "updated_by_session_id": "${session.openclaw_session_id}"}
+   Body: {"status": "${nextStatus}", "updated_by_session_id": "${session.session_id}"}
 ${loopGuide}
 
 **If tests FAIL:**
 1. ${failEndpoint}${authHeader}
-   Body: {"reason": "Detailed description of what failed and what needs fixing", "openclaw_session_id": "${session.openclaw_session_id}"}
+   Body: {"reason": "Detailed description of what failed and what needs fixing", "session_id": "${session.session_id}"}
 
 Progress reporting rules:
 - Post at least one mid-run update using /activities with activity_type "updated".
@@ -706,12 +706,12 @@ Review deliverables, test results, and task requirements.
 1. POST ${missionControlUrl}/api/tasks/${task.id}/activities${authHeader}
    Body: {"activity_type": "completed", "message": "Verification passed: [summary]"}
 2. PATCH ${missionControlUrl}/api/tasks/${task.id}${authHeader}
-   Body: {"status": "${nextStatus}", "updated_by_session_id": "${session.openclaw_session_id}"}
+   Body: {"status": "${nextStatus}", "updated_by_session_id": "${session.session_id}"}
 ${loopGuide}
 
 **If verification FAILS:**
 1. ${failEndpoint}${authHeader}
-   Body: {"reason": "Detailed description of what failed and what needs fixing", "openclaw_session_id": "${session.openclaw_session_id}"}
+   Body: {"reason": "Detailed description of what failed and what needs fixing", "session_id": "${session.session_id}"}
 
 Progress reporting rules:
 - Post at least one mid-run update using /activities with activity_type "updated".
@@ -722,7 +722,7 @@ Reply with: \`VERIFY_PASS: [summary]\` or \`VERIFY_FAIL: [what failed]\``;
     } else {
       completionInstructions = `**IMPORTANT:** After completing work:
 1. PATCH ${missionControlUrl}/api/tasks/${task.id}${authHeader}
-   Body: {"status": "${nextStatus}", "updated_by_session_id": "${session.openclaw_session_id}"}`;
+   Body: {"status": "${nextStatus}", "updated_by_session_id": "${session.session_id}"}`;
     }
 
     const roleLabel = currentStage?.label || 'Task';
@@ -764,19 +764,20 @@ If you need help or clarification, ask the orchestrator.`;
       task,
       taskProjectDir,
       content: taskProblemStatement,
-      agentSessionId: session.openclaw_session_id,
+      agentSessionId: session.session_id,
       agentName: agent.name,
       workflowStep: task.status === 'assigned' ? 'in_progress' : task.status,
     });
 
     try {
       const prefix = agent.session_key_prefix || 'agent:main:';
-      const sessionKey = `${prefix}${session.openclaw_session_id}`;
-      const traceUrl = `/api/tasks/${task.id}/sessions/${encodeURIComponent(session.openclaw_session_id)}/trace`;
+      const sessionKey = `${prefix}${session.session_id}`;
+      const traceUrl = `/api/tasks/${task.id}/sessions/${encodeURIComponent(session.session_id)}/trace`;
       const dispatchResult = await dispatchToOpenCode({
         sessionKey,
         message: taskMessage,
         cwd: worktree?.worktreePath || repoPath,
+        outputDir: taskProjectDir,
       });
 
       createTaskActivity({
@@ -785,9 +786,10 @@ If you need help or clarification, ask the orchestrator.`;
         message: `Dispatch invocation sent to ${agent.name}`,
         agentId: agent.id,
         metadata: {
-          openclaw_session_id: session.openclaw_session_id,
+          session_id: session.session_id,
           session_key: sessionKey,
           trace_url: traceUrl,
+          trace_path: dispatchResult.tracePath || null,
           output_directory: taskProjectDir,
           problem_statement_path: problemStatementPath,
           branch: worktree?.branchName || null,
@@ -844,7 +846,7 @@ If you need help or clarification, ask the orchestrator.`;
         success: true,
         taskId: task.id,
         agentId: agent.id,
-        sessionId: session.openclaw_session_id,
+        sessionId: session.session_id,
         updatedTask: updatedTask || undefined,
         updatedAgent: updatedAgent || undefined,
       };

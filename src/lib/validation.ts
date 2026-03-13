@@ -128,7 +128,7 @@ export const CreateDeliverableSchema = z.object({
   title: z.string().min(1, 'Title is required'),
   path: z.string().optional(),
   description: z.string().optional(),
-  openclaw_session_id: z.string().optional(),
+  session_id: z.string().optional(),
 });
 
 export const UpdateDeliverableSchema = z.object({

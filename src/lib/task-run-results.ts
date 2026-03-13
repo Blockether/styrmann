@@ -42,7 +42,7 @@ type TaskRunResultRow = {
   status: string;
   summary?: string | null;
   agent_id?: string | null;
-  openclaw_session_id?: string | null;
+  session_id?: string | null;
   completed_activity_id?: string | null;
   metadata?: string | null;
   created_at: string;
@@ -199,9 +199,9 @@ export function captureTaskRunResult(taskId: string): TaskRunResultRow | null {
     [taskId],
   );
 
-  const session = queryOne<{ openclaw_session_id?: string | null }>(
-    `SELECT openclaw_session_id
-     FROM openclaw_sessions
+  const session = queryOne<{ session_id?: string | null }>(
+    `SELECT session_id
+     FROM sessions
      WHERE task_id = ?
      ORDER BY updated_at DESC, created_at DESC
      LIMIT 1`,
@@ -250,7 +250,7 @@ export function captureTaskRunResult(taskId: string): TaskRunResultRow | null {
     run(
       `INSERT INTO task_run_results (
         id, task_id, run_number, status, summary, agent_id,
-        openclaw_session_id, completed_activity_id, metadata, created_at
+        session_id, completed_activity_id, metadata, created_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         runId,
@@ -259,7 +259,7 @@ export function captureTaskRunResult(taskId: string): TaskRunResultRow | null {
         task.status,
         summary,
         task.assigned_agent_id,
-        session?.openclaw_session_id || null,
+        session?.session_id || null,
         completedActivity?.id || null,
         metadata,
         createdAt,

@@ -10,7 +10,7 @@ type TaskRunRow = {
   status: string;
   summary?: string | null;
   agent_id?: string | null;
-  openclaw_session_id?: string | null;
+  session_id?: string | null;
   completed_activity_id?: string | null;
   metadata?: string | null;
   created_at: string;

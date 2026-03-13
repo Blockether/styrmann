@@ -14,7 +14,7 @@ import { useTraceDeepLink } from '@/hooks/useTraceDeepLink';
 interface SessionWithAgent {
   id: string;
   agent_id: string | null;
-  openclaw_session_id: string;
+  session_id: string;
   channel: string | null;
   status: string;
   session_type: string;
@@ -264,14 +264,14 @@ export function SessionsList({ taskId }: SessionsListProps) {
 
             {/* Session ID */}
             <div className="text-xs text-mc-text-secondary font-mono mb-2 truncate">
-              Session: {session.openclaw_session_id}
+              Session: {session.session_id}
             </div>
 
             {session.trace_url && (
               <div className="mb-2">
                 <button
                   type="button"
-                  onClick={() => openTrace(session.openclaw_session_id, taskId)}
+                  onClick={() => openTrace(session.session_id, taskId)}
                   className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs border border-cyan-200 bg-cyan-50 text-cyan-700 rounded hover:bg-cyan-100"
                 >
                   <Waypoints className="w-3.5 h-3.5" />
@@ -330,7 +330,7 @@ export function SessionsList({ taskId }: SessionsListProps) {
           <div className="flex flex-col gap-1 items-end">
             {session.status === 'interrupted' && (
               <button
-                onClick={() => handleResumeInterrupted(session.openclaw_session_id)}
+                onClick={() => handleResumeInterrupted(session.session_id)}
                 className="px-2 py-1 text-[11px] border border-orange-200 rounded bg-orange-50 hover:bg-orange-100 text-orange-700 whitespace-nowrap"
                 title="Resume interrupted session"
               >

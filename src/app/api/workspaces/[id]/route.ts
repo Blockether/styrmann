@@ -142,6 +142,7 @@ export async function DELETE(
     const tIds = taskIds.map(t => t.id);
 
     const cascade = db.transaction(() => {
+      // Per-task children (no CASCADE FKs referencing tasks)
       for (const taskId of tIds) {
         db.prepare('DELETE FROM task_run_result_artifacts WHERE task_id = ?').run(taskId);
         db.prepare('DELETE FROM task_run_results WHERE task_id = ?').run(taskId);
@@ -156,14 +157,26 @@ export async function DELETE(
         db.prepare('DELETE FROM task_tags WHERE task_id = ?').run(taskId);
         db.prepare('DELETE FROM task_roles WHERE task_id = ?').run(taskId);
         db.prepare('DELETE FROM task_provenance WHERE task_id = ?').run(taskId);
-        db.prepare('DELETE FROM openclaw_sessions WHERE task_id = ?').run(taskId);
+        db.prepare('DELETE FROM sessions WHERE task_id = ?').run(taskId);
         db.prepare('DELETE FROM planning_questions WHERE task_id = ?').run(taskId);
+        db.prepare('DELETE FROM planning_specs WHERE task_id = ?').run(taskId);
         db.prepare('DELETE FROM events WHERE task_id = ?').run(taskId);
+        db.prepare('DELETE FROM scheduled_job_runs WHERE task_id = ?').run(taskId);
+        // conversations.task_id has no CASCADE — delete messages/participants via cascade, then conversations
+        const convos = db.prepare('SELECT id FROM conversations WHERE task_id = ?').all(taskId) as { id: string }[];
+        for (const c of convos) {
+          db.prepare('DELETE FROM messages WHERE conversation_id = ?').run(c.id);
+          db.prepare('DELETE FROM conversation_participants WHERE conversation_id = ?').run(c.id);
+        }
+        db.prepare('DELETE FROM conversations WHERE task_id = ?').run(taskId);
       }
+      // Workspace-level children (must come before tasks/milestones/sprints/workspaces)
       db.prepare('DELETE FROM task_workflow_plans WHERE workspace_id = ?').run(id);
       db.prepare('DELETE FROM task_findings WHERE workspace_id = ?').run(id);
       db.prepare('DELETE FROM capability_proposals WHERE workspace_id = ?').run(id);
       db.prepare('DELETE FROM agent_logs WHERE workspace_id = ?').run(id);
+      db.prepare('DELETE FROM acp_bindings WHERE workspace_id = ?').run(id);
+      // Now safe to delete tasks (all FK references to tasks are gone)
       db.prepare('DELETE FROM tasks WHERE workspace_id = ?').run(id);
       db.prepare('DELETE FROM milestone_dependencies WHERE milestone_id IN (SELECT id FROM milestones WHERE workspace_id = ?)').run(id);
       db.prepare('DELETE FROM milestones WHERE workspace_id = ?').run(id);
@@ -171,7 +184,6 @@ export async function DELETE(
       db.prepare('DELETE FROM tags WHERE workspace_id = ?').run(id);
       db.prepare('DELETE FROM github_issues WHERE workspace_id = ?').run(id);
       db.prepare('DELETE FROM workflow_templates WHERE workspace_id = ?').run(id);
-      db.prepare('DELETE FROM acp_bindings WHERE workspace_id = ?').run(id);
       db.prepare('DELETE FROM workspaces WHERE id = ?').run(id);
     });
 

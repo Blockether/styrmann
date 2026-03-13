@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic';
 type Params = { params: Promise<{ id: string; sessionId: string }> };
 
 type DispatchMetadata = {
-  openclaw_session_id?: unknown;
+  session_id?: unknown;
   session_key?: unknown;
   worktree_path?: unknown;
   output_directory?: unknown;
@@ -47,15 +47,15 @@ export async function POST(_request: NextRequest, { params }: Params) {
     const now = new Date().toISOString();
 
     const session = db.prepare(
-      `SELECT s.id, s.agent_id, s.openclaw_session_id, s.status, s.task_id, a.name as agent_name, a.session_key_prefix
-       FROM openclaw_sessions s
+      `SELECT s.id, s.agent_id, s.session_id, s.status, s.task_id, a.name as agent_name, a.session_key_prefix
+       FROM sessions s
        LEFT JOIN agents a ON a.id = s.agent_id
-       WHERE s.task_id = ? AND (s.openclaw_session_id = ? OR s.id = ?)
+       WHERE s.task_id = ? AND (s.session_id = ? OR s.id = ?)
        LIMIT 1`,
     ).get(taskId, sessionId, sessionId) as {
       id: string;
       agent_id: string | null;
-      openclaw_session_id: string;
+      session_id: string;
       status: string | null;
       task_id: string;
       agent_name: string | null;
@@ -76,7 +76,7 @@ export async function POST(_request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: 'Task not found' }, { status: 404 });
     }
 
-    db.prepare('UPDATE openclaw_sessions SET status = ?, ended_at = NULL, updated_at = ? WHERE id = ?').run('active', now, session.id);
+    db.prepare('UPDATE sessions SET status = ?, ended_at = NULL, updated_at = ? WHERE id = ?').run('active', now, session.id);
 
     const dispatchRow = db.prepare(
       `SELECT metadata
@@ -84,13 +84,13 @@ export async function POST(_request: NextRequest, { params }: Params) {
        WHERE task_id = ? AND activity_type = 'dispatch_invocation' AND metadata LIKE ?
        ORDER BY created_at DESC
        LIMIT 1`,
-    ).get(taskId, `%${session.openclaw_session_id}%`) as { metadata: string | null } | undefined;
+    ).get(taskId, `%${session.session_id}%`) as { metadata: string | null } | undefined;
 
     const metadata = parseDispatchMetadata(dispatchRow?.metadata || null);
     const sessionKey =
       (typeof metadata?.session_key === 'string' && metadata.session_key.trim().length > 0)
         ? metadata.session_key.trim()
-        : `${session.session_key_prefix || 'agent:main:'}${session.openclaw_session_id}`;
+        : `${session.session_key_prefix || 'agent:main:'}${session.session_id}`;
 
     const resumeMessage = `[Styrmann] Resume previous interrupted session for task "${task.title}" and continue from the latest context. Do not restart from scratch; continue the active iteration and report progress.`;
 
@@ -116,13 +116,13 @@ export async function POST(_request: NextRequest, { params }: Params) {
       metadata: {
         workflow_step: task.status || 'in_progress',
         decision_event: true,
-        openclaw_session_id: session.openclaw_session_id,
+        session_id: session.session_id,
         resume_mode: 'session_continue',
         pid: result.pid,
       },
     });
 
-    const updated = db.prepare('SELECT * FROM openclaw_sessions WHERE id = ?').get(session.id);
+    const updated = db.prepare('SELECT * FROM sessions WHERE id = ?').get(session.id);
     return NextResponse.json({
       success: true,
       session: updated,

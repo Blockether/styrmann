@@ -24,9 +24,9 @@ export async function GET(
             WHERE ta.task_id = s.task_id
               AND ta.activity_type = 'status_changed'
               AND ta.metadata LIKE '%"resume_mode":"session_continue"%'
-              AND ta.metadata LIKE ('%"openclaw_session_id":"' || s.openclaw_session_id || '"%')
+              AND ta.metadata LIKE ('%"session_id":"' || s.session_id || '"%')
           ) as resumed_at
-        FROM openclaw_sessions s
+        FROM sessions s
         LEFT JOIN agents a ON s.agent_id = a.id
         WHERE s.task_id = ?
         ORDER BY s.created_at DESC`,
@@ -54,7 +54,7 @@ export async function GET(
         inactivity_minutes: inactivityMinutes,
         resumed_via_session_continuation: Boolean(session.resumed_at),
         resumed_at: session.resumed_at || null,
-        trace_url: `/api/tasks/${taskId}/sessions/${encodeURIComponent(String(session.openclaw_session_id))}/trace`,
+        trace_url: `/api/tasks/${taskId}/sessions/${encodeURIComponent(String(session.session_id))}/trace`,
       };
     });
 

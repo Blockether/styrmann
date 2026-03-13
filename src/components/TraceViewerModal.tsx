@@ -35,7 +35,7 @@ interface ProvenanceEntry {
 
 interface TracePayload {
   task_id: string;
-  openclaw_session_id: string;
+  session_id: string;
   agent_name: string | null;
   session_key: string | null;
   session?: {
@@ -275,7 +275,7 @@ export function TraceViewerModal({ taskId, sessionId, onClose }: TraceViewerModa
 
   const summary = data?.summary;
   const previewMessages = useMemo(() => data?.history ?? [], [data]);
-  const sessionLabel = data?.openclaw_session_id || sessionId;
+  const sessionLabel = data?.session_id || sessionId;
   const roleOptions = useMemo(() => {
     const set = new Set(previewMessages.map((message) => roleLabel(message.role, message.tool_name)));
     return ['all', ...Array.from(set)];

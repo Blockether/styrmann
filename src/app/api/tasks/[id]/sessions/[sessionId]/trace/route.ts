@@ -147,7 +147,7 @@ function extractSessionMetadata(taskId: string, sessionId: string): {
         const parsed = JSON.parse(row.metadata || '{}') as Record<string, unknown>;
         return {
           created_at: row.created_at,
-          session_id: String(parsed.openclaw_session_id || ''),
+          session_id: String(parsed.session_id || ''),
           session_key: String(parsed.session_key || ''),
           output_directory: String(parsed.output_directory || ''),
           invocation: String(parsed.invocation || ''),
@@ -299,7 +299,7 @@ export async function GET(request: Request, { params }: Params) {
 
     let session = queryOne<{
       id: string;
-      openclaw_session_id: string;
+      session_id: string;
       task_id?: string | null;
       agent_name?: string;
       session_key_prefix?: string;
@@ -309,11 +309,11 @@ export async function GET(request: Request, { params }: Params) {
       created_at?: string | null;
       ended_at?: string | null;
     }>(
-      `SELECT s.id, s.openclaw_session_id, s.task_id, s.status, s.session_type, s.channel, s.created_at, s.ended_at,
+      `SELECT s.id, s.session_id, s.task_id, s.status, s.session_type, s.channel, s.created_at, s.ended_at,
               a.name as agent_name, a.session_key_prefix
-       FROM openclaw_sessions s
+       FROM sessions s
        LEFT JOIN agents a ON s.agent_id = a.id
-       WHERE s.task_id = ? AND (s.openclaw_session_id = ? OR s.id = ?)
+       WHERE s.task_id = ? AND (s.session_id = ? OR s.id = ?)
        LIMIT 1`,
       [taskId, sessionId, sessionId],
     );
@@ -323,7 +323,7 @@ export async function GET(request: Request, { params }: Params) {
     if (!session) {
       const bySession = queryOne<{
         id: string;
-        openclaw_session_id: string;
+        session_id: string;
         task_id?: string | null;
         agent_name?: string;
         session_key_prefix?: string;
@@ -333,18 +333,18 @@ export async function GET(request: Request, { params }: Params) {
         created_at?: string | null;
         ended_at?: string | null;
       }>(
-        `SELECT s.id, s.openclaw_session_id, s.task_id, s.status, s.session_type, s.channel, s.created_at, s.ended_at,
+        `SELECT s.id, s.session_id, s.task_id, s.status, s.session_type, s.channel, s.created_at, s.ended_at,
                 a.name as agent_name, a.session_key_prefix
-         FROM openclaw_sessions s
+         FROM sessions s
          LEFT JOIN agents a ON s.agent_id = a.id
-         WHERE s.openclaw_session_id = ? OR s.id = ?
+         WHERE s.session_id = ? OR s.id = ?
          LIMIT 1`,
         [sessionId, sessionId],
       );
 
       if (bySession && invocation) {
         if (!bySession.task_id) {
-          run('UPDATE openclaw_sessions SET task_id = ?, session_type = ?, updated_at = datetime(\'now\') WHERE id = ?', [taskId, 'subagent', bySession.id]);
+          run('UPDATE sessions SET task_id = ?, session_type = ?, updated_at = datetime(\'now\') WHERE id = ?', [taskId, 'subagent', bySession.id]);
         }
         session = {
           ...bySession,
@@ -358,13 +358,13 @@ export async function GET(request: Request, { params }: Params) {
     }
 
     const resolvedSessionKey = invocation?.session_key
-      || `${session.session_key_prefix || 'agent:main:'}${session.openclaw_session_id}`;
+      || `${session.session_key_prefix || 'agent:main:'}${session.session_id}`;
 
     const rawLogs = queryAll<{ role: string; content: string; created_at: string }>(
       `SELECT role, content, created_at FROM agent_logs
        WHERE session_id = ? OR session_id = ?
        ORDER BY created_at ASC`,
-      [session.openclaw_session_id, resolvedSessionKey],
+      [session.session_id, resolvedSessionKey],
     );
 
     let history: TraceMessage[] = rawLogs
@@ -398,15 +398,15 @@ export async function GET(request: Request, { params }: Params) {
       }
     }
 
-    const hasSessionIdColumn = tableHasColumn('task_deliverables', 'openclaw_session_id');
+    const hasSessionIdColumn = tableHasColumn('task_deliverables', 'session_id');
     const dispatchActivity = queryOne<{ metadata: string | null }>(
       `SELECT metadata FROM task_activities
        WHERE task_id = ?
          AND activity_type = 'dispatch_invocation'
-         AND json_extract(metadata, '$.openclaw_session_id') = ?
+         AND json_extract(metadata, '$.session_id') = ?
        ORDER BY created_at DESC
        LIMIT 1`,
-      [taskId, session.openclaw_session_id],
+      [taskId, session.session_id],
     );
     const dispatchMetadata = parseToolInputObject(dispatchActivity?.metadata || '');
     const workflowStep = typeof dispatchMetadata?.workflow_step === 'string' && dispatchMetadata.workflow_step.trim().length > 0
@@ -419,8 +419,8 @@ export async function GET(request: Request, { params }: Params) {
     for (const candidate of autoDeliverableCandidates) {
       const existing = hasSessionIdColumn
         ? queryOne<{ id: string }>(
-          'SELECT id FROM task_deliverables WHERE task_id = ? AND openclaw_session_id = ? AND path = ? LIMIT 1',
-          [taskId, session.openclaw_session_id, candidate.path],
+          'SELECT id FROM task_deliverables WHERE task_id = ? AND session_id = ? AND path = ? LIMIT 1',
+          [taskId, session.session_id, candidate.path],
         )
         : queryOne<{ id: string }>(
           'SELECT id FROM task_deliverables WHERE task_id = ? AND path = ? LIMIT 1',
@@ -432,7 +432,7 @@ export async function GET(request: Request, { params }: Params) {
       if (hasSessionIdColumn) {
         run(
           `INSERT INTO task_deliverables
-            (id, task_id, deliverable_type, title, path, description, openclaw_session_id)
+            (id, task_id, deliverable_type, title, path, description, session_id)
            VALUES (?, ?, 'file', ?, ?, ?, ?)`,
           [
             deliverableId,
@@ -440,7 +440,7 @@ export async function GET(request: Request, { params }: Params) {
             candidate.title,
             candidate.path,
             `Created during ${workflowStep.replace(/_/g, ' ')} by ${agentName} via ${candidate.sourceTool}.`,
-            session.openclaw_session_id,
+            session.session_id,
           ],
         );
       } else {
@@ -465,7 +465,7 @@ export async function GET(request: Request, { params }: Params) {
         title: string;
         path: string | null;
         description: string | null;
-        openclaw_session_id?: string | null;
+        session_id?: string | null;
         created_at: string;
       }>('SELECT * FROM task_deliverables WHERE id = ?', [deliverableId]);
 
@@ -485,7 +485,7 @@ export async function GET(request: Request, { params }: Params) {
     if (provenanceEntries.length > 0) {
       const existingCount = queryOne<{ cnt: number }>(
         'SELECT COUNT(*) as cnt FROM task_provenance WHERE task_id = ? AND session_id = ?',
-        [taskId, session.openclaw_session_id],
+        [taskId, session.session_id],
       );
       if (!existingCount || existingCount.cnt === 0) {
         for (const { msg, idx } of provenanceEntries) {
@@ -496,7 +496,7 @@ export async function GET(request: Request, { params }: Params) {
             [
               crypto.randomUUID(),
               taskId,
-              session.openclaw_session_id,
+              session.session_id,
               prov?.kind || 'external_user',
               prov?.originSessionId || msg.receipt?.originSessionId || null,
               prov?.sourceSessionKey || msg.receipt?.targetSession || null,
@@ -515,7 +515,7 @@ export async function GET(request: Request, { params }: Params) {
 
     return NextResponse.json({
       task_id: taskId,
-      openclaw_session_id: session.openclaw_session_id,
+      session_id: session.session_id,
       agent_name: session.agent_name || null,
       session_key: resolvedSessionKey,
       session: {

@@ -34,7 +34,7 @@ interface AgentOption {
 }
 
 interface SessionOption {
-  openclaw_session_id: string;
+  session_id: string;
   agent_name: string;
   log_count: number;
   first_log_at: string;
@@ -353,7 +353,7 @@ export function AgentLogsView({ workspaceId, logsView = 'sessions', onLogsViewCh
               >
                 <option value="">All Sessions</option>
                 {sessions.map((session) => (
-                  <option key={session.openclaw_session_id} value={session.openclaw_session_id}>
+                  <option key={session.session_id} value={session.session_id}>
                     {session.agent_name} ({session.log_count} logs)
                   </option>
                 ))}
@@ -522,7 +522,7 @@ export function AgentLogsView({ workspaceId, logsView = 'sessions', onLogsViewCh
 
                     {/* Session ID */}
                     <div className="mt-2 text-xs text-mc-text-secondary">
-                      Session: <span className="font-mono">{log.openclaw_session_id}</span>
+                      Session: <span className="font-mono">{log.session_id}</span>
                     </div>
                   </div>
                 </div>

@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
       params.push(agentId);
     }
     if (sessionId) {
-      conditions.push('l.openclaw_session_id = ?');
+      conditions.push('l.session_id = ?');
       params.push(sessionId);
     }
     if (role && ['user', 'assistant', 'system'].includes(role)) {
@@ -78,7 +78,7 @@ export async function GET(request: NextRequest) {
       SELECT
         l.id,
         l.agent_id,
-        l.openclaw_session_id,
+        l.session_id,
         l.role,
         l.content,
         l.content_hash,

@@ -22,7 +22,7 @@ type DispatchMetadata = {
   worktree_path?: unknown;
   output_directory?: unknown;
   session_key?: unknown;
-  openclaw_session_id?: unknown;
+  session_id?: unknown;
 };
 
 function withinMissionControlRoot(candidate: string, missionControlRoot: string): boolean {
@@ -533,8 +533,8 @@ export async function DELETE(
       return NextResponse.json({ error: 'Task not found' }, { status: 404 });
     }
 
-    const sessionRows = queryAll<{ openclaw_session_id: string }>(
-      'SELECT openclaw_session_id FROM openclaw_sessions WHERE task_id = ?',
+    const sessionRows = queryAll<{ session_id: string }>(
+      'SELECT session_id FROM sessions WHERE task_id = ?',
       [id],
     );
 
@@ -547,7 +547,7 @@ export async function DELETE(
     for (const row of dispatchMetadataRows) {
       const metadata = parseDispatchMetadata(row.metadata);
       if (!metadata) continue;
-      const sessionId = typeof metadata.openclaw_session_id === 'string' ? metadata.openclaw_session_id.trim() : '';
+      const sessionId = typeof metadata.session_id === 'string' ? metadata.session_id.trim() : '';
       const sessionKey = typeof metadata.session_key === 'string' ? metadata.session_key.trim() : '';
       if (sessionId && sessionKey && !sessionKeyBySessionId.has(sessionId)) {
         sessionKeyBySessionId.set(sessionId, sessionKey);
@@ -602,7 +602,7 @@ export async function DELETE(
       }
     }
 
-    run('DELETE FROM openclaw_sessions WHERE task_id = ?', [id]);
+    run('DELETE FROM sessions WHERE task_id = ?', [id]);
     run('DELETE FROM task_run_results WHERE task_id = ?', [id]);
     run('DELETE FROM events WHERE task_id = ?', [id]);
     if (tableHasColumn('acp_bindings', 'task_id')) {

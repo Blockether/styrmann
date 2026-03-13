@@ -148,6 +148,7 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
         ...form,
         status: resolvedStatus,
         assigned_agent_id: task ? (form.assigned_agent_id || null) : null,
+        assigned_human_id: form.assigned_human_id || null,
         milestone_id: form.milestone_id || null,
         workspace_id: workspaceId || task?.workspace_id || 'default',
       };

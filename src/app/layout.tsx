@@ -40,7 +40,7 @@ export default function RootLayout({
 }) {
   return (
     <html data-component="src/app/layout" lang="en" className={`${ibmPlexMono.variable} ${atkinsonHyperlegible.variable}`}>
-      <body className={`${ibmPlexMono.className} bg-mc-bg text-mc-text min-h-screen`}>
+      <body className={`${ibmPlexMono.className} bg-mc-bg text-mc-text min-h-screen`} style={{ backgroundColor: '#fdf4e5' }}>
         <DemoBanner />
         {children}
       </body>

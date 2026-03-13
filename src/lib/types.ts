@@ -428,7 +428,7 @@ export interface TaskRole {
 export interface AgentSession {
   id: string;
   agent_id: string;
-  openclaw_session_id: string;
+  session_id: string;
   channel?: string;
   status: string;
   session_type: 'persistent' | 'subagent';
@@ -482,7 +482,7 @@ export interface TaskDeliverable {
   title: string;
   path?: string;
   description?: string;
-  openclaw_session_id?: string;
+  session_id?: string;
   created_via_agent_id?: string | null;
   created_via_agent_name?: string | null;
   created_via_workflow_step?: string | null;
@@ -632,7 +632,7 @@ export type AgentLogRole = 'user' | 'assistant' | 'system';
 export interface AgentLog {
   id: string;
   agent_id: string | null;
-  openclaw_session_id: string;
+  session_id: string;
   role: AgentLogRole;
   content: string;
   content_hash: string;

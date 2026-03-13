@@ -142,7 +142,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Agent not found' }, { status: 404 });
     }
 
-    run('DELETE FROM openclaw_sessions WHERE agent_id = ?', [id]);
+    run('DELETE FROM sessions WHERE agent_id = ?', [id]);
     run('DELETE FROM events WHERE agent_id = ?', [id]);
     run('DELETE FROM messages WHERE sender_agent_id = ?', [id]);
     run('DELETE FROM conversation_participants WHERE agent_id = ?', [id]);

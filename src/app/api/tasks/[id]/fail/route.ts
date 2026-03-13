@@ -22,7 +22,7 @@ export async function POST(
 
   try {
     const body = await request.json();
-    const { reason, session_id: openclaw_session_id } = body as { reason?: string; session_id?: string };
+    const { reason, session_id: session_id } = body as { reason?: string; session_id?: string };
 
     if (!reason) {
       return NextResponse.json({ error: 'reason is required' }, { status: 400 });
@@ -43,8 +43,8 @@ export async function POST(
     }
 
     // Trigger the fail-loopback via the workflow engine
-    if (typeof openclaw_session_id === 'string' && openclaw_session_id.trim().length > 0) {
-      finalizeSessionById(openclaw_session_id.trim(), 'interrupted');
+    if (typeof session_id === 'string' && session_id.trim().length > 0) {
+      finalizeSessionById(session_id.trim(), 'interrupted');
     }
     const result = await handleStageFailure(taskId, task.status, reason);
 

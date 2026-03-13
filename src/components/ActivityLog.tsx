@@ -36,8 +36,8 @@ function parseMetadata(activity: TaskActivity): Record<string, unknown> | null {
 
 function getTraceSessionId(activity: TaskActivity): string | null {
   const metadata = parseMetadata(activity);
-  if (typeof metadata?.openclaw_session_id === 'string' && metadata.openclaw_session_id) {
-    return metadata.openclaw_session_id;
+  if (typeof metadata?.session_id === 'string' && metadata.session_id) {
+    return metadata.session_id;
   }
   if (typeof metadata?.trace_url === 'string') {
     const match = metadata.trace_url.match(/\/sessions\/([^/]+)\/trace/);

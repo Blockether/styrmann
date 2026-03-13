@@ -2112,6 +2112,27 @@ const migrations: Migration[] = [
       db.exec('DROP TABLE IF EXISTS knowledge_attachments');
       db.exec('DROP TABLE IF EXISTS knowledge_entries');
     }
+  },
+  {
+    id: '047',
+    name: 'rename_openclaw_to_session',
+    up: (db) => {
+      db.exec('DROP INDEX IF EXISTS idx_openclaw_sessions_task');
+      db.exec('DROP INDEX IF EXISTS idx_agent_logs_session');
+      db.exec('DROP INDEX IF EXISTS idx_agent_logs_content_hash');
+      db.exec('DROP INDEX IF EXISTS idx_deliverables_session');
+
+      db.exec('ALTER TABLE openclaw_sessions RENAME TO sessions');
+      db.exec('ALTER TABLE sessions RENAME COLUMN openclaw_session_id TO session_id');
+      db.exec('ALTER TABLE agent_logs RENAME COLUMN openclaw_session_id TO session_id');
+      db.exec('ALTER TABLE task_deliverables RENAME COLUMN openclaw_session_id TO session_id');
+      db.exec('ALTER TABLE task_run_results RENAME COLUMN openclaw_session_id TO session_id');
+
+      db.exec('CREATE INDEX idx_sessions_task ON sessions(task_id)');
+      db.exec('CREATE INDEX idx_agent_logs_session ON agent_logs(session_id)');
+      db.exec('CREATE UNIQUE INDEX idx_agent_logs_content_hash ON agent_logs(content_hash)');
+      db.exec('CREATE INDEX idx_deliverables_session ON task_deliverables(session_id)');
+    }
   }
 ];
 

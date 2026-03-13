@@ -315,9 +315,9 @@ export async function handleStageTransition(
       const errorText = await dispatchRes.text();
       const error = `Auto-dispatch to ${roleAgent.name} failed (${dispatchRes.status}): ${errorText}`;
       console.error(`[Workflow] ${error}`);
-      const latestSession = queryOne<{ openclaw_session_id: string }>(
-        `SELECT openclaw_session_id
-         FROM openclaw_sessions
+      const latestSession = queryOne<{ session_id: string }>(
+        `SELECT session_id
+         FROM sessions
          WHERE task_id = ? AND agent_id = ?
          ORDER BY created_at DESC
          LIMIT 1`,
@@ -333,7 +333,7 @@ export async function handleStageTransition(
           workflow_step: targetStage.status,
           decision_event: true,
           dispatch_error: error,
-          openclaw_session_id: latestSession?.openclaw_session_id || null,
+          session_id: latestSession?.session_id || null,
         },
       });
       return { success: false, handedOff: true, newAgentId: roleAgent.id, newAgentName: roleAgent.name, error };
@@ -344,9 +344,9 @@ export async function handleStageTransition(
   } catch (err) {
     const error = `Dispatch error: ${(err as Error).message}`;
     console.error(`[Workflow] ${error}`);
-    const latestSession = queryOne<{ openclaw_session_id: string }>(
-      `SELECT openclaw_session_id
-       FROM openclaw_sessions
+    const latestSession = queryOne<{ session_id: string }>(
+      `SELECT session_id
+       FROM sessions
        WHERE task_id = ? AND agent_id = ?
        ORDER BY created_at DESC
        LIMIT 1`,
@@ -362,7 +362,7 @@ export async function handleStageTransition(
         workflow_step: targetStage.status,
         decision_event: true,
         dispatch_error: error,
-        openclaw_session_id: latestSession?.openclaw_session_id || null,
+        session_id: latestSession?.session_id || null,
       },
     });
     return { success: false, handedOff: true, newAgentId: roleAgent.id, newAgentName: roleAgent.name, error };
