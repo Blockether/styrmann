@@ -106,7 +106,6 @@ export async function POST(request: NextRequest) {
       dispatch_result: {
         success: dispatchResult.success,
         error: dispatchResult.error,
-        warning: dispatchResult.warning,
         session_id: dispatchResult.sessionId,
       },
     }, { status: dispatchResult.success ? 201 : 207 });

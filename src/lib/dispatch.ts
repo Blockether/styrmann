@@ -22,8 +22,6 @@ export interface DispatchResult {
   sessionId?: string;
   updatedTask?: Task;
   updatedAgent?: Agent;
-  warning?: string;
-  otherOrchestrators?: Array<{ id: string; name: string; role: string }>;
 }
 
 function normalizeSessionSlug(value: string): string {
@@ -369,25 +367,6 @@ export async function dispatchTaskToAgent(taskId: string): Promise<DispatchResul
     const agent = queryOne<Agent>('SELECT * FROM agents WHERE id = ?', [task.assigned_agent_id]);
     if (!agent) {
       return { success: false, error: 'Assigned agent not found' };
-    }
-
-    if (agent.role === 'orchestrator') {
-    const otherOrchestrators = queryAll<{ id: string; name: string; role: string }>(
-        `SELECT id, name, role
-         FROM agents
-         WHERE role = 'orchestrator'
-         AND id != ?
-         AND status != 'offline'`,
-        [agent.id]
-      );
-
-      if (otherOrchestrators.length > 0) {
-        return {
-          success: false,
-          warning: 'Other orchestrators available',
-          otherOrchestrators,
-        };
-      }
     }
 
     const now = new Date().toISOString();

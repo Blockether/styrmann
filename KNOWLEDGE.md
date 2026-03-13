@@ -154,7 +154,7 @@ Auto-named `SPRINT-N` per workspace (auto-incremented `sprint_number`). Users ca
 
 Milestones are the primary grouping unit for tasks. Each milestone optionally belongs to a sprint.
 
-**Fields**: workspace_id, name, description, due_date, status (open/closed), coordinator_agent_id, sprint_id, priority.
+**Fields**: workspace_id, name, description, due_date, status (open/closed), coordinator_agent_id (auto-resolved from default orchestrator), sprint_id, priority.
 
 **sprint_id**: FK to sprints (nullable). A milestone can exist without a sprint (it will appear in the backlog view).
 
@@ -306,11 +306,13 @@ The Presenter is a core role that interprets technical execution data without ch
 
 ### Orchestrator Role
 
-One global agent may have `role = 'orchestrator'`. This is the Product Owner / project manager role.
+One global agent has `role = 'orchestrator'`. This is the Product Owner / project manager role. The orchestrator is auto-resolved everywhere -- milestones, workflow plans, dispatch, and recovery all resolve the default orchestrator automatically. No user selection is required or exposed in the UI.
 
 **Single global orchestrator constraint**: Creating a second orchestrator returns `409 Conflict`. Enforced at the API level.
 
 **Demotion blocked**: `PATCH /api/agents/{id}` cannot change an orchestrator's role. Returns `400 Bad Request`. To change the orchestrator, delete the agent and recreate with a different role.
+
+**Auto-resolution**: All subsystems that need the orchestrator (milestone creation, workflow planning, task dispatch, recovery daemon) resolve it via `SELECT id FROM agents WHERE role = 'orchestrator' ORDER BY created_at ASC LIMIT 1`. No manual assignment.
 
 **Status is system-managed**: `PATCH /api/agents/{id}` rejects manual `status` updates with `403` (`Agent status is system-managed and cannot be updated manually`) unless the request carries internal daemon header `x-mc-system: daemon`.
 
@@ -420,7 +422,7 @@ Fallback: Agent Activity Dashboard polls every 20s; task-specific views use SSE 
 - **agents** -- name, role, status, model, source, gateway_agent_id, session_key_prefix, agent_dir, agent_workspace_path, soul_md, user_md, agents_md. No `is_master` column.
 - **tasks** -- title, description, status, priority, task_type, effort, impact, assigned_agent_id, milestone_id, workflow_template_id, workflow_plan_id, due_date, github_issue_id (nullable FK to github_issues), planning fields. No `sprint_id`. No `parent_task_id`.
 - **sprints** -- workspace_id, name, goal, sprint_number, start_date, end_date, status
-- **milestones** -- workspace_id, name, description, due_date, status, coordinator_agent_id, sprint_id (FK nullable), priority ('low'|'normal'|'high'|'urgent')
+- **milestones** -- workspace_id, name, description, due_date, status, coordinator_agent_id (auto-resolved from default orchestrator, not user-settable), sprint_id (FK nullable), priority ('low'|'normal'|'high'|'urgent')
 - **milestone_dependencies** -- id, milestone_id, depends_on_milestone_id (nullable), depends_on_task_id (nullable), dependency_type ('finish_to_start'|'blocks')
 - **tags** / **task_tags** -- workspace-scoped tags, many-to-many with tasks
 
@@ -610,7 +612,7 @@ Agents without direct filesystem access use upload/download endpoints:
 6. **Migrations auto-run on DB connection**: Schema creation only for fresh databases. `legacy_alter_table = ON` during migrations to prevent FK rewriting bug.
 7. **Component traceability**: Every React component's root DOM element has `data-component="src/path/to/File"` (relative path, no extension). Paste rendered HTML and immediately identify which source file to edit.
 8. **LiveFeed is workspace-scoped**: Events API filters by `workspace_id` via task or agent ownership. System events (no task/agent) appear in all workspaces. AgentActivityDashboard is the global cross-workspace activity view.
-9. **Single global orchestrator**: Only one agent with `role = 'orchestrator'` is allowed globally. Enforced at the API level (409 on duplicate). Orchestrators cannot be demoted via PATCH (400) -- delete and recreate to change. Orchestrators are excluded from workflow stage auto-assignment.
+9. **Single global orchestrator**: Only one agent with `role = 'orchestrator'` is allowed globally. Enforced at the API level (409 on duplicate). Orchestrators cannot be demoted via PATCH (400) -- delete and recreate to change. Orchestrators are excluded from workflow stage auto-assignment. The orchestrator is auto-resolved in all subsystems (milestones, workflow plans, dispatch, recovery) -- no manual selection is exposed or required.
 10. **Story points computed, not stored**: `story_points` on a milestone is computed at read time via `SUM(task.effort)`. It is never persisted in the database.
 11. **Milestone dependencies are informational in v1**: The `milestone_dependencies` table exists and is queryable, but no blocking behavior is enforced. Dependencies are for planning visibility only.
 
@@ -676,7 +678,7 @@ The daemon is a standalone Node.js process with nine modules:
 | **heartbeat** | 30s | Polls `/api/agents` and active subagent sessions; stale working agents are set to standby only when they exceed `MC_AGENT_STALE_THRESHOLD_MS` (default 60m) and have no active subagent session |
 | **dispatcher** | 10s | Polls `/api/tasks?status=assigned`, auto-dispatches each via `POST /api/tasks/{id}/dispatch` |
 | **scheduler** | 10s | Runs registered `ScheduledJob` entries on interval. Job registry starts empty — no hardcoded jobs |
-| **recovery** | 60s | Polls recoverable statuses (`assigned`, `in_progress`, `testing`, `verification`, `review`), detects stale work (default 20m via `MC_STALLED_TASK_THRESHOLD_MS`), marks stale active sessions as `interrupted`, then attempts continuation by re-dispatching to the assignee; on conflict or offline assignee, reassigns to fallback orchestrator |
+| **recovery** | 60s | Polls recoverable statuses (`assigned`, `in_progress`, `testing`, `verification`, `review`), detects stale work (default 20m via `MC_STALLED_TASK_THRESHOLD_MS`), marks stale active sessions as `interrupted`, then attempts continuation by re-dispatching to the assignee; on conflict or offline assignee, reassigns to the default orchestrator |
 | **autotrain** | 30s | Polls completed `autotrain` tasks and reopens them for the next repo-improvement iteration until stop/max-iteration conditions are hit |
 | **health** | 60s | Pings MC to verify API is reachable, logs connection changes |
 | **router** | SSE stream | Subscribes to `/api/events/stream`, routes events (e.g., logs task assignments for dispatcher awareness) |

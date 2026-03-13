@@ -782,7 +782,6 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
       {showMilestoneModal && (
         <CreateMilestoneModal
           workspaceId={resolvedWorkspaceId}
-          agents={agents}
           onClose={() => setShowMilestoneModal(false)}
           onCreated={(milestoneId) => {
             loadMilestones().then((items) => {

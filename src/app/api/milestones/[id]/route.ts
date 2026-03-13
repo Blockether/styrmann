@@ -94,10 +94,6 @@ export async function PATCH(
       updates.push('status = ?');
       values.push(data.status);
     }
-    if (data.coordinator_agent_id !== undefined) {
-      updates.push('coordinator_agent_id = ?');
-      values.push(data.coordinator_agent_id);
-    }
     if (data.sprint_id !== undefined) {
       updates.push('sprint_id = ?');
       values.push(data.sprint_id);

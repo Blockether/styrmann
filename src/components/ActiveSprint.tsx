@@ -686,7 +686,6 @@ export function ActiveSprint({ workspaceId, mobileMode = false, isPortrait = tru
         <CreateMilestoneModal
           workspaceId={workspaceId}
           sprintId={selectedSprintId || undefined}
-          agents={agents}
           onClose={() => setShowCreateMilestoneModal(false)}
           onCreated={() => {
             const url = selectedSprintId

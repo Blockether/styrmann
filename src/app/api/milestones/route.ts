@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDb } from '@/lib/db';
+import { getDb, queryOne } from '@/lib/db';
 import { CreateMilestoneSchema } from '@/lib/validation';
 import type { Milestone } from '@/lib/types';
 
@@ -87,7 +87,8 @@ export async function POST(request: NextRequest) {
     const id = crypto.randomUUID();
     const now = new Date().toISOString();
 
-    const coordinatorAgentId = data.coordinator_agent_id ?? null;
+    const orchestrator = queryOne<{ id: string }>(`SELECT id FROM agents WHERE role = 'orchestrator' ORDER BY created_at ASC LIMIT 1`);
+    const coordinatorAgentId = orchestrator?.id ?? null;
     const sprintId = data.sprint_id ?? null;
     const priority = data.priority ?? null;
 

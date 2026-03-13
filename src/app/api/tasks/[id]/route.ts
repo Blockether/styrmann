@@ -487,19 +487,23 @@ export async function PATCH(
       if (remainingTasks && remainingTasks.count === 0) {
         run('UPDATE milestones SET status = ?, updated_at = ? WHERE id = ?', ['closed', now, existing.milestone_id]);
 
-        const milestone = queryOne<{ coordinator_agent_id: string | null; name: string }>(
-          'SELECT coordinator_agent_id, name FROM milestones WHERE id = ?',
+        const milestone = queryOne<{ name: string }>(
+          'SELECT name FROM milestones WHERE id = ?',
           [existing.milestone_id]
         );
 
-        if (milestone?.coordinator_agent_id) {
+        const orchestrator = queryOne<{ id: string }>(
+          `SELECT id FROM agents WHERE role = 'orchestrator' ORDER BY created_at ASC LIMIT 1`,
+        );
+
+        if (milestone && orchestrator) {
           run(
             `INSERT INTO events (id, type, agent_id, task_id, message, created_at)
              VALUES (?, ?, ?, ?, ?, ?)`,
             [
               uuidv4(),
               'task_completed',
-              milestone.coordinator_agent_id,
+              orchestrator.id,
               id,
               `Milestone "${milestone.name}" completed - all tasks done`,
               now,

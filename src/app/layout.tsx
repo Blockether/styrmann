@@ -22,7 +22,7 @@ export const metadata: Metadata = {
   title: 'Blockether',
   description: 'AI Agent Orchestration Dashboard',
   icons: {
-    icon: '/logo.png',
+    icon: '/favicon.svg',
   },
 };
 

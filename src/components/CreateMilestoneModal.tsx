@@ -2,24 +2,22 @@
 
 import { useEffect, useState } from 'react';
 import { X, Loader2, Target } from 'lucide-react';
-import type { Agent, TaskPriority } from '@/lib/types';
+import type { TaskPriority } from '@/lib/types';
 
 interface CreateMilestoneModalProps {
   workspaceId: string;
   sprintId?: string;
-  agents: Agent[];
   onClose: () => void;
   onCreated: (milestoneId?: string) => void;
 }
 
-export function CreateMilestoneModal({ workspaceId, sprintId, agents, onClose, onCreated }: CreateMilestoneModalProps) {
+export function CreateMilestoneModal({ workspaceId, sprintId, onClose, onCreated }: CreateMilestoneModalProps) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({
     name: '',
     description: '',
     priority: 'normal' as TaskPriority,
-    coordinator_agent_id: '',
   });
 
   useEffect(() => {
@@ -49,7 +47,6 @@ export function CreateMilestoneModal({ workspaceId, sprintId, agents, onClose, o
           name: form.name.trim(),
           description: form.description.trim() || null,
           priority: form.priority,
-          coordinator_agent_id: form.coordinator_agent_id || null,
         }),
       });
 
@@ -120,23 +117,6 @@ export function CreateMilestoneModal({ workspaceId, sprintId, agents, onClose, o
               <option value="urgent">Urgent</option>
             </select>
           </div>
-
-          {agents.length > 0 && (
-            <div>
-              <label className="block text-sm font-medium mb-1">Coordinator agent</label>
-              <select
-                value={form.coordinator_agent_id}
-                onChange={(e) => setForm({ ...form, coordinator_agent_id: e.target.value })}
-                className="w-full min-h-11 px-3 py-2 bg-mc-bg border border-mc-border rounded text-sm focus:outline-none focus:border-mc-accent"
-              >
-                <option value="">No coordinator yet</option>
-                {agents.map((agent) => (
-                  <option key={agent.id} value={agent.id}>{agent.name}</option>
-                ))}
-              </select>
-              <p className="text-xs text-mc-text-secondary mt-1">Pick who keeps this milestone moving and unblocks follow-up work.</p>
-            </div>
-          )}
 
           {error && (
             <p className="text-sm text-mc-accent-red">{error}</p>

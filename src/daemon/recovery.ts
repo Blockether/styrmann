@@ -137,23 +137,20 @@ export function startRecovery(config: DaemonConfig, stats: DaemonStats): () => v
         const assignedAgent = agents.find((agent) => agent.id === task.assigned_agent_id);
 
         if (!assignedAgent || assignedAgent.status === 'offline') {
-          const fallback = agents.find(
-            (agent) =>
-              agent.role === 'orchestrator' &&
-              agent.status !== 'offline' &&
-              agent.id !== task.assigned_agent_id,
+          const orchestrator = agents.find(
+            (agent) => agent.role === 'orchestrator' && agent.status !== 'offline',
           );
 
-          if (fallback) {
-            const ok = await reassignTask(task.id, fallback.id);
+          if (orchestrator && orchestrator.id !== task.assigned_agent_id) {
+            const ok = await reassignTask(task.id, orchestrator.id);
             if (ok) {
               stats.stalledReassignedCount = (stats.stalledReassignedCount || 0) + 1;
               recoveryState.set(task.id, { lastActionAt: nowMs });
               await logRecoveryActivity(
                 task.id,
-                `[Auto-Recovery] Reassigned stale task after ${ageMinutes}m without updates to ${fallback.name}.`,
+                `[Auto-Recovery] Reassigned stale task after ${ageMinutes}m to orchestrator ${orchestrator.name}.`,
               );
-              log.info(`Reassigned stale task ${task.id} to ${fallback.name}`);
+              log.info(`Reassigned stale task ${task.id} to orchestrator ${orchestrator.name}`);
             } else {
               log.warn(`Failed to reassign stale task ${task.id}`);
             }
@@ -161,9 +158,9 @@ export function startRecovery(config: DaemonConfig, stats: DaemonStats): () => v
             recoveryState.set(task.id, { lastActionAt: nowMs });
             await logRecoveryActivity(
               task.id,
-              `[Auto-Recovery] Task stale for ${ageMinutes}m but no fallback orchestrator is available.`,
+              `[Auto-Recovery] Task stale for ${ageMinutes}m but orchestrator is unavailable.`,
             );
-            log.warn(`Stale task ${task.id} has no fallback orchestrator`);
+            log.warn(`Stale task ${task.id} — orchestrator unavailable`);
           }
 
           continue;
@@ -186,23 +183,12 @@ export function startRecovery(config: DaemonConfig, stats: DaemonStats): () => v
         }
 
         if (dispatchRes.status === 409) {
-          const payload = (await dispatchRes.json().catch(() => ({}))) as {
-            otherOrchestrators?: Array<{ id: string; name: string }>;
-          };
-          const fallback = payload.otherOrchestrators?.[0];
-
-          if (fallback) {
-            const ok = await reassignTask(task.id, fallback.id);
-            if (ok) {
-              stats.stalledReassignedCount = (stats.stalledReassignedCount || 0) + 1;
-              recoveryState.set(task.id, { lastActionAt: nowMs });
-              await logRecoveryActivity(
-                task.id,
-                `[Auto-Recovery] Reassigned stale task to ${fallback.name} after dispatch conflict.`,
-              );
-              log.info(`Reassigned stale task ${task.id} to alternate orchestrator ${fallback.name}`);
-            }
-          }
+          recoveryState.set(task.id, { lastActionAt: nowMs });
+          await logRecoveryActivity(
+            task.id,
+            `[Auto-Recovery] Dispatch blocked (409) for stale task — likely dependency or stage gate.`,
+          );
+          log.warn(`Recovery dispatch blocked (409) for ${task.id}`);
           continue;
         }
 

@@ -102,7 +102,6 @@ export const CreateMilestoneSchema = z.object({
   name: z.string().min(1).max(200),
   description: z.string().max(2000).optional(),
   due_date: z.string().optional().nullable(),
-  coordinator_agent_id: z.string().uuid().optional().nullable(),
   priority: z.enum(['low', 'normal', 'high', 'urgent']).optional(),
 });
 
@@ -110,7 +109,6 @@ export const UpdateMilestoneSchema = z.object({
   name: z.string().min(1).max(200).optional(),
   description: z.string().max(2000).optional().nullable(),
   due_date: z.string().optional().nullable(),
-  coordinator_agent_id: z.string().uuid().optional().nullable(),
   status: z.enum(['open', 'closed']).optional(),
   sprint_id: z.string().optional().nullable(),
   priority: z.enum(['low', 'normal', 'high', 'urgent']).optional(),

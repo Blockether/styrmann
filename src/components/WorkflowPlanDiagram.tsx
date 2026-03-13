@@ -243,7 +243,7 @@ export function WorkflowPlanDiagram({
               <div className="flex items-center justify-between gap-2 flex-wrap">
                 <div className="flex items-center gap-2 text-sm font-medium text-mc-text">
                   <Brain className="h-4 w-4 text-mc-accent" />
-                  <span>{planner?.agent_name || 'No orchestrator assigned'}</span>
+                  <span>{planner?.agent_name || 'Orchestrator'}</span>
                 </div>
                 <span className="rounded-full border border-mc-accent/30 bg-mc-accent/10 px-2.5 py-1 text-[11px] uppercase tracking-wide text-mc-accent">
                   Planning lead
@@ -252,7 +252,7 @@ export function WorkflowPlanDiagram({
               <p className="mt-2 text-xs leading-5 text-mc-text-secondary">
                 {planner
                   ? `${planner.agent_role} owns workflow shaping, stage sequencing, and participant coverage before runtime begins.`
-                  : 'No dedicated planner was found for this workflow plan.'}
+                  : 'The default orchestrator owns workflow shaping, stage sequencing, and participant coverage.'}
               </p>
               {planner?.skills?.length ? (
                 <div className="mt-3 flex flex-wrap gap-1.5">

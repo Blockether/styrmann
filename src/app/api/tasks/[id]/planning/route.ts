@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDb, queryAll, queryOne, run } from '@/lib/db';
+import { getDb, queryOne, run } from '@/lib/db';
 import { broadcast } from '@/lib/events';
 import { extractJSON } from '@/lib/planning-utils';
 
@@ -86,27 +86,6 @@ export async function POST(
     const defaultMaster = queryOne<{ id: string; session_key_prefix?: string }>(
       `SELECT id, session_key_prefix FROM agents WHERE role = 'orchestrator' ORDER BY created_at ASC LIMIT 1`,
     );
-
-    const otherOrchestrators = queryAll<{
-      id: string;
-      name: string;
-      role: string;
-    }>(
-      `SELECT id, name, role
-       FROM agents
-       WHERE role = 'orchestrator'
-       AND id != ?
-       AND status != 'offline'`,
-      [defaultMaster?.id ?? '']
-    );
-
-    if (otherOrchestrators.length > 0) {
-      return NextResponse.json({
-        error: 'Other orchestrators available',
-        message: `There ${otherOrchestrators.length === 1 ? 'is' : 'are'} ${otherOrchestrators.length} other orchestrator${otherOrchestrators.length === 1 ? '' : 's'} available: ${otherOrchestrators.map(o => o.name).join(', ')}. Please assign this task to them directly.`,
-        otherOrchestrators,
-      }, { status: 409 });
-    }
 
     const planningPrefix = (defaultMaster?.session_key_prefix || DEFAULT_SESSION_KEY_PREFIX) + 'planning:';
     const sessionKey = `${planningPrefix}${taskId}`;

@@ -39,20 +39,6 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const result = await dispatchTaskToAgent(id);
 
     if (!result.success) {
-      if (result.warning === 'Other orchestrators available') {
-        const count = result.otherOrchestrators?.length || 0;
-        const names = result.otherOrchestrators?.map((orchestrator) => orchestrator.name).join(', ') || '';
-        return NextResponse.json(
-          {
-            success: false,
-            warning: result.warning,
-            message: `There ${count === 1 ? 'is' : 'are'} ${count} other orchestrator${count === 1 ? '' : 's'} available in this workspace: ${names}. Consider assigning this task to them instead.`,
-            otherOrchestrators: result.otherOrchestrators || [],
-          },
-          { status: 409 }
-        );
-      }
-
       if (result.error === 'Task not found' || result.error === 'Assigned agent not found') {
         return NextResponse.json({ error: result.error }, { status: 404 });
       }
