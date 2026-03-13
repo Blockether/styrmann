@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="public/logo.png" alt="Styrmann logo" width="220" />
+  <img src="https://raw.githubusercontent.com/Blockether/styrmann/main/logo.png" alt="Styrmann logo" width="220" />
 </p>
 
 <div align="center">
