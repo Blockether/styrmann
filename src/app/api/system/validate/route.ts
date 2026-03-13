@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic';
 
 const PROJECT_DIR = '/root/repos/blockether/mission-control';
 const DB_CANDIDATES = [
-  process.env.DATABASE_PATH,
+    process.env.STYRMAN_DATABASE_PATH,
   path.join(PROJECT_DIR, 'mission-control.db'),
   path.join(PROJECT_DIR, 'styrmann.db'),
   path.join(PROJECT_DIR, 'styrmann'),
@@ -18,7 +18,7 @@ const DB_PATH = DB_CANDIDATES.find((candidate) => existsSync(candidate)) || DB_C
 const ENV_FILE = `${PROJECT_DIR}/.env.local`;
 const PUBLIC_URL = 'https://control.blockether.com';
 const LOCAL_URL = 'http://localhost:4000';
-const REQUIRED_VARS = ['MC_API_TOKEN'];
+  const REQUIRED_VARS = ['STYRMAN_API_TOKEN'];
 
 type CheckResult = {
   status: 'pass' | 'fail' | 'warn';
@@ -49,7 +49,7 @@ export async function POST() {
         status: 'fail',
         message: '.env.local not found',
         repairable: true,
-        repair_prompt: 'The .env.local file is missing from the Styrmann project directory at /root/repos/blockether/mission-control. Create it with the required environment variables: MC_API_TOKEN. Check /root/repos/blockether/mission-control/.env.example for the template.',
+      repair_prompt: 'The .env.local file is missing from the Styrmann project directory at /root/repos/blockether/mission-control. Create it with the required environment variables: STYRMAN_API_TOKEN. Check /root/repos/blockether/mission-control/.env.example for the template.',
       };
     }
     return { status: 'pass', message: '.env.local exists' };

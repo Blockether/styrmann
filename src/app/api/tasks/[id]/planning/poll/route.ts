@@ -7,15 +7,8 @@ import { Task } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
 
-const PLANNING_TIMEOUT_MS = parseInt(process.env.PLANNING_TIMEOUT_MS || '30000', 10);
-const PLANNING_POLL_INTERVAL_MS = parseInt(process.env.PLANNING_POLL_INTERVAL_MS || '2000', 10);
-
-if (isNaN(PLANNING_TIMEOUT_MS) || PLANNING_TIMEOUT_MS < 1000) {
-  throw new Error('PLANNING_TIMEOUT_MS must be a valid number >= 1000ms');
-}
-if (isNaN(PLANNING_POLL_INTERVAL_MS) || PLANNING_POLL_INTERVAL_MS < 100) {
-  throw new Error('PLANNING_POLL_INTERVAL_MS must be a valid number >= 100ms');
-}
+const PLANNING_TIMEOUT_MS = 30_000;
+const PLANNING_POLL_INTERVAL_MS = 2_000;
 
 async function handlePlanningCompletion(taskId: string, parsed: { spec?: object; agents?: unknown[]; execution_plan?: object }, messages: unknown[]) {
   const dispatchError: string | null = null;

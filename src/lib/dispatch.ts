@@ -12,6 +12,7 @@ import { getUnresolvedTaskDependencies } from '@/lib/task-dependencies';
 import { generateScopedApiToken } from '@/lib/scoped-api-tokens';
 import { getTaskWorkflowPlan } from '@/lib/workflow-planning';
 import { finalizeOtherActiveSessionsForTask } from '@/lib/session-lifecycle';
+import { storeDeliverableFile } from '@/lib/deliverable-store';
 import type { Task, Agent, AgentSession, WorkflowStage, WorkflowPlanParticipant, WorkflowPlanStep } from '@/lib/types';
 
 export interface DispatchResult {
@@ -50,11 +51,11 @@ function getExternalMissionControlUrl(missionControlUrl: string): string {
   try {
     const parsed = new URL(missionControlUrl);
     if (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1' || parsed.hostname === '::1') {
-      return process.env.MISSION_CONTROL_PUBLIC_URL || 'https://control.blockether.com';
+   return process.env.STYRMAN_URL || 'https://control.blockether.com';
     }
     return missionControlUrl;
   } catch {
-    return process.env.MISSION_CONTROL_PUBLIC_URL || 'https://control.blockether.com';
+  return process.env.STYRMAN_URL || 'https://control.blockether.com';
   }
 }
 
@@ -284,12 +285,13 @@ function ensureProblemStatementArtifact(args: {
   writeFileSync(artifactPath, content, 'utf-8');
 
   const existing = queryOne<{ id: string }>(
-    'SELECT id FROM task_deliverables WHERE task_id = ? AND path = ? LIMIT 1',
-    [task.id, artifactPath],
+    `SELECT id FROM task_deliverables WHERE task_id = ? AND title = 'task-problem-statement.md' AND source = 'system' LIMIT 1`,
+    [task.id],
   );
   if (!existing) {
     const deliverableId = uuidv4();
     const now = new Date().toISOString();
+    const safePath = storeDeliverableFile(task.id, deliverableId, artifactPath) || artifactPath;
 
     run(
       `INSERT INTO task_deliverables (id, task_id, deliverable_type, title, path, description, session_id, source, created_at)
@@ -298,7 +300,7 @@ function ensureProblemStatementArtifact(args: {
         deliverableId,
         task.id,
         'task-problem-statement.md',
-        artifactPath,
+        safePath,
         buildDeliverableDescription(agentName, workflowStep, 'dispatch initialization'),
         agentSessionId,
         now,

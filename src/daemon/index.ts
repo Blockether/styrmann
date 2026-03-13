@@ -16,7 +16,7 @@ async function main() {
   const { mcUrl, mcToken } = getConfig();
 
   if (shouldUseMissionControlToken(mcUrl) && !mcToken) {
-    log.error('MC_API_TOKEN (or MC_TOKEN) is required. Set it as an environment variable.');
+    log.error('STYRMAN_API_TOKEN is required. Set it as an environment variable.');
     process.exit(1);
   }
 

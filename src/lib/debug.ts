@@ -1,12 +1,12 @@
 /**
  * Debug Logging Utility
- * Enable with localStorage.setItem('MC_DEBUG', 'true')
+ * Enable with localStorage.setItem('STYRMAN_DEBUG', 'true')
  * Or run mcDebug.enable() in browser console
  */
 
 const isDebugEnabled = (): boolean => {
   if (typeof window === 'undefined') return true; // Always log server-side
-  return localStorage.getItem('MC_DEBUG') === 'true';
+  return localStorage.getItem('STYRMAN_DEBUG') === 'true';
 };
 
 export const debug = {
@@ -40,14 +40,14 @@ export const debug = {
 // Enable debug mode helper
 export const enableDebug = () => {
   if (typeof window !== 'undefined') {
-    localStorage.setItem('MC_DEBUG', 'true');
+  localStorage.setItem('STYRMAN_DEBUG', 'true');
     console.log('[DEBUG] Debug mode enabled. Refresh to see all logs.');
   }
 };
 
 export const disableDebug = () => {
   if (typeof window !== 'undefined') {
-    localStorage.removeItem('MC_DEBUG');
+  localStorage.removeItem('STYRMAN_DEBUG');
     console.log('[DEBUG] Debug mode disabled.');
   }
 };

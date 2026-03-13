@@ -29,8 +29,8 @@ interface ActiveSessionInfo {
   updated_at?: string;
 }
 
-const STALLED_TASK_THRESHOLD_MS = Number.parseInt(process.env.MC_STALLED_TASK_THRESHOLD_MS || '1200000', 10);
-const STALLED_TASK_COOLDOWN_MS = Number.parseInt(process.env.MC_STALLED_TASK_COOLDOWN_MS || '600000', 10);
+const STALLED_TASK_THRESHOLD_MS = 1_200_000;
+const STALLED_TASK_COOLDOWN_MS = 600_000;
 const RECOVERABLE_TASK_STATUSES = ['assigned', 'in_progress', 'testing', 'verification', 'review'] as const;
 
 function getStatusThresholdMs(status: string): number {

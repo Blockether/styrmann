@@ -9,6 +9,7 @@ import { broadcast } from '@/lib/events';
 import { CreateDeliverableSchema } from '@/lib/validation';
 import { verifyScopedApiToken } from '@/lib/scoped-api-tokens';
 import { existsSync } from 'fs';
+import { resolveDeliverablePath, storeDeliverableFile } from '@/lib/deliverable-store';
 
 import type { TaskDeliverable } from '@/lib/types';
 
@@ -171,18 +172,6 @@ export async function POST(
       requestedSessionId
       || scopedSessionId;
 
-    // Validate file existence for file deliverables
-    let fileExists = true;
-    let normalizedPath = path;
-    if (deliverable_type === 'file' && path) {
-      // Expand tilde
-      normalizedPath = path.replace(/^~/, process.env.HOME || '');
-      fileExists = existsSync(normalizedPath);
-      if (!fileExists) {
-        console.warn(`[DELIVERABLE] Warning: File does not exist: ${normalizedPath}`);
-      }
-    }
-
     const db = getDb();
     const id = crypto.randomUUID();
     let linkedSessionId = resolvedSessionId;
@@ -193,42 +182,37 @@ export async function POST(
       if (!sessionExists) linkedSessionId = null;
     }
 
-    // Insert deliverable
+    let storedPath = path || null;
+    let warning: string | undefined;
+
+    if (deliverable_type === 'file' && path) {
+      const resolvedPath = resolveDeliverablePath(db, taskId, path);
+      const safePath = storeDeliverableFile(taskId, id, resolvedPath);
+
+      if (safePath) {
+        storedPath = safePath;
+      } else if (existsSync(resolvedPath)) {
+        storedPath = resolvedPath;
+      } else {
+        storedPath = resolvedPath;
+        warning = `File does not exist at path: ${resolvedPath}. Please create the file.`;
+        console.warn(`[DELIVERABLE] Warning: ${warning}`);
+      }
+    }
+
     db.prepare(`
       INSERT INTO task_deliverables (id, task_id, deliverable_type, title, path, description, session_id)
       VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      id,
-      taskId,
-      deliverable_type,
-      title,
-      path || null,
-      description || null,
-      linkedSessionId
-    );
+    `).run(id, taskId, deliverable_type, title, storedPath, description || null, linkedSessionId);
 
-    // Get the created deliverable
-    const deliverable = db.prepare(`
-      SELECT *
-      FROM task_deliverables
-      WHERE id = ?
-    `).get(id) as TaskDeliverable;
+    const deliverable = db.prepare(
+      'SELECT * FROM task_deliverables WHERE id = ?'
+    ).get(id) as TaskDeliverable;
 
-    // Broadcast to SSE clients
-    broadcast({
-      type: 'deliverable_added',
-      payload: deliverable,
-    });
+    broadcast({ type: 'deliverable_added', payload: deliverable });
 
-    // Return with warning if file doesn't exist
-    if (deliverable_type === 'file' && !fileExists) {
-      return NextResponse.json(
-        {
-          ...deliverable,
-          warning: `File does not exist at path: ${normalizedPath}. Please create the file.`
-        },
-        { status: 201 }
-      );
+    if (warning) {
+      return NextResponse.json({ ...deliverable, warning }, { status: 201 });
     }
 
     return NextResponse.json(deliverable, { status: 201 });

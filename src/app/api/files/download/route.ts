@@ -13,8 +13,8 @@ import { getStoredArtifactByPath } from '@/lib/task-run-results';
 export const dynamic = 'force-dynamic';
 
 // Base directory for all project files - must match upload endpoint
-// Set via PROJECTS_PATH env var (e.g., ~/projects or /var/www/projects)
-const PROJECTS_BASE = (process.env.PROJECTS_PATH || '~/projects').replace(/^~/, process.env.HOME || '');
+// Set via STYRMAN_PROJECTS_PATH env var (e.g., ~/projects or /var/www/projects)
+const PROJECTS_BASE = (process.env.STYRMAN_PROJECTS_PATH || '~/projects').replace(/^~/, process.env.HOME || '');
 
 // MIME types for common file extensions
 const MIME_TYPES: Record<string, string> = {

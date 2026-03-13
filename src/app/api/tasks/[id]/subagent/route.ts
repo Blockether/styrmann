@@ -42,8 +42,8 @@ export async function POST(
 
       if (existingAgent) {
         agentId = existingAgent.id;
-      } else if (process.env.ALLOW_DYNAMIC_AGENTS !== 'false') {
-        // Create temporary sub-agent record (skipped when ALLOW_DYNAMIC_AGENTS=false)
+    } else if (process.env.STYRMAN_ALLOW_DYNAMIC_AGENTS !== 'false') {
+      // Create temporary sub-agent record (skipped when STYRMAN_ALLOW_DYNAMIC_AGENTS=false)
         agentId = crypto.randomUUID();
         db.prepare(`
           INSERT INTO agents (id, name, role, description, status)
@@ -56,7 +56,7 @@ export async function POST(
           'working'
         );
       } else {
-        console.log(`[Subagent] Dynamic agent generation disabled (ALLOW_DYNAMIC_AGENTS=false), skipping creation of sub-agent "${agent_name}"`);
+      console.log(`[Subagent] Dynamic agent generation disabled (STYRMAN_ALLOW_DYNAMIC_AGENTS=false), skipping creation of sub-agent "${agent_name}"`);
       }
     }
 

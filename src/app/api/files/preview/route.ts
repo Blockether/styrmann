@@ -3,6 +3,7 @@ import { readFileSync, existsSync, statSync, realpathSync } from 'fs';
 import path from 'path';
 import { marked } from 'marked';
 import { getStoredArtifactByPath } from '@/lib/task-run-results';
+import { getDeliverableStoreDir } from '@/lib/deliverable-store';
 
 export const dynamic = 'force-dynamic';
 
@@ -143,8 +144,8 @@ export async function GET(request: NextRequest) {
   }
 
   const allowedPaths = [
-    process.env.WORKSPACE_BASE_PATH?.replace(/^~/, process.env.HOME || ''),
-    process.env.PROJECTS_PATH?.replace(/^~/, process.env.HOME || ''),
+    process.env.STYRMAN_PROJECTS_PATH?.replace(/^~/, process.env.HOME || ''),
+    getDeliverableStoreDir(),
   ].filter(Boolean) as string[];
 
   let pathToRead = normalizedPath;

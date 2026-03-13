@@ -1,6 +1,6 @@
 export function createLogger(tag: string) {
   const ts = () => new Date().toISOString().slice(11, 19);
-  const isDebugEnabled = () => process.env.MC_DEBUG === 'true';
+const isDebugEnabled = () => process.env.STYRMAN_DEBUG === 'true';
 
   return {
     debug: (msg: string, ...args: unknown[]) => {

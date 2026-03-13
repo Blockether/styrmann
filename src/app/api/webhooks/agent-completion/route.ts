@@ -12,7 +12,7 @@ export const dynamic = 'force-dynamic';
  * Verify HMAC-SHA256 signature of webhook request
  */
 function verifyWebhookSignature(signature: string, rawBody: string): boolean {
-  const webhookSecret = process.env.WEBHOOK_SECRET;
+  const webhookSecret = process.env.STYRMAN_WEBHOOK_SECRET;
   
   if (!webhookSecret) {
     // Dev mode - skip validation
@@ -51,8 +51,8 @@ export async function POST(request: NextRequest) {
     // Read raw body for signature verification
     const rawBody = await request.text();
     
-    // Verify webhook signature if WEBHOOK_SECRET is set
-    const webhookSecret = process.env.WEBHOOK_SECRET;
+  // Verify webhook signature if STYRMAN_WEBHOOK_SECRET is set
+  const webhookSecret = process.env.STYRMAN_WEBHOOK_SECRET;
     if (webhookSecret) {
       const signature = request.headers.get('x-webhook-signature');
       

@@ -1,10 +1,8 @@
 import { createHmac, timingSafeEqual } from 'crypto';
 
 function getTokenSecrets(): string[] {
-  const candidates = [process.env.MC_API_TOKEN, process.env.MC_TOKEN]
-    .map((value) => (value || '').trim())
-    .filter((value) => value.length > 0);
-  return Array.from(new Set(candidates));
+  const token = (process.env.STYRMAN_API_TOKEN || '').trim();
+  return token.length > 0 ? [token] : [];
 }
 
 export interface ScopedTokenPayload {
@@ -28,7 +26,7 @@ export function generateScopedApiToken(input: {
   const secrets = getTokenSecrets();
   const primarySecret = secrets[0];
   if (!primarySecret) {
-    throw new Error('MC_API_TOKEN (or MC_TOKEN) is required to generate scoped API tokens');
+  throw new Error('STYRMAN_API_TOKEN is required to generate scoped API tokens');
   }
 
   const now = Math.floor(Date.now() / 1000);

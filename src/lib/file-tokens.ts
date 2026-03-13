@@ -5,8 +5,7 @@
  */
 import { createHmac, randomBytes, timingSafeEqual } from 'crypto';
 
-// Use MC_API_TOKEN as signing key when available, otherwise generate ephemeral secret
-const FILE_TOKEN_SECRET = process.env.MC_API_TOKEN || randomBytes(32).toString('hex');
+const FILE_TOKEN_SECRET = process.env.STYRMAN_API_TOKEN || randomBytes(32).toString('hex');
 
 /**
  * Generate a signed token for accessing a specific workspace file.

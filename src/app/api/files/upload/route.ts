@@ -12,8 +12,8 @@ import path from 'path';
 export const dynamic = 'force-dynamic';
 
 // Base directory for all uploaded project files
-// Set via PROJECTS_PATH env var (e.g., ~/projects or /var/www/projects)
-const PROJECTS_BASE = (process.env.PROJECTS_PATH || '~/projects').replace(/^~/, process.env.HOME || '');
+// Set via STYRMAN_PROJECTS_PATH env var (e.g., ~/projects or /var/www/projects)
+const PROJECTS_BASE = (process.env.STYRMAN_PROJECTS_PATH || '~/projects').replace(/^~/, process.env.HOME || '');
 
 interface UploadRequest {
   // Path relative to PROJECTS_BASE (e.g., "dashboard-redesign/index.html")

@@ -67,12 +67,12 @@ export function resetConfig(): void {
 
 export function getMissionControlUrl(): string {
   if (typeof window === 'undefined') {
-    return process.env.MISSION_CONTROL_URL || process.env.MISSION_CONTROL_PUBLIC_URL || 'https://control.blockether.com';
+  return process.env.STYRMAN_URL || 'https://control.blockether.com';
   }
 
   return getConfig().missionControlUrl;
 }
 
 export function getProjectsPath(): string {
-  return process.env.PROJECTS_PATH || '/root/repos';
+  return process.env.STYRMAN_PROJECTS_PATH || '/root/repos';
 }

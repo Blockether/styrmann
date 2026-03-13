@@ -12,7 +12,7 @@ interface AgentInfo {
 }
 
 
-const STALE_THRESHOLD_MS = Number.parseInt(process.env.MC_AGENT_STALE_THRESHOLD_MS || '3600000', 10);
+const STALE_THRESHOLD_MS = 3_600_000;
 
 export function startHeartbeat(config: DaemonConfig, stats: DaemonStats): () => void {
   async function tick() {

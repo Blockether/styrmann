@@ -617,7 +617,7 @@ const migrations: Migration[] = [
       console.log('[Migration 013] Strict template is now default with reviewer role');
 
       // 4. Bootstrap core agents globally (default workspace)
-      const missionControlUrl = process.env.MISSION_CONTROL_URL || 'http://localhost:4000';
+  const missionControlUrl = process.env.STYRMAN_URL || 'http://localhost:4000';
       bootstrapCoreAgentsRaw(db, missionControlUrl);
 
       console.log('[Migration 013] Fresh start complete');
@@ -2000,7 +2000,7 @@ const migrations: Migration[] = [
     name: 'bootstrap_presenter_agent',
     up: (db) => {
       // Agents are global — bootstrap once into 'default', not per-workspace.
-      const missionControlUrl = process.env.MISSION_CONTROL_URL || 'http://localhost:4000';
+  const missionControlUrl = process.env.STYRMAN_URL || 'http://localhost:4000';
       bootstrapCoreAgentsRaw(db, missionControlUrl);
     }
   },

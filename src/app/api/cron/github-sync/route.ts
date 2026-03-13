@@ -36,7 +36,7 @@ interface GhIssue {
 
 export async function GET(request: NextRequest) {
   const authHeader = request.headers.get('authorization');
-  const apiToken = process.env.MC_API_TOKEN;
+  const apiToken = process.env.STYRMAN_API_TOKEN;
 
   if (apiToken && authHeader !== `Bearer ${apiToken}`) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });

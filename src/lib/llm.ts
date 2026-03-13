@@ -6,8 +6,7 @@
  *  2. ANTHROPIC_API_KEY env var  → Anthropic Messages API
  *  3. ~/.opencode/config.json  → first provider with apiKey + models
  *
- * Override model:  PLANNING_MODEL env var (default: cheapest fast model).
- * Override timeout: PLANNING_LLM_TIMEOUT_MS env var (default: 25000).
+ * Model: cheapest fast model per provider (gpt-4o-mini / claude-haiku-4-5).
  */
 
 import { existsSync, readFileSync, statSync } from 'fs';
@@ -36,11 +35,11 @@ interface ProviderEntry {
 // Config resolution
 // ---------------------------------------------------------------------------
 
-const TIMEOUT_MS = Number(process.env.PLANNING_LLM_TIMEOUT_MS) || 25_000;
+const TIMEOUT_MS = 25_000;
 const MAX_CONFIG_BYTES = 1024 * 1024;
 
 function resolveProvider(): LlmProviderConfig | null {
-  const overrideModel = process.env.PLANNING_MODEL;
+const overrideModel: string | undefined = undefined;
 
   // 1. OpenAI env var (preferred default)
   if (process.env.OPENAI_API_KEY) {

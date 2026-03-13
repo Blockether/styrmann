@@ -4,8 +4,8 @@ const log = createLogger('bridge');
 
 export function getConfig() {
   return {
-    mcUrl: (process.env.MC_URL || process.env.MISSION_CONTROL_PUBLIC_URL || 'https://control.blockether.com').replace(/\/$/, ''),
-    mcToken: process.env.MC_API_TOKEN || process.env.MC_TOKEN || '',
+  mcUrl: (process.env.STYRMAN_URL || 'https://control.blockether.com').replace(/\/$/, ''),
+  mcToken: process.env.STYRMAN_API_TOKEN || '',
   };
 }
 

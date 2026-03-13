@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 // Log warning at startup if auth is disabled
-const MC_API_TOKEN = process.env.MC_API_TOKEN?.trim() || '';
-if (!MC_API_TOKEN) {
-  console.warn('[SECURITY WARNING] MC_API_TOKEN not set - API authentication is DISABLED (local dev mode)');
+const STYRMAN_API_TOKEN = process.env.STYRMAN_API_TOKEN?.trim() || '';
+if (!STYRMAN_API_TOKEN) {
+  console.warn('[SECURITY WARNING] STYRMAN_API_TOKEN not set - API authentication is DISABLED (local dev mode)');
 }
 
 /**
@@ -64,10 +64,8 @@ type ScopedPayload = {
 };
 
 function getScopedSigningSecrets(): string[] {
-  const candidates = [process.env.MC_API_TOKEN, process.env.MC_TOKEN]
-    .map((value) => (value || '').trim())
-    .filter((value) => value.length > 0);
-  return Array.from(new Set(candidates));
+  const token = (process.env.STYRMAN_API_TOKEN || '').trim();
+  return token.length > 0 ? [token] : [];
 }
 
 function extractBearerToken(authHeader: string | null): string | null {
@@ -182,8 +180,8 @@ async function isScopedTokenAuthorized(
 }
 
 // Demo mode — read-only, blocks all mutations
-const DEMO_MODE = process.env.DEMO_MODE === 'true';
-if (DEMO_MODE) {
+const STYRMAN_DEMO_MODE = process.env.STYRMAN_DEMO_MODE === 'true';
+if (STYRMAN_DEMO_MODE) {
   console.log('[DEMO] Running in demo mode — all write operations are blocked');
 }
 
@@ -193,7 +191,7 @@ export async function proxy(request: NextRequest) {
   // Only protect /api/* routes
   if (!pathname.startsWith('/api/')) {
     // Add demo mode header for UI detection
-    if (DEMO_MODE) {
+if (STYRMAN_DEMO_MODE) {
       const response = NextResponse.next();
       response.headers.set('X-Demo-Mode', 'true');
       return response;
@@ -202,7 +200,7 @@ export async function proxy(request: NextRequest) {
   }
 
   // Demo mode: block all write operations
-  if (DEMO_MODE) {
+if (STYRMAN_DEMO_MODE) {
     const method = request.method.toUpperCase();
     if (method !== 'GET' && method !== 'HEAD' && method !== 'OPTIONS') {
       return NextResponse.json(
@@ -213,8 +211,8 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // If MC_API_TOKEN is not set, auth is disabled (dev mode)
-  if (!MC_API_TOKEN) {
+  // If STYRMAN_API_TOKEN is not set, auth is disabled (dev mode)
+  if (!STYRMAN_API_TOKEN) {
     return NextResponse.next();
   }
 
@@ -227,7 +225,7 @@ export async function proxy(request: NextRequest) {
   if (pathname === '/api/events/stream') {
     const queryToken = request.nextUrl.searchParams.get('token');
     const scoped = queryToken ? await isScopedTokenAuthorized(request, queryToken) : { ok: false };
-    if (queryToken && (queryToken === MC_API_TOKEN || scoped.ok)) {
+  if (queryToken && (queryToken === STYRMAN_API_TOKEN || scoped.ok)) {
       return NextResponse.next();
     }
     // Fall through to header check below
@@ -245,7 +243,7 @@ export async function proxy(request: NextRequest) {
     );
   }
 
-  if (token !== MC_API_TOKEN) {
+  if (token !== STYRMAN_API_TOKEN) {
     const scoped = await isScopedTokenAuthorized(request, token);
     if (scoped.ok) {
       return NextResponse.next();

@@ -62,8 +62,8 @@ interface TestResponse {
   newStatus?: string;
 }
 
-// Screenshots stored in projects directory - set via PROJECTS_PATH env var
-const SCREENSHOTS_DIR = ((process.env.PROJECTS_PATH || '~/projects').replace(/^~/, process.env.HOME || '')) + '/.screenshots';
+// Screenshots stored in projects directory - set via STYRMAN_PROJECTS_PATH env var
+const SCREENSHOTS_DIR = ((process.env.STYRMAN_PROJECTS_PATH || '~/projects').replace(/^~/, process.env.HOME || '')) + '/.screenshots';
 
 /**
  * POST /api/tasks/[id]/test

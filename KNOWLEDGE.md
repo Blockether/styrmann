@@ -496,20 +496,20 @@ When a task is created from a GitHub issue:
 
 ## Authentication
 
-When `MC_API_TOKEN` is set in `.env.local`:
+When `STYRMAN_API_TOKEN` is set in `.env.local`:
 - Same-origin browser requests bypass auth.
 - All non-browser API access requires Bearer auth (no localhost bypass).
 - Scoped per-task tokens (`mcst.<payload>.<sig>`) are supported and enforced at middleware level:
   - task-scoped read/write (`task:{id}:read`, `task:{id}:write`)
   - optional task list/create (`tasks:read`, `tasks:create`)
   - OpenClaw session endpoints are scoped by `session_id` in the token payload (`/api/openclaw/sessions/{id}` and `/api/openclaw/sessions/{id}/history`) and additionally require task scope (`task:{id}:read`/`task:{id}:write`)
-- Scoped token signing/verification uses configured API secrets only (`MC_API_TOKEN` / `MC_TOKEN`) and supports cross-checking both configured values to avoid env-order mismatches.
+- Scoped token signing/verification uses `STYRMAN_API_TOKEN`.
 - Bearer parsing is normalized (trims whitespace, handles duplicated `Bearer`, strips quote wrappers) before scoped verification.
 - Invalid scoped token => `401 invalid_token`; missing scope => `403 insufficient_scope` with loopback guidance to `/api/tasks/{id}/fail`.
 - SSE streams accept token as query parameter.
 - Implemented in `middleware.ts` + `src/proxy.ts`.
 
-Webhook verification: `WEBHOOK_SECRET` env var, HMAC signature in `x-webhook-signature` header.
+Webhook verification: `STYRMAN_WEBHOOK_SECRET` env var, HMAC signature in `x-webhook-signature` header.
 
 ---
 
@@ -596,7 +596,7 @@ Webhook verification: `WEBHOOK_SECRET` env var, HMAC signature in `x-webhook-sig
 
 Agents without direct filesystem access use upload/download endpoints:
 
-- `POST /api/files/upload` -- `{ relativePath, content, encoding }` -> saves to `$PROJECTS_PATH/{relativePath}`
+- `POST /api/files/upload` -- `{ relativePath, content, encoding }` -> saves to `$STYRMAN_PROJECTS_PATH/{relativePath}`
 - `GET /api/files/download?relativePath=...` -- Returns file content (JSON or raw with `&raw=true`)
 - `POST /api/files/reveal` -- Opens file in system file manager
 
@@ -628,14 +628,11 @@ Agents without direct filesystem access use upload/download endpoints:
 |----------|----------|---------|---------|
 | `OPENCLAW_GATEWAY_URL` | Yes | `ws://127.0.0.1:18789` | WebSocket URL to OpenClaw Gateway |
 | `OPENCLAW_GATEWAY_TOKEN` | Yes | -- | Auth token for OpenClaw |
-| `MC_API_TOKEN` | No | -- | API auth token (enables Bearer auth) |
-| `WEBHOOK_SECRET` | No | -- | HMAC secret for webhook verification |
-| `DATABASE_PATH` | No | `./mission-control.db` | SQLite database path |
-| `WORKSPACE_BASE_PATH` | No | `~/Documents/Shared` | Base workspace directory |
-| `PROJECTS_PATH` | No | `/root/repos` | Repos base directory — scanned for `{org}/{repo}` git repos, auto-discovered as workspaces |
-| `MISSION_CONTROL_URL` | No | auto-detected | API URL for agent callbacks |
-| `MC_AGENT_STALE_THRESHOLD_MS` | No | `3600000` | Daemon heartbeat threshold before considering a working agent stale (requires no active subagent session) |
-| `DEMO_MODE` | No | -- | Enables read-only demo mode |
+| `STYRMAN_API_TOKEN` | No | -- | API auth token (enables Bearer auth) |
+| `STYRMAN_WEBHOOK_SECRET` | No | -- | HMAC secret for webhook verification |
+| `STYRMAN_DATABASE_PATH` | No | `./mission-control.db` | SQLite database path |
+| `STYRMAN_PROJECTS_PATH` | No | `/root/repos` | Repos base directory — scanned for `{org}/{repo}` git repos, auto-discovered as workspaces |
+| `STYRMAN_URL` | No | auto-detected | API URL for agent callbacks |
 
 ---
 
@@ -675,10 +672,10 @@ The daemon is a standalone Node.js process with nine modules:
 
 | Module | Interval | Purpose |
 |--------|----------|---------|
-| **heartbeat** | 30s | Polls `/api/agents` and active subagent sessions; stale working agents are set to standby only when they exceed `MC_AGENT_STALE_THRESHOLD_MS` (default 60m) and have no active subagent session |
+| **heartbeat** | 30s | Polls `/api/agents` and active subagent sessions; stale working agents are set to standby after 60m inactivity with no active subagent session |
 | **dispatcher** | 10s | Polls `/api/tasks?status=assigned`, auto-dispatches each via `POST /api/tasks/{id}/dispatch` |
 | **scheduler** | 10s | Runs registered `ScheduledJob` entries on interval. Job registry starts empty — no hardcoded jobs |
-| **recovery** | 60s | Polls recoverable statuses (`assigned`, `in_progress`, `testing`, `verification`, `review`), detects stale work (default 20m via `MC_STALLED_TASK_THRESHOLD_MS`), marks stale active sessions as `interrupted`, then attempts continuation by re-dispatching to the assignee; on conflict or offline assignee, reassigns to the default orchestrator |
+| **recovery** | 60s | Polls recoverable statuses (`assigned`, `in_progress`, `testing`, `verification`, `review`), detects stale work (20m threshold), marks stale active sessions as `interrupted`, then attempts continuation by re-dispatching to the assignee; on conflict or offline assignee, reassigns to the default orchestrator |
 | **autotrain** | 30s | Polls completed `autotrain` tasks and reopens them for the next repo-improvement iteration until stop/max-iteration conditions are hit |
 | **health** | 60s | Pings MC to verify API is reachable, logs connection changes |
 | **router** | SSE stream | Subscribes to `/api/events/stream`, routes events (e.g., logs task assignments for dispatcher awareness) |
@@ -698,7 +695,7 @@ npm run daemon
 npm run daemon:dev
 ```
 
-Env vars: `MC_URL` (default `https://control.blockether.com`), `MC_API_TOKEN` (required — same token used by `mc` CLI), `MC_STALLED_TASK_THRESHOLD_MS` (default `1800000`), `MC_STALLED_TASK_COOLDOWN_MS` (default `600000`).
+Env vars: `STYRMAN_URL` (default `https://control.blockether.com`), `STYRMAN_API_TOKEN` (required).
 
 ### Database Tables
 
@@ -715,7 +712,7 @@ The dispatch module includes a **concurrent session guard**: before creating a n
 
 ### Broadcast Endpoint
 
-`POST /api/events/broadcast` — accepts `{type, payload}` and broadcasts to all connected SSE clients. Protected by the existing middleware auth (`MC_API_TOKEN`). Used by the daemon to push real-time updates from a separate process that can't access the in-memory SSE client set directly.
+`POST /api/events/broadcast` — accepts `{type, payload}` and broadcasts to all connected SSE clients. Protected by the existing middleware auth (`STYRMAN_API_TOKEN`). Used by the daemon to push real-time updates from a separate process that can't access the in-memory SSE client set directly.
 
 ### Agent Logs (OpenClaw Transcripts)
 

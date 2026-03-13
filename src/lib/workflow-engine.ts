@@ -301,7 +301,7 @@ export async function handleStageTransition(
   // Dispatch to the agent
   const missionControlUrl = getMissionControlUrl();
   try {
-    const internalToken = process.env.MC_API_TOKEN?.trim();
+    const internalToken = process.env.STYRMAN_API_TOKEN?.trim();
     const headers: Record<string, string> = {};
     if (internalToken) {
       headers.Authorization = `Bearer ${internalToken}`;

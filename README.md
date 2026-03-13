@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/Blockether/styrmann/main/logo.png" alt="Styrmann logo" width="220" />
+  <img src="https://raw.githubusercontent.com/Blockether/styrmann/main/logo.png" alt="Styrmann logo" width="320" />
 </p>
 
 <div align="center">
@@ -48,8 +48,8 @@ cp .env.example .env.local
 Configure `.env.local`:
 
 ```env
-MC_API_TOKEN=optional-api-token
-WEBHOOK_SECRET=optional-webhook-secret
+STYRMAN_API_TOKEN=optional-api-token
+STYRMAN_WEBHOOK_SECRET=optional-webhook-secret
 ```
 
 Run locally:
@@ -66,7 +66,7 @@ Open `http://localhost:4000`.
 Browser (SSE)
   -> Styrmann (Next.js, React, TypeScript)
   -> SQLite state + workflow engine
-  -> OpenCode ACP (Agent Communication Protocol)
+  -> OpenCode (opencode run)
   -> Model providers
 ```
 
@@ -92,9 +92,11 @@ Core stack:
 
 | Variable | Required | Description |
 |----------|:--------:|-------------|
-| `MC_API_TOKEN` | No | API Bearer auth token |
-| `WEBHOOK_SECRET` | No | HMAC verification secret |
-| `DATABASE_PATH` | No | SQLite path (default: `./styrmann.db`) |
+| `STYRMAN_API_TOKEN` | No | API Bearer auth token |
+| `STYRMAN_DATABASE_PATH` | No | SQLite path (default: `./styrmann.db`) |
+| `STYRMAN_PROJECTS_PATH` | No | Repos base directory (default: `/root/repos`) |
+| `STYRMAN_URL` | No | Server URL (auto-detected) |
+| `STYRMAN_WEBHOOK_SECRET` | No | HMAC verification secret |
 
 ## Documentation
 

@@ -10,8 +10,8 @@ interface NotifyPayload {
 }
 
 export function notify(payload: NotifyPayload): void {
-  const scriptPath = process.env.MC_NOTIFY_SCRIPT;
-  const webhookUrl = process.env.MC_NOTIFY_WEBHOOK;
+  const scriptPath = process.env.STYRMAN_NOTIFY_SCRIPT;
+  const webhookUrl = process.env.STYRMAN_NOTIFY_WEBHOOK;
 
   if (scriptPath) {
     try {
@@ -40,9 +40,9 @@ export function notify(payload: NotifyPayload): void {
 
 export function getNotifyStatus(): { script_configured: boolean; script_path: string | null; webhook_configured: boolean; webhook_url: string | null } {
   return {
-    script_configured: Boolean(process.env.MC_NOTIFY_SCRIPT),
-    script_path: process.env.MC_NOTIFY_SCRIPT || null,
-    webhook_configured: Boolean(process.env.MC_NOTIFY_WEBHOOK),
-    webhook_url: process.env.MC_NOTIFY_WEBHOOK || null,
+    script_configured: Boolean(process.env.STYRMAN_NOTIFY_SCRIPT),
+    script_path: process.env.STYRMAN_NOTIFY_SCRIPT || null,
+    webhook_configured: Boolean(process.env.STYRMAN_NOTIFY_WEBHOOK),
+    webhook_url: process.env.STYRMAN_NOTIFY_WEBHOOK || null,
   };
 }

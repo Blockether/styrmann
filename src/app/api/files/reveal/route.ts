@@ -30,8 +30,7 @@ export async function POST(request: NextRequest) {
 
     // Security: Ensure path is within allowed directories (from env config)
     const allowedPaths = [
-      process.env.WORKSPACE_BASE_PATH?.replace(/^~/, process.env.HOME || ''),
-      process.env.PROJECTS_PATH?.replace(/^~/, process.env.HOME || ''),
+      process.env.STYRMAN_PROJECTS_PATH?.replace(/^~/, process.env.HOME || ''),
     ].filter(Boolean) as string[];
 
     const normalizedPath = path.normalize(expandedPath);
