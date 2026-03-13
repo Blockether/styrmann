@@ -116,22 +116,19 @@ export async function PATCH(
   }
 }
 
-// DELETE /api/workspaces/[id] - Delete a workspace
 export async function DELETE(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  
+
   try {
     const db = getDb();
-    
-    // Don't allow deleting internal system repositories
+
     if (id === 'default') {
       return NextResponse.json({ error: 'Cannot delete the system meta repository' }, { status: 403 });
     }
 
-    // Check workspace exists
     const existing = db.prepare('SELECT * FROM workspaces WHERE id = ?').get(id) as Workspace | undefined;
     if (!existing) {
       return NextResponse.json({ error: 'Workspace not found' }, { status: 404 });
@@ -140,23 +137,45 @@ export async function DELETE(
     if (existing.is_internal) {
       return NextResponse.json({ error: 'Cannot delete internal system repositories' }, { status: 403 });
     }
-    
-    // Check if workspace has tasks
-    const taskCount = db.prepare(
-      'SELECT COUNT(*) as count FROM tasks WHERE workspace_id = ?'
-    ).get(id) as { count: number };
-    
-    
-    if (taskCount.count > 0) {
-      return NextResponse.json({
-        error: 'Cannot delete workspace with existing tasks',
-        taskCount: taskCount.count
-      }, { status: 400 });
-    }
-    
-    db.prepare('DELETE FROM workspaces WHERE id = ?').run(id);
-    
-    return NextResponse.json({ success: true });
+
+    const taskIds = db.prepare('SELECT id FROM tasks WHERE workspace_id = ?').all(id) as { id: string }[];
+    const ids = taskIds.map(t => t.id);
+
+    const cascade = db.transaction(() => {
+      for (const taskId of ids) {
+        db.prepare('DELETE FROM task_run_screenshots WHERE task_id = ?').run(taskId);
+        db.prepare('DELETE FROM task_run_results WHERE task_id = ?').run(taskId);
+        db.prepare('DELETE FROM task_acceptance_criteria WHERE task_id = ?').run(taskId);
+        db.prepare('DELETE FROM task_deliverables WHERE task_id = ?').run(taskId);
+        db.prepare('DELETE FROM task_activities WHERE task_id = ?').run(taskId);
+        db.prepare('DELETE FROM task_resources WHERE task_id = ?').run(taskId);
+        db.prepare('DELETE FROM task_artifacts WHERE task_id = ?').run(taskId);
+        db.prepare('DELETE FROM task_comments WHERE task_id = ?').run(taskId);
+        db.prepare('DELETE FROM task_blockers WHERE task_id = ?').run(taskId);
+        db.prepare('DELETE FROM task_dependencies WHERE task_id = ? OR depends_on_task_id = ?').run(taskId, taskId);
+        db.prepare('DELETE FROM task_tags WHERE task_id = ?').run(taskId);
+        db.prepare('DELETE FROM task_roles WHERE task_id = ?').run(taskId);
+        db.prepare('DELETE FROM agent_sessions WHERE task_id = ?').run(taskId);
+        db.prepare('DELETE FROM planning_questions WHERE task_id = ?').run(taskId);
+      }
+      db.prepare('DELETE FROM task_workflow_plans WHERE workspace_id = ?').run(id);
+      db.prepare('DELETE FROM task_findings WHERE workspace_id = ?').run(id);
+      db.prepare('DELETE FROM capability_proposals WHERE workspace_id = ?').run(id);
+      db.prepare('DELETE FROM tasks WHERE workspace_id = ?').run(id);
+      db.prepare('DELETE FROM milestone_dependencies WHERE milestone_id IN (SELECT id FROM milestones WHERE workspace_id = ?)').run(id);
+      db.prepare('DELETE FROM milestones WHERE workspace_id = ?').run(id);
+      db.prepare('DELETE FROM sprints WHERE workspace_id = ?').run(id);
+      db.prepare('DELETE FROM tags WHERE workspace_id = ?').run(id);
+      db.prepare('DELETE FROM github_issues WHERE workspace_id = ?').run(id);
+      db.prepare('DELETE FROM workflow_templates WHERE workspace_id = ?').run(id);
+      db.prepare('DELETE FROM events WHERE task_id IN (SELECT id FROM tasks WHERE workspace_id = ?)').run(id);
+      db.prepare('DELETE FROM acp_bindings WHERE workspace_id = ?').run(id);
+      db.prepare('DELETE FROM workspaces WHERE id = ?').run(id);
+    });
+
+    cascade();
+
+    return NextResponse.json({ success: true, deleted_tasks: ids.length });
   } catch (error) {
     console.error('Failed to delete workspace:', error);
     return NextResponse.json({ error: 'Failed to delete workspace' }, { status: 500 });

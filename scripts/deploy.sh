@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Blockether Mission Control - Build & Deploy
+# Styrmann - Build & Deploy
 # Usage: ./scripts/deploy.sh [--skip-build] [--no-restart]
 
 RED='\033[0;31m'
@@ -11,7 +11,7 @@ CYAN='\033[0;36m'
 NC='\033[0m'
 BOLD='\033[1m'
 
-PROJECT_DIR="/root/repos/blockether/mission-control"
+PROJECT_DIR="/root/repos/blockether/styrmann"
 WEB_SERVICE="mission-control"
 DAEMON_SERVICE="mission-control-daemon"
 LOG_FILE="${PROJECT_DIR}/.next/deploy.log"
@@ -43,7 +43,7 @@ TOTAL=5
 ERRORS=0
 WARNINGS=0
 
-echo -e "${BOLD}Blockether Mission Control - Deploy${NC}"
+echo -e "${BOLD}Styrmann - Deploy${NC}"
 echo "================================================"
 
 # ── Step 1: Build ────────────────────────────────────────────
