@@ -151,20 +151,11 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated, initia
     ...(form.role && !DEFAULT_AGENT_ROLE_OPTIONS.includes(form.role as typeof DEFAULT_AGENT_ROLE_OPTIONS[number]) ? [form.role] : []),
   ]));
 
-  // Load available models from OpenClaw config
   useEffect(() => {
     const loadModels = async () => {
       try {
-        const res = await fetch('/api/openclaw/models');
-        if (res.ok) {
-          const data = await res.json();
-          setAvailableModels(data.availableModels || []);
-          setDefaultModel(data.defaultModel || '');
-          // If agent has no model set, use default
-          if (!agent?.model && data.defaultModel) {
-            setForm(prev => ({ ...prev, model: data.defaultModel }));
-          }
-        }
+        setAvailableModels([]);
+        setDefaultModel('');
       } catch (error) {
         console.error('Failed to load models:', error);
       } finally {
@@ -210,7 +201,7 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated, initia
         }
       } catch (error) {
         if (!cancelled) {
-          setWorkspaceError(error instanceof Error ? error.message : 'We could not load this OpenClaw workspace. Please try again.');
+          setWorkspaceError(error instanceof Error ? error.message : 'We could not load this agent workspace. Please try again.');
         }
       } finally {
         if (!cancelled) {

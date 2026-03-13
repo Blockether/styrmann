@@ -486,8 +486,8 @@ export function SystemPanel({ embedded = false }: SystemPanelProps) {
 
                   <div className="border-t border-mc-border pt-4 space-y-4">
                     {(() => {
-                      const systemChecks = validationResult.checks.filter(c => c.category !== 'openclaw');
-                      const openclawChecks = validationResult.checks.filter(c => c.category === 'openclaw');
+                      const systemChecks = validationResult.checks.filter(c => c.category !== 'agent');
+                      const agentChecks = validationResult.checks.filter(c => c.category === 'agent');
 
                       const renderCheckItem = (check: ValidationCheck) => {
                         const isRepairing = repairingChecks.has(check.name);
@@ -545,11 +545,11 @@ export function SystemPanel({ embedded = false }: SystemPanelProps) {
                               </div>
                             </div>
                           )}
-                          {openclawChecks.length > 0 && (
+                          {agentChecks.length > 0 && (
                             <div>
-                              <h4 className="text-xs font-medium text-mc-text-secondary uppercase tracking-wide mb-2">OpenClaw Doctor</h4>
+                              <h4 className="text-xs font-medium text-mc-text-secondary uppercase tracking-wide mb-2">Agent Health</h4>
                               <div className="space-y-2">
-                                {openclawChecks.map(renderCheckItem)}
+                                {agentChecks.map(renderCheckItem)}
                               </div>
                             </div>
                           )}

@@ -2,7 +2,7 @@
 
 import { create } from 'zustand';
 import { debug } from './debug';
-import type { Agent, Task, Conversation, Message, Event, TaskStatus, OpenClawSession } from './types';
+import type { Agent, Task, Conversation, Message, Event, TaskStatus, AgentSession } from './types';
 
 interface MissionControlState {
   // Data
@@ -13,9 +13,8 @@ interface MissionControlState {
   currentConversation: Conversation | null;
   messages: Message[];
 
-  // OpenClaw state
-  agentOpenClawSessions: Record<string, OpenClawSession | null>; // agentId -> session
-  openclawMessages: Message[]; // Messages from OpenClaw (displayed alongside regular messages)
+  agentSessions: Record<string, AgentSession | null>;
+  agentMessages: Message[];
 
   // UI State
   selectedAgent: Agent | null;
@@ -47,10 +46,9 @@ interface MissionControlState {
   updateAgent: (agent: Agent) => void;
   addAgent: (agent: Agent) => void;
 
-  // OpenClaw actions
-  setAgentOpenClawSession: (agentId: string, session: OpenClawSession | null) => void;
-  setOpenclawMessages: (messages: Message[]) => void;
-  addOpenclawMessage: (message: Message) => void;
+  setAgentSession: (agentId: string, session: AgentSession | null) => void;
+  setAgentMessages: (messages: Message[]) => void;
+  addAgentMessage: (message: Message) => void;
 }
 
 export const useMissionControl = create<MissionControlState>((set) => ({
@@ -61,8 +59,8 @@ export const useMissionControl = create<MissionControlState>((set) => ({
   events: [],
   currentConversation: null,
   messages: [],
-  agentOpenClawSessions: {},
-  openclawMessages: [],
+  agentSessions: {},
+  agentMessages: [],
   selectedAgent: null,
   selectedTask: null,
   selectedSprintId: null,
@@ -151,12 +149,11 @@ export const useMissionControl = create<MissionControlState>((set) => ({
     })),
   addAgent: (agent) => set((state) => ({ agents: [...state.agents, agent] })),
 
-  // OpenClaw actions
-  setAgentOpenClawSession: (agentId, session) =>
+  setAgentSession: (agentId: string, session: AgentSession | null) =>
     set((state) => ({
-      agentOpenClawSessions: { ...state.agentOpenClawSessions, [agentId]: session },
+      agentSessions: { ...state.agentSessions, [agentId]: session },
     })),
-  setOpenclawMessages: (messages) => set({ openclawMessages: messages }),
-  addOpenclawMessage: (message) =>
-    set((state) => ({ openclawMessages: [...state.openclawMessages, message] })),
+  setAgentMessages: (messages: Message[]) => set({ agentMessages: messages }),
+  addAgentMessage: (message: Message) =>
+    set((state) => ({ agentMessages: [...state.agentMessages, message] })),
 }));

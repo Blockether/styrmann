@@ -45,9 +45,7 @@ export interface Agent {
   source: AgentSource;
   gateway_agent_id?: string;
   session_key_prefix?: string;
-  /** Absolute path to the OpenClaw agent config directory */
   agent_dir?: string;
-  /** Absolute path to the OpenClaw agent workspace directory (contains AGENTS.md and optional identity files) */
   agent_workspace_path?: string;
   /** Number of active tasks (assigned, in_progress, testing, review, verification) */
   active_task_count?: number;
@@ -427,7 +425,7 @@ export interface TaskRole {
   agent?: Agent;
 }
 
-export interface OpenClawSession {
+export interface AgentSession {
   id: string;
   agent_id: string;
   openclaw_session_id: string;
@@ -439,6 +437,8 @@ export interface OpenClawSession {
   created_at: string;
   updated_at: string;
 }
+
+export type OpenClawSession = AgentSession;
 
 export type ActivityType = 'spawned' | 'updated' | 'completed' | 'file_created' | 'status_changed' | 'dispatch_invocation' | 'test_passed' | 'test_failed' | 'activity_summary';
 
@@ -607,8 +607,7 @@ export interface SendMessageRequest {
   metadata?: string;
 }
 
-// OpenClaw WebSocket message types
-export interface OpenClawMessage {
+export interface AgentMessage {
   id?: number;
   method?: string;
   params?: Record<string, unknown>;
@@ -616,7 +615,7 @@ export interface OpenClawMessage {
   error?: { code: number; message: string };
 }
 
-export interface OpenClawSessionInfo {
+export interface AgentSessionInfo {
   id: string;
   channel: string;
   peer?: string;
@@ -624,12 +623,15 @@ export interface OpenClawSessionInfo {
   status: string;
 }
 
-// OpenClaw history message format (from Gateway)
-export interface OpenClawHistoryMessage {
+export interface AgentHistoryMessage {
   role: 'user' | 'assistant' | 'system';
   content: string;
   timestamp?: string;
 }
+
+export type OpenClawMessage = AgentMessage;
+export type OpenClawSessionInfo = AgentSessionInfo;
+export type OpenClawHistoryMessage = AgentHistoryMessage;
 
 export type AgentLogRole = 'user' | 'assistant' | 'system';
 
@@ -647,10 +649,11 @@ export interface AgentLog {
   agent_role?: string;
 }
 
-// Agent with OpenClaw session info (extended for UI use)
-export interface AgentWithOpenClaw extends Agent {
-  openclawSession?: OpenClawSession | null;
+export interface AgentWithSession extends Agent {
+  agentSession?: AgentSession | null;
 }
+
+export type AgentWithOpenClaw = AgentWithSession;
 
 // Real-time SSE event types
 export type SSEEventType =
@@ -695,8 +698,7 @@ export interface ValidationCheck {
   repairable?: boolean;
   /** Prompt to send to the repair agent describing what to fix */
   repair_prompt?: string;
-  /** Category grouping for display (e.g. 'system', 'openclaw') */
-  category?: 'system' | 'openclaw';
+  category?: 'system' | 'agent';
 }
 
 export interface ValidationResult {

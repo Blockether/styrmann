@@ -11,39 +11,21 @@ interface AgentInfo {
   updated_at?: string;
 }
 
-interface SessionInfo {
-  agent_id?: string;
-  status?: string;
-}
 
 const STALE_THRESHOLD_MS = Number.parseInt(process.env.MC_AGENT_STALE_THRESHOLD_MS || '3600000', 10);
 
 export function startHeartbeat(config: DaemonConfig, stats: DaemonStats): () => void {
   async function tick() {
     try {
-      const [agentsRes, sessionsRes] = await Promise.all([
-        mcFetch('/api/agents'),
-        mcFetch('/api/openclaw/sessions?session_type=subagent&status=active'),
-      ]);
+      const agentsRes = await mcFetch('/api/agents');
 
       if (!agentsRes.ok) {
         log.warn(`Failed to fetch agents: ${agentsRes.status}`);
         return;
       }
 
-      if (!sessionsRes.ok) {
-        log.warn(`Failed to fetch active sessions: ${sessionsRes.status}`);
-        return;
-      }
-
       const agents: AgentInfo[] = await agentsRes.json();
-      const activeSessionsRaw = await sessionsRes.json();
-      const activeSessions = (Array.isArray(activeSessionsRaw) ? activeSessionsRaw : []) as SessionInfo[];
-      const activeSessionAgentIds = new Set(
-        activeSessions
-          .filter((session) => session.status === 'active' && typeof session.agent_id === 'string')
-          .map((session) => session.agent_id as string),
-      );
+      const activeSessionAgentIds = new Set<string>();
       const working = agents.filter(a => a.status === 'working');
       const standby = agents.filter(a => a.status === 'standby');
 

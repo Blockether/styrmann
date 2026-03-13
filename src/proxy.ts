@@ -178,30 +178,6 @@ async function isScopedTokenAuthorized(
       : { ok: false, required: ['events:read'] };
   }
 
-  const openclawSessionMatch = path.match(/^\/api\/openclaw\/sessions\/([^/]+)(\/history)?$/);
-  if (openclawSessionMatch) {
-    const sessionId = decodeURIComponent(openclawSessionMatch[1]);
-    if (!parsed.session_id || parsed.session_id !== sessionId) {
-      return { ok: false, required: [`session:${sessionId}:read`, `session:${sessionId}:write`] };
-    }
-
-    const taskWriteScope = parsed.task_id ? `task:${parsed.task_id}:write` : '';
-    const taskReadScope = parsed.task_id ? `task:${parsed.task_id}:read` : '';
-    const writeMethods = new Set(['POST', 'PATCH', 'PUT', 'DELETE']);
-    if (writeMethods.has(method)) {
-      return taskWriteScope && hasScope(parsed.scopes, taskWriteScope)
-        ? { ok: true, taskId: parsed.task_id }
-        : { ok: false, required: taskWriteScope ? [taskWriteScope] : [] };
-    }
-
-    const hasRead = (Boolean(taskReadScope) && hasScope(parsed.scopes, taskReadScope))
-      || (Boolean(taskWriteScope) && hasScope(parsed.scopes, taskWriteScope))
-      || hasScope(parsed.scopes, 'tasks:read');
-    return hasRead
-      ? { ok: true, taskId: parsed.task_id }
-      : { ok: false, required: taskReadScope ? [taskReadScope] : ['tasks:read'] };
-  }
-
   return { ok: false, required: [] };
 }
 

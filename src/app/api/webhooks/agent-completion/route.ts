@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { createHmac } from 'crypto';
 import { queryOne, queryAll, run } from '@/lib/db';
 import { checkBuilderEvidence } from '@/lib/builder-evidence';
-import { finalizeSessionByOpenClawId } from '@/lib/session-lifecycle';
+import { finalizeSessionById } from '@/lib/session-lifecycle';
 import { checkTransitionEligibility } from '@/lib/workflow-engine';
 import type { Task, Agent, OpenClawSession } from '@/lib/types';
 
@@ -158,7 +158,7 @@ export async function POST(request: NextRequest) {
         [task.id, task.assigned_agent_id || ''],
       );
       if (latestSession?.openclaw_session_id) {
-        finalizeSessionByOpenClawId(latestSession.openclaw_session_id, 'completed', now);
+        finalizeSessionById(latestSession.openclaw_session_id, 'completed', now);
       }
 
       return NextResponse.json({
@@ -285,7 +285,7 @@ export async function POST(request: NextRequest) {
         'UPDATE agents SET status = ?, updated_at = ? WHERE id = ?',
         ['standby', now, session.agent_id]
       );
-      finalizeSessionByOpenClawId(session.openclaw_session_id, 'completed', now);
+      finalizeSessionById(session.openclaw_session_id, 'completed', now);
 
       return NextResponse.json({
         success: true,

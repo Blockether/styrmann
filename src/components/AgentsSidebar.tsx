@@ -144,11 +144,10 @@ export function AgentsSidebar({
   );
 
 
-  // Shared OpenClaw summary link
-  const renderOpenClawLink = (minimized: boolean) => (
+  const renderOperationsLink = (minimized: boolean) => (
     <div className="mt-auto p-2 border-t border-mc-border">
       <Link
-        href="/operations#openclaw"
+        href="/operations"
         className={`group transition-colors ${
           minimized
             ? 'flex items-center justify-center rounded-md border border-mc-border bg-mc-bg hover:bg-mc-bg-tertiary p-2'
@@ -217,7 +216,7 @@ export function AgentsSidebar({
             </nav>
           </div>
 
-          {renderOpenClawLink(false)}
+          {renderOperationsLink(false)}
         </aside>
       </div>
     );
@@ -249,7 +248,7 @@ export function AgentsSidebar({
         </div>
       </div>
 
-      {renderOpenClawLink(isMinimized)}
+      {renderOperationsLink(isMinimized)}
     </aside>
   );
 }

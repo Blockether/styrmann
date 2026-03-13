@@ -264,9 +264,9 @@ export function AgentLogsView({ workspaceId, logsView = 'sessions', onLogsViewCh
         <div>
           <div className="flex items-center gap-2 text-sm font-medium text-mc-text">
             <MessageSquare className="w-4 h-4 text-mc-text-secondary" />
-            <span>OpenClaw Logs</span>
+            <span>Agent Logs</span>
           </div>
-          <p className="mt-1 text-xs text-mc-text-secondary">Switch between session transcripts and gateway runtime logs.</p>
+          <p className="mt-1 text-xs text-mc-text-secondary">Switch between session transcripts and runtime logs.</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap justify-end">
           {onLogsViewChange && (

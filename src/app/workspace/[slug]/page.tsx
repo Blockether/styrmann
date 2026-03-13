@@ -132,25 +132,8 @@ export default function WorkspacePage() {
       }
     }
 
-    async function checkOpenClaw() {
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000);
-
-        const openclawRes = await fetch('/api/openclaw/status', { signal: controller.signal });
-        clearTimeout(timeoutId);
-
-        if (openclawRes.ok) {
-          const status = await openclawRes.json();
-          setIsOnline(status.connected);
-        }
-      } catch {
-        setIsOnline(false);
-      }
-    }
-
     loadData();
-    checkOpenClaw();
+    setIsOnline(true);
 
     const taskPoll = setInterval(async () => {
       try {
@@ -176,20 +159,7 @@ export default function WorkspacePage() {
       }
     }, 60000);
 
-    const connectionCheck = setInterval(async () => {
-      try {
-        const res = await fetch('/api/openclaw/status');
-        if (res.ok) {
-          const status = await res.json();
-          setIsOnline(status.connected);
-        }
-      } catch {
-        setIsOnline(false);
-      }
-    }, 30000);
-
     return () => {
-      clearInterval(connectionCheck);
       clearInterval(taskPoll);
     };
   }, [workspace, setAgents, setTasks, setIsOnline, setIsLoading]);

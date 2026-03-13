@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { queryOne } from '@/lib/db';
-import { finalizeSessionByOpenClawId } from '@/lib/session-lifecycle';
+import { finalizeSessionById } from '@/lib/session-lifecycle';
 import { handleStageFailure, drainQueue } from '@/lib/workflow-engine';
 import type { Task } from '@/lib/types';
 
@@ -22,7 +22,7 @@ export async function POST(
 
   try {
     const body = await request.json();
-    const { reason, openclaw_session_id } = body as { reason?: string; openclaw_session_id?: string };
+    const { reason, session_id: openclaw_session_id } = body as { reason?: string; session_id?: string };
 
     if (!reason) {
       return NextResponse.json({ error: 'reason is required' }, { status: 400 });
@@ -44,7 +44,7 @@ export async function POST(
 
     // Trigger the fail-loopback via the workflow engine
     if (typeof openclaw_session_id === 'string' && openclaw_session_id.trim().length > 0) {
-      finalizeSessionByOpenClawId(openclaw_session_id.trim(), 'interrupted');
+      finalizeSessionById(openclaw_session_id.trim(), 'interrupted');
     }
     const result = await handleStageFailure(taskId, task.status, reason);
 

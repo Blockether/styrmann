@@ -32,7 +32,7 @@ type CheckResult = {
 
 function check(
   name: string,
-  category: 'system' | 'openclaw',
+  category: 'system' | 'agent',
   fn: () => CheckResult,
 ): ValidationCheck {
   try {

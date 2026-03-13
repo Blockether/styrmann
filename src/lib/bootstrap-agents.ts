@@ -19,7 +19,7 @@ function sharedUserMd(missionControlUrl: string): string {
 - Platform: Autensa multi-agent task orchestration
 - API Base: ${missionControlUrl}
 - Tasks are dispatched automatically by the workflow engine
-- Communication via OpenClaw Gateway
+- Communication via OpenCode ACP
 
 ## The Human
 Manages overall system, sets priorities, defines tasks. Follow specifications precisely.
@@ -241,16 +241,13 @@ export function bootstrapCoreAgents(): void {
  *
  * Agents are ALWAYS global — NEVER create per-workspace copies.
  *
- * If OpenClaw-synced agents already exist, bootstrap is skipped entirely.
+ * If synced agents already exist, bootstrap is skipped entirely.
  * Synced agents ARE the real team.
  */
 export function bootstrapCoreAgentsRaw(
   db: Database.Database,
   missionControlUrl: string,
 ): void {
-  // If OpenClaw-synced agents exist, skip bootstrap entirely.
-  // Synced agents ARE the real team — bootstrap is only a fallback
-  // for fresh installs without an OpenClaw gateway.
   const syncedCount = (db.prepare(
     "SELECT COUNT(*) as cnt FROM agents WHERE source = 'synced'"
   ).get() as { cnt: number }).cnt;

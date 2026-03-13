@@ -7,7 +7,7 @@ import { queryAll, queryOne, run } from '@/lib/db';
 import { broadcast } from '@/lib/events';
 import { getMissionControlUrl } from '@/lib/config';
 import { getHimalayaStatus, sendHumanAssignmentEmail } from '@/lib/himalaya';
-import { finalizeOtherActiveSessionsForTask, finalizeSessionByOpenClawId } from '@/lib/session-lifecycle';
+import { finalizeOtherActiveSessionsForTask, finalizeSessionById } from '@/lib/session-lifecycle';
 import { checkTransitionEligibility, handleStageTransition, getTaskWorkflow, drainQueue } from '@/lib/workflow-engine';
 import { captureTaskRunResult } from '@/lib/task-run-results';
 import { checkBuilderEvidence } from '@/lib/builder-evidence';
@@ -353,7 +353,7 @@ export async function PATCH(
     run(`UPDATE tasks SET ${updates.join(', ')} WHERE id = ?`, values);
 
     if (body.updated_by_session_id && nextStatus && nextStatus !== existing.status) {
-      finalizeSessionByOpenClawId(body.updated_by_session_id, 'completed', now);
+      finalizeSessionById(body.updated_by_session_id, 'completed', now);
     }
 
     if (effectiveAssigneeType === 'ai' && shouldRegeneratePlan) {

@@ -4,7 +4,7 @@
  * Resolution order:
  *  1. OPENAI_API_KEY env var     → OpenAI Chat Completions API
  *  2. ANTHROPIC_API_KEY env var  → Anthropic Messages API
- *  3. ~/.openclaw/openclaw.json  → first provider with apiKey + models
+ *  3. ~/.opencode/config.json  → first provider with apiKey + models
  *
  * Override model:  PLANNING_MODEL env var (default: cheapest fast model).
  * Override timeout: PLANNING_LLM_TIMEOUT_MS env var (default: 25000).
@@ -26,7 +26,7 @@ interface LlmProviderConfig {
   model: string;
 }
 
-interface OpenClawProviderEntry {
+interface ProviderEntry {
   baseUrl?: string;
   apiKey?: string;
   models?: Array<{ id: string; name?: string }>;
@@ -62,14 +62,13 @@ function resolveProvider(): LlmProviderConfig | null {
     };
   }
 
-  // 3. OpenClaw config file
-  const configPath = join(homedir(), '.openclaw', 'openclaw.json');
+  const configPath = join(homedir(), '.opencode', 'config.json');
   if (!existsSync(configPath)) return null;
   try {
     const stats = statSync(configPath);
     if (stats.size > MAX_CONFIG_BYTES) return null;
     const raw = JSON.parse(readFileSync(configPath, 'utf-8')) as {
-      models?: { providers?: Record<string, OpenClawProviderEntry> };
+      models?: { providers?: Record<string, ProviderEntry> };
     };
     const providers = raw.models?.providers;
     if (!providers) return null;

@@ -151,7 +151,7 @@ export function ActivityLog({ taskId }: ActivityLogProps) {
               <Activity className="w-4 h-4 text-mc-accent" />
               <span>Task Activity</span>
             </div>
-            <p className="mt-1 text-xs text-mc-text-secondary">Live orchestration evidence with direct links into OpenClaw session traces.</p>
+            <p className="mt-1 text-xs text-mc-text-secondary">Live orchestration evidence with direct links into agent session traces.</p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             <div className="inline-flex items-center gap-2 text-xs text-mc-text-secondary px-2 py-1 border border-mc-border rounded-full bg-white/80">

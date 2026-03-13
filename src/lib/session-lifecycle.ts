@@ -25,10 +25,10 @@ function maybeStandbyAgent(agentId: string, at: string) {
   }
 }
 
-export function finalizeSessionByOpenClawId(openclawSessionId: string, status: 'completed' | 'interrupted', endedAt?: string): boolean {
+export function finalizeSessionById(sessionId: string, status: 'completed' | 'interrupted', endedAt?: string): boolean {
   const session = queryOne<SessionRow>(
     'SELECT id, openclaw_session_id, agent_id, task_id, status, ended_at FROM openclaw_sessions WHERE openclaw_session_id = ? LIMIT 1',
-    [openclawSessionId],
+    [sessionId],
   );
   if (!session) return false;
 

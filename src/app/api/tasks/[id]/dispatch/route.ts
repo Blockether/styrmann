@@ -65,10 +65,6 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           { status: 409 },
         );
       }
-      if (result.error === 'Failed to connect to OpenClaw Gateway') {
-        return NextResponse.json({ error: result.error }, { status: 503 });
-      }
-
       return NextResponse.json({ error: result.error || 'Internal server error' }, { status: 500 });
     }
 
