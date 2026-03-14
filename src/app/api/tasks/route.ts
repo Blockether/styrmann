@@ -139,6 +139,26 @@ export async function POST(request: NextRequest) {
 
     const validatedData = validation.data;
 
+    // Auth gate: only agents and internal systems can create workspace tasks
+    const systemHeader = request.headers.get('x-mc-system');
+    const isInternalSystem = systemHeader && ['orchestrator', 'daemon', 'delegation'].includes(systemHeader);
+    const hasAgentId = Boolean(validatedData.created_by_agent_id);
+
+    if (!isInternalSystem && !hasAgentId) {
+      return NextResponse.json({
+        error: 'Workspace tasks can only be created through org ticket delegation. Create an org ticket at /api/org-tickets and use the delegate action.',
+        code: 'DIRECT_TASK_CREATION_BLOCKED',
+      }, { status: 403 });
+    }
+
+    // If created_by_agent_id provided, verify the agent exists
+    if (validatedData.created_by_agent_id) {
+      const agentExists = queryOne<{ id: string }>('SELECT id FROM agents WHERE id = ?', [validatedData.created_by_agent_id]);
+      if (!agentExists) {
+        return NextResponse.json({ error: 'Invalid created_by_agent_id: agent not found' }, { status: 400 });
+      }
+    }
+
     const id = uuidv4();
     const now = new Date().toISOString();
 
