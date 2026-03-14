@@ -10,6 +10,17 @@
  */
 
 export const schema = `
+-- Organizations table
+CREATE TABLE IF NOT EXISTS organizations (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  slug TEXT NOT NULL UNIQUE,
+  description TEXT,
+  logo_url TEXT,
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now'))
+);
+
 -- Workspaces table
 CREATE TABLE IF NOT EXISTS workspaces (
   id TEXT PRIMARY KEY,
@@ -25,6 +36,7 @@ CREATE TABLE IF NOT EXISTS workspaces (
   coordinator_email TEXT,
   logo_url TEXT,
   organization TEXT,
+  organization_id TEXT REFERENCES organizations(id) ON DELETE SET NULL,
   created_at TEXT DEFAULT (datetime('now')),
   updated_at TEXT DEFAULT (datetime('now'))
 );
@@ -409,6 +421,8 @@ CREATE TABLE IF NOT EXISTS task_provenance (
 );
 
 -- Indexes for performance
+CREATE INDEX IF NOT EXISTS idx_organizations_slug ON organizations(slug);
+CREATE INDEX IF NOT EXISTS idx_workspaces_organization_id ON workspaces(organization_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
 CREATE INDEX IF NOT EXISTS idx_tasks_assigned ON tasks(assigned_agent_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_assigned_human ON tasks(assigned_human_id);

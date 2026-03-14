@@ -1,6 +1,49 @@
 import { describe, it, expect } from 'vitest';
 import { createTestDb } from './test-helpers';
 
+describe('Migration 055: add_organizations', () => {
+  it('creates organizations table with correct schema', () => {
+    const db = createTestDb();
+    const result = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='organizations'").get();
+    expect(result).toBeDefined();
+
+    const cols = db.prepare("PRAGMA table_info(organizations)").all() as { name: string }[];
+    const colNames = cols.map(c => c.name);
+    expect(colNames).toContain('id');
+    expect(colNames).toContain('name');
+    expect(colNames).toContain('slug');
+    expect(colNames).toContain('description');
+    expect(colNames).toContain('logo_url');
+    expect(colNames).toContain('created_at');
+    expect(colNames).toContain('updated_at');
+    db.close();
+  });
+
+  it('workspaces table has organization_id column', () => {
+    const db = createTestDb();
+    const cols = db.prepare("PRAGMA table_info(workspaces)").all() as { name: string }[];
+    const colNames = cols.map(c => c.name);
+    expect(colNames).toContain('organization_id');
+    db.close();
+  });
+
+  it('organizations slug index exists', () => {
+    const db = createTestDb();
+    const indexes = db.prepare("SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='organizations'").all() as { name: string }[];
+    const indexNames = indexes.map(i => i.name);
+    expect(indexNames).toContain('idx_organizations_slug');
+    db.close();
+  });
+
+  it('workspaces organization_id index exists', () => {
+    const db = createTestDb();
+    const indexes = db.prepare("SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='workspaces'").all() as { name: string }[];
+    const indexNames = indexes.map(i => i.name);
+    expect(indexNames).toContain('idx_workspaces_organization_id');
+    db.close();
+  });
+});
+
 describe('Migration 054: drop_legacy_tables', () => {
   it('drops legacy tables from database', () => {
     const db = createTestDb();

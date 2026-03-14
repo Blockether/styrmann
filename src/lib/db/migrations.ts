@@ -2211,6 +2211,91 @@ const migrations: Migration[] = [
 
       console.log('[Migration 054] Legacy tables cleanup complete');
     }
+  },
+  {
+    id: '055',
+    name: 'add_organizations',
+    up: (db) => {
+      console.log('[Migration 055] Adding organizations table...');
+
+      // Create organizations table
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS organizations (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          slug TEXT NOT NULL UNIQUE,
+          description TEXT,
+          logo_url TEXT,
+          created_at TEXT DEFAULT (datetime('now')),
+          updated_at TEXT DEFAULT (datetime('now'))
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_organizations_slug ON organizations(slug);
+      `);
+
+      // Add organization_id FK to workspaces (nullable for safe migration)
+      const workspaceCols = db.prepare("PRAGMA table_info(workspaces)").all() as { name: string }[];
+      if (!workspaceCols.some(c => c.name === 'organization_id')) {
+        db.exec(`ALTER TABLE workspaces ADD COLUMN organization_id TEXT REFERENCES organizations(id) ON DELETE SET NULL`);
+        db.exec(`CREATE INDEX IF NOT EXISTS idx_workspaces_organization_id ON workspaces(organization_id)`);
+        console.log('[Migration 055] Added organization_id to workspaces');
+      }
+
+      // DATA MIGRATION: Create org rows from existing workspace.organization values
+      // Get distinct organization values
+      const orgValues = db.prepare(
+        "SELECT DISTINCT organization FROM workspaces WHERE organization IS NOT NULL AND organization != ''"
+      ).all() as { organization: string }[];
+
+      for (const row of orgValues) {
+        const orgName = row.organization;
+        const orgSlug = orgName.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+
+        // Insert org if it doesn't already exist (idempotent)
+        const existing = db.prepare("SELECT id FROM organizations WHERE slug = ?").get(orgSlug);
+        if (!existing) {
+          const orgId = crypto.randomUUID();
+          db.prepare("INSERT INTO organizations (id, name, slug) VALUES (?, ?, ?)").run(orgId, orgName, orgSlug);
+          console.log(`[Migration 055] Created organization: ${orgName} (${orgSlug})`);
+        }
+
+        // Link workspaces to this org
+        const org = db.prepare("SELECT id FROM organizations WHERE slug = ?").get(orgSlug) as { id: string } | undefined;
+        if (org) {
+          db.prepare("UPDATE workspaces SET organization_id = ? WHERE organization = ? AND organization_id IS NULL").run(org.id, orgName);
+        }
+      }
+
+      // Handle workspaces with NULL or empty organization
+      // Create a 'system' organization for the default internal workspace
+      const internalWorkspace = db.prepare("SELECT id FROM workspaces WHERE id = 'default' OR is_internal = 1").get();
+      if (internalWorkspace) {
+        let systemOrg = db.prepare("SELECT id FROM organizations WHERE slug = 'system'").get() as { id: string } | undefined;
+        if (!systemOrg) {
+          const systemOrgId = crypto.randomUUID();
+          db.prepare("INSERT INTO organizations (id, name, slug, description) VALUES (?, ?, ?, ?)").run(
+            systemOrgId, 'System', 'system', 'Internal system organization'
+          );
+          systemOrg = { id: systemOrgId };
+          console.log('[Migration 055] Created system organization');
+        }
+        db.prepare("UPDATE workspaces SET organization_id = ? WHERE (id = 'default' OR is_internal = 1) AND organization_id IS NULL").run(systemOrg.id);
+      }
+
+      // Handle any remaining workspaces without organization (create default org)
+      const unlinked = db.prepare("SELECT COUNT(*) as count FROM workspaces WHERE organization_id IS NULL").get() as { count: number };
+      if (unlinked.count > 0) {
+        let defaultOrg = db.prepare("SELECT id FROM organizations WHERE slug = 'default'").get() as { id: string } | undefined;
+        if (!defaultOrg) {
+          const defaultOrgId = crypto.randomUUID();
+          db.prepare("INSERT INTO organizations (id, name, slug) VALUES (?, ?, ?)").run(defaultOrgId, 'Default', 'default');
+          defaultOrg = { id: defaultOrgId };
+        }
+        db.prepare("UPDATE workspaces SET organization_id = ? WHERE organization_id IS NULL").run(defaultOrg.id);
+      }
+
+      console.log('[Migration 055] Organizations migration complete');
+    }
   }
 ];
 
