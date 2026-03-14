@@ -1,6 +1,6 @@
 # KNOWLEDGE.md -- Styrmann
 
-Last updated: 2026-03-13
+Last updated: 2026-03-14
 
 ---
 
@@ -415,12 +415,12 @@ Fallback: Agent Activity Dashboard polls every 20s; task-specific views use SSE 
 
 ## Database Schema
 
-42 migrations (001-042), auto-run on DB connection in `src/lib/db/index.ts`. Schema creation (`schema.ts`) only runs for fresh databases. After migrations, `discoverRepoWorkspaces()` scans `/root/repos/{org}/{repo}` for git repos and creates/syncs workspaces.
+54 migrations (001-054), auto-run on DB connection in `src/lib/db/index.ts`. Schema creation (`schema.ts`) only runs for fresh databases. After migrations, `discoverRepoWorkspaces()` scans `/root/repos/{org}/{repo}` for git repos and creates/syncs workspaces.
 
 ### Core Tables
 - **workspaces** -- slug (`{org}-{repo}` format), name, description, icon, github_repo, owner_email, coordinator_email, logo_url, organization
 - **agents** -- name, role, status, model, source, gateway_agent_id, session_key_prefix, agent_dir, agent_workspace_path, soul_md, user_md, agents_md. No `is_master` column.
-- **tasks** -- title, description, status, priority, task_type, effort, impact, assigned_agent_id, milestone_id, workflow_template_id, workflow_plan_id, due_date, github_issue_id (nullable FK to github_issues), planning fields. No `sprint_id`. No `parent_task_id`.
+- **tasks** -- title, description, status, priority, task_type, effort, impact, assigned_agent_id, milestone_id, workflow_template_id, workflow_plan_id, due_date, github_issue_id (nullable FK to github_issues). No `sprint_id`. No `parent_task_id`.
 - **sprints** -- workspace_id, name, goal, sprint_number, start_date, end_date, status
 - **milestones** -- workspace_id, name, description, due_date, status, coordinator_agent_id (auto-resolved from default orchestrator, not user-settable), sprint_id (FK nullable), priority ('low'|'normal'|'high'|'urgent')
 - **milestone_dependencies** -- id, milestone_id, depends_on_milestone_id (nullable), depends_on_task_id (nullable), dependency_type ('finish_to_start'|'blocks')
@@ -447,9 +447,6 @@ Fallback: Agent Activity Dashboard polls every 20s; task-specific views use SSE 
 ### Session and Event Tables
 - **openclaw_sessions** -- agent_id, openclaw_session_id, channel, status, session_type (persistent/subagent), task_id, ended_at
 - **events** -- type, agent_id, task_id, message, metadata
-- **conversations** / **messages** / **conversation_participants** -- agent-to-agent messaging
-- **planning_questions** / **planning_specs** -- legacy AI planning Q&A flow metadata still present; execution planning now comes from persisted orchestrator workflow plans
-- **businesses** -- legacy table, kept for compatibility
 - **github_issues** -- workspace_id, github_id (integer), issue_number, title, body, state ('open'|'closed'), state_reason, labels (JSON string), assignees (JSON string), github_url, author, created_at_github, updated_at_github, synced_at, task_id (nullable FK to tasks). Unique constraint on (workspace_id, issue_number). Indexes on workspace_id and (workspace_id, state).
 - **task_provenance** -- task_id, session_id, kind ('external_user'|'inter_session'|'internal_system'), origin_session_id, source_session_key, source_channel, source_tool, receipt_text, receipt_data (JSON). Stores ACP provenance metadata and Source Receipt blocks parsed from OpenClaw session history.
 
@@ -620,6 +617,8 @@ Agents without direct filesystem access use upload/download endpoints:
 13. **Workflow templates in code, not DB-cloned**: Template definitions (Simple, Standard, Strict, Auto-Train, Architecture) live in `src/lib/workflow-templates.ts` as TypeScript constants. New workspaces get templates provisioned from code, not cloned from another workspace's DB rows.
 14. **LLM-powered skill selection**: Workflow planning uses LLM inference to intelligently select the most relevant skills per agent per task step, rather than assigning all available skills. Falls back to rule-based selection when LLM is unavailable.
 15. **Standardized file upload UX**: Active file input areas across the UI use a consistent drag-and-drop zone pattern with Upload icon, dashed border, and "Drop file or click to browse" text.
+16. **Vitest test framework**: Tests use `pool: 'forks'` for better-sqlite3 native module support. Test helper `createTestDb()` creates in-memory SQLite databases with full schema + migrations applied. Test files are colocated at `src/**/*.test.ts`.
+17. **Stabilization wave**: Legacy tables removed (businesses, memory_pipeline_config, planning_questions, planning_specs, conversations, conversation_participants, messages). Legacy task columns removed (business_id, planning_*). Clean schema foundation for org/knowledge platform migration.
 ---
 
 ## Environment Variables
@@ -643,6 +642,8 @@ npm run dev          # Start dev server on port 4000
 npm run build        # Production build (next build)
 npm run start        # Production server on port 4000
 npm run lint         # ESLint
+npm run test         # Run vitest test suite
+npm run test:watch   # Run vitest in watch mode
 npm run db:seed      # Create DB + seed defaults
 npm run db:backup    # WAL checkpoint + copy to .backup
 npm run db:restore   # Restore from .backup
