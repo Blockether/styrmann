@@ -1,10 +1,22 @@
 'use client';
-import { Ticket, BookOpen, Folder, ArrowLeft, Plus } from 'lucide-react';
+import { Ticket, BookOpen, Folder, ArrowLeft, Plus, Zap } from 'lucide-react';
 import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import type { OrgTicket, KnowledgeArticle } from '@/lib/types';
 import { OrgTicketCreateModal } from '@/components/OrgTicketCreateModal';
+
+interface DelegatedTask {
+  id: string;
+  title: string;
+  status: string;
+  workspace_id: string;
+}
+
+interface DelegationInfo {
+  tasks: DelegatedTask[];
+  workspaceName: string;
+}
 
 interface OrgDetail {
   id: string;
@@ -23,6 +35,7 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
   const [knowledge, setKnowledge] = useState<KnowledgeArticle[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [delegationInfo, setDelegationInfo] = useState<Map<string, DelegationInfo>>(new Map());
 
   useEffect(() => {
     fetch(`/api/organizations/${slug}`)
@@ -31,12 +44,42 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
         setOrg(data);
         setLoading(false);
         if (data?.id) {
+          const workspaces = data.workspaces || [];
+          const workspaceMap = new Map(workspaces.map((ws: { id: string; name: string }) => [ws.id, ws.name]));
+
           Promise.all([
             fetch(`/api/org-tickets?organization_id=${data.id}`).then(r => r.json()),
             fetch(`/api/knowledge?organization_id=${data.id}`).then(r => r.json()),
           ]).then(([t, k]) => {
-            setTickets(Array.isArray(t) ? t : []);
+            const ticketsList = Array.isArray(t) ? t : [];
+            setTickets(ticketsList);
             setKnowledge(Array.isArray(k) ? k : []);
+
+            const delegatedTickets = ticketsList.filter((ticket: OrgTicket) =>
+              ['delegated', 'in_progress'].includes(ticket.status)
+            );
+            if (delegatedTickets.length > 0) {
+              Promise.all(
+                delegatedTickets.map((ticket: OrgTicket) =>
+                  fetch(`/api/org-tickets/${ticket.id}`).then(r => r.json())
+                )
+              ).then(details => {
+                const infoMap = new Map<string, DelegationInfo>();
+                for (const detail of details) {
+                  const tasks = detail.delegated_tasks as DelegatedTask[] | undefined;
+                  if (tasks && tasks.length > 0) {
+                    const firstTask = tasks[0];
+                    const wsId = String(firstTask.workspace_id);
+                    const wsName = workspaceMap.get(wsId);
+                    infoMap.set(String(detail.id), {
+                      tasks: tasks,
+                      workspaceName: wsName && typeof wsName === 'string' ? wsName : 'workspace',
+                    });
+                  }
+                }
+                setDelegationInfo(infoMap);
+              }).catch(() => {});
+            }
           }).catch(() => {});
         }
       })
@@ -109,11 +152,19 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
                 {tickets.map(ticket => (
                   <div key={ticket.id} className="p-3 rounded border border-mc-border bg-mc-bg-secondary">
                     <div className="flex items-center justify-between gap-2 flex-wrap">
-                      <span className="font-mono text-sm text-mc-text">{ticket.title}</span>
-                      <span className={`text-xs px-1.5 py-0.5 rounded font-mono ${STATUS_COLORS[ticket.status] || 'bg-gray-100 text-gray-600'}`}>
-                        {ticket.status}
-                      </span>
-                    </div>
+                       <span className="font-mono text-sm text-mc-text">{ticket.title}</span>
+                       <span className={`text-xs px-1.5 py-0.5 rounded font-mono ${STATUS_COLORS[ticket.status] || 'bg-gray-100 text-gray-600'}`}>
+                         {ticket.status}
+                       </span>
+                     </div>
+                    {delegationInfo.has(ticket.id) && (
+                      <div className="mt-2 flex items-center gap-1.5 text-xs text-mc-text-secondary">
+                        <Zap size={10} className="text-mc-accent" />
+                        <span>{delegationInfo.get(ticket.id)?.tasks.length} task{delegationInfo.get(ticket.id)?.tasks.length !== 1 ? 's' : ''} delegated</span>
+                        <span>to</span>
+                        <span className="font-medium text-mc-text">{delegationInfo.get(ticket.id)?.workspaceName}</span>
+                      </div>
+                    )}
                     {ticket.description && (
                       <p className="mt-1 text-xs text-mc-text-secondary line-clamp-2">{ticket.description}</p>
                     )}
