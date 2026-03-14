@@ -32,4 +32,18 @@ describe('Fresh database', () => {
     
     db.close();
   });
+
+  it('has org_ticket_acceptance_criteria table', () => {
+    const db = createTestDb();
+    const result = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='org_ticket_acceptance_criteria'").get();
+    expect(result).toBeDefined();
+    db.close();
+  });
+
+  it('org_tickets has story_points column', () => {
+    const db = createTestDb();
+    const cols = (db.prepare("PRAGMA table_info(org_tickets)").all() as { name: string }[]).map(c => c.name);
+    expect(cols).toContain('story_points');
+    db.close();
+  });
 });

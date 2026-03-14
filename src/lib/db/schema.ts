@@ -122,10 +122,23 @@ CREATE TABLE IF NOT EXISTS org_tickets (
   creator_name TEXT,
   assignee_name TEXT,
   due_date TEXT,
+  story_points INTEGER CHECK (story_points IS NULL OR (story_points >= 0 AND story_points <= 100)),
   tags TEXT DEFAULT '[]',
   created_at TEXT DEFAULT (datetime('now')),
   updated_at TEXT DEFAULT (datetime('now'))
 );
+
+-- Org ticket acceptance criteria
+CREATE TABLE IF NOT EXISTS org_ticket_acceptance_criteria (
+  id TEXT PRIMARY KEY,
+  org_ticket_id TEXT NOT NULL REFERENCES org_tickets(id) ON DELETE CASCADE,
+  description TEXT NOT NULL,
+  sort_order INTEGER DEFAULT 0,
+  is_met INTEGER DEFAULT 0,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_org_ticket_ac ON org_ticket_acceptance_criteria(org_ticket_id);
 
 -- Sprints table
 CREATE TABLE IF NOT EXISTS sprints (

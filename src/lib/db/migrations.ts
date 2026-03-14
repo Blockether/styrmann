@@ -30,6 +30,32 @@ const migrations: Migration[] = [
       console.log('[Migration 100] Core agents bootstrapped');
     }
   },
+  {
+    id: '101',
+    name: 'add_story_points_and_acceptance_criteria',
+    up: (db) => {
+      // Add story_points to org_tickets (for existing DBs)
+      const cols = (db.prepare("PRAGMA table_info(org_tickets)").all() as { name: string }[]).map(c => c.name);
+      if (!cols.includes('story_points')) {
+        db.exec("ALTER TABLE org_tickets ADD COLUMN story_points INTEGER CHECK (story_points IS NULL OR (story_points >= 0 AND story_points <= 100))");
+      }
+
+      // Create org_ticket_acceptance_criteria table
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS org_ticket_acceptance_criteria (
+          id TEXT PRIMARY KEY,
+          org_ticket_id TEXT NOT NULL REFERENCES org_tickets(id) ON DELETE CASCADE,
+          description TEXT NOT NULL,
+          sort_order INTEGER DEFAULT 0,
+          is_met INTEGER DEFAULT 0,
+          created_at TEXT DEFAULT (datetime('now'))
+        );
+        CREATE INDEX IF NOT EXISTS idx_org_ticket_ac ON org_ticket_acceptance_criteria(org_ticket_id);
+      `);
+
+      console.log('[Migration 101] Added story_points and org_ticket_acceptance_criteria');
+    }
+  },
 ];
 
 export function runMigrations(db: Database.Database): void {

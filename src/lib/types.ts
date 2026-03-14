@@ -824,9 +824,19 @@ export interface OrgTicket {
   creator_name?: string | null;
   assignee_name?: string | null;
   due_date?: string | null;
+  story_points?: number | null;
   tags: string;
   created_at: string;
   updated_at: string;
+}
+
+export interface OrgTicketAcceptanceCriteria {
+  id: string;
+  org_ticket_id: string;
+  description: string;
+  sort_order: number;
+  is_met: number;
+  created_at: string;
 }
 
 export type MemoryType = 'fact' | 'decision' | 'event' | 'tool_run' | 'error' | 'observation' | 'note' | 'patch';

@@ -191,6 +191,7 @@ export const CreateOrgTicketSchema = z.object({
   creator_name: z.string().optional(),
   assignee_name: z.string().optional(),
   due_date: z.string().optional(),
+  story_points: z.number().int().min(0).max(100).optional(),
   tags: z.array(z.string()).default([]),
 });
 
@@ -260,8 +261,23 @@ export const UpdateOrgTicketSchema = z.object({
   external_system: z.string().optional().nullable(),
   assignee_name: z.string().optional().nullable(),
   due_date: z.string().optional().nullable(),
+  story_points: z.number().int().min(0).max(100).optional().nullable(),
   tags: z.array(z.string()).optional(),
 });
+
+export const CreateOrgTicketAcceptanceCriteriaSchema = z.object({
+  description: z.string().min(1).max(1000),
+  sort_order: z.number().int().min(0).default(0),
+});
+
+export const UpdateOrgTicketAcceptanceCriteriaSchema = z.object({
+  description: z.string().min(1).max(1000).optional(),
+  sort_order: z.number().int().min(0).optional(),
+  is_met: z.number().int().min(0).max(1).optional(),
+});
+
+export type CreateOrgTicketAcceptanceCriteriaInput = z.infer<typeof CreateOrgTicketAcceptanceCriteriaSchema>;
+export type UpdateOrgTicketAcceptanceCriteriaInput = z.infer<typeof UpdateOrgTicketAcceptanceCriteriaSchema>;
 
 export type CreateOrgTicketInput = z.infer<typeof CreateOrgTicketSchema>;
 export type UpdateOrgTicketInput = z.infer<typeof UpdateOrgTicketSchema>;
