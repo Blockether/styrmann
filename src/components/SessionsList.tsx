@@ -258,11 +258,7 @@ export function SessionsList({ taskId }: SessionsListProps) {
                   </span>
                 )}
 
-                {session.status === 'stale' && !session.is_active && (
-                  <span className="text-[11px] px-1.5 py-0.5 rounded border border-yellow-200 bg-yellow-50 text-yellow-700 whitespace-nowrap">
-                    stale
-                  </span>
-                )}
+
                 {session.resumed_via_session_continuation && session.is_active && (
                   <span className="text-[11px] px-1.5 py-0.5 rounded border border-cyan-200 bg-cyan-50 text-cyan-700 whitespace-nowrap">
                     resumed via continuation
