@@ -189,11 +189,10 @@ export interface Task {
   assigned_agent_id: string | null;
   assigned_human_id?: string | null;
   created_by_agent_id: string | null;
-  workspace_id: string;
-  milestone_id?: string;
-  github_issue_id?: string | null;
-  business_id: string;
-  due_date?: string;
+   workspace_id: string;
+   milestone_id?: string;
+   github_issue_id?: string | null;
+   due_date?: string;
   workflow_template_id?: string;
   status_reason?: string;
   planning_complete?: number;
@@ -567,11 +566,10 @@ export interface CreateTaskRequest {
   impact?: number;
   assignee_type?: 'ai' | 'human';
   assigned_human_id?: string;
-  created_by_agent_id?: string;
-  workspace_id?: string;
-  milestone_id?: string;
-  business_id?: string;
-  due_date?: string;
+   created_by_agent_id?: string;
+   workspace_id?: string;
+   milestone_id?: string;
+   due_date?: string;
   tags?: string[];
 }
 

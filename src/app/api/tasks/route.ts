@@ -14,10 +14,9 @@ import type { Task, CreateTaskRequest, Agent, Human } from '@/lib/types';
 export const dynamic = 'force-dynamic';
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
-    const status = searchParams.get('status');
-    const businessId = searchParams.get('business_id');
-    const workspaceId = searchParams.get('workspace_id');
+     const { searchParams } = new URL(request.url);
+     const status = searchParams.get('status');
+     const workspaceId = searchParams.get('workspace_id');
     const assignedAgentId = searchParams.get('assigned_agent_id');
     const sprintId = searchParams.get('sprint_id');
     const milestoneId = searchParams.get('milestone_id');
@@ -56,13 +55,9 @@ export async function GET(request: NextRequest) {
       } else if (statuses.length > 1) {
         sql += ` AND t.status IN (${statuses.map(() => '?').join(',')})`;
         params.push(...statuses);
-      }
-    }
-    if (businessId) {
-      sql += ' AND t.business_id = ?';
-      params.push(businessId);
-    }
-    if (workspaceId) {
+       }
+     }
+     if (workspaceId) {
       sql += ' AND t.workspace_id = ?';
       params.push(workspaceId);
     }
@@ -170,32 +165,31 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    run(
-      `INSERT INTO tasks (id, title, description, status, priority, task_type, effort, impact, assignee_type, assigned_agent_id, assigned_human_id, created_by_agent_id, workspace_id, milestone_id, business_id, due_date, workflow_template_id, github_issue_id, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        id,
-        validatedData.title,
-        validatedData.description || null,
-        status,
-        validatedData.priority || 'normal',
-        validatedData.task_type || 'feature',
-        effort,
-        impact,
-        assigneeType,
-        assignedAgentId,
-        assignedHumanId,
-        validatedData.created_by_agent_id || null,
-        workspaceId,
-        validatedData.milestone_id || null,
-        validatedData.business_id || 'default',
-        validatedData.due_date || null,
-        null,
-        github_issue_id || null,
-        now,
-        now,
-      ]
-    );
+     run(
+       `INSERT INTO tasks (id, title, description, status, priority, task_type, effort, impact, assignee_type, assigned_agent_id, assigned_human_id, created_by_agent_id, workspace_id, milestone_id, due_date, workflow_template_id, github_issue_id, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       [
+         id,
+         validatedData.title,
+         validatedData.description || null,
+         status,
+         validatedData.priority || 'normal',
+         validatedData.task_type || 'feature',
+         effort,
+         impact,
+         assigneeType,
+         assignedAgentId,
+         assignedHumanId,
+         validatedData.created_by_agent_id || null,
+         workspaceId,
+         validatedData.milestone_id || null,
+         validatedData.due_date || null,
+         null,
+         github_issue_id || null,
+         now,
+         now,
+       ]
+     );
 
     if (assigneeType === 'ai') {
       void generateTaskWorkflowPlan(id);

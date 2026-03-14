@@ -311,12 +311,11 @@ const migrations: Migration[] = [
             description TEXT,
             status TEXT DEFAULT 'inbox' CHECK (status IN ('pending_dispatch', 'planning', 'inbox', 'assigned', 'in_progress', 'testing', 'review', 'verification', 'done')),
             priority TEXT DEFAULT 'normal' CHECK (priority IN ('low', 'normal', 'high', 'urgent')),
-            assigned_agent_id TEXT REFERENCES agents(id),
-            created_by_agent_id TEXT REFERENCES agents(id),
-            workspace_id TEXT DEFAULT 'default' REFERENCES workspaces(id),
-            business_id TEXT DEFAULT 'default',
-            due_date TEXT,
-            workflow_template_id TEXT REFERENCES workflow_templates(id),
+             assigned_agent_id TEXT REFERENCES agents(id),
+             created_by_agent_id TEXT REFERENCES agents(id),
+             workspace_id TEXT DEFAULT 'default' REFERENCES workspaces(id),
+             due_date TEXT,
+             workflow_template_id TEXT REFERENCES workflow_templates(id),
             planning_session_key TEXT,
             planning_messages TEXT,
             planning_complete INTEGER DEFAULT 0,
@@ -329,8 +328,8 @@ const migrations: Migration[] = [
           )
         `);
 
-        // Copy data with explicit column mapping
-        const sharedCols = 'id, title, description, status, priority, assigned_agent_id, created_by_agent_id, workspace_id, business_id, due_date, planning_session_key, planning_messages, planning_complete, planning_spec, planning_agents, planning_dispatch_error, status_reason, created_at, updated_at';
+         // Copy data with explicit column mapping
+         const sharedCols = 'id, title, description, status, priority, assigned_agent_id, created_by_agent_id, workspace_id, due_date, planning_session_key, planning_messages, planning_complete, planning_spec, planning_agents, planning_dispatch_error, status_reason, created_at, updated_at';
 
         if (hasWorkflowCol) {
           db.exec(`
@@ -885,11 +884,10 @@ const migrations: Migration[] = [
             effort INTEGER CHECK (effort IS NULL OR (effort >= 1 AND effort <= 5)),
             impact INTEGER CHECK (impact IS NULL OR (impact >= 1 AND impact <= 5)),
             assigned_agent_id TEXT REFERENCES agents(id),
-            created_by_agent_id TEXT REFERENCES agents(id),
-            workspace_id TEXT DEFAULT 'default' REFERENCES workspaces(id),
-            milestone_id TEXT REFERENCES milestones(id) ON DELETE SET NULL,
-            business_id TEXT DEFAULT 'default',
-            due_date TEXT,
+             created_by_agent_id TEXT REFERENCES agents(id),
+             workspace_id TEXT DEFAULT 'default' REFERENCES workspaces(id),
+             milestone_id TEXT REFERENCES milestones(id) ON DELETE SET NULL,
+             due_date TEXT,
             workflow_template_id TEXT REFERENCES workflow_templates(id),
             planning_session_key TEXT,
             planning_messages TEXT,
@@ -905,19 +903,19 @@ const migrations: Migration[] = [
 
         db.exec(`
           INSERT INTO tasks_new_020 (
-            id, title, description, status, priority, task_type, effort, impact,
-            assigned_agent_id, created_by_agent_id, workspace_id, milestone_id,
-            business_id, due_date, workflow_template_id, planning_session_key,
-            planning_messages, planning_complete, planning_spec, planning_agents,
-            planning_dispatch_error, status_reason, created_at, updated_at
-          )
-          SELECT
-            id, title, description, status, priority, task_type, effort, impact,
-            assigned_agent_id, created_by_agent_id, workspace_id, milestone_id,
-            business_id, due_date, workflow_template_id, planning_session_key,
-            planning_messages, planning_complete, planning_spec, planning_agents,
-            planning_dispatch_error, status_reason, created_at, updated_at
-          FROM tasks
+             id, title, description, status, priority, task_type, effort, impact,
+             assigned_agent_id, created_by_agent_id, workspace_id, milestone_id,
+             due_date, workflow_template_id, planning_session_key,
+             planning_messages, planning_complete, planning_spec, planning_agents,
+             planning_dispatch_error, status_reason, created_at, updated_at
+           )
+           SELECT
+             id, title, description, status, priority, task_type, effort, impact,
+             assigned_agent_id, created_by_agent_id, workspace_id, milestone_id,
+             due_date, workflow_template_id, planning_session_key,
+             planning_messages, planning_complete, planning_spec, planning_agents,
+             planning_dispatch_error, status_reason, created_at, updated_at
+           FROM tasks
         `);
 
         db.exec(`DROP TABLE tasks`);
@@ -1259,14 +1257,13 @@ const migrations: Migration[] = [
           task_type TEXT DEFAULT 'feature' CHECK (task_type IN ('bug', 'feature', 'chore', 'documentation', 'research', 'autotrain')),
           effort INTEGER CHECK (effort IS NULL OR (effort >= 1 AND effort <= 5)),
           impact INTEGER CHECK (impact IS NULL OR (impact >= 1 AND impact <= 5)),
-          assigned_agent_id TEXT REFERENCES agents(id),
-          created_by_agent_id TEXT REFERENCES agents(id),
-          workspace_id TEXT DEFAULT 'default' REFERENCES workspaces(id),
-          milestone_id TEXT REFERENCES milestones(id) ON DELETE SET NULL,
-          github_issue_id TEXT REFERENCES github_issues(id) ON DELETE SET NULL,
-          business_id TEXT DEFAULT 'default',
-          due_date TEXT,
-          workflow_template_id TEXT REFERENCES workflow_templates(id),
+           assigned_agent_id TEXT REFERENCES agents(id),
+           created_by_agent_id TEXT REFERENCES agents(id),
+           workspace_id TEXT DEFAULT 'default' REFERENCES workspaces(id),
+           milestone_id TEXT REFERENCES milestones(id) ON DELETE SET NULL,
+           github_issue_id TEXT REFERENCES github_issues(id) ON DELETE SET NULL,
+           due_date TEXT,
+           workflow_template_id TEXT REFERENCES workflow_templates(id),
           planning_session_key TEXT,
           planning_messages TEXT,
           planning_complete INTEGER DEFAULT 0,
@@ -1279,22 +1276,22 @@ const migrations: Migration[] = [
         )
       `);
 
-      db.exec(`
-        INSERT INTO tasks_new_028 (
-          id, title, description, status, priority, task_type, effort, impact,
-          assigned_agent_id, created_by_agent_id, workspace_id, milestone_id,
-          github_issue_id, business_id, due_date, workflow_template_id, planning_session_key,
-          planning_messages, planning_complete, planning_spec, planning_agents,
-          planning_dispatch_error, status_reason, created_at, updated_at
-        )
-        SELECT
-          id, title, description, status, priority, task_type, effort, impact,
-          assigned_agent_id, created_by_agent_id, workspace_id, milestone_id,
-          github_issue_id, business_id, due_date, workflow_template_id, planning_session_key,
-          planning_messages, planning_complete, planning_spec, planning_agents,
-          planning_dispatch_error, status_reason, created_at, updated_at
-        FROM tasks
-      `);
+       db.exec(`
+         INSERT INTO tasks_new_028 (
+           id, title, description, status, priority, task_type, effort, impact,
+           assigned_agent_id, created_by_agent_id, workspace_id, milestone_id,
+           github_issue_id, due_date, workflow_template_id, planning_session_key,
+           planning_messages, planning_complete, planning_spec, planning_agents,
+           planning_dispatch_error, status_reason, created_at, updated_at
+         )
+         SELECT
+           id, title, description, status, priority, task_type, effort, impact,
+           assigned_agent_id, created_by_agent_id, workspace_id, milestone_id,
+           github_issue_id, due_date, workflow_template_id, planning_session_key,
+           planning_messages, planning_complete, planning_spec, planning_agents,
+           planning_dispatch_error, status_reason, created_at, updated_at
+         FROM tasks
+       `);
 
       db.exec('DROP TABLE tasks');
       db.exec('ALTER TABLE tasks_new_028 RENAME TO tasks');
@@ -1413,15 +1410,14 @@ const migrations: Migration[] = [
             task_type TEXT DEFAULT 'feature' CHECK (task_type IN ('bug', 'feature', 'chore', 'documentation', 'research')),
             effort INTEGER CHECK (effort IS NULL OR (effort >= 1 AND effort <= 5)),
             impact INTEGER CHECK (impact IS NULL OR (impact >= 1 AND impact <= 5)),
-            assigned_agent_id TEXT REFERENCES agents(id),
-            created_by_agent_id TEXT REFERENCES agents(id),
-            workspace_id TEXT DEFAULT 'default' REFERENCES workspaces(id),
-            milestone_id TEXT REFERENCES milestones(id) ON DELETE SET NULL,
-            github_issue_id TEXT REFERENCES github_issues(id) ON DELETE SET NULL,
-            business_id TEXT DEFAULT 'default',
-            due_date TEXT,
-            workflow_template_id TEXT REFERENCES workflow_templates(id),
-            planning_session_key TEXT,
+             assigned_agent_id TEXT REFERENCES agents(id),
+             created_by_agent_id TEXT REFERENCES agents(id),
+             workspace_id TEXT DEFAULT 'default' REFERENCES workspaces(id),
+             milestone_id TEXT REFERENCES milestones(id) ON DELETE SET NULL,
+             github_issue_id TEXT REFERENCES github_issues(id) ON DELETE SET NULL,
+             due_date TEXT,
+             workflow_template_id TEXT REFERENCES workflow_templates(id),
+             planning_session_key TEXT,
             planning_messages TEXT,
             planning_complete INTEGER DEFAULT 0,
             planning_spec TEXT,
@@ -1433,24 +1429,24 @@ const migrations: Migration[] = [
           )
         `);
 
-        db.exec(`
-          INSERT INTO tasks (
-            id, title, description, status, priority, task_type, effort, impact,
-            assigned_agent_id, created_by_agent_id, workspace_id, milestone_id, github_issue_id,
-            business_id, due_date, workflow_template_id,
-            planning_session_key, planning_messages, planning_complete, planning_spec, planning_agents,
-            planning_dispatch_error, status_reason, created_at, updated_at
-          )
-          SELECT
-            id, title, description, status, priority,
-            CASE WHEN task_type = 'autotrain' THEN 'chore' ELSE task_type END,
-            effort, impact,
-            assigned_agent_id, created_by_agent_id, workspace_id, milestone_id, github_issue_id,
-            business_id, due_date, workflow_template_id,
-            planning_session_key, planning_messages, planning_complete, planning_spec, planning_agents,
-            planning_dispatch_error, status_reason, created_at, updated_at
-          FROM _tasks_old_031
-        `);
+         db.exec(`
+           INSERT INTO tasks (
+             id, title, description, status, priority, task_type, effort, impact,
+             assigned_agent_id, created_by_agent_id, workspace_id, milestone_id, github_issue_id,
+             due_date, workflow_template_id,
+             planning_session_key, planning_messages, planning_complete, planning_spec, planning_agents,
+             planning_dispatch_error, status_reason, created_at, updated_at
+           )
+           SELECT
+             id, title, description, status, priority,
+             CASE WHEN task_type = 'autotrain' THEN 'chore' ELSE task_type END,
+             effort, impact,
+             assigned_agent_id, created_by_agent_id, workspace_id, milestone_id, github_issue_id,
+             due_date, workflow_template_id,
+             planning_session_key, planning_messages, planning_complete, planning_spec, planning_agents,
+             planning_dispatch_error, status_reason, created_at, updated_at
+           FROM _tasks_old_031
+         `);
 
         db.exec('DROP TABLE _tasks_old_031');
         db.exec('CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status)');
@@ -2184,14 +2180,13 @@ const migrations: Migration[] = [
           task_type TEXT DEFAULT 'feature' CHECK (task_type IN ('bug', 'feature', 'chore', 'documentation', 'research', 'spike')),
           effort INTEGER CHECK (effort IS NULL OR (effort >= 1 AND effort <= 5)),
           impact INTEGER CHECK (impact IS NULL OR (impact >= 1 AND impact <= 5)),
-          assigned_agent_id TEXT REFERENCES agents(id) ON DELETE SET NULL,
-          created_by_agent_id TEXT REFERENCES agents(id) ON DELETE SET NULL,
-          workspace_id TEXT REFERENCES workspaces(id) ON DELETE CASCADE,
-          milestone_id TEXT REFERENCES milestones(id) ON DELETE SET NULL,
-          github_issue_id TEXT REFERENCES github_issues(id) ON DELETE SET NULL,
-          business_id TEXT DEFAULT 'default',
-          due_date TEXT,
-          workflow_template_id TEXT REFERENCES workflow_templates(id) ON DELETE SET NULL,
+           assigned_agent_id TEXT REFERENCES agents(id) ON DELETE SET NULL,
+           created_by_agent_id TEXT REFERENCES agents(id) ON DELETE SET NULL,
+           workspace_id TEXT REFERENCES workspaces(id) ON DELETE CASCADE,
+           milestone_id TEXT REFERENCES milestones(id) ON DELETE SET NULL,
+           github_issue_id TEXT REFERENCES github_issues(id) ON DELETE SET NULL,
+           due_date TEXT,
+           workflow_template_id TEXT REFERENCES workflow_templates(id) ON DELETE SET NULL,
           planning_session_key TEXT,
           planning_messages TEXT,
           planning_complete INTEGER DEFAULT 0,
@@ -2212,9 +2207,8 @@ const migrations: Migration[] = [
         CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
         CREATE INDEX IF NOT EXISTS idx_tasks_agent ON tasks(assigned_agent_id);
         CREATE INDEX IF NOT EXISTS idx_tasks_milestone ON tasks(milestone_id);
-        CREATE INDEX IF NOT EXISTS idx_tasks_type ON tasks(task_type);
-        CREATE INDEX IF NOT EXISTS idx_tasks_business ON tasks(business_id);
-      `);
+         CREATE INDEX IF NOT EXISTS idx_tasks_type ON tasks(task_type);
+       `);
     }
   },
   {

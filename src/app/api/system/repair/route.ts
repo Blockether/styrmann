@@ -57,23 +57,22 @@ export async function POST(request: NextRequest) {
     const taskId = uuidv4();
     const now = new Date().toISOString();
 
-    run(
-      `INSERT INTO tasks (id, title, description, status, priority, task_type, assigned_agent_id, workspace_id, business_id, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        taskId,
-        `System Repair: ${check_name}`,
-        repair_prompt,
-        'assigned',
-        'high',
-        'chore',
-        agent.id,
-        workspace_id,
-        'default',
-        now,
-        now,
-      ],
-    );
+     run(
+       `INSERT INTO tasks (id, title, description, status, priority, task_type, assigned_agent_id, workspace_id, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       [
+         taskId,
+         `System Repair: ${check_name}`,
+         repair_prompt,
+         'assigned',
+         'high',
+         'chore',
+         agent.id,
+         workspace_id,
+         now,
+         now,
+       ],
+     );
 
     // Log event
     run(

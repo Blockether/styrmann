@@ -165,10 +165,10 @@ async function seed() {
     const task = tasks[i];
     const assignedTo = task.status !== 'inbox' ? agentIds[i % agentIds.length] : null;
 
-    db.prepare(
-      `INSERT INTO tasks (id, title, status, priority, assigned_agent_id, created_by_agent_id, business_id, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).run(taskId, task.title, task.status, task.priority, assignedTo, orchestratorId, businessId, now, now);
+     db.prepare(
+       `INSERT INTO tasks (id, title, status, priority, assigned_agent_id, created_by_agent_id, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+     ).run(taskId, task.title, task.status, task.priority, assignedTo, orchestratorId, now, now);
   }
 
   // Create initial events
