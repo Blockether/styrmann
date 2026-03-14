@@ -257,11 +257,7 @@ export function SessionsList({ taskId }: SessionsListProps) {
                     active
                   </span>
                 )}
-                {session.status === 'interrupted' && !session.is_active && (
-                  <span className="text-[11px] px-1.5 py-0.5 rounded border border-orange-200 bg-orange-50 text-orange-700 whitespace-nowrap">
-                    interrupted
-                  </span>
-                )}
+
                 {session.status === 'stale' && !session.is_active && (
                   <span className="text-[11px] px-1.5 py-0.5 rounded border border-yellow-200 bg-yellow-50 text-yellow-700 whitespace-nowrap">
                     stale
