@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { X, Bot, User, Cpu, Clock3, MessageSquare, Shield, ArrowRight, ArrowDown, Wrench, Terminal, Search, AlertTriangle, Copy, Check } from 'lucide-react';
+import { X, Bot, User, Cpu, Clock3, MessageSquare, Shield, ArrowRight, ArrowDown, Wrench, Terminal, Search, AlertTriangle, Copy, Check, ChevronDown, ChevronRight } from 'lucide-react';
 import { marked } from 'marked';
 import { useScrollLock } from '@/hooks/useScrollLock';
 
@@ -176,6 +176,44 @@ function toSafeMarkdownHtml(raw: string): string {
     breaks: true,
     renderer,
   }) as string;
+}
+
+function ExpandableTraceContent({
+  content,
+  threshold = 500,
+  plainClassName,
+  jsonClassName,
+  markdownClassName,
+}: {
+  content: string;
+  threshold?: number;
+  plainClassName: string;
+  jsonClassName: string;
+  markdownClassName: string;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const isLong = content.length > threshold;
+  const displayContent = isLong && !expanded ? `${content.slice(0, threshold)}...` : content;
+
+  return (
+    <div>
+      <RenderTraceBody
+        raw={displayContent}
+        plainClassName={plainClassName}
+        jsonClassName={jsonClassName}
+        markdownClassName={markdownClassName}
+      />
+      {isLong && (
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="mt-1 flex items-center gap-1 text-[11px] text-mc-accent hover:text-mc-accent/80"
+        >
+          {expanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+          {expanded ? 'Collapse' : `Show full (${(content.length / 1000).toFixed(1)}k chars)`}
+        </button>
+      )}
+    </div>
+  );
 }
 
 function RenderTraceBody({
@@ -497,11 +535,12 @@ export function TraceViewerModal({ taskId, sessionId, onClose }: TraceViewerModa
                         <span className="text-[11px] text-mc-text-secondary flex-shrink-0">#{index + 1} - {formatTimestamp(message.timestamp)}</span>
                       </div>
                       {message.content && isToolOutput ? (
-                        <RenderTraceBody
-                          raw={message.content}
-                          plainClassName={`text-xs p-1.5 mt-1 rounded font-mono whitespace-pre-wrap break-words overflow-x-auto max-h-48 ${isError ? 'bg-red-50 border border-red-200 text-red-800' : 'bg-mc-bg border border-mc-border text-mc-text-secondary'}`}
-                          jsonClassName={`text-xs p-1.5 mt-1 rounded font-mono whitespace-pre-wrap break-words overflow-x-auto max-h-48 ${isError ? 'bg-red-50 border border-red-200 text-red-800' : 'bg-mc-bg border border-mc-border text-mc-text-secondary'}`}
-                          markdownClassName={`text-xs p-2 mt-1 rounded whitespace-pre-wrap break-words overflow-x-auto max-h-48 [&_h1]:text-sm [&_h1]:font-semibold [&_h2]:text-sm [&_h2]:font-semibold [&_h3]:font-semibold [&_ul]:list-disc [&_ul]:pl-4 [&_ol]:list-decimal [&_ol]:pl-4 [&_code]:font-mono [&_code]:text-[11px] [&_pre]:font-mono [&_a]:text-cyan-700 [&_a]:underline ${isError ? 'bg-red-50 border border-red-200 text-red-800' : 'bg-mc-bg border border-mc-border text-mc-text'}`}
+                        <ExpandableTraceContent
+                          content={message.content}
+                          threshold={800}
+                          plainClassName={`text-xs p-1.5 mt-1 rounded font-mono whitespace-pre-wrap break-words overflow-x-auto ${isError ? 'bg-red-50 border border-red-200 text-red-800' : 'bg-mc-bg border border-mc-border text-mc-text-secondary'}`}
+                          jsonClassName={`text-xs p-1.5 mt-1 rounded font-mono whitespace-pre-wrap break-words overflow-x-auto ${isError ? 'bg-red-50 border border-red-200 text-red-800' : 'bg-mc-bg border border-mc-border text-mc-text-secondary'}`}
+                          markdownClassName={`text-xs p-2 mt-1 rounded whitespace-pre-wrap break-words overflow-x-auto [&_h1]:text-sm [&_h1]:font-semibold [&_h2]:text-sm [&_h2]:font-semibold [&_h3]:font-semibold [&_ul]:list-disc [&_ul]:pl-4 [&_ol]:list-decimal [&_ol]:pl-4 [&_code]:font-mono [&_code]:text-[11px] [&_pre]:font-mono [&_a]:text-cyan-700 [&_a]:underline ${isError ? 'bg-red-50 border border-red-200 text-red-800' : 'bg-mc-bg border border-mc-border text-mc-text'}`}
                         />
                       ) : message.content ? (
                         <RenderTraceBody
@@ -519,11 +558,11 @@ export function TraceViewerModal({ taskId, sessionId, onClose }: TraceViewerModa
                               <div className="min-w-0">
                                 <span className="font-mono font-medium text-mc-accent">{tc.name}</span>
                                 {tc.input && (
-                                  <RenderTraceBody
-                                    raw={tc.input.length > 500 ? `${tc.input.slice(0, 500)}...` : tc.input}
-                                    plainClassName="mt-0.5 p-1.5 rounded bg-mc-bg border border-mc-border text-[11px] text-mc-text-secondary overflow-x-auto max-h-32 whitespace-pre-wrap break-words font-mono"
-                                    jsonClassName="mt-0.5 p-1.5 rounded bg-mc-bg border border-mc-border text-[11px] text-mc-text-secondary overflow-x-auto max-h-32 whitespace-pre-wrap break-words font-mono"
-                                    markdownClassName="mt-0.5 p-1.5 rounded bg-mc-bg border border-mc-border text-[11px] text-mc-text overflow-x-auto max-h-32 whitespace-pre-wrap break-words [&_ul]:list-disc [&_ul]:pl-4 [&_ol]:list-decimal [&_ol]:pl-4 [&_code]:font-mono [&_code]:text-[10px] [&_a]:text-cyan-700 [&_a]:underline"
+                                  <ExpandableTraceContent
+                                    content={tc.input}
+                                    plainClassName="mt-0.5 p-1.5 rounded bg-mc-bg border border-mc-border text-[11px] text-mc-text-secondary overflow-x-auto whitespace-pre-wrap break-words font-mono"
+                                    jsonClassName="mt-0.5 p-1.5 rounded bg-mc-bg border border-mc-border text-[11px] text-mc-text-secondary overflow-x-auto whitespace-pre-wrap break-words font-mono"
+                                    markdownClassName="mt-0.5 p-1.5 rounded bg-mc-bg border border-mc-border text-[11px] text-mc-text overflow-x-auto whitespace-pre-wrap break-words [&_ul]:list-disc [&_ul]:pl-4 [&_ol]:list-decimal [&_ol]:pl-4 [&_code]:font-mono [&_code]:text-[10px] [&_a]:text-cyan-700 [&_a]:underline"
                                   />
                                 )}
                               </div>
@@ -535,11 +574,11 @@ export function TraceViewerModal({ taskId, sessionId, onClose }: TraceViewerModa
                         <div className="mt-1 flex items-start gap-1.5 text-xs">
                           <Terminal className="w-3 h-3 mt-0.5 text-emerald-600 flex-shrink-0" />
                           <div className="min-w-0 flex-1">
-                            <RenderTraceBody
-                              raw={message.tool_result.length > 500 ? `${message.tool_result.slice(0, 500)}...` : message.tool_result}
-                              plainClassName="p-1.5 rounded bg-emerald-50 border border-emerald-200 text-[11px] text-emerald-800 overflow-x-auto max-h-32 whitespace-pre-wrap break-words font-mono"
-                              jsonClassName="p-1.5 rounded bg-emerald-50 border border-emerald-200 text-[11px] text-emerald-800 overflow-x-auto max-h-32 whitespace-pre-wrap break-words font-mono"
-                              markdownClassName="p-1.5 rounded bg-emerald-50 border border-emerald-200 text-[11px] text-emerald-900 overflow-x-auto max-h-32 whitespace-pre-wrap break-words [&_ul]:list-disc [&_ul]:pl-4 [&_ol]:list-decimal [&_ol]:pl-4 [&_code]:font-mono [&_code]:text-[10px] [&_a]:text-emerald-700 [&_a]:underline"
+                            <ExpandableTraceContent
+                              content={message.tool_result}
+                              plainClassName="p-1.5 rounded bg-emerald-50 border border-emerald-200 text-[11px] text-emerald-800 overflow-x-auto whitespace-pre-wrap break-words font-mono"
+                              jsonClassName="p-1.5 rounded bg-emerald-50 border border-emerald-200 text-[11px] text-emerald-800 overflow-x-auto whitespace-pre-wrap break-words font-mono"
+                              markdownClassName="p-1.5 rounded bg-emerald-50 border border-emerald-200 text-[11px] text-emerald-900 overflow-x-auto whitespace-pre-wrap break-words [&_ul]:list-disc [&_ul]:pl-4 [&_ol]:list-decimal [&_ol]:pl-4 [&_code]:font-mono [&_code]:text-[10px] [&_a]:text-emerald-700 [&_a]:underline"
                             />
                           </div>
                         </div>

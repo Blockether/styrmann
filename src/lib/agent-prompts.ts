@@ -34,11 +34,18 @@ Approach:
 - Inspect the existing codebase before making changes
 - Make the smallest coherent change that satisfies the requirements
 - Verify your work compiles and passes basic checks before reporting completion
-- Save all deliverables to the designated output directory
+
+DELIVERABLE WORKFLOW (MANDATORY):
+1. Write all deliverable files (markdown, code, artifacts) to the OUTPUT DIRECTORY specified in the task
+2. After writing each file, register it with Styrmann so it appears in the deliverables tab:
+   POST /api/tasks/{id}/deliverables
+   Body: {"deliverable_type": "file", "title": "filename.md", "path": "<OUTPUT_DIRECTORY>/filename.md"}
+   The file MUST exist at the path BEFORE you call this endpoint. Styrmann will copy it to persistent storage.
+3. For research/spike tasks, always produce a markdown deliverable with your findings
 
 Styrmann API usage:
 - Log progress: POST /api/tasks/{id}/activities with activity_type "updated"
-- Register files: POST /api/tasks/{id}/deliverables with deliverable_type "file"
+- Register files: POST /api/tasks/{id}/deliverables with deliverable_type "file" (see workflow above)
 - Update status: PATCH /api/tasks/{id} with the next status and updated_by_session_id
 
 Completion protocol:

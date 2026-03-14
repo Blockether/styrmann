@@ -658,11 +658,19 @@ export async function dispatchTaskToAgent(taskId: string): Promise<DispatchResul
 - This workspace runs without a git worktree branch requirement.
 - Still write deliverables under ${taskProjectDir}`;
 
-completionInstructions = `**IMPORTANT:** Use Styrmann direct REST API.
+completionInstructions = `**DELIVERABLE WORKFLOW (MANDATORY):**
+You MUST register all deliverables with Styrmann. Files you write are NOT automatically tracked.
+1. Write your deliverable files (markdown, code, artifacts) to: ${taskProjectDir}
+2. For EACH file, register it so it appears in the Deliverables tab:
+   POST ${styrmannUrl}/api/tasks/${task.id}/deliverables${authHeader}
+   Body: {"deliverable_type": "file", "title": "your-file.md", "path": "${taskProjectDir}/your-file.md"}
+   The file MUST exist at the path BEFORE you call this. Styrmann copies it to persistent storage.
+3. For spike/research tasks, always produce at least one markdown deliverable with findings.
+
+**COMPLETION STEPS (in order):**
 1. Log activity: POST ${styrmannUrl}/api/tasks/${task.id}/activities${authHeader}
    Body: {"activity_type": "completed", "message": "Description of what was done", "metadata": ${branchMetadata}}
-2. Register deliverable: POST ${styrmannUrl}/api/tasks/${task.id}/deliverables${authHeader}
-   Body: {"deliverable_type": "file", "title": "File name", "path": "${taskProjectDir}/filename.html"}
+2. Register ALL deliverable files (see workflow above)
 3. Update status: PATCH ${styrmannUrl}/api/tasks/${task.id}${authHeader}
    Body: {"status": "${nextStatus}", "updated_by_session_id": "${session.session_id}"}
 
