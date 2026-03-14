@@ -28,6 +28,21 @@ interface TaskResponse {
   task_type: string;
 }
 
+interface OrgTicketResponse {
+  id: string;
+  title: string;
+  status: string;
+  priority: string;
+  ticket_type: string;
+}
+
+interface DelegationResponse {
+  success: boolean;
+  task_ids: string[];
+  error?: string;
+  llm_used: boolean;
+}
+
 interface CompletionEntry {
   id: string;
   discord_channel_id: string;
@@ -83,25 +98,90 @@ async function classifyMessage(content: string, authorName: string): Promise<Cla
   }
 }
 
-async function createTask(classification: ClassifyResponse, content: string, workspaceId: string): Promise<TaskResponse | null> {
+const VALID_TICKET_TYPES = new Set(['feature', 'bug', 'improvement', 'task', 'epic']);
+
+function toTicketType(taskType?: string): string {
+  if (taskType && VALID_TICKET_TYPES.has(taskType)) return taskType;
+  return 'task';
+}
+
+async function getWorkspaceOrgId(workspaceId: string): Promise<string | null> {
   try {
-    const res = await mcFetch('/api/tasks', {
-      method: 'POST',
-      body: JSON.stringify({
-        title: classification.title || content.slice(0, 200),
-        description: classification.description || content,
-        workspace_id: workspaceId,
-        task_type: classification.task_type || 'feature',
-        priority: classification.priority || 'normal',
-      }),
-    });
+    const res = await mcFetch(`/api/workspaces/${workspaceId}`);
     if (!res.ok) {
-      log.warn(`Task creation failed: ${res.status}`);
+      log.warn(`Failed to fetch workspace ${workspaceId}: ${res.status}`);
       return null;
     }
-    return await res.json() as TaskResponse;
+    const workspace = await res.json() as { organization_id?: string };
+    return workspace.organization_id || null;
   } catch (err) {
-    log.error('Task creation request failed:', err);
+    log.error('Failed to fetch workspace:', err);
+    return null;
+  }
+}
+
+async function createTask(classification: ClassifyResponse, content: string, workspaceId: string): Promise<TaskResponse | null> {
+  try {
+    const orgId = await getWorkspaceOrgId(workspaceId);
+    if (!orgId) {
+      log.warn('No organization_id found for workspace — cannot create org ticket');
+      return null;
+    }
+
+    const title = classification.title || content.slice(0, 200);
+
+    const ticketRes = await mcFetch('/api/org-tickets', {
+      method: 'POST',
+      headers: { 'x-mc-system': 'daemon' },
+      body: JSON.stringify({
+        organization_id: orgId,
+        title,
+        description: classification.description || content,
+        ticket_type: toTicketType(classification.task_type),
+        priority: classification.priority || 'normal',
+        external_system: 'discord',
+        creator_name: 'discord-daemon',
+      }),
+    });
+
+    if (!ticketRes.ok) {
+      log.warn(`Org ticket creation failed: ${ticketRes.status}`);
+      return null;
+    }
+
+    const ticket = await ticketRes.json() as OrgTicketResponse;
+    log.info(`Created org ticket ${ticket.id}: "${ticket.title}"`);
+
+    const delegateRes = await mcFetch(`/api/org-tickets/${ticket.id}/delegate`, {
+      method: 'POST',
+      headers: { 'x-mc-system': 'daemon' },
+      body: JSON.stringify({ workspace_id: workspaceId }),
+    });
+
+    if (!delegateRes.ok) {
+      log.warn(`Org ticket delegation failed: ${delegateRes.status}`);
+      return {
+        id: ticket.id,
+        title: ticket.title,
+        status: 'inbox',
+        priority: ticket.priority,
+        task_type: classification.task_type || 'feature',
+      };
+    }
+
+    const delegation = await delegateRes.json() as DelegationResponse;
+    const primaryTaskId = delegation.task_ids?.[0] || ticket.id;
+    log.info(`Delegated org ticket ${ticket.id} -> tasks: [${delegation.task_ids.join(', ')}]`);
+
+    return {
+      id: primaryTaskId,
+      title: ticket.title,
+      status: 'inbox',
+      priority: ticket.priority,
+      task_type: classification.task_type || 'feature',
+    };
+  } catch (err) {
+    log.error('Org ticket creation/delegation failed:', err);
     return null;
   }
 }

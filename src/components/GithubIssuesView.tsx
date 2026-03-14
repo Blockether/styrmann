@@ -8,7 +8,7 @@ import {
   RefreshCw,
   CircleDot,
   CheckCircle2,
-  ChevronRight,
+  Loader2,
 } from 'lucide-react';
 import type { GitHubIssue, Workspace } from '@/lib/types';
 import { formatDistanceToNow } from 'date-fns';
@@ -16,17 +16,18 @@ import { formatDistanceToNow } from 'date-fns';
 interface GithubIssuesViewProps {
   workspaceId: string;
   workspace: Workspace;
-  onCreateTask: (issue: GitHubIssue) => void;
 }
 
 type IssueStateFilter = 'open' | 'closed' | 'all';
 
-export function GithubIssuesView({ workspaceId, workspace, onCreateTask }: GithubIssuesViewProps) {
+export function GithubIssuesView({ workspaceId, workspace }: GithubIssuesViewProps) {
   const [issues, setIssues] = useState<GitHubIssue[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [stateFilter, setStateFilter] = useState<IssueStateFilter>('open');
   const [error, setError] = useState<string | null>(null);
+  const [creatingTicket, setCreatingTicket] = useState<string | null>(null);
+  const [ticketSuccess, setTicketSuccess] = useState<string | null>(null);
 
   const fetchIssues = useCallback(async () => {
     try {
@@ -69,6 +70,58 @@ export function GithubIssuesView({ workspaceId, workspace, onCreateTask }: Githu
       setError(err instanceof Error ? err.message : 'Sync failed');
     } finally {
       setSyncing(false);
+    }
+  };
+
+  const handleCreateTicket = async (issue: GitHubIssue) => {
+    if (!workspace.organization_id) {
+      setError('Workspace has no linked organization');
+      return;
+    }
+
+    setCreatingTicket(issue.id);
+    setTicketSuccess(null);
+    try {
+      const ticketRes = await fetch('/api/org-tickets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          organization_id: workspace.organization_id,
+          title: issue.title,
+          description: issue.body || issue.title,
+          ticket_type: 'task',
+          priority: 'normal',
+          external_ref: `github#${issue.issue_number}`,
+          external_system: 'github',
+        }),
+      });
+
+      if (!ticketRes.ok) {
+        const errData = await ticketRes.json().catch(() => ({ error: 'Failed to create ticket' }));
+        setError(errData.error || 'Failed to create ticket');
+        return;
+      }
+
+      const ticket = await ticketRes.json() as { id: string; title: string };
+
+      const delegateRes = await fetch(`/api/org-tickets/${ticket.id}/delegate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workspace_id: workspaceId }),
+      });
+
+      if (!delegateRes.ok) {
+        setTicketSuccess(`Ticket created (${ticket.id.slice(0, 8)}) but delegation failed`);
+        return;
+      }
+
+      const delegation = await delegateRes.json() as { task_ids?: string[] };
+      const taskCount = delegation.task_ids?.length || 0;
+      setTicketSuccess(`Ticket delegated: ${taskCount} task${taskCount !== 1 ? 's' : ''} created`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create ticket');
+    } finally {
+      setCreatingTicket(null);
     }
   };
 
@@ -168,7 +221,13 @@ export function GithubIssuesView({ workspaceId, workspace, onCreateTask }: Githu
         </div>
       </div>
 
-      {/* Content */}
+      {ticketSuccess && (
+        <div className="mx-3 mt-3 p-2 bg-mc-accent-green/10 border border-mc-accent-green/30 rounded text-xs text-mc-accent-green flex items-center justify-between">
+          <span>{ticketSuccess}</span>
+          <button onClick={() => setTicketSuccess(null)} className="ml-2 hover:opacity-70">&times;</button>
+        </div>
+      )}
+
       <div className="flex-1 overflow-y-auto p-3">
         {loading ? (
           <div className="flex items-center justify-center py-12">
@@ -278,19 +337,24 @@ export function GithubIssuesView({ workspaceId, workspace, onCreateTask }: Githu
                           )}
                         </div>
 
-                        {/* Action button */}
                         {hasTask ? (
                           <span className="text-xs text-mc-accent-green flex items-center gap-1">
                             <CheckCircle2 className="w-3 h-3" />
                             Linked to task
                           </span>
+                        ) : creatingTicket === issue.id ? (
+                          <span className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-mc-text-secondary">
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                            Creating...
+                          </span>
                         ) : (
                           <button
-                            onClick={() => onCreateTask(issue)}
-                            className="flex items-center gap-1.5 px-2.5 py-1.5 bg-mc-accent text-white rounded text-xs font-medium hover:bg-mc-accent/90 transition-colors"
+                            onClick={() => handleCreateTicket(issue)}
+                            disabled={!workspace.organization_id}
+                            className="flex items-center gap-1.5 px-2.5 py-1.5 bg-mc-accent text-white rounded text-xs font-medium hover:bg-mc-accent/90 transition-colors disabled:opacity-50"
                           >
                             <Plus className="w-3 h-3" />
-                            Create Task
+                            Create Ticket
                           </button>
                         )}
                       </div>

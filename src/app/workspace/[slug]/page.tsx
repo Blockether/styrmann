@@ -13,11 +13,10 @@ import { ParetoView } from '@/components/ParetoView';
 import { SSEDebugPanel } from '@/components/SSEDebugPanel';
 import { GithubIssuesView } from '@/components/GithubIssuesView';
 import { DiscordMessagesView } from '@/components/DiscordMessagesView';
-import { TaskModal } from '@/components/TaskModal';
 import { useStyrmann } from '@/lib/store';
 import { useSSE } from '@/hooks/useSSE';
 import { debug } from '@/lib/debug';
-import type { Task, Workspace, GitHubIssue } from '@/lib/types';
+import type { Task, Workspace } from '@/lib/types';
 
 function getInitialView(): DashboardView {
   if (typeof window === 'undefined') return 'sprint';
@@ -40,7 +39,6 @@ export default function WorkspacePage() {
   const [view, setView] = useState<DashboardView>(getInitialView);
 
   const [isPortrait, setIsPortrait] = useState(true);
-  const [githubIssueForTask, setGithubIssueForTask] = useState<GitHubIssue | null>(null);
 
   useSSE();
 
@@ -175,7 +173,7 @@ export default function WorkspacePage() {
       case 'pareto':
         return <ParetoView workspaceId={workspace.id} />;
       case 'issues':
-        return <GithubIssuesView workspaceId={workspace.id} workspace={workspace} onCreateTask={(issue) => setGithubIssueForTask(issue)} />;
+        return <GithubIssuesView workspaceId={workspace.id} workspace={workspace} />;
       case 'discord':
         return <DiscordMessagesView workspaceId={workspace.id} />;
       default:
@@ -223,13 +221,6 @@ export default function WorkspacePage() {
       <main id="main-content" className="flex-1 min-w-0 overflow-hidden flex flex-col">{renderView()}</main>
 
       <SSEDebugPanel />
-      {githubIssueForTask && (
-        <TaskModal
-          githubIssue={githubIssueForTask}
-          onClose={() => setGithubIssueForTask(null)}
-          workspaceId={workspace.id}
-        />
-      )}
     </div>
   );
 }

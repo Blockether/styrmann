@@ -250,6 +250,7 @@ export interface Workspace {
   coordinator_email?: string;
   logo_url?: string;
   organization?: string;
+  organization_id?: string;
   created_at: string;
   updated_at: string;
 }
