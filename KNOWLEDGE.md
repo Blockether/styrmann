@@ -266,7 +266,7 @@ The Strict template is the default. Per-task workflow plans persist selected par
 **Bootstrap policy**: `bootstrapCoreAgentsRaw()` is a fallback for fresh installs without an OpenClaw gateway. It bootstraps 8 local fallback agents globally: Orchestrator, Builder, Tester, Reviewer, Explorer, Pragmatist, Guardian, and Consolidator. If any synced agents exist, bootstrap is skipped entirely — synced agents ARE the real team. Workflow planning handles missing roles via `task_findings` and `capability_proposals` rather than creating new agents.
 
 **OpenClaw prompt source policy**: Styrmann treats workspace `AGENTS.md` as the canonical agent instruction source and `SOUL.md` as identity/personality context. `system.md` in agent directories is considered legacy and is auto-migrated into workspace `AGENTS.md` + `SOUL.md` when detected, then removed. Framework-level duplicate system prompt injection is intentionally avoided.
-**Memory handling**: Memory is handled natively by OpenClaw's lossless memory system. Styrmann no longer runs its own memory consolidation pipeline, vector search, agent filesystem sync, or workspace knowledge API. The `/api/memory/*` endpoints and daemon consolidation job have been removed.
+**Org knowledge platform**: Styrmann stores organization-scoped memories (`/api/memories`), relationship edges (`/api/entity-links`), and synthesized knowledge articles (`/api/knowledge`). `POST /api/knowledge/synthesize` runs an LLM-backed synthesis pipeline over open/resolved memories and publishes curated knowledge articles linked with `derived_from` entity links.
 
 **Agent fields**: name, role, description, status (standby/working/offline), model, source (local/gateway/synced), gateway_agent_id, session_key_prefix, agent_dir, agent_workspace_path, soul_md, user_md, agents_md. **API enrichment**: `GET /api/agents` returns `active_task_count` (number of active tasks) and `current_task_title` (title of in-progress task, if any) for each agent.
 
@@ -333,6 +333,7 @@ Events broadcast:
 - `activity_logged`, `activity_presented`, `deliverable_added`, `deliverable_deleted`
 - `agent_spawned`, `agent_completed`
 - `agent_updated`, `agent_log_added`, `github_issues_synced`, `daemon_stats_updated`
+- `organization_created`, `organization_updated`, `organization_deleted`, `org_ticket_created`, `org_ticket_updated`, `org_ticket_deleted`, `memory_created`, `memory_updated`, `entity_linked`, `commit_ingested`, `knowledge_synthesized`
 Client: `src/hooks/useSSE.ts` with auto-reconnect (5s retry) and 30s keep-alive pings.
 Server: `src/lib/events.ts` manages connected clients.
 
@@ -410,6 +411,15 @@ Fallback: Agent Activity Dashboard polls every 20s; task-specific views use SSE 
 | POST | `/api/system/validate` | Run validation checks (env, DB, services, HTTP) — returns JSON |
 | GET | `/api/daemon/stats` | Latest daemon stats snapshot (pushed by daemon every 30s) |
 | POST | `/api/daemon/stats` | Daemon pushes its in-memory stats to MC |
+
+### Org Knowledge APIs
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET/POST | `/api/memories` | List/create organization memory entries with optional FTS search and filters |
+| GET/POST | `/api/entity-links` | List/create cross-entity links (`delegates_to`, `derived_from`, etc.) |
+| GET | `/api/knowledge` | List synthesized knowledge articles with optional FTS search |
+| GET/PATCH/DELETE | `/api/knowledge/{id}` | Read/update/archive a single knowledge article |
+| POST | `/api/knowledge/synthesize` | Trigger LLM-powered synthesis from memories into published knowledge articles |
 
 ---
 
