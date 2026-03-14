@@ -46,6 +46,16 @@ WARNINGS=0
 echo -e "${BOLD}Styrmann - Deploy${NC}"
 echo "================================================"
 
+# ── DB Backup (before deploy) ────────────────────────────────
+DB_FILE="${PROJECT_DIR}/styrman.db"
+if [ -f "$DB_FILE" ]; then
+  BACKUP_FILE="${PROJECT_DIR}/styrman.db.pre-deploy-$(date +%s)"
+  cp "$DB_FILE" "$BACKUP_FILE"
+  echo "DB backed up to $BACKUP_FILE"
+  # Clean up backups older than 7 days
+  find "${PROJECT_DIR}" -name "styrman.db.pre-deploy-*" -mtime +7 -delete 2>/dev/null || true
+fi
+
 # ── Step 1: Build ────────────────────────────────────────────
 step 1 "Clearing cache + building..."
 rm -rf "${PROJECT_DIR}/.next/cache/images" 2>/dev/null || true
