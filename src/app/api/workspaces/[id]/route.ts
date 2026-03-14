@@ -152,11 +152,9 @@ export async function DELETE(
         db.prepare('DELETE FROM task_dependencies WHERE task_id = ? OR depends_on_task_id = ?').run(taskId, taskId);
         db.prepare('DELETE FROM task_tags WHERE task_id = ?').run(taskId);
         db.prepare('DELETE FROM task_roles WHERE task_id = ?').run(taskId);
-        db.prepare('DELETE FROM task_provenance WHERE task_id = ?').run(taskId);
-        db.prepare('DELETE FROM sessions WHERE task_id = ?').run(taskId);
-        db.prepare('DELETE FROM planning_questions WHERE task_id = ?').run(taskId);
-        db.prepare('DELETE FROM planning_specs WHERE task_id = ?').run(taskId);
-        db.prepare('DELETE FROM events WHERE task_id = ?').run(taskId);
+         db.prepare('DELETE FROM task_provenance WHERE task_id = ?').run(taskId);
+         db.prepare('DELETE FROM sessions WHERE task_id = ?').run(taskId);
+         db.prepare('DELETE FROM events WHERE task_id = ?').run(taskId);
         db.prepare('DELETE FROM scheduled_job_runs WHERE task_id = ?').run(taskId);
         // conversations.task_id has no CASCADE — delete messages/participants via cascade, then conversations
         const convos = db.prepare('SELECT id FROM conversations WHERE task_id = ?').all(taskId) as { id: string }[];

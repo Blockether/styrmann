@@ -527,28 +527,15 @@ export async function generateTaskWorkflowPlan(taskId: string): Promise<{ plan: 
       `UPDATE tasks
        SET workflow_template_id = ?,
            workflow_plan_id = ?,
-           planning_complete = 1,
-           planning_spec = ?,
-           planning_agents = ?,
            assigned_agent_id = ?,
            status = ?,
-           planning_dispatch_error = ?,
            updated_at = ?
        WHERE id = ?`,
       [
         workflowTemplateId,
         planId,
-        JSON.stringify({
-          title: `Workflow Plan - ${task.title}`,
-          summary,
-          deliverables: ['Execution workflow plan', 'Agent role and skill mapping'],
-          success_criteria: ['Existing agents selected', 'No dynamic agents created', 'Findings and proposals recorded for missing capability'],
-          constraints: { workflow_name: workflowName },
-        }),
-        JSON.stringify(planningAgentsPayload),
         nextAssignedAgentId,
         nextStatus,
-        findings.length > 0 ? `${findings.length} workflow finding(s) recorded` : null,
         now,
         task.id,
       ],
@@ -605,8 +592,7 @@ export function updateWorkflowStepPrompt(taskId: string, stepId: string, prompt:
   const now = new Date().toISOString();
   const planningAgentsPayload = buildPlanningAgentsPayload(task, participants, steps);
 
-  run('UPDATE task_workflow_plans SET steps_json = ?, updated_at = ? WHERE task_id = ?', [JSON.stringify(steps), now, taskId]);
-  run('UPDATE tasks SET planning_agents = ?, updated_at = ? WHERE id = ?', [JSON.stringify(planningAgentsPayload), now, taskId]);
+   run('UPDATE task_workflow_plans SET steps_json = ?, updated_at = ? WHERE task_id = ?', [JSON.stringify(steps), now, taskId]);
 
   const updatedTask = queryOne<Task>('SELECT * FROM tasks WHERE id = ? LIMIT 1', [taskId]);
   if (updatedTask) {

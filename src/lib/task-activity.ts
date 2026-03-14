@@ -87,7 +87,6 @@ function hasCriticalTransitionSignal(activity: TaskActivity): boolean {
     || details.fail_target
     || details.dispatch_error
     || details.retry_error
-    || details.planning_dispatch_error
     || details.status_reason
   );
 }

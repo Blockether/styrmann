@@ -201,7 +201,6 @@ function buildTaskProblemStatementMarkdown(args: {
   orchestratorPlanSummary: string[];
   orchestratorParticipants: string[];
   orchestratorPlanDiagram: string | null;
-  planningSpecSection: string;
   agentInstructionsSection: string;
   resourceSection: string;
 }): string {
@@ -217,7 +216,6 @@ function buildTaskProblemStatementMarkdown(args: {
     orchestratorPlanSummary,
     orchestratorParticipants,
     orchestratorPlanDiagram,
-    planningSpecSection,
     agentInstructionsSection,
     resourceSection,
   } = args;
@@ -263,7 +261,6 @@ ${orchestratorPlanDiagram}\n\n\
     orchestratorPlanSection,
     orchestratorDiagramSection,
     participantsSection,
-    planningSpecSection.trim().length > 0 ? `## Planning Specification\n${sanitizePlanningSection(planningSpecSection)}` : '',
     agentInstructionsSection.trim().length > 0 ? `## Role Instructions\n${agentInstructionsSection.trim()}` : '',
     resourceSection.trim().length > 0 ? `## Task Resources\n${resourceSection.trim()}` : '',
     '',
@@ -507,61 +504,9 @@ export async function dispatchTaskToAgent(taskId: string): Promise<DispatchResul
     const rawTask = task as Task & {
       assigned_agent_name?: string;
       workspace_id: string;
-      planning_spec?: string;
-      planning_agents?: string;
     };
-    let planningSpecSection = '';
     let agentInstructionsSection = '';
-    let planningSpecData: Record<string, unknown> | null = null;
-    let planningAgentsData: Array<{ name?: string; role?: string; instructions?: string; agent_id?: string }> = [];
     const workflowPlanData = getTaskWorkflowPlan(task.id)?.plan || null;
-
-    if (rawTask.planning_spec) {
-      try {
-        const spec = JSON.parse(rawTask.planning_spec);
-        if (spec && typeof spec === 'object' && !Array.isArray(spec)) {
-          planningSpecData = spec as Record<string, unknown>;
-        }
-        const formattedSpec = typeof spec === 'string'
-          ? spec
-          : (typeof spec.spec_markdown === 'string' && spec.spec_markdown.trim().length > 0
-            ? spec.spec_markdown
-            : formatPlanningSpecMarkdown(planningSpecData));
-        const specText = formattedSpec && formattedSpec.trim().length > 0
-          ? formattedSpec
-          : JSON.stringify(spec, null, 2);
-        planningSpecSection = `\n---\n**PLANNING SPECIFICATION:**\n${specText}\n`;
-      } catch {
-        planningSpecSection = `\n---\n**PLANNING SPECIFICATION:**\n${rawTask.planning_spec}\n`;
-      }
-    }
-
-    if (rawTask.planning_agents) {
-      try {
-        const agents = JSON.parse(rawTask.planning_agents);
-        if (Array.isArray(agents)) {
-          planningAgentsData = agents as Array<{ name?: string; role?: string; instructions?: string; agent_id?: string }>;
-          const myInstructions = agents.find(
-            (a: { agent_id?: string; name?: string; instructions?: string }) =>
-              a.agent_id === agent.id || a.name === agent.name
-          );
-          if (myInstructions?.instructions) {
-            agentInstructionsSection = `\n**YOUR INSTRUCTIONS:**\n${myInstructions.instructions}\n`;
-          } else {
-            const allInstructions = agents
-              .filter((a: { instructions?: string }) => a.instructions)
-              .map((a: { name?: string; role?: string; instructions?: string }) =>
-                `- **${a.name || a.role || 'Agent'}:** ${a.instructions}`
-              )
-              .join('\n');
-            if (allInstructions) {
-              agentInstructionsSection = `\n**AGENT INSTRUCTIONS:**\n${allInstructions}\n`;
-            }
-          }
-        }
-      } catch {
-      }
-    }
 
     const resourceSection = buildResourceContext(task.id);
     const acceptanceCriteriaRows = queryAll<{ description: string; is_met: number }>(
@@ -573,35 +518,9 @@ export async function dispatchTaskToAgent(taskId: string): Promise<DispatchResul
     );
     const acceptanceCriteria = acceptanceCriteriaRows.map((row) => `${row.description}${row.is_met ? ' (already marked met)' : ''}`);
     const orchestratorPlanSummary: string[] = [];
-    const specSummary = planningSpecData?.summary;
-    if (typeof specSummary === 'string' && specSummary.trim().length > 0) {
-      orchestratorPlanSummary.push(specSummary.trim());
-    }
-    const specSuccessCriteria = planningSpecData?.success_criteria;
-    if (Array.isArray(specSuccessCriteria)) {
-      for (const criterion of specSuccessCriteria) {
-        if (typeof criterion === 'string' && criterion.trim().length > 0) {
-          acceptanceCriteria.push(criterion.trim());
-        }
-      }
-    }
-    const specDeliverables = planningSpecData?.deliverables;
-    if (Array.isArray(specDeliverables) && specDeliverables.length > 0) {
-      const formatted = specDeliverables
-        .filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
-        .map((item) => item.trim());
-      if (formatted.length > 0) {
-        orchestratorPlanSummary.push(`Expected deliverables: ${formatted.join('; ')}`);
-      }
-    }
-    const orchestratorParticipants = planningAgentsData
-      .map((entry) => {
-        const name = typeof entry.name === 'string' && entry.name.trim().length > 0 ? entry.name.trim() : 'Unnamed agent';
-        const role = typeof entry.role === 'string' && entry.role.trim().length > 0 ? entry.role.trim() : null;
-        return role ? `${name} (${role})` : name;
-      });
+    const orchestratorParticipants: string[] = [];
     const orchestratorPlanDiagram = buildWorkflowDiagram(
-      workflowPlanData?.summary || (typeof specSummary === 'string' ? specSummary : null),
+      workflowPlanData?.summary || null,
       workflowPlanData?.participants || [],
       workflowPlanData?.steps || [],
     );
@@ -747,7 +666,7 @@ ${task.description ? `**Description:** ${task.description}\n` : ''}
 ${task.due_date ? `**Due:** ${task.due_date}\n` : ''}
 **Task ID:** ${task.id}
 **Styrmann API base:** ${styrmannUrl}/api
-${planningSpecSection}${agentInstructionsSection}${resourceSection}
+${agentInstructionsSection}${resourceSection}
 **RUNTIME CONTRACT:**
 - This task runs in an OpenCode session for this agent.
 - Inspect, edit, and verify using the runtime tools available to you.
@@ -769,7 +688,6 @@ If you need help or clarification, ask the orchestrator.`;
       orchestratorPlanSummary,
       orchestratorParticipants,
       orchestratorPlanDiagram,
-      planningSpecSection,
       agentInstructionsSection,
       resourceSection,
     });

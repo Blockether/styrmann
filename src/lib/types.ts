@@ -193,12 +193,9 @@ export interface Task {
    milestone_id?: string;
    github_issue_id?: string | null;
    due_date?: string;
-  workflow_template_id?: string;
-  status_reason?: string;
-  planning_complete?: number;
-  planning_dispatch_error?: string;
-  planning_session_key?: string;
-  workflow_plan_id?: string | null;
+   workflow_template_id?: string;
+   status_reason?: string;
+   workflow_plan_id?: string | null;
   created_at: string;
   updated_at: string;
   assigned_agent?: Agent;
@@ -490,56 +487,6 @@ export interface TaskDeliverable {
   created_at: string;
 }
 
-// Planning types
-export type PlanningQuestionType = 'multiple_choice' | 'text' | 'yes_no';
-
-export type PlanningCategory = 
-  | 'goal'
-  | 'audience'
-  | 'scope'
-  | 'design'
-  | 'content'
-  | 'technical'
-  | 'timeline'
-  | 'constraints';
-
-export interface PlanningQuestionOption {
-  id: string;
-  label: string;
-}
-
-export interface PlanningQuestion {
-  id: string;
-  task_id: string;
-  category: PlanningCategory;
-  question: string;
-  question_type: PlanningQuestionType;
-  options?: PlanningQuestionOption[];
-  answer?: string;
-  answered_at?: string;
-  sort_order: number;
-  created_at: string;
-}
-
-export interface PlanningSpec {
-  id: string;
-  task_id: string;
-  spec_markdown: string;
-  locked_at: string;
-  locked_by?: string;
-  created_at: string;
-}
-
-export interface PlanningState {
-  questions: PlanningQuestion[];
-  spec?: PlanningSpec;
-  progress: {
-    total: number;
-    answered: number;
-    percentage: number;
-  };
-  isLocked: boolean;
-}
 
 // API request/response types
 export interface CreateAgentRequest {

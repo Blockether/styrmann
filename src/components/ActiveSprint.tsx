@@ -214,7 +214,6 @@ export function ActiveSprint({ workspaceId, mobileMode = false, isPortrait = tru
   const completedSprintTasks = sprintTasks.filter((task) => DONE_STATUSES.includes(task.status)).length;
   const completionPercent = sprintTasks.length > 0 ? Math.round((completedSprintTasks / sprintTasks.length) * 100) : 0;
   const DONE_OR_TERMINAL = [...DONE_STATUSES, 'cancelled'];
-  const blockedSprintTasks = sprintTasks.filter((task) => Boolean(task.planning_dispatch_error) && !DONE_OR_TERMINAL.includes(task.status)).length;
 
   const updateTaskStatusWithPersist = async (task: Task, targetStatus: TaskStatus) => {
     if (task.status === targetStatus) return;
@@ -512,10 +511,6 @@ export function ActiveSprint({ workspaceId, mobileMode = false, isPortrait = tru
           <div className="p-2.5 rounded-lg border border-green-200 bg-green-50">
             <div className="text-green-700">Completed</div>
             <div className="text-green-700 font-semibold mt-0.5">{completedSprintTasks} ({completionPercent}%)</div>
-          </div>
-          <div className="p-2.5 rounded-lg border border-red-200 bg-red-50">
-            <div className="text-red-700">Blocked</div>
-            <div className="text-red-700 font-semibold mt-0.5">{blockedSprintTasks}</div>
           </div>
         </div>
       </div>
@@ -1065,7 +1060,6 @@ function TaskRow({ task, isPortrait, onClick, onMoveStatus, mobileMode }: TaskRo
   const statusConfig = STATUS_CONFIG[task.status];
   const isDone = DONE_STATUSES.includes(task.status);
   const isPlanning = task.status === 'planning';
-  const dispatchError = task.planning_dispatch_error;
   const TypeIcon = TASK_TYPE_CONFIG[task.task_type]?.icon;
   const typeColor = TASK_TYPE_CONFIG[task.task_type]?.color;
   const assignee = getTaskAssigneePresentation(task);
@@ -1096,13 +1090,6 @@ function TaskRow({ task, isPortrait, onClick, onMoveStatus, mobileMode }: TaskRo
             <div className={`flex items-center gap-2 mb-2 py-1.5 px-2.5 bg-amber-50 rounded border border-amber-200 ${isPortrait ? 'text-xs' : 'text-xs'}`}>
               <div className="w-1.5 h-1.5 bg-amber-600 rounded-full animate-pulse flex-shrink-0" />
               <span className="text-amber-700 font-medium">Planning still in progress</span>
-            </div>
-          )}
-
-          {task.status === 'assigned' && dispatchError && (
-            <div className={`flex items-start gap-2 mb-2 py-1.5 px-2.5 bg-red-600/12 rounded border border-red-600/25 ${isPortrait ? 'text-xs' : 'text-xs'}`}>
-              <div className="w-1.5 h-1.5 bg-red-600 rounded-full mt-0.5 flex-shrink-0" />
-              <span className="text-red-700">Assigned, but blocked: {dispatchError}</span>
             </div>
           )}
 

@@ -128,15 +128,9 @@ CREATE TABLE IF NOT EXISTS tasks (
    milestone_id TEXT REFERENCES milestones(id) ON DELETE SET NULL,
    github_issue_id TEXT REFERENCES github_issues(id) ON DELETE SET NULL,
    due_date TEXT,
-  workflow_template_id TEXT REFERENCES workflow_templates(id),
-  workflow_plan_id TEXT,
-  planning_session_key TEXT,
-  planning_messages TEXT,
-  planning_complete INTEGER DEFAULT 0,
-  planning_spec TEXT,
-  planning_agents TEXT,
-  planning_dispatch_error TEXT,
-  status_reason TEXT,
+   workflow_template_id TEXT REFERENCES workflow_templates(id),
+   workflow_plan_id TEXT,
+   status_reason TEXT,
   created_at TEXT DEFAULT (datetime('now')),
   updated_at TEXT DEFAULT (datetime('now'))
 );
@@ -273,29 +267,6 @@ CREATE TABLE IF NOT EXISTS task_acceptance_criteria (
   created_at TEXT DEFAULT (datetime('now'))
 );
 
--- Planning questions table
-CREATE TABLE IF NOT EXISTS planning_questions (
-  id TEXT PRIMARY KEY,
-  task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
-  category TEXT NOT NULL,
-  question TEXT NOT NULL,
-  question_type TEXT DEFAULT 'multiple_choice' CHECK (question_type IN ('multiple_choice', 'text', 'yes_no')),
-  options TEXT,
-  answer TEXT,
-  answered_at TEXT,
-  sort_order INTEGER DEFAULT 0,
-  created_at TEXT DEFAULT (datetime('now'))
-);
-
--- Planning specs table (locked specifications)
-CREATE TABLE IF NOT EXISTS planning_specs (
-  id TEXT PRIMARY KEY,
-  task_id TEXT NOT NULL UNIQUE REFERENCES tasks(id) ON DELETE CASCADE,
-  spec_markdown TEXT NOT NULL,
-  locked_at TEXT NOT NULL,
-  locked_by TEXT,
-  created_at TEXT DEFAULT (datetime('now'))
-);
 
 -- Conversations table (agent-to-agent or task-related)
 CREATE TABLE IF NOT EXISTS conversations (
@@ -502,7 +473,6 @@ CREATE INDEX IF NOT EXISTS idx_task_run_result_artifacts_run ON task_run_result_
 CREATE INDEX IF NOT EXISTS idx_task_run_result_artifacts_task ON task_run_result_artifacts(task_id);
 CREATE INDEX IF NOT EXISTS idx_task_run_result_artifacts_path ON task_run_result_artifacts(normalized_path, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_sessions_task ON sessions(task_id);
-CREATE INDEX IF NOT EXISTS idx_planning_questions_task ON planning_questions(task_id, sort_order);
 CREATE INDEX IF NOT EXISTS idx_workflow_templates_workspace ON workflow_templates(workspace_id);
 CREATE INDEX IF NOT EXISTS idx_task_roles_task ON task_roles(task_id);
 CREATE INDEX IF NOT EXISTS idx_task_workflow_plans_task ON task_workflow_plans(task_id);

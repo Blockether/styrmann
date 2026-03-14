@@ -190,13 +190,6 @@ export async function handleStageTransition(
 ): Promise<StageTransitionResult> {
   const eligibility = checkTransitionEligibility(taskId, newStatus);
   if (!eligibility.ok) {
-    const details = eligibility.code === 'dependency_blocked'
-      ? `${eligibility.unresolved_dependencies?.length || 0} unresolved dependencies`
-      : `missing artifacts: ${(eligibility.missing_artifacts || []).join(', ')}`;
-    run(
-      'UPDATE tasks SET planning_dispatch_error = ?, updated_at = datetime(\'now\') WHERE id = ?',
-      [`Transition blocked (${eligibility.code}): ${details}`, taskId],
-    );
     return {
       success: false,
       handedOff: false,
@@ -254,10 +247,6 @@ export async function handleStageTransition(
   if (!roleAgent) {
     // No agent for this role — record error but don't block status change
     const errorMsg = `No agent assigned for role: ${targetStage.role}. Assign an agent to this task.`;
-    run(
-      'UPDATE tasks SET planning_dispatch_error = ?, updated_at = datetime(\'now\') WHERE id = ?',
-      [errorMsg, taskId]
-    );
     createTaskActivity({
       taskId,
       activityType: 'updated',
@@ -275,7 +264,7 @@ export async function handleStageTransition(
   // Assign agent to task
   const now = new Date().toISOString();
   run(
-    'UPDATE tasks SET assigned_agent_id = ?, planning_dispatch_error = NULL, updated_at = ? WHERE id = ?',
+    'UPDATE tasks SET assigned_agent_id = ?, updated_at = ? WHERE id = ?',
     [roleAgent.id, now, taskId]
   );
 
@@ -323,7 +312,6 @@ export async function handleStageTransition(
          LIMIT 1`,
         [taskId, roleAgent.id],
       );
-      run('UPDATE tasks SET planning_dispatch_error = ?, updated_at = ? WHERE id = ?', [error, now, taskId]);
       createTaskActivity({
         taskId,
         activityType: 'updated',
@@ -352,7 +340,6 @@ export async function handleStageTransition(
        LIMIT 1`,
       [taskId, roleAgent.id],
     );
-    run('UPDATE tasks SET planning_dispatch_error = ?, updated_at = ? WHERE id = ?', [error, now, taskId]);
     createTaskActivity({
       taskId,
       activityType: 'updated',

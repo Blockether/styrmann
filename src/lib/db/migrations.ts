@@ -70,90 +70,7 @@ const migrations: Migration[] = [
       }
     }
   },
-  {
-    id: '003',
-    name: 'add_planning_tables',
-    up: (db) => {
-      console.log('[Migration 003] Adding planning tables...');
-      
-      // Create planning_questions table if not exists
-      db.exec(`
-        CREATE TABLE IF NOT EXISTS planning_questions (
-          id TEXT PRIMARY KEY,
-          task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
-          category TEXT NOT NULL,
-          question TEXT NOT NULL,
-          question_type TEXT DEFAULT 'multiple_choice' CHECK (question_type IN ('multiple_choice', 'text', 'yes_no')),
-          options TEXT,
-          answer TEXT,
-          answered_at TEXT,
-          sort_order INTEGER DEFAULT 0,
-          created_at TEXT DEFAULT (datetime('now'))
-        );
-      `);
-      
-      // Create planning_specs table if not exists
-      db.exec(`
-        CREATE TABLE IF NOT EXISTS planning_specs (
-          id TEXT PRIMARY KEY,
-          task_id TEXT NOT NULL UNIQUE REFERENCES tasks(id) ON DELETE CASCADE,
-          spec_markdown TEXT NOT NULL,
-          locked_at TEXT NOT NULL,
-          locked_by TEXT,
-          created_at TEXT DEFAULT (datetime('now'))
-        );
-      `);
-      
-      // Create index
-      db.exec(`CREATE INDEX IF NOT EXISTS idx_planning_questions_task ON planning_questions(task_id, sort_order)`);
-      
-      // Update tasks status check constraint to include 'planning'
-      // SQLite doesn't support ALTER CONSTRAINT, so we check if it's needed
-      const taskSchema = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='tasks'").get() as { sql: string } | undefined;
-      if (taskSchema && !taskSchema.sql.includes("'planning'")) {
-        console.log('[Migration 003] Note: tasks table needs planning status - will be handled by schema recreation on fresh dbs');
-      }
-    }
-  },
-  {
-    id: '004',
-    name: 'add_planning_session_columns',
-    up: (db) => {
-      console.log('[Migration 004] Adding planning session columns to tasks...');
 
-      const tasksInfo = db.prepare("PRAGMA table_info(tasks)").all() as { name: string }[];
-
-      // Add planning_session_key column
-      if (!tasksInfo.some(col => col.name === 'planning_session_key')) {
-        db.exec(`ALTER TABLE tasks ADD COLUMN planning_session_key TEXT`);
-        console.log('[Migration 004] Added planning_session_key');
-      }
-
-      // Add planning_messages column (stores JSON array of messages)
-      if (!tasksInfo.some(col => col.name === 'planning_messages')) {
-        db.exec(`ALTER TABLE tasks ADD COLUMN planning_messages TEXT`);
-        console.log('[Migration 004] Added planning_messages');
-      }
-
-      // Add planning_complete column
-      if (!tasksInfo.some(col => col.name === 'planning_complete')) {
-        db.exec(`ALTER TABLE tasks ADD COLUMN planning_complete INTEGER DEFAULT 0`);
-        console.log('[Migration 004] Added planning_complete');
-      }
-
-      // Add planning_spec column (stores final spec JSON)
-      if (!tasksInfo.some(col => col.name === 'planning_spec')) {
-        db.exec(`ALTER TABLE tasks ADD COLUMN planning_spec TEXT`);
-        console.log('[Migration 004] Added planning_spec');
-      }
-
-      // Add planning_agents column (stores generated agents JSON)
-      if (!tasksInfo.some(col => col.name === 'planning_agents')) {
-        db.exec(`ALTER TABLE tasks ADD COLUMN planning_agents TEXT`);
-        console.log('[Migration 004] Added planning_agents');
-      }
-    }
-  },
   {
     id: '005',
     name: 'add_agent_model_field',
@@ -166,21 +83,6 @@ const migrations: Migration[] = [
       if (!agentsInfo.some(col => col.name === 'model')) {
         db.exec(`ALTER TABLE agents ADD COLUMN model TEXT`);
         console.log('[Migration 005] Added model to agents');
-      }
-    }
-  },
-  {
-    id: '006',
-    name: 'add_planning_dispatch_error_column',
-    up: (db) => {
-      console.log('[Migration 006] Adding planning_dispatch_error column to tasks...');
-
-      const tasksInfo = db.prepare("PRAGMA table_info(tasks)").all() as { name: string }[];
-
-      // Add planning_dispatch_error column
-      if (!tasksInfo.some(col => col.name === 'planning_dispatch_error')) {
-        db.exec(`ALTER TABLE tasks ADD COLUMN planning_dispatch_error TEXT`);
-        console.log('[Migration 006] Added planning_dispatch_error to tasks');
       }
     }
   },
@@ -316,12 +218,6 @@ const migrations: Migration[] = [
              workspace_id TEXT DEFAULT 'default' REFERENCES workspaces(id),
              due_date TEXT,
              workflow_template_id TEXT REFERENCES workflow_templates(id),
-            planning_session_key TEXT,
-            planning_messages TEXT,
-            planning_complete INTEGER DEFAULT 0,
-            planning_spec TEXT,
-            planning_agents TEXT,
-            planning_dispatch_error TEXT,
             status_reason TEXT,
             created_at TEXT DEFAULT (datetime('now')),
             updated_at TEXT DEFAULT (datetime('now'))
@@ -329,7 +225,7 @@ const migrations: Migration[] = [
         `);
 
          // Copy data with explicit column mapping
-         const sharedCols = 'id, title, description, status, priority, assigned_agent_id, created_by_agent_id, workspace_id, due_date, planning_session_key, planning_messages, planning_complete, planning_spec, planning_agents, planning_dispatch_error, status_reason, created_at, updated_at';
+         const sharedCols = 'id, title, description, status, priority, assigned_agent_id, created_by_agent_id, workspace_id, due_date, status_reason, created_at, updated_at';
 
         if (hasWorkflowCol) {
           db.exec(`
@@ -429,26 +325,6 @@ const migrations: Migration[] = [
 
       // Table definitions with correct FK references to tasks(id)
       const tableDefinitions: Record<string, string> = {
-        planning_questions: `CREATE TABLE planning_questions (
-          id TEXT PRIMARY KEY,
-          task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
-          category TEXT NOT NULL,
-          question TEXT NOT NULL,
-          question_type TEXT DEFAULT 'multiple_choice' CHECK (question_type IN ('multiple_choice', 'text', 'yes_no')),
-          options TEXT,
-          answer TEXT,
-          answered_at TEXT,
-          sort_order INTEGER DEFAULT 0,
-          created_at TEXT DEFAULT (datetime('now'))
-        )`,
-        planning_specs: `CREATE TABLE planning_specs (
-          id TEXT PRIMARY KEY,
-          task_id TEXT NOT NULL UNIQUE REFERENCES tasks(id) ON DELETE CASCADE,
-          spec_markdown TEXT NOT NULL,
-          locked_at TEXT NOT NULL,
-          locked_by TEXT,
-          created_at TEXT DEFAULT (datetime('now'))
-        )`,
         conversations: `CREATE TABLE conversations (
           id TEXT PRIMARY KEY,
           title TEXT,
@@ -526,7 +402,6 @@ const migrations: Migration[] = [
       }
 
       // Recreate indexes for affected tables
-      db.exec(`CREATE INDEX IF NOT EXISTS idx_planning_questions_task ON planning_questions(task_id, sort_order)`);
       db.exec(`CREATE INDEX IF NOT EXISTS idx_task_roles_task ON task_roles(task_id)`);
       db.exec(`CREATE INDEX IF NOT EXISTS idx_events_created ON events(created_at DESC)`);
       db.exec(`CREATE INDEX IF NOT EXISTS idx_activities_task ON task_activities(task_id, created_at DESC)`);
@@ -576,8 +451,6 @@ const migrations: Migration[] = [
         'task_roles',
         'task_activities',
         'task_deliverables',
-        'planning_questions',
-        'planning_specs',
         'knowledge_entries',
         'messages',
         'conversation_participants',
@@ -889,12 +762,6 @@ const migrations: Migration[] = [
              milestone_id TEXT REFERENCES milestones(id) ON DELETE SET NULL,
              due_date TEXT,
             workflow_template_id TEXT REFERENCES workflow_templates(id),
-            planning_session_key TEXT,
-            planning_messages TEXT,
-            planning_complete INTEGER DEFAULT 0,
-            planning_spec TEXT,
-            planning_agents TEXT,
-            planning_dispatch_error TEXT,
             status_reason TEXT,
             created_at TEXT DEFAULT (datetime('now')),
             updated_at TEXT DEFAULT (datetime('now'))
@@ -905,16 +772,12 @@ const migrations: Migration[] = [
           INSERT INTO tasks_new_020 (
              id, title, description, status, priority, task_type, effort, impact,
              assigned_agent_id, created_by_agent_id, workspace_id, milestone_id,
-             due_date, workflow_template_id, planning_session_key,
-             planning_messages, planning_complete, planning_spec, planning_agents,
-             planning_dispatch_error, status_reason, created_at, updated_at
+             due_date, workflow_template_id, status_reason, created_at, updated_at
            )
            SELECT
              id, title, description, status, priority, task_type, effort, impact,
              assigned_agent_id, created_by_agent_id, workspace_id, milestone_id,
-             due_date, workflow_template_id, planning_session_key,
-             planning_messages, planning_complete, planning_spec, planning_agents,
-             planning_dispatch_error, status_reason, created_at, updated_at
+             due_date, workflow_template_id, status_reason, created_at, updated_at
            FROM tasks
         `);
 
@@ -1264,12 +1127,6 @@ const migrations: Migration[] = [
            github_issue_id TEXT REFERENCES github_issues(id) ON DELETE SET NULL,
            due_date TEXT,
            workflow_template_id TEXT REFERENCES workflow_templates(id),
-          planning_session_key TEXT,
-          planning_messages TEXT,
-          planning_complete INTEGER DEFAULT 0,
-          planning_spec TEXT,
-          planning_agents TEXT,
-          planning_dispatch_error TEXT,
           status_reason TEXT,
           created_at TEXT DEFAULT (datetime('now')),
           updated_at TEXT DEFAULT (datetime('now'))
@@ -1277,21 +1134,19 @@ const migrations: Migration[] = [
       `);
 
        db.exec(`
-         INSERT INTO tasks_new_028 (
-           id, title, description, status, priority, task_type, effort, impact,
-           assigned_agent_id, created_by_agent_id, workspace_id, milestone_id,
-           github_issue_id, due_date, workflow_template_id, planning_session_key,
-           planning_messages, planning_complete, planning_spec, planning_agents,
-           planning_dispatch_error, status_reason, created_at, updated_at
-         )
-         SELECT
-           id, title, description, status, priority, task_type, effort, impact,
-           assigned_agent_id, created_by_agent_id, workspace_id, milestone_id,
-           github_issue_id, due_date, workflow_template_id, planning_session_key,
-           planning_messages, planning_complete, planning_spec, planning_agents,
-           planning_dispatch_error, status_reason, created_at, updated_at
-         FROM tasks
-       `);
+          INSERT INTO tasks_new_028 (
+            id, title, description, status, priority, task_type, effort, impact,
+            assigned_agent_id, created_by_agent_id, workspace_id, milestone_id,
+            github_issue_id, due_date, workflow_template_id,
+            status_reason, created_at, updated_at
+          )
+          SELECT
+            id, title, description, status, priority, task_type, effort, impact,
+            assigned_agent_id, created_by_agent_id, workspace_id, milestone_id,
+            github_issue_id, due_date, workflow_template_id,
+            status_reason, created_at, updated_at
+          FROM tasks
+        `);
 
       db.exec('DROP TABLE tasks');
       db.exec('ALTER TABLE tasks_new_028 RENAME TO tasks');
@@ -1417,12 +1272,6 @@ const migrations: Migration[] = [
              github_issue_id TEXT REFERENCES github_issues(id) ON DELETE SET NULL,
              due_date TEXT,
              workflow_template_id TEXT REFERENCES workflow_templates(id),
-             planning_session_key TEXT,
-            planning_messages TEXT,
-            planning_complete INTEGER DEFAULT 0,
-            planning_spec TEXT,
-            planning_agents TEXT,
-            planning_dispatch_error TEXT,
             status_reason TEXT,
             created_at TEXT DEFAULT (datetime('now')),
             updated_at TEXT DEFAULT (datetime('now'))
@@ -1430,23 +1279,21 @@ const migrations: Migration[] = [
         `);
 
          db.exec(`
-           INSERT INTO tasks (
-             id, title, description, status, priority, task_type, effort, impact,
-             assigned_agent_id, created_by_agent_id, workspace_id, milestone_id, github_issue_id,
-             due_date, workflow_template_id,
-             planning_session_key, planning_messages, planning_complete, planning_spec, planning_agents,
-             planning_dispatch_error, status_reason, created_at, updated_at
-           )
-           SELECT
-             id, title, description, status, priority,
-             CASE WHEN task_type = 'autotrain' THEN 'chore' ELSE task_type END,
-             effort, impact,
-             assigned_agent_id, created_by_agent_id, workspace_id, milestone_id, github_issue_id,
-             due_date, workflow_template_id,
-             planning_session_key, planning_messages, planning_complete, planning_spec, planning_agents,
-             planning_dispatch_error, status_reason, created_at, updated_at
-           FROM _tasks_old_031
-         `);
+            INSERT INTO tasks (
+              id, title, description, status, priority, task_type, effort, impact,
+              assigned_agent_id, created_by_agent_id, workspace_id, milestone_id, github_issue_id,
+              due_date, workflow_template_id,
+              status_reason, created_at, updated_at
+            )
+            SELECT
+              id, title, description, status, priority,
+              CASE WHEN task_type = 'autotrain' THEN 'chore' ELSE task_type END,
+              effort, impact,
+              assigned_agent_id, created_by_agent_id, workspace_id, milestone_id, github_issue_id,
+              due_date, workflow_template_id,
+              status_reason, created_at, updated_at
+            FROM _tasks_old_031
+          `);
 
         db.exec('DROP TABLE _tasks_old_031');
         db.exec('CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status)');
@@ -2187,12 +2034,6 @@ const migrations: Migration[] = [
            github_issue_id TEXT REFERENCES github_issues(id) ON DELETE SET NULL,
            due_date TEXT,
            workflow_template_id TEXT REFERENCES workflow_templates(id) ON DELETE SET NULL,
-          planning_session_key TEXT,
-          planning_messages TEXT,
-          planning_complete INTEGER DEFAULT 0,
-          planning_spec TEXT,
-          planning_agents TEXT,
-          planning_dispatch_error TEXT,
           status_reason TEXT,
           created_at TEXT DEFAULT (datetime('now')),
           updated_at TEXT DEFAULT (datetime('now')),

@@ -205,12 +205,6 @@ export async function PATCH(
     const readinessIssues: string[] = [];
     if (effectiveAssigneeType === 'human' && !effectiveAssignedHumanId) readinessIssues.push('No human assigned');
 
-    // If task came from planning mode, require planning to be complete before auto-start
-    const planningComplete = Number((existing as any).planning_complete || 0) === 1;
-    if (existing.status === 'planning' && !planningComplete) {
-      readinessIssues.push('Planning not complete');
-    }
-
     if (
       effectiveAssigneeType === 'human' &&
       validatedData.assigned_human_id !== undefined &&
@@ -339,11 +333,7 @@ export async function PATCH(
 
     // Persist readiness warning for assigned tasks if validation fails
     if (nextStatus === 'assigned' && readinessIssues.length > 0) {
-      updates.push('planning_dispatch_error = ?');
-      values.push(`Validation: ${readinessIssues.join(', ')}`);
       shouldDispatch = false;
-    } else if (nextStatus === 'assigned') {
-      updates.push('planning_dispatch_error = NULL');
     }
 
     updates.push('updated_at = ?');
