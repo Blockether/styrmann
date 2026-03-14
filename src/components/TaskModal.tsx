@@ -21,9 +21,10 @@ interface TaskModalProps {
   githubIssue?: GitHubIssue;
   defaultTab?: TabType;
   onTabChange?: (tab: TabType) => void;
+  onNavigateToTask?: (task: Task) => void;
 }
 
-export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaultSprintId, defaultMilestoneId, githubIssue, defaultTab, onTabChange }: TaskModalProps) {
+export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaultSprintId, defaultMilestoneId, githubIssue, defaultTab, onTabChange, onNavigateToTask }: TaskModalProps) {
   const { agents, addTask, updateTask, addEvent } = useStyrmann();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isProcessingAcceptance, setIsProcessingAcceptance] = useState(false);
@@ -191,7 +192,7 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
     }
   };
 
-  const [showFollowUpForm, setShowFollowUpForm] = useState(false);
+  const [showFollowUpModal, setShowFollowUpModal] = useState(false);
   const [followUpDescription, setFollowUpDescription] = useState('');
   const [creatingFollowUpSpike, setCreatingFollowUpSpike] = useState(false);
 
@@ -242,22 +243,19 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
       });
 
       if (createRes.ok) {
-        const newTask = await createRes.json();
+        const newTask = await createRes.json() as Task;
         await fetch(`/api/tasks/${newTask.id}/dependencies`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ depends_on_task_id: task.id, required_status: 'done' }),
         });
         addTask(newTask);
-        addEvent({
-          id: newTask.id + '-followup',
-          type: 'task_created',
-          task_id: newTask.id,
-          message: `Follow-up spike from: ${task.title}`,
-          created_at: new Date().toISOString(),
-        });
         setFollowUpDescription('');
-        setShowFollowUpForm(false);
+        setShowFollowUpModal(false);
+        onClose();
+        if (onNavigateToTask) {
+          onNavigateToTask(newTask);
+        }
       }
     } catch (err) {
       console.error('Failed to create follow-up spike:', err);
@@ -911,52 +909,15 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
           )}
 
           {task && task.task_type === 'spike' && (
-            <div>
-              {!showFollowUpForm ? (
-                <button
-                  type="button"
-                  onClick={() => setShowFollowUpForm(true)}
-                  className="w-full flex items-center justify-center gap-2 min-h-10 px-4 py-2 rounded border border-mc-accent/30 bg-mc-accent/5 text-mc-accent text-sm font-medium hover:bg-mc-accent/10 transition-colors"
-                >
-                  <Sparkles className="w-4 h-4" />
-                  <span className="hidden sm:inline">Create Follow-up Spike</span>
-                  <span className="sm:hidden">Follow-up Spike</span>
-                </button>
-              ) : (
-                <div className="rounded border border-mc-accent/30 bg-mc-accent/5 p-3 space-y-2">
-                  <label className="block text-sm font-medium">What should the follow-up investigate?</label>
-                  <p className="text-xs text-mc-text-secondary">
-                    The last deliverable from this spike will be included as context automatically.
-                  </p>
-                  <textarea
-                    value={followUpDescription}
-                    onChange={(e) => setFollowUpDescription(e.target.value)}
-                    placeholder="Describe what the follow-up spike should explore..."
-                    rows={3}
-                    className="w-full bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent resize-none"
-                    autoFocus
-                  />
-                  <div className="flex items-center justify-end gap-2">
-                    <button
-                      type="button"
-                      onClick={() => { setShowFollowUpForm(false); setFollowUpDescription(''); }}
-                      className="px-3 py-1.5 text-sm text-mc-text-secondary hover:text-mc-text rounded"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleCreateFollowUpSpike}
-                      disabled={!followUpDescription.trim() || creatingFollowUpSpike}
-                      className="flex items-center gap-2 px-3 py-1.5 bg-mc-accent text-white rounded text-sm hover:bg-mc-accent/90 disabled:opacity-50"
-                    >
-                      {creatingFollowUpSpike ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                      Create Spike
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
+            <button
+              type="button"
+              onClick={() => setShowFollowUpModal(true)}
+              className="w-full flex items-center justify-center gap-2 min-h-10 px-4 py-2 rounded border border-mc-accent/30 bg-mc-accent/5 text-mc-accent text-sm font-medium hover:bg-mc-accent/10 transition-colors"
+            >
+              <Sparkles className="w-4 h-4" />
+              <span className="hidden sm:inline">Create Follow-up Spike</span>
+              <span className="sm:hidden">Follow-up Spike</span>
+            </button>
           )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1297,6 +1258,55 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
             setShowMilestoneModal(false);
           }}
         />
+      )}
+
+      {showFollowUpModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[60] p-4">
+          <div className="bg-[linear-gradient(180deg,#fffaf0_0%,#f8f1e3_100%)] rounded-lg border border-mc-border shadow-xl w-full max-w-lg">
+            <div className="flex items-center justify-between p-4 border-b border-mc-border">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-mc-accent" />
+                <h3 className="font-mono font-medium">Create Follow-up Spike</h3>
+              </div>
+              <button
+                onClick={() => { setShowFollowUpModal(false); setFollowUpDescription(''); }}
+                className="p-1 hover:bg-mc-bg-tertiary rounded"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-4 space-y-3">
+              <p className="text-sm text-mc-text-secondary">
+                Describe what this follow-up should investigate. The last deliverable from
+                <span className="font-medium text-mc-text"> {task?.title}</span> will be included as context.
+              </p>
+              <textarea
+                value={followUpDescription}
+                onChange={(e) => setFollowUpDescription(e.target.value)}
+                placeholder="e.g. Take the best bits of Datalaga and integrate them straight into SQLite..."
+                rows={5}
+                className="w-full bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent resize-none"
+                autoFocus
+              />
+            </div>
+            <div className="flex items-center justify-end gap-2 p-4 border-t border-mc-border">
+              <button
+                onClick={() => { setShowFollowUpModal(false); setFollowUpDescription(''); }}
+                className="px-4 py-2 text-sm text-mc-text-secondary hover:text-mc-text rounded"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCreateFollowUpSpike}
+                disabled={!followUpDescription.trim() || creatingFollowUpSpike}
+                className="flex items-center gap-2 px-4 py-2 bg-mc-accent text-white rounded text-sm font-medium hover:bg-mc-accent/90 disabled:opacity-50"
+              >
+                {creatingFollowUpSpike ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                Create Spike
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -485,6 +485,7 @@ export function BacklogView({ workspaceId }: BacklogViewProps) {
           workspaceId={workspaceId}
           defaultTab={linkedTask ? initialTab : undefined}
           onTabChange={updateTab}
+          onNavigateToTask={(t) => { setEditingTask(null); closeTask(); openTask(t); setEditingTask(t); }}
         />
       )}
     </div>

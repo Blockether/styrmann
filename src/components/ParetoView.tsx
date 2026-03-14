@@ -321,6 +321,7 @@ export function ParetoView({ workspaceId }: ParetoViewProps) {
           workspaceId={workspaceId}
           defaultTab={linkedTask ? initialTab : undefined}
           onTabChange={updateTab}
+          onNavigateToTask={(t) => { setEditingTask(null); closeTask(); openTask(t); setEditingTask(t); }}
         />
       )}
     </div>

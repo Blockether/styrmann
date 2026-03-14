@@ -681,6 +681,7 @@ export function ActiveSprint({ workspaceId, mobileMode = false, isPortrait = tru
           workspaceId={workspaceId}
           defaultTab={linkedTask ? initialTab : undefined}
           onTabChange={updateTab}
+          onNavigateToTask={(t) => { setEditingTask(null); closeTask(); openTask(t); setEditingTask(t); }}
         />
       )}
 
