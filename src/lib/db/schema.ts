@@ -278,14 +278,6 @@ CREATE TABLE IF NOT EXISTS events (
   created_at TEXT DEFAULT (datetime('now'))
 );
 
--- Businesses/Workspaces table (legacy - kept for compatibility)
-CREATE TABLE IF NOT EXISTS businesses (
-  id TEXT PRIMARY KEY,
-  name TEXT NOT NULL,
-  description TEXT,
-  created_at TEXT DEFAULT (datetime('now'))
-);
-
 -- Agent session mapping
 CREATE TABLE IF NOT EXISTS sessions (
   id TEXT PRIMARY KEY,
@@ -340,18 +332,6 @@ CREATE TABLE IF NOT EXISTS task_roles (
   agent_id TEXT NOT NULL REFERENCES agents(id),
   created_at TEXT DEFAULT (datetime('now')),
   UNIQUE(task_id, role)
-);
-
-CREATE TABLE IF NOT EXISTS memory_pipeline_config (
-  id TEXT PRIMARY KEY,
-  enabled INTEGER DEFAULT 1,
-  llm_enabled INTEGER DEFAULT 1,
-  schedule_cron TEXT DEFAULT '0 * * * *',
-  top_k INTEGER DEFAULT 24,
-  llm_model TEXT DEFAULT 'gpt-4o-mini',
-  llm_base_url TEXT DEFAULT 'https://api.openai.com/v1',
-  summary_prompt TEXT,
-  updated_at TEXT DEFAULT (datetime('now'))
 );
 
 -- Task activities table (for real-time activity log)

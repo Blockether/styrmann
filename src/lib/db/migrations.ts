@@ -2123,6 +2123,94 @@ const migrations: Migration[] = [
 
       console.log('[Migration 053] task_deliverables BLOB columns ready');
     }
+  },
+  {
+    id: '054',
+    name: 'drop_legacy_tables',
+    up: (db) => {
+      console.log('[Migration 054] Dropping legacy tables...');
+
+      const tablesToDrop = [
+        'businesses',
+        'memory_pipeline_config',
+        'planning_questions',
+        'planning_specs',
+        'conversations',
+        'conversation_participants',
+        'messages',
+      ];
+
+      for (const table of tablesToDrop) {
+        db.exec(`DROP TABLE IF EXISTS ${table}`);
+        console.log(`[Migration 054] Dropped table: ${table}`);
+      }
+
+      // Check if tasks table has legacy columns that need removal
+      const tasksColumns = db.prepare('PRAGMA table_info(tasks)').all() as { name: string }[];
+      const colNames = new Set(tasksColumns.map(c => c.name));
+      const legacyColumns = [
+        'business_id',
+        'planning_session_key',
+        'planning_messages',
+        'planning_complete',
+        'planning_spec',
+        'planning_agents',
+        'planning_dispatch_error',
+      ];
+      const hasLegacyColumns = legacyColumns.some(col => colNames.has(col));
+
+      if (hasLegacyColumns) {
+        console.log('[Migration 054] Removing legacy columns from tasks table...');
+
+        // Columns to keep: everything that is NOT a legacy column
+        const keepColumns = tasksColumns
+          .map(c => c.name)
+          .filter(name => !legacyColumns.includes(name));
+        const colList = keepColumns.join(', ');
+
+        db.exec(`
+          CREATE TABLE tasks_054 (
+            id TEXT PRIMARY KEY,
+            title TEXT NOT NULL,
+            description TEXT,
+            status TEXT DEFAULT 'inbox' CHECK (status IN ('pending_dispatch', 'planning', 'inbox', 'assigned', 'in_progress', 'testing', 'review', 'verification', 'done')),
+            priority TEXT DEFAULT 'normal' CHECK (priority IN ('low', 'normal', 'high', 'urgent')),
+            task_type TEXT DEFAULT 'feature' CHECK (task_type IN ('bug', 'feature', 'chore', 'documentation', 'research', 'spike')),
+            effort INTEGER CHECK (effort IS NULL OR (effort >= 1 AND effort <= 5)),
+            impact INTEGER CHECK (impact IS NULL OR (impact >= 1 AND impact <= 5)),
+            assignee_type TEXT DEFAULT 'ai' CHECK (assignee_type IN ('ai', 'human')),
+            assigned_agent_id TEXT REFERENCES agents(id),
+            assigned_human_id TEXT REFERENCES humans(id),
+            created_by_agent_id TEXT REFERENCES agents(id),
+            workspace_id TEXT DEFAULT 'default' REFERENCES workspaces(id),
+            milestone_id TEXT REFERENCES milestones(id) ON DELETE SET NULL,
+            github_issue_id TEXT REFERENCES github_issues(id) ON DELETE SET NULL,
+            due_date TEXT,
+            workflow_template_id TEXT REFERENCES workflow_templates(id),
+            workflow_plan_id TEXT,
+            status_reason TEXT,
+            created_at TEXT DEFAULT (datetime('now')),
+            updated_at TEXT DEFAULT (datetime('now'))
+          )
+        `);
+
+        db.exec(`INSERT INTO tasks_054 (${colList}) SELECT ${colList} FROM tasks`);
+        db.exec('DROP TABLE tasks');
+        db.exec('ALTER TABLE tasks_054 RENAME TO tasks');
+
+        // Recreate indexes
+        db.exec('CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status)');
+        db.exec('CREATE INDEX IF NOT EXISTS idx_tasks_assigned ON tasks(assigned_agent_id)');
+        db.exec('CREATE INDEX IF NOT EXISTS idx_tasks_assigned_human ON tasks(assigned_human_id)');
+        db.exec('CREATE INDEX IF NOT EXISTS idx_tasks_workspace ON tasks(workspace_id)');
+        db.exec('CREATE INDEX IF NOT EXISTS idx_tasks_milestone ON tasks(milestone_id)');
+        db.exec('CREATE INDEX IF NOT EXISTS idx_tasks_type ON tasks(task_type)');
+
+        console.log('[Migration 054] Legacy task columns removed');
+      }
+
+      console.log('[Migration 054] Legacy tables cleanup complete');
+    }
   }
 ];
 
