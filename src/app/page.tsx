@@ -1,13 +1,5 @@
-import { AppNav } from '@/components/AppNav';
-import { WorkspaceDashboard } from '@/components/WorkspaceDashboard';
+import { OrgHomePage } from '@/components/OrgHomePage';
 
 export default function HomePage() {
-  return (
-    <div data-component="src/app/page" className="min-h-screen bg-mc-bg">
-      <AppNav />
-      <main>
-        <WorkspaceDashboard />
-      </main>
-    </div>
-  );
+  return <OrgHomePage />;
 }
