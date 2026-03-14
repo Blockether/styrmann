@@ -78,6 +78,22 @@ function scanRepos(): DiscoveredRepo[] {
 }
 
 /**
+ * Ensure organization exists for the given org name.
+ * Returns the organization ID (creates if needed).
+ */
+function ensureOrganization(db: Database.Database, orgName: string): string {
+  const slug = orgName.toLowerCase().replace(/[^a-z0-9]/g, '-');
+  const existing = db.prepare('SELECT id FROM organizations WHERE slug = ?').get(slug) as { id: string } | undefined;
+  if (existing) return existing.id;
+
+  const id = crypto.randomUUID();
+  const displayName = orgName.charAt(0).toUpperCase() + orgName.slice(1);
+  db.prepare('INSERT INTO organizations (id, name, slug) VALUES (?, ?, ?)').run(id, displayName, slug);
+  console.log(`[RepoDiscovery] Created organization: ${displayName} (${slug})`);
+  return id;
+}
+
+/**
  * Discover git repos under REPOS_BASE/{org}/{repo} and ensure matching workspaces exist.
  * Safe to call on every startup — idempotent.
  */
@@ -92,6 +108,9 @@ export function discoverRepoWorkspaces(db: Database.Database): void {
   for (const discovered of repos) {
     const { org, repo, slug, displayName, githubRepo } = discovered;
 
+    // Ensure organization exists and get its ID
+    const organizationId = ensureOrganization(db, org);
+
     const oldSlug = repo; // backward compat: previous discovery used repo name only
     const existing = db.prepare(
       'SELECT id, slug FROM workspaces WHERE slug = ? OR slug = ? OR github_repo = ? OR local_path = ? LIMIT 1',
@@ -100,9 +119,9 @@ export function discoverRepoWorkspaces(db: Database.Database): void {
     if (existing) {
       db.prepare(`
         UPDATE workspaces
-        SET slug = ?, name = ?, github_repo = ?, organization = ?, is_internal = 0, repo_kind = 'standard', local_path = ?, updated_at = datetime('now')
+        SET slug = ?, name = ?, github_repo = ?, organization = ?, organization_id = ?, is_internal = 0, repo_kind = 'standard', local_path = ?, updated_at = datetime('now')
         WHERE id = ?
-      `).run(slug, displayName, githubRepo, org, discovered.repoPath, existing.id);
+      `).run(slug, displayName, githubRepo, org, organizationId, discovered.repoPath, existing.id);
 
       if (existing.slug !== slug) {
         console.log(`[RepoDiscovery] Renamed workspace '${existing.slug}' → '${slug}'`);
@@ -117,9 +136,9 @@ export function discoverRepoWorkspaces(db: Database.Database): void {
     // Create new workspace
     const id = crypto.randomUUID();
     db.prepare(`
-      INSERT INTO workspaces (id, name, slug, description, icon, github_repo, is_internal, repo_kind, local_path, organization)
-      VALUES (?, ?, ?, ?, ?, ?, 0, 'standard', ?, ?)
-    `).run(id, displayName, slug, null, 'BL', githubRepo, discovered.repoPath, org);
+      INSERT INTO workspaces (id, name, slug, description, icon, github_repo, is_internal, repo_kind, local_path, organization, organization_id)
+      VALUES (?, ?, ?, ?, ?, ?, 0, 'standard', ?, ?, ?)
+    `).run(id, displayName, slug, null, 'BL', githubRepo, discovered.repoPath, org, organizationId);
 
     provisionWorkflowTemplates(db, id);
     console.log(`[RepoDiscovery] Created workspace '${slug}' for ${org}/${repo}`);
