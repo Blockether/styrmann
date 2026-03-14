@@ -54,5 +54,11 @@ next-env.d.ts
 .sisyphus/
 .env.daemon
 
+# Deliverable store (agent file artifacts — stored in SQLite, not on disk)
+/deliverable-store/
+
+# Documentation images (screenshots, diagrams)
+/docs/images/
+
 # Mission Control task outputs (agent artifacts, screenshots)
 .mission-control/
