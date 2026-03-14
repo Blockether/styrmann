@@ -145,6 +145,8 @@ export async function DELETE(
 
     db.prepare('DELETE FROM memories WHERE id = ?').run(id);
 
+    broadcast({ type: 'memory_deleted', payload: { id } });
+
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Failed to delete memory:', error);

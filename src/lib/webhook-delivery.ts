@@ -121,8 +121,6 @@ async function deliverWithRetry(
       `).run(attempt + 1, deliveryId);
     }
   }
-
-  db.prepare(`UPDATE webhooks SET failure_count = failure_count + 1, updated_at = datetime('now') WHERE id = ?`).run(webhook.id);
 }
 
 function sleep(ms: number): Promise<void> {

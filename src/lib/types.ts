@@ -582,9 +582,13 @@ export type SSEEventType =
   | 'org_ticket_deleted'
   | 'memory_created'
   | 'memory_updated'
+  | 'memory_deleted'
   | 'entity_linked'
+  | 'entity_link_deleted'
   | 'commit_ingested'
-  | 'knowledge_synthesized';
+  | 'knowledge_synthesized'
+  | 'knowledge_article_archived'
+  | 'webhook_deleted';
 
 export interface SSEEvent {
   type: SSEEventType;

@@ -13,6 +13,8 @@ export async function GET(request: NextRequest) {
     const organization_id = searchParams.get('organization_id');
     const status = searchParams.get('status');
     const priority = searchParams.get('priority');
+    const limit = Math.min(parseInt(searchParams.get('limit') || '50'), 200);
+    const offset = parseInt(searchParams.get('offset') || '0');
 
     const db = getDb();
 
@@ -32,7 +34,8 @@ export async function GET(request: NextRequest) {
       params.push(priority);
     }
 
-    query += ' ORDER BY created_at DESC';
+    query += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
+    params.push(limit, offset);
 
     const tickets = db.prepare(query).all(...params) as OrgTicket[];
     const result = tickets.map(t => ({ ...t, tags: JSON.parse(t.tags || '[]') }));

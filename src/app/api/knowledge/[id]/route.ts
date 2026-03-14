@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
+import { broadcast } from '@/lib/events';
 import type { KnowledgeArticle, Memory } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
@@ -65,6 +66,8 @@ export async function DELETE(
     }
 
     db.prepare("UPDATE knowledge_articles SET status = 'archived', updated_at = datetime('now') WHERE id = ?").run(id);
+
+    broadcast({ type: 'knowledge_article_archived', payload: { id } });
 
     return NextResponse.json({ id, status: 'archived' });
   } catch (error) {

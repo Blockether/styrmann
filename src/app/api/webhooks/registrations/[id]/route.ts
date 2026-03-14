@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
+import { broadcast } from '@/lib/events';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,16 +13,19 @@ export async function GET(
   try {
     const db = getDb();
 
-    const webhook = db.prepare('SELECT * FROM webhooks WHERE id = ?').get(id);
+    const webhook = db.prepare('SELECT * FROM webhooks WHERE id = ?').get(id) as Record<string, unknown> | undefined;
     if (!webhook) {
       return NextResponse.json({ error: 'Webhook not found' }, { status: 404 });
     }
+
+    let event_types: string[] = [];
+    try { event_types = JSON.parse((webhook.event_types as string) || '[]'); } catch { /* ignore */ }
 
     const deliveries = db.prepare(
       'SELECT * FROM webhook_deliveries WHERE webhook_id = ? ORDER BY created_at DESC LIMIT 20'
     ).all(id);
 
-    return NextResponse.json({ ...webhook as Record<string, unknown>, recent_deliveries: deliveries });
+    return NextResponse.json({ ...webhook, event_types, recent_deliveries: deliveries });
   } catch (error) {
     console.error('Failed to fetch webhook:', error);
     return NextResponse.json({ error: 'Failed to fetch webhook' }, { status: 500 });
@@ -106,6 +110,8 @@ export async function DELETE(
     }
 
     db.prepare('DELETE FROM webhooks WHERE id = ?').run(id);
+
+    broadcast({ type: 'webhook_deleted', payload: { id } });
 
     return NextResponse.json({ success: true });
   } catch (error) {

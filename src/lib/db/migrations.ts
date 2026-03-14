@@ -56,6 +56,88 @@ const migrations: Migration[] = [
       console.log('[Migration 101] Added story_points and org_ticket_acceptance_criteria');
     }
   },
+  {
+    id: '102',
+    name: 'fix_fts5_null_coalesce_triggers',
+    up: (db) => {
+      db.exec(`
+        DROP TRIGGER IF EXISTS memories_ai;
+        DROP TRIGGER IF EXISTS memories_ad;
+        DROP TRIGGER IF EXISTS memories_au;
+
+        CREATE TRIGGER memories_ai AFTER INSERT ON memories BEGIN
+          INSERT INTO memories_fts(rowid, title, summary, body)
+          VALUES (new.rowid, new.title, COALESCE(new.summary, ''), COALESCE(new.body, ''));
+        END;
+
+        CREATE TRIGGER memories_ad AFTER DELETE ON memories BEGIN
+          INSERT INTO memories_fts(memories_fts, rowid, title, summary, body)
+          VALUES('delete', old.rowid, old.title, COALESCE(old.summary, ''), COALESCE(old.body, ''));
+        END;
+
+        CREATE TRIGGER memories_au AFTER UPDATE ON memories BEGIN
+          INSERT INTO memories_fts(memories_fts, rowid, title, summary, body)
+          VALUES('delete', old.rowid, old.title, COALESCE(old.summary, ''), COALESCE(old.body, ''));
+          INSERT INTO memories_fts(rowid, title, summary, body)
+          VALUES (new.rowid, new.title, COALESCE(new.summary, ''), COALESCE(new.body, ''));
+        END;
+
+        INSERT INTO memories_fts(memories_fts) VALUES('rebuild');
+      `);
+
+      db.exec(`
+        DROP TRIGGER IF EXISTS org_tickets_ai;
+        DROP TRIGGER IF EXISTS org_tickets_ad;
+        DROP TRIGGER IF EXISTS org_tickets_au;
+
+        CREATE TRIGGER org_tickets_ai AFTER INSERT ON org_tickets BEGIN
+          INSERT INTO org_tickets_fts(rowid, title, description)
+          VALUES (new.rowid, new.title, COALESCE(new.description, ''));
+        END;
+
+        CREATE TRIGGER org_tickets_ad AFTER DELETE ON org_tickets BEGIN
+          INSERT INTO org_tickets_fts(org_tickets_fts, rowid, title, description)
+          VALUES('delete', old.rowid, old.title, COALESCE(old.description, ''));
+        END;
+
+        CREATE TRIGGER org_tickets_au AFTER UPDATE ON org_tickets BEGIN
+          INSERT INTO org_tickets_fts(org_tickets_fts, rowid, title, description)
+          VALUES('delete', old.rowid, old.title, COALESCE(old.description, ''));
+          INSERT INTO org_tickets_fts(rowid, title, description)
+          VALUES (new.rowid, new.title, COALESCE(new.description, ''));
+        END;
+
+        INSERT INTO org_tickets_fts(org_tickets_fts) VALUES('rebuild');
+      `);
+
+      db.exec(`
+        DROP TRIGGER IF EXISTS commits_ai;
+        DROP TRIGGER IF EXISTS commits_ad;
+        DROP TRIGGER IF EXISTS commits_au;
+
+        CREATE TRIGGER commits_ai AFTER INSERT ON commits BEGIN
+          INSERT INTO commits_fts(rowid, message, author_name)
+          VALUES (new.rowid, new.message, COALESCE(new.author_name, ''));
+        END;
+
+        CREATE TRIGGER commits_ad AFTER DELETE ON commits BEGIN
+          INSERT INTO commits_fts(commits_fts, rowid, message, author_name)
+          VALUES('delete', old.rowid, old.message, COALESCE(old.author_name, ''));
+        END;
+
+        CREATE TRIGGER commits_au AFTER UPDATE ON commits BEGIN
+          INSERT INTO commits_fts(commits_fts, rowid, message, author_name)
+          VALUES('delete', old.rowid, old.message, COALESCE(old.author_name, ''));
+          INSERT INTO commits_fts(rowid, message, author_name)
+          VALUES (new.rowid, new.message, COALESCE(new.author_name, ''));
+        END;
+
+        INSERT INTO commits_fts(commits_fts) VALUES('rebuild');
+      `);
+
+      console.log('[Migration 102] Fixed FTS5 triggers with COALESCE for nullable columns');
+    }
+  },
 ];
 
 export function runMigrations(db: Database.Database): void {

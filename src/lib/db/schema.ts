@@ -661,19 +661,19 @@ CREATE VIRTUAL TABLE IF NOT EXISTS memories_fts USING fts5(
 
 CREATE TRIGGER IF NOT EXISTS memories_ai AFTER INSERT ON memories BEGIN
   INSERT INTO memories_fts(rowid, title, summary, body)
-  VALUES (new.rowid, new.title, new.summary, new.body);
+  VALUES (new.rowid, new.title, COALESCE(new.summary, ''), COALESCE(new.body, ''));
 END;
 
 CREATE TRIGGER IF NOT EXISTS memories_ad AFTER DELETE ON memories BEGIN
   INSERT INTO memories_fts(memories_fts, rowid, title, summary, body)
-  VALUES('delete', old.rowid, old.title, old.summary, old.body);
+  VALUES('delete', old.rowid, old.title, COALESCE(old.summary, ''), COALESCE(old.body, ''));
 END;
 
 CREATE TRIGGER IF NOT EXISTS memories_au AFTER UPDATE ON memories BEGIN
   INSERT INTO memories_fts(memories_fts, rowid, title, summary, body)
-  VALUES('delete', old.rowid, old.title, old.summary, old.body);
+  VALUES('delete', old.rowid, old.title, COALESCE(old.summary, ''), COALESCE(old.body, ''));
   INSERT INTO memories_fts(rowid, title, summary, body)
-  VALUES (new.rowid, new.title, new.summary, new.body);
+  VALUES (new.rowid, new.title, COALESCE(new.summary, ''), COALESCE(new.body, ''));
 END;
 
 CREATE VIRTUAL TABLE IF NOT EXISTS knowledge_articles_fts USING fts5(
@@ -709,19 +709,19 @@ CREATE VIRTUAL TABLE IF NOT EXISTS org_tickets_fts USING fts5(
 
 CREATE TRIGGER IF NOT EXISTS org_tickets_ai AFTER INSERT ON org_tickets BEGIN
   INSERT INTO org_tickets_fts(rowid, title, description)
-  VALUES (new.rowid, new.title, new.description);
+  VALUES (new.rowid, new.title, COALESCE(new.description, ''));
 END;
 
 CREATE TRIGGER IF NOT EXISTS org_tickets_ad AFTER DELETE ON org_tickets BEGIN
   INSERT INTO org_tickets_fts(org_tickets_fts, rowid, title, description)
-  VALUES('delete', old.rowid, old.title, old.description);
+  VALUES('delete', old.rowid, old.title, COALESCE(old.description, ''));
 END;
 
 CREATE TRIGGER IF NOT EXISTS org_tickets_au AFTER UPDATE ON org_tickets BEGIN
   INSERT INTO org_tickets_fts(org_tickets_fts, rowid, title, description)
-  VALUES('delete', old.rowid, old.title, old.description);
+  VALUES('delete', old.rowid, old.title, COALESCE(old.description, ''));
   INSERT INTO org_tickets_fts(rowid, title, description)
-  VALUES (new.rowid, new.title, new.description);
+  VALUES (new.rowid, new.title, COALESCE(new.description, ''));
 END;
 
 CREATE VIRTUAL TABLE IF NOT EXISTS commits_fts USING fts5(
@@ -733,18 +733,18 @@ CREATE VIRTUAL TABLE IF NOT EXISTS commits_fts USING fts5(
 
 CREATE TRIGGER IF NOT EXISTS commits_ai AFTER INSERT ON commits BEGIN
   INSERT INTO commits_fts(rowid, message, author_name)
-  VALUES (new.rowid, new.message, new.author_name);
+  VALUES (new.rowid, new.message, COALESCE(new.author_name, ''));
 END;
 
 CREATE TRIGGER IF NOT EXISTS commits_ad AFTER DELETE ON commits BEGIN
   INSERT INTO commits_fts(commits_fts, rowid, message, author_name)
-  VALUES('delete', old.rowid, old.message, old.author_name);
+  VALUES('delete', old.rowid, old.message, COALESCE(old.author_name, ''));
 END;
 
 CREATE TRIGGER IF NOT EXISTS commits_au AFTER UPDATE ON commits BEGIN
   INSERT INTO commits_fts(commits_fts, rowid, message, author_name)
-  VALUES('delete', old.rowid, old.message, old.author_name);
+  VALUES('delete', old.rowid, old.message, COALESCE(old.author_name, ''));
   INSERT INTO commits_fts(rowid, message, author_name)
-  VALUES (new.rowid, new.message, new.author_name);
+  VALUES (new.rowid, new.message, COALESCE(new.author_name, ''));
 END;
 `;

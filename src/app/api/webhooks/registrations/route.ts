@@ -8,12 +8,20 @@ export async function GET(request: NextRequest) {
   try {
     const db = getDb();
     const organizationId = request.nextUrl.searchParams.get('organization_id');
+    const limit = Math.min(parseInt(request.nextUrl.searchParams.get('limit') || '50'), 200);
+    const offset = parseInt(request.nextUrl.searchParams.get('offset') || '0');
 
     const webhooks = organizationId
-      ? db.prepare('SELECT * FROM webhooks WHERE organization_id = ? ORDER BY created_at DESC').all(organizationId)
-      : db.prepare('SELECT * FROM webhooks ORDER BY created_at DESC').all();
+      ? db.prepare('SELECT * FROM webhooks WHERE organization_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?').all(organizationId, limit, offset)
+      : db.prepare('SELECT * FROM webhooks ORDER BY created_at DESC LIMIT ? OFFSET ?').all(limit, offset);
 
-    return NextResponse.json(webhooks);
+    const parsed = (webhooks as Record<string, unknown>[]).map(w => {
+      let event_types: string[] = [];
+      try { event_types = JSON.parse((w.event_types as string) || '[]'); } catch { /* ignore */ }
+      return { ...w, event_types };
+    });
+
+    return NextResponse.json(parsed);
   } catch (error) {
     console.error('Failed to list webhooks:', error);
     return NextResponse.json({ error: 'Failed to list webhooks' }, { status: 500 });

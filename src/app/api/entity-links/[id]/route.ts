@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
+import { broadcast } from '@/lib/events';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,6 +20,8 @@ export async function DELETE(
     }
 
     db.prepare('DELETE FROM entity_links WHERE id = ?').run(id);
+
+    broadcast({ type: 'entity_link_deleted', payload: { id } });
 
     return NextResponse.json({ success: true });
   } catch (error) {

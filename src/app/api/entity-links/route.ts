@@ -14,6 +14,8 @@ export async function GET(request: NextRequest) {
     const from_entity_id = searchParams.get('from_entity_id');
     const to_entity_id = searchParams.get('to_entity_id');
     const link_type = searchParams.get('link_type');
+    const limit = Math.min(parseInt(searchParams.get('limit') || '50'), 200);
+    const offset = parseInt(searchParams.get('offset') || '0');
 
     if (!from_entity_id && !to_entity_id) {
       return NextResponse.json(
@@ -46,7 +48,8 @@ export async function GET(request: NextRequest) {
       params.push(link_type);
     }
 
-    query += ' ORDER BY created_at DESC';
+    query += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
+    params.push(limit, offset);
 
     const links = db.prepare(query).all(...params);
     return NextResponse.json(links);
