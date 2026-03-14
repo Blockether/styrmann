@@ -50,7 +50,9 @@ OpenClaw Gateway was removed because:
 
 ## Dashboard Architecture
 
-Single-page dashboard per workspace. No route navigations between views.
+The homepage lists organizations and their workspaces. Clicking a workspace opens the single-page workspace dashboard. No route navigations between views within a workspace.
+
+**Org-first navigation**: The root `/` page groups workspaces by organization. Each organization card shows its name, slug, and workspace count. Workspaces without an `organization_id` appear under an "Ungrouped" section.
 
 ```
 /workspace/[slug]/page.tsx
@@ -121,15 +123,227 @@ Tasks get sprint context via `milestone.sprint_id`. There is no direct `sprint_i
 
 ## Hierarchy
 
-The workspace hierarchy is strict:
+The full hierarchy from org to task:
 
 ```
-Workspace -> Sprint -> Milestone -> Task
+Organization -> Workspace -> Sprint -> Milestone -> Task
 ```
 
-Sprints contain milestones. Milestones contain tasks. A task belongs to a milestone; a milestone optionally belongs to a sprint. Tasks do not belong directly to sprints.
+Organizations group workspaces. Each workspace has its own sprints, milestones, and tasks. The workspace-level hierarchy is strict: sprints contain milestones, milestones contain tasks. A task belongs to a milestone; a milestone optionally belongs to a sprint. Tasks do not belong directly to sprints.
+
+Organizations also have a parallel business-facing track:
+
+```
+Organization -> Org Tickets (human-facing, Jira-style)
+                    |
+                    v (delegation)
+             Workspace Tasks (via orchestrator)
+```
+
+Org tickets are the only authorized way to create workspace tasks in production. The delegation endpoint acts as an auth gate.
 
 **Backlog**: tasks where `milestone_id IS NULL` and status != `done`.
+
+---
+
+## Organizations
+
+Organizations are the top-level grouping entity. They are auto-created during workspace discovery when `discoverRepoWorkspaces()` detects a new org directory under `STYRMAN_PROJECTS_PATH`. Each org directory (e.g., `/root/repos/blockether`) becomes one organization.
+
+**Fields**: id, name, slug, description, logo_url.
+
+**Workspace link**: `workspaces.organization_id` is a nullable FK to `organizations(id)`. Workspaces discovered under the same org directory share the same `organization_id`.
+
+**API**:
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET | `/api/organizations` | List all organizations |
+| POST | `/api/organizations` | Create organization |
+| GET | `/api/organizations/[id]` | Get organization by ID |
+| PATCH | `/api/organizations/[id]` | Update organization |
+| DELETE | `/api/organizations/[id]` | Delete organization |
+
+---
+
+## Organizational Tickets
+
+Org tickets are human-facing business tickets at the organization level, analogous to Jira issues. They represent work requests from stakeholders before that work is broken down into technical tasks.
+
+**Fields**: id, organization_id, title, description, status, priority, ticket_type, external_ref, external_system, creator_name, assignee_name, due_date, tags.
+
+**ticket_type**: `feature | bug | improvement | task | epic`.
+
+**Lifecycle**:
+```
+open -> triaged -> delegated -> in_progress -> resolved -> closed
+```
+
+**Delegation**: `POST /api/org-tickets/[id]/delegate` converts an org ticket into one or more workspace tasks. The delegation module (`src/lib/delegation.ts`) uses LLM planning to decompose the ticket into 1-3 tasks with acceptance criteria. Falls back to a single task if LLM is unavailable. Each created task gets an `org_ticket_id` FK and a `delegates_to` entity link from the ticket to the task. The ticket status moves to `delegated` atomically.
+
+**Auth gate**: Delegation is the only authorized path to create workspace tasks in production. Direct `POST /api/tasks` is available but gated by the same auth middleware.
+
+**FTS**: `org_tickets_fts` virtual table enables full-text search on title and description.
+
+**API**:
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET | `/api/org-tickets` | List org tickets (filter: organization_id, status, priority) |
+| POST | `/api/org-tickets` | Create org ticket |
+| GET | `/api/org-tickets/[id]` | Get org ticket |
+| PATCH | `/api/org-tickets/[id]` | Update org ticket |
+| DELETE | `/api/org-tickets/[id]` | Delete org ticket |
+| POST | `/api/org-tickets/[id]/delegate` | Delegate ticket to workspace tasks |
+
+---
+
+## Memory System
+
+Memories are the raw knowledge store for an organization. They capture facts, decisions, events, and observations from development activity.
+
+**8 memory types**: `fact`, `decision`, `event`, `tool_run`, `error`, `observation`, `note`, `patch`.
+
+**Fields**: id, organization_id, workspace_id, memory_type, title, summary, body, source, source_ref, confidence (0-100), status (open/resolved/closed), metadata (JSON), tags (JSON).
+
+**Provenance**: `source` names the origin system (e.g., `agent`, `discord`, `webhook`). `source_ref` is a free-form reference (e.g., session ID, commit hash, ticket number).
+
+**Status lifecycle**: `open -> resolved -> closed`. Synthesis reads `open` and `resolved` memories; `closed` memories are excluded.
+
+**FTS**: `memories_fts` virtual table (FTS5, porter tokenizer) enables full-text search on title, summary, and body. Kept in sync via INSERT/UPDATE/DELETE triggers.
+
+**API**:
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET | `/api/memories` | List memories (filter: organization_id, workspace_id, memory_type, status, search) |
+| POST | `/api/memories` | Create memory |
+| GET | `/api/memories/[id]` | Get memory |
+| PATCH | `/api/memories/[id]` | Update memory |
+| DELETE | `/api/memories/[id]` | Delete memory |
+
+---
+
+## Entity Links
+
+Entity links are generic directed edges between any two entities in the system. They form a knowledge graph that connects org tickets, tasks, memories, knowledge articles, commits, and other entities.
+
+**10 link types**: `delegates_to`, `blocks`, `relates_to`, `derived_from`, `references`, `parent_of`, `motivated_by`, `resolved_by`, `contains`, `touches`.
+
+**Fields**: id, from_entity_type, from_entity_id, to_entity_type, to_entity_id, link_type, explanation.
+
+**Self-link prevention**: A CHECK constraint enforces `from_entity_id != to_entity_id`.
+
+**Unique constraint**: `(from_entity_id, to_entity_id, link_type)` is unique. Duplicate links are silently ignored via `INSERT OR IGNORE`.
+
+**Graph traversal**: `GET /api/entity-links/graph` uses a recursive CTE with `MAX_DEPTH=10` to traverse the full reachability graph from a given root entity.
+
+**System-created links**:
+- Delegation creates `org_ticket -> delegates_to -> task`
+- Knowledge synthesis creates `knowledge_article -> derived_from -> memory` for each source memory
+
+**API**:
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET | `/api/entity-links` | List links (filter: from_entity_id, to_entity_id, link_type) |
+| POST | `/api/entity-links` | Create link |
+| GET | `/api/entity-links/graph` | Recursive graph traversal from a root entity |
+
+---
+
+## Knowledge Synthesis
+
+Knowledge synthesis converts raw memories into curated, LLM-authored knowledge articles. It runs as a daemon module and can also be triggered on demand.
+
+**Pipeline** (`src/lib/knowledge-synthesis.ts`):
+1. Fetch all non-closed memories for the organization (optionally scoped to a workspace).
+2. Group memories into batches of up to `maxMemoriesPerArticle` (default 20).
+3. For each batch, compute a `synthesis_prompt_hash` (SHA-256 of sorted memory IDs + summaries). Skip if an up-to-date article with that hash already exists.
+4. Send batch to LLM with a synthesis prompt. LLM returns `{title, summary, body}`.
+5. Archive any stale articles for the same org/workspace.
+6. Insert new `knowledge_article` with status `published`.
+7. Create `derived_from` entity links from the article to each source memory.
+8. Broadcast `knowledge_synthesized` SSE event.
+
+**Staleness detection**: Articles with `status='stale'` are archived before new ones are inserted. Articles become stale when their source memories are updated.
+
+**Daemon**: The synthesis daemon module runs hourly. It iterates all organizations and calls `synthesizeKnowledge()` for each.
+
+**Minimum threshold**: Synthesis requires at least `minMemories` (default 3) memories before running.
+
+**API**:
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET | `/api/knowledge` | List knowledge articles (filter: organization_id, workspace_id, status, search) |
+| GET | `/api/knowledge/[id]` | Get knowledge article |
+| PATCH | `/api/knowledge/[id]` | Update or archive article |
+| DELETE | `/api/knowledge/[id]` | Delete article |
+| POST | `/api/knowledge/synthesize` | Trigger LLM synthesis for an organization |
+
+---
+
+## Full-Text Search
+
+Styrmann uses SQLite FTS5 virtual tables with the external content pattern. All FTS tables use the porter tokenizer for stemming.
+
+**FTS5 virtual tables**:
+| Table | Source table | Indexed columns |
+|-------|-------------|-----------------|
+| `memories_fts` | `memories` | title, summary, body |
+| `knowledge_articles_fts` | `knowledge_articles` | title, summary, body |
+| `org_tickets_fts` | `org_tickets` | title, description |
+| `commits_fts` | `commits` | message, author_name |
+
+Each FTS table is kept in sync with its source via three triggers: `AFTER INSERT`, `AFTER DELETE`, and `AFTER UPDATE`. The update trigger deletes the old row and inserts the new one.
+
+**Unified search endpoint**: `GET /api/search` queries all FTS tables and returns ranked results. Supports `entity_types` filter to restrict which tables are searched.
+
+---
+
+## Commit Ingestion
+
+Commits are ingested from external CI/CD systems or git hooks via a REST API. They are stored in the `commits` table and indexed for full-text search.
+
+**Fields**: id, workspace_id, commit_hash, message, author_name, author_email, branch, files_changed (JSON), insertions, deletions, committed_at, ingested_at, metadata (JSON).
+
+**Unique constraint**: `(workspace_id, commit_hash)` prevents duplicate ingestion.
+
+**Ticket reference parsing**: The ingestion endpoint parses commit messages for ticket references in the formats `#123` and `PROJ-123`. Matched references are stored in `metadata` and can be used to create entity links between commits and org tickets.
+
+**FTS**: `commits_fts` enables full-text search on commit message and author name.
+
+**API**:
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET | `/api/commits` | List commits (filter: workspace_id, branch, author_email, search) |
+| POST | `/api/commits` | Ingest one or more commits |
+
+---
+
+## Webhook System
+
+Styrmann supports outbound webhooks for pushing events to external dev portals, CI systems, or monitoring tools.
+
+**Registration**: Webhooks are registered per organization. Each registration specifies a target URL, an optional HMAC secret, and a list of event types to subscribe to. An empty `event_types` array means "subscribe to all events".
+
+**Delivery** (`src/lib/webhook-delivery.ts`):
+1. On each broadcast event, `deliverWebhookEvent()` finds all active, non-failed webhooks matching the event type.
+2. A `webhook_deliveries` row is created with status `pending`.
+3. Delivery runs asynchronously with up to 3 attempts and exponential backoff (1s, 5s, 30s).
+4. Each request includes `X-Webhook-Event`, `X-Delivery-ID`, and (if secret is set) `X-Webhook-Signature: sha256=<hmac>`.
+5. On success, `failure_count` resets to 0. On failure, `failure_count` increments.
+
+**HMAC signing**: `HMAC-SHA256` over the full JSON payload string. Signature format: `sha256=<hex>`.
+
+**Auto-disable**: Webhooks with `failure_count >= 10` are excluded from future deliveries. They must be manually re-enabled via PATCH.
+
+**Delivery tracking**: `webhook_deliveries` records every attempt with `response_status`, `response_body` (truncated to 1000 chars), and `attempts` count.
+
+**API**:
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET | `/api/webhooks/registrations` | List webhook registrations |
+| POST | `/api/webhooks/registrations` | Create webhook registration |
+| GET | `/api/webhooks/registrations/[id]` | Get registration |
+| PATCH | `/api/webhooks/registrations/[id]` | Update registration (re-enable, change URL/secret/events) |
+| DELETE | `/api/webhooks/registrations/[id]` | Delete registration |
 
 ---
 
@@ -266,8 +480,6 @@ The Strict template is the default. Per-task workflow plans persist selected par
 **Bootstrap policy**: `bootstrapCoreAgentsRaw()` is a fallback for fresh installs without an OpenClaw gateway. It bootstraps 8 local fallback agents globally: Orchestrator, Builder, Tester, Reviewer, Explorer, Pragmatist, Guardian, and Consolidator. If any synced agents exist, bootstrap is skipped entirely — synced agents ARE the real team. Workflow planning handles missing roles via `task_findings` and `capability_proposals` rather than creating new agents.
 
 **OpenClaw prompt source policy**: Styrmann treats workspace `AGENTS.md` as the canonical agent instruction source and `SOUL.md` as identity/personality context. `system.md` in agent directories is considered legacy and is auto-migrated into workspace `AGENTS.md` + `SOUL.md` when detected, then removed. Framework-level duplicate system prompt injection is intentionally avoided.
-**Org knowledge platform**: Styrmann stores organization-scoped memories (`/api/memories`), relationship edges (`/api/entity-links`), and synthesized knowledge articles (`/api/knowledge`). `POST /api/knowledge/synthesize` runs an LLM-backed synthesis pipeline over open/resolved memories and publishes curated knowledge articles linked with `derived_from` entity links.
-
 **Agent fields**: name, role, description, status (standby/working/offline), model, source (local/gateway/synced), gateway_agent_id, session_key_prefix, agent_dir, agent_workspace_path, soul_md, user_md, agents_md. **API enrichment**: `GET /api/agents` returns `active_task_count` (number of active tasks) and `current_task_title` (title of in-progress task, if any) for each agent.
 
 **Prompts stored in files**: soul_md, user_md, agents_md are read from OpenClaw agent workspace directories on disk. Double binding -- files are the source of truth, DB reflects them.
@@ -412,29 +624,85 @@ Fallback: Agent Activity Dashboard polls every 20s; task-specific views use SSE 
 | GET | `/api/daemon/stats` | Latest daemon stats snapshot (pushed by daemon every 30s) |
 | POST | `/api/daemon/stats` | Daemon pushes its in-memory stats to MC |
 
-### Org Knowledge APIs
+### Organizations
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
-| GET/POST | `/api/memories` | List/create organization memory entries with optional FTS search and filters |
-| GET/POST | `/api/entity-links` | List/create cross-entity links (`delegates_to`, `derived_from`, etc.) |
-| GET | `/api/knowledge` | List synthesized knowledge articles with optional FTS search |
-| GET/PATCH/DELETE | `/api/knowledge/{id}` | Read/update/archive a single knowledge article |
-| POST | `/api/knowledge/synthesize` | Trigger LLM-powered synthesis from memories into published knowledge articles |
+| GET/POST | `/api/organizations` | List/create organizations |
+| GET/PATCH/DELETE | `/api/organizations/[id]` | Organization CRUD |
+
+### Org Tickets
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET/POST | `/api/org-tickets` | List/create org tickets |
+| GET/PATCH/DELETE | `/api/org-tickets/[id]` | Org ticket CRUD |
+| POST | `/api/org-tickets/[id]/delegate` | Delegate ticket to workspace tasks via orchestrator |
+
+### Memories
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET/POST | `/api/memories` | List/create memory entries (supports FTS search via `?search=`) |
+| GET/PATCH/DELETE | `/api/memories/[id]` | Memory CRUD |
+
+### Entity Links
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET/POST | `/api/entity-links` | List/create cross-entity links |
+| GET | `/api/entity-links/graph` | Recursive graph traversal (MAX_DEPTH=10) from a root entity |
+
+### Knowledge Articles
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET | `/api/knowledge` | List synthesized knowledge articles (supports FTS search) |
+| GET/PATCH/DELETE | `/api/knowledge/[id]` | Read/update/archive a single knowledge article |
+| POST | `/api/knowledge/synthesize` | Trigger LLM-powered synthesis from memories into published articles |
+
+### Commits
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET/POST | `/api/commits` | List/ingest commits (supports FTS search) |
+
+### Webhooks
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET/POST | `/api/webhooks/registrations` | List/create webhook registrations |
+| GET/PATCH/DELETE | `/api/webhooks/registrations/[id]` | Webhook registration CRUD |
+
+### Search
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET | `/api/search` | Unified FTS search across memories, knowledge articles, org tickets, commits (filter: `entity_types`) |
 
 ---
 
 ## Database Schema
 
-54 migrations (001-054), auto-run on DB connection in `src/lib/db/index.ts`. Schema creation (`schema.ts`) only runs for fresh databases. After migrations, `discoverRepoWorkspaces()` scans `/root/repos/{org}/{repo}` for git repos and creates/syncs workspaces.
+62 migrations (001-062), auto-run on DB connection in `src/lib/db/index.ts`. Schema creation (`schema.ts`) only runs for fresh databases. After migrations, `discoverRepoWorkspaces()` scans `/root/repos/{org}/{repo}` for git repos and creates/syncs workspaces. Migrations 055-062 added the org/knowledge platform tables.
 
 ### Core Tables
-- **workspaces** -- slug (`{org}-{repo}` format), name, description, icon, github_repo, owner_email, coordinator_email, logo_url, organization
+- **organizations** -- id, name, slug (unique), description, logo_url. Auto-created from workspace discovery.
+- **workspaces** -- slug (`{org}-{repo}` format), name, description, icon, github_repo, owner_email, coordinator_email, logo_url, organization, organization_id (FK to organizations, nullable)
 - **agents** -- name, role, status, model, source, gateway_agent_id, session_key_prefix, agent_dir, agent_workspace_path, soul_md, user_md, agents_md. No `is_master` column.
-- **tasks** -- title, description, status, priority, task_type, effort, impact, assigned_agent_id, milestone_id, workflow_template_id, workflow_plan_id, due_date, github_issue_id (nullable FK to github_issues). No `sprint_id`. No `parent_task_id`.
+- **tasks** -- title, description, status, priority, task_type, effort, impact, assigned_agent_id, milestone_id, workflow_template_id, workflow_plan_id, due_date, github_issue_id (nullable FK to github_issues), org_ticket_id (nullable FK to org_tickets). No `sprint_id`. No `parent_task_id`.
 - **sprints** -- workspace_id, name, goal, sprint_number, start_date, end_date, status
 - **milestones** -- workspace_id, name, description, due_date, status, coordinator_agent_id (auto-resolved from default orchestrator, not user-settable), sprint_id (FK nullable), priority ('low'|'normal'|'high'|'urgent')
 - **milestone_dependencies** -- id, milestone_id, depends_on_milestone_id (nullable), depends_on_task_id (nullable), dependency_type ('finish_to_start'|'blocks')
 - **tags** / **task_tags** -- workspace-scoped tags, many-to-many with tasks
+
+### Org/Knowledge Platform Tables
+- **org_tickets** -- organization_id, title, description, status, priority, ticket_type, external_ref, external_system, creator_name, assignee_name, due_date, tags (JSON)
+- **memories** -- organization_id, workspace_id, memory_type (8 types), title, summary, body, source, source_ref, confidence (0-100), status, metadata (JSON), tags (JSON)
+- **entity_links** -- from_entity_type, from_entity_id, to_entity_type, to_entity_id, link_type (10 types), explanation. Self-link prevented by CHECK constraint.
+- **knowledge_articles** -- organization_id, workspace_id, title, summary, body, synthesis_model, synthesis_prompt_hash, source_memory_ids (JSON), status (draft/published/stale/archived), version, supersedes_id
+- **commits** -- workspace_id, commit_hash, message, author_name, author_email, branch, files_changed (JSON), insertions, deletions, committed_at, metadata (JSON). Unique on (workspace_id, commit_hash).
+- **webhooks** -- organization_id, url, secret, event_types (JSON), is_active, last_delivery_at, last_delivery_status, failure_count
+- **webhook_deliveries** -- webhook_id, event_type, payload, status (pending/delivered/failed), response_status, response_body, attempts
+
+### FTS5 Virtual Tables
+Four FTS5 virtual tables use the external content pattern with porter tokenizer. Each is kept in sync via INSERT/UPDATE/DELETE triggers:
+- **memories_fts** -- indexes memories(title, summary, body)
+- **knowledge_articles_fts** -- indexes knowledge_articles(title, summary, body)
+- **org_tickets_fts** -- indexes org_tickets(title, description)
+- **commits_fts** -- indexes commits(message, author_name)
 
 ### Task Sub-Resource Tables
 - **task_comments** -- author, content
@@ -629,6 +897,10 @@ Agents without direct filesystem access use upload/download endpoints:
 15. **Standardized file upload UX**: Active file input areas across the UI use a consistent drag-and-drop zone pattern with Upload icon, dashed border, and "Drop file or click to browse" text.
 16. **Vitest test framework**: Tests use `pool: 'forks'` for better-sqlite3 native module support. Test helper `createTestDb()` creates in-memory SQLite databases with full schema + migrations applied. Test files are colocated at `src/**/*.test.ts`.
 17. **Stabilization wave**: Legacy tables removed (businesses, memory_pipeline_config, planning_questions, planning_specs, conversations, conversation_participants, messages). Legacy task columns removed (business_id, planning_*). Clean schema foundation for org/knowledge platform migration.
+18. **Organization-first hierarchy**: The full hierarchy is `Organization -> Workspace -> Sprint -> Milestone -> Task`. Organizations are auto-created from repo directory structure. `workspaces.organization_id` links workspaces to their parent org. The homepage groups workspaces by organization.
+19. **Task creation lockdown via org tickets**: Org tickets are the intended entry point for all new work. `POST /api/org-tickets/[id]/delegate` is the authorized path that creates workspace tasks via LLM-powered decomposition. The delegation module enforces ticket status transitions and creates `delegates_to` entity links atomically. Direct task creation remains available but is treated as an internal/admin path.
+20. **Memory system without vectors**: The knowledge store uses SQLite FTS5 (porter tokenizer) for full-text search rather than vector embeddings. This keeps the system self-contained with no external vector DB dependency. Eight memory types cover the full range of development knowledge: fact, decision, event, tool_run, error, observation, note, patch. LLM synthesis converts raw memories into curated knowledge articles on a scheduled basis.
+21. **Outbound webhook system for external integration**: Styrmann pushes events to external dev portals via registered webhooks. HMAC-SHA256 signing ensures payload authenticity. Exponential backoff (3 attempts: 1s, 5s, 30s) handles transient failures. Webhooks with 10+ consecutive failures are auto-disabled to prevent noise. Delivery history is tracked in `webhook_deliveries` for debugging.
 ---
 
 ## Environment Variables
