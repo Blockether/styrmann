@@ -13,7 +13,7 @@ import { useStyrmann } from '@/lib/store';
 import { format } from 'date-fns';
 import type { Workspace } from '@/lib/types';
 
-export type DashboardView = 'sprint' | 'backlog' | 'pareto' | 'issues';
+export type DashboardView = 'sprint' | 'backlog' | 'pareto' | 'issues' | 'discord';
 
 interface HeaderProps {
   workspace?: Workspace;

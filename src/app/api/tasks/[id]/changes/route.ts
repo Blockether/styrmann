@@ -20,10 +20,9 @@ interface BranchDetail {
 }
 
 interface SessionSummaryCounts {
+  active_count: number;
   interrupted_count: number;
-  stale_count: number;
-  finished_count: number;
-  unfinished_count: number;
+  completed_count: number;
 }
 
 function extractWorktreePath(metadataRaw: string | null | undefined): string[] {
@@ -80,27 +79,37 @@ function isTaskScopedBranch(branch: string, taskId: string): boolean {
   return lower.startsWith('task/') || lower.includes(shortId);
 }
 
-function summarizeSessions(rows: Array<{ status?: string | null; ended_at?: string | null }>): SessionSummaryCounts {
+function summarizeSessions(
+  rows: Array<{ status?: string | null; ended_at?: string | null }>,
+  taskTerminal: boolean,
+): SessionSummaryCounts {
+  let active = 0;
   let interrupted = 0;
-  let stale = 0;
-  let finished = 0;
-  let unfinished = 0;
+  let completed = 0;
 
   for (const row of rows) {
     const status = String(row.status || '').toLowerCase();
     const ended = Boolean(row.ended_at);
-    const isFinished = status === 'completed' || status === 'done' || ended;
-    if (status === 'interrupted') interrupted += 1;
-    if (status === 'stale') stale += 1;
-    if (isFinished) finished += 1;
-    else unfinished += 1;
+
+    if (status === 'interrupted') {
+      interrupted += 1;
+    } else if (status === 'completed' || status === 'done' || ended) {
+      completed += 1;
+    } else if (taskTerminal && (status === 'active' || status === 'stale')) {
+      // Task is terminal — treat lingering active/stale sessions as finished
+      completed += 1;
+    } else if (status === 'active') {
+      active += 1;
+    } else {
+      // stale or unknown when task is not terminal — count as active (still running)
+      active += 1;
+    }
   }
 
   return {
+    active_count: active,
     interrupted_count: interrupted,
-    stale_count: stale,
-    finished_count: finished,
-    unfinished_count: unfinished,
+    completed_count: completed,
   };
 }
 
@@ -132,7 +141,7 @@ export async function GET(
 
     const task = db
       .prepare(
-        `SELECT t.id, t.title, t.created_at, t.workspace_id, w.name as workspace_name, w.slug as workspace_slug,
+        `SELECT t.id, t.title, t.status, t.created_at, t.workspace_id, w.name as workspace_name, w.slug as workspace_slug,
                 w.organization as workspace_org, w.github_repo as workspace_repo
          FROM tasks t
          LEFT JOIN workspaces w ON w.id = t.workspace_id
@@ -142,6 +151,7 @@ export async function GET(
       | {
           id: string;
           title: string;
+          status: string;
           created_at: string;
           workspace_id: string;
           workspace_name?: string;
@@ -355,7 +365,11 @@ export async function GET(
       }
     }
 
-    const sessionSummary = summarizeSessions((Array.isArray(sessions) ? sessions : []) as Array<{ status?: string | null; ended_at?: string | null }>);
+    const taskTerminal = task.status === 'done' || task.status === 'cancelled';
+    const sessionSummary = summarizeSessions(
+      (Array.isArray(sessions) ? sessions : []) as Array<{ status?: string | null; ended_at?: string | null }>,
+      taskTerminal,
+    );
     const worktreeName = branchMetadataRows
       .flatMap((row) => extractWorktreePath(row.metadata))
       .find((candidate) => candidate.includes(`${path.sep}.mission-control${path.sep}worktrees${path.sep}`));
@@ -384,10 +398,9 @@ export async function GET(
       },
       summary: {
         sessions_count: Array.isArray(sessions) ? sessions.length : 0,
-        interruptions_count: sessionSummary.interrupted_count,
-        stales_count: sessionSummary.stale_count,
-        finished_count: sessionSummary.finished_count,
-        unfinished_count: sessionSummary.unfinished_count,
+        active_count: sessionSummary.active_count,
+        interrupted_count: sessionSummary.interrupted_count,
+        completed_count: sessionSummary.completed_count,
         deliverables_count: deliverables.length,
         changed_files_count: uniqueChangedFiles.length,
         commits_count: commits.length,

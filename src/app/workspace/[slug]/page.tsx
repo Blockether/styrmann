@@ -12,6 +12,7 @@ import { BacklogView } from '@/components/BacklogView';
 import { ParetoView } from '@/components/ParetoView';
 import { SSEDebugPanel } from '@/components/SSEDebugPanel';
 import { GithubIssuesView } from '@/components/GithubIssuesView';
+import { DiscordMessagesView } from '@/components/DiscordMessagesView';
 import { TaskModal } from '@/components/TaskModal';
 import { useStyrmann } from '@/lib/store';
 import { useSSE } from '@/hooks/useSSE';
@@ -22,7 +23,7 @@ function getInitialView(): DashboardView {
   if (typeof window === 'undefined') return 'sprint';
   const params = new URLSearchParams(window.location.search);
   const urlView = params.get('view');
-  if (urlView && ['sprint', 'backlog', 'pareto', 'issues'].includes(urlView)) {
+  if (urlView && ['sprint', 'backlog', 'pareto', 'issues', 'discord'].includes(urlView)) {
     return urlView as DashboardView;
   }
   return 'sprint';
@@ -45,7 +46,7 @@ export default function WorkspacePage() {
 
   useEffect(() => {
     const urlView = new URLSearchParams(window.location.search).get('view');
-    if (urlView && ['sprint', 'backlog', 'pareto', 'issues'].includes(urlView)) {
+    if (urlView && ['sprint', 'backlog', 'pareto', 'issues', 'discord'].includes(urlView)) {
       return;
     }
     if (urlView) {
@@ -175,6 +176,8 @@ export default function WorkspacePage() {
         return <ParetoView workspaceId={workspace.id} />;
       case 'issues':
         return <GithubIssuesView workspaceId={workspace.id} workspace={workspace} onCreateTask={(issue) => setGithubIssueForTask(issue)} />;
+      case 'discord':
+        return <DiscordMessagesView workspaceId={workspace.id} />;
       default:
         return <ActiveSprint workspaceId={workspace.id} />;
     }

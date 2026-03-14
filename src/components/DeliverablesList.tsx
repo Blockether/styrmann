@@ -29,10 +29,9 @@ interface TaskChangesPayload {
   };
   summary: {
     sessions_count: number;
-    interruptions_count?: number;
-    stales_count?: number;
-    finished_count?: number;
-    unfinished_count?: number;
+    active_count?: number;
+    interrupted_count?: number;
+    completed_count?: number;
     deliverables_count: number;
     changed_files_count: number;
     commits_count: number;
@@ -461,14 +460,16 @@ export function DeliverablesList({ taskId }: DeliverablesListProps) {
             <div className="p-2 rounded bg-mc-bg-tertiary">
               <div className="text-mc-text-secondary">Sessions</div>
               <div className="font-medium text-mc-text mt-0.5">{changes.summary.sessions_count}</div>
-              <div className="text-[11px] text-mc-text-secondary mt-1 flex flex-wrap gap-x-1.5 gap-y-0.5">
-                <span>interrupted {changes.summary.interruptions_count || 0}</span>
-                <span className="hidden sm:inline">•</span>
-                <span>stale {changes.summary.stales_count || 0}</span>
-                <span className="hidden sm:inline">•</span>
-                <span>finished {changes.summary.finished_count || 0}</span>
-                <span className="hidden sm:inline">•</span>
-                <span>unfinished {changes.summary.unfinished_count || 0}</span>
+              <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                {(changes.summary.active_count || 0) > 0 && (
+                  <span className="px-1.5 py-0.5 rounded border border-green-200 bg-green-50 text-green-700 text-[11px] whitespace-nowrap">{changes.summary.active_count} running</span>
+                )}
+                {(changes.summary.interrupted_count || 0) > 0 && (
+                  <span className="px-1.5 py-0.5 rounded border border-orange-200 bg-orange-50 text-orange-700 text-[11px] whitespace-nowrap">{changes.summary.interrupted_count} interrupted</span>
+                )}
+                {(changes.summary.completed_count || 0) > 0 && (
+                  <span className="px-1.5 py-0.5 rounded border border-mc-border bg-mc-bg text-mc-text-secondary text-[11px] whitespace-nowrap">Finished: {changes.summary.completed_count}</span>
+                )}
               </div>
             </div>
             <div className="p-2 rounded bg-mc-bg-tertiary">

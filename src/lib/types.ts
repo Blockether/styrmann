@@ -757,6 +757,12 @@ export interface DaemonStatsSnapshot {
   // Modules & jobs
   modules: DaemonModuleInfo[];
   jobs: DaemonJobInfo[];
+  // Discord
+  discord_connected?: boolean;
+  discord_messages_processed?: number;
+  discord_tasks_created?: number;
+  discord_completions_sent?: number;
+  discord_voice_responses?: number;
 }
 
 // ── ACP Provenance types ──────────────────────────────────────────────
@@ -797,4 +803,63 @@ export interface ProvenanceRecord {
   message_role?: string;
   message_index?: number;
   created_at: string;
+}
+
+// ---------------------------------------------------------------------------
+// Discord Integration
+// ---------------------------------------------------------------------------
+
+export type DiscordClassificationType = 'task' | 'conversation' | 'clarification';
+
+export interface DiscordClassification {
+  type: DiscordClassificationType;
+  confidence: number;
+  reasoning: string;
+  /** Extracted task title when type=task */
+  title?: string;
+  /** Extracted task description when type=task */
+  description?: string;
+  /** Inferred task type when type=task */
+  task_type?: 'bug' | 'feature' | 'chore' | 'documentation' | 'research' | 'spike';
+  /** Inferred priority when type=task */
+  priority?: 'low' | 'normal' | 'high' | 'urgent';
+  /** Clarification question to ask when type=clarification */
+  question?: string;
+}
+
+export interface DiscordMessage {
+  id: string;
+  discord_message_id: string;
+  discord_channel_id: string;
+  discord_guild_id: string;
+  discord_author_id: string;
+  discord_author_name: string;
+  content: string;
+  classification: DiscordClassificationType;
+  task_id?: string | null;
+  workspace_id: string;
+  response_sent: number;
+  completion_notified: number;
+  discord_thread_id?: string | null;
+  metadata?: string | null;
+  created_at: string;
+  /** Joined from tasks table */
+  task_title?: string | null;
+  task_status?: string | null;
+}
+
+export type ClarificationStatus = 'pending' | 'resolved' | 'expired';
+
+export interface ClarificationContext {
+  id: string;
+  discord_channel_id: string;
+  discord_author_id: string;
+  original_message_id: string;
+  original_content: string;
+  question: string;
+  classification_data?: string | null;
+  status: ClarificationStatus;
+  workspace_id: string;
+  created_at: string;
+  resolved_at?: string | null;
 }

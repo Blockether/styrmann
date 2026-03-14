@@ -757,3 +757,55 @@ Both sections auto-refresh every 30 seconds. Validation only runs on button clic
 New daemon module (`src/daemon/reporter.ts`): pushes the daemon's in-memory `DaemonStats` object to MC via `POST /api/daemon/stats` every 30 seconds. MC stores the latest snapshot in a `globalThis` variable (in-memory, lost on MC restart but daemon re-pushes within one interval). Payload includes all DaemonStats counters, process memory, PID, module intervals with last-tick timestamps, and registered scheduled jobs.
 
 The scheduler now exports `getRegisteredJobs()` for the reporter to include job metadata in its stats push.
+
+### Discord Integration
+
+Discord integration runs as a daemon module (`src/daemon/discord.ts`). Conditional on `DISCORD_BOT_TOKEN` env var — if absent, the module is a no-op.
+
+**Architecture**: Discord.js v14 client runs inside the daemon process alongside other modules (heartbeat, dispatcher, etc.). Communicates with Styrmann via `mcFetch()` HTTP calls to API endpoints.
+
+**Message flow**: Discord message received -> check for pending clarification (state machine) -> `POST /api/discord/classify` (LLM classification via `src/lib/discord-classifier.ts`) -> if task: `POST /api/tasks` creates the task, creates a Discord thread via `Message.startThread()`, stores record in `discord_messages` table with provenance -> if conversation: `POST /api/discord/respond` generates AI reply -> if clarification: stores context in `discord_clarification_contexts` table, asks follow-up question, waits for user's next message in that channel.
+
+**Thread support**: When a task is created from a Discord message, the bot creates a thread from that message (named `Task: {title}`). Completion notifications are sent to the thread when available, falling back to the original channel. Thread IDs are stored in `discord_messages.discord_thread_id` (migration 052).
+
+**Clarification state machine**: When a message is classified as `clarification`, the bot stores context in `discord_clarification_contexts` (migration 052) and holds in-memory state keyed by `channel:author`. When the same user sends a follow-up in the same channel within 10 minutes, the bot combines both messages and re-classifies. If still unclear, it can ask again. Contexts expire after 10 minutes. Stale pending contexts are cleaned up on next message from that user.
+
+**Completion notifications**: The discord module polls `GET /api/discord/completions` every 30 seconds to find tasks that originated from Discord and reached `done` status. Sends notification to the originating thread (preferred) or channel (fallback) and marks as notified via `POST /api/discord/completions/ack`.
+
+**Provenance**: When a task is created from Discord, the `POST /api/discord/messages` endpoint inserts a `task_provenance` record with `kind='external_user'`, `source_channel='discord'`, `source_tool='discord-bot'`, and receipt data containing the Discord message/channel/author metadata. This makes Discord-originated tasks traceable in the task provenance view.
+
+**Classification**: Uses `llmJsonInfer()` with system prompt to classify messages as task/conversation/clarification. When LLM is unavailable, falls back to rule-based keyword matching. Classification extracts task title, description, type, and priority when applicable.
+
+**Database**: `discord_messages` table (migration 051) stores message metadata, classification result, linked task_id, thread_id, and notification tracking flags. `discord_clarification_contexts` table (migration 052) tracks pending clarification conversations with status (`pending`/`resolved`/`expired`).
+
+**Reporter stats**: The daemon reporter includes Discord-specific counters in the stats payload: `discord_connected`, `discord_messages_processed`, `discord_tasks_created`, `discord_completions_sent`, `discord_voice_responses`. When connected, a `discord` module entry appears in the modules list.
+
+**UI**: `DiscordMessagesView` component (`src/components/DiscordMessagesView.tsx`) shows Discord message history with classification icons, author badges, task linkage, and thread indicators. Accessible via the `?view=discord` URL param or the sidebar Discord nav item. Filterable by classification type (all/task/conversation/clarification).
+
+**Channel filtering**: `DISCORD_CHANNEL_IDS` env var (comma-separated) limits which channels the bot monitors. If not set, bot only responds to @mentions.
+
+**Voice** (optional): `src/daemon/discord-voice.ts` — enabled only when both `OPENAI_API_KEY` (Whisper ASR) and `ELEVENLABS_API_KEY` (TTS) are set. Captures audio from Discord voice channels, transcribes via Whisper, classifies and processes the transcription, then responds with ElevenLabs-synthesized speech.
+
+**API endpoints**:
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/api/discord/classify` | POST | Classify a message as task/conversation/clarification |
+| `/api/discord/respond` | POST | Generate conversational AI response |
+| `/api/discord/messages` | GET | List Discord messages with optional workspace/classification filter |
+| `/api/discord/messages` | POST | Store Discord message record with classification and provenance |
+| `/api/discord/completions` | GET | Find tasks from Discord that completed but not yet notified |
+| `/api/discord/completions/ack` | POST | Mark completion notifications as sent |
+| `/api/discord/clarifications` | POST | Store clarification context for state machine |
+| `/api/discord/clarifications/[id]/resolve` | POST | Resolve a pending clarification context |
+| `/api/workspaces/[id]/discord/messages` | GET | List Discord messages scoped to a workspace |
+
+**Env vars** (set in daemon environment):
+| Variable | Required | Purpose |
+|----------|----------|---------|
+| `DISCORD_BOT_TOKEN` | Yes (to enable) | Discord bot authentication |
+| `DISCORD_CHANNEL_IDS` | No | Comma-separated channel IDs to monitor |
+| `DISCORD_WORKSPACE_ID` | No | Workspace for created tasks (default: "default") |
+| `OPENAI_API_KEY` | For voice | Whisper ASR |
+| `OPENAI_BASE_URL` | No | Custom OpenAI-compatible endpoint |
+| `ELEVENLABS_API_KEY` | For voice | ElevenLabs TTS |
+| `ELEVENLABS_VOICE_ID` | No | ElevenLabs voice (default: Sarah) |

@@ -35,4 +35,9 @@ export interface DaemonStats {
   logEntriesCleaned?: number;
   stalledRedispatchedCount?: number;
   stalledReassignedCount?: number;
+  discordConnected?: boolean;
+  discordMessagesProcessed?: number;
+  discordTasksCreated?: number;
+  discordCompletionsSent?: number;
+  discordVoiceResponses?: number;
 }

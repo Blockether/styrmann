@@ -8,6 +8,7 @@ import { startRouter } from './router';
 import { startLogPoller } from './logs';
 import { startReporter } from './reporter';
 import { startRecovery } from './recovery';
+import { startDiscord } from './discord';
 import type { DaemonStats } from './types';
 
 const log = createLogger('daemon');
@@ -56,10 +57,11 @@ async function main() {
   const stopLogPoller = startLogPoller(config, stats);
   const stopRecovery = startRecovery(config, stats);
   const stopReporter = startReporter(config, stats);
+  const stopDiscord = startDiscord(config, stats);
 
-  // Clean shutdown
   const shutdown = () => {
     log.info('Shutting down...');
+    stopDiscord();
     stopReporter();
     stopRecovery();
     stopLogPoller();

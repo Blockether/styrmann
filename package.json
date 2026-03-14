@@ -15,12 +15,14 @@
     "daemon:dev": "tsx watch src/daemon/index.ts"
   },
   "dependencies": {
+    "@discordjs/voice": "^0.19.1",
     "@hello-pangea/dnd": "18.0.1",
     "@tailwindcss/postcss": "4.2.1",
     "better-sqlite3": "12.6.2",
     "clsx": "2.1.1",
     "css-tree": "3.2.1",
     "date-fns": "4.1.0",
+    "discord.js": "^14.25.1",
     "lucide-react": "0.577.0",
     "marked": "17.0.4",
     "next": "16.1.6",

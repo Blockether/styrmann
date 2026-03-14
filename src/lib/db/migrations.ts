@@ -2207,6 +2207,69 @@ const migrations: Migration[] = [
         CREATE INDEX IF NOT EXISTS idx_tasks_business ON tasks(business_id);
       `);
     }
+  },
+  {
+    id: '051',
+    name: 'add_discord_messages',
+    up: (db) => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS discord_messages (
+          id TEXT PRIMARY KEY,
+          discord_message_id TEXT NOT NULL,
+          discord_channel_id TEXT NOT NULL,
+          discord_guild_id TEXT NOT NULL,
+          discord_author_id TEXT NOT NULL,
+          discord_author_name TEXT NOT NULL,
+          content TEXT NOT NULL,
+          classification TEXT NOT NULL CHECK (classification IN ('task', 'conversation', 'clarification')),
+          task_id TEXT REFERENCES tasks(id) ON DELETE SET NULL,
+          workspace_id TEXT NOT NULL DEFAULT 'default' REFERENCES workspaces(id) ON DELETE CASCADE,
+          response_sent INTEGER DEFAULT 0,
+          completion_notified INTEGER DEFAULT 0,
+          metadata TEXT,
+          created_at TEXT DEFAULT (datetime('now'))
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_discord_messages_discord_id ON discord_messages(discord_message_id);
+        CREATE INDEX IF NOT EXISTS idx_discord_messages_task ON discord_messages(task_id);
+        CREATE INDEX IF NOT EXISTS idx_discord_messages_channel ON discord_messages(discord_channel_id);
+        CREATE INDEX IF NOT EXISTS idx_discord_messages_classification ON discord_messages(classification);
+      `);
+    }
+  },
+  {
+    id: '052',
+    name: 'add_discord_threads_and_clarification_contexts',
+    up: (db) => {
+      console.log('[Migration 052] Adding discord thread support and clarification context tracking...');
+
+      // Add thread_id column to discord_messages
+      const cols = db.pragma('table_info(discord_messages)') as { name: string }[];
+      if (!cols.some(c => c.name === 'discord_thread_id')) {
+        db.exec(`ALTER TABLE discord_messages ADD COLUMN discord_thread_id TEXT`);
+      }
+
+      // Clarification context tracking for the state machine
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS discord_clarification_contexts (
+          id TEXT PRIMARY KEY,
+          discord_channel_id TEXT NOT NULL,
+          discord_author_id TEXT NOT NULL,
+          original_message_id TEXT NOT NULL,
+          original_content TEXT NOT NULL,
+          question TEXT NOT NULL,
+          classification_data TEXT,
+          status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'resolved', 'expired')),
+          workspace_id TEXT NOT NULL DEFAULT 'default',
+          created_at TEXT DEFAULT (datetime('now')),
+          resolved_at TEXT,
+          FOREIGN KEY (original_message_id) REFERENCES discord_messages(id) ON DELETE CASCADE
+        )
+      `);
+
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_discord_clarification_channel_author ON discord_clarification_contexts(discord_channel_id, discord_author_id, status)`);
+
+      console.log('[Migration 052] Discord threads and clarification contexts ready');
+    }
   }
 ];
 

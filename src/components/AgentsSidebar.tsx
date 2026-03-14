@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { ChevronRight, ChevronLeft, ChevronDown, ListTodo, Inbox, BarChart3, X, CircleDot, Clock, Settings2, Bot } from 'lucide-react';
+import { ChevronRight, ChevronLeft, ChevronDown, ListTodo, Inbox, BarChart3, X, CircleDot, Clock, Settings2, Bot, MessageSquare } from 'lucide-react';
 import { useStyrmann } from '@/lib/store';
 import type { Sprint } from '@/lib/types';
 import type { DashboardView } from './Header';
@@ -20,6 +20,7 @@ const NAV_ITEMS = [
   { label: 'Backlog', view: 'backlog' as DashboardView, icon: <Inbox className="w-4 h-4" /> },
   { label: 'Pareto', view: 'pareto' as DashboardView, icon: <BarChart3 className="w-4 h-4" /> },
   { label: 'Issues', view: 'issues' as DashboardView, icon: <CircleDot className="w-4 h-4" /> },
+  { label: 'Discord', view: 'discord' as DashboardView, icon: <MessageSquare className="w-4 h-4" /> },
 ];
 
 interface AgentSummary {
