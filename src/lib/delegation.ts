@@ -129,10 +129,6 @@ export async function delegateOrgTicket(ticketId: string, options?: DelegationOp
     return { success: false, task_ids: [], error: 'Org ticket not found', llm_used: false };
   }
 
-  if (ticket.status === 'delegated' || ticket.status === 'in_progress') {
-    return { success: false, task_ids: [], error: 'Ticket already delegated', llm_used: false };
-  }
-
   const workspaces = db.prepare(
     `SELECT *
      FROM workspaces
@@ -160,6 +156,17 @@ export async function delegateOrgTicket(ticketId: string, options?: DelegationOp
   const fallbackTaskType = TASK_TYPE_MAP[ticket.ticket_type] || 'feature';
 
   const tx = db.transaction(() => {
+    // Atomic status update — prevents race condition where two concurrent requests delegate the same ticket
+    const statusUpdate = db.prepare(`
+      UPDATE org_tickets
+      SET status = 'delegated', updated_at = ?
+      WHERE id = ? AND status NOT IN ('delegated', 'in_progress', 'resolved', 'closed')
+    `).run(now, ticketId);
+
+    if (statusUpdate.changes === 0) {
+      throw new Error('ALREADY_DELEGATED');
+    }
+
     for (const rawTask of plan.tasks) {
       const taskId = uuidv4();
       const workspaceId = rawTask.workspace_id || targetWorkspace.id;
@@ -227,11 +234,16 @@ export async function delegateOrgTicket(ticketId: string, options?: DelegationOp
 
       createdTaskIds.push(taskId);
     }
-
-    db.prepare(`UPDATE org_tickets SET status = 'delegated', updated_at = ? WHERE id = ?`).run(now, ticketId);
   });
 
-  tx();
+  try {
+    tx();
+  } catch (error) {
+    if (error instanceof Error && error.message === 'ALREADY_DELEGATED') {
+      return { success: false, task_ids: [], error: 'Ticket already delegated or in progress', llm_used: false };
+    }
+    throw error;
+  }
 
   const updatedTicket = db.prepare('SELECT * FROM org_tickets WHERE id = ? LIMIT 1').get(ticketId) as OrgTicketRow;
   broadcast({

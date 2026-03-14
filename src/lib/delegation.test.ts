@@ -121,10 +121,22 @@ describe('delegateOrgTicket', () => {
     expect(result.error).toBe('Org ticket not found');
   });
 
+  it('prevents double delegation (race condition)', async () => {
+    const { ticketId } = seedOrgWorkspaceAndTicket();
+    vi.mocked(isLlmAvailable).mockReturnValue(false);
+
+    const result1 = await delegateOrgTicket(ticketId);
+    expect(result1.success).toBe(true);
+
+    const result2 = await delegateOrgTicket(ticketId);
+    expect(result2.success).toBe(false);
+    expect(result2.error).toMatch(/already delegated/i);
+  });
+
   it('returns error when ticket is already delegated', async () => {
     const { ticketId } = seedOrgWorkspaceAndTicket({ ticketStatus: 'delegated' });
     const result = await delegateOrgTicket(ticketId);
     expect(result.success).toBe(false);
-    expect(result.error).toBe('Ticket already delegated');
+    expect(result.error).toMatch(/already delegated/i);
   });
 });
