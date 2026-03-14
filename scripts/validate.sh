@@ -16,8 +16,8 @@ CYAN='\033[0;36m'
 NC='\033[0m'
 BOLD='\033[1m'
 
-PROJECT_DIR="/root/repos/blockether/mission-control"
-DB_PATH="${PROJECT_DIR}/mission-control.db"
+PROJECT_DIR="/root/repos/blockether/styrmann"
+DB_PATH="${PROJECT_DIR}/styrman.db"
 ENV_FILE="${PROJECT_DIR}/.env.local"
 SERVICE_NAME="mission-control"
 DAEMON_SERVICE="mission-control-daemon"

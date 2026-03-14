@@ -7,12 +7,10 @@ import type { ValidationCheck, ValidationResult } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
 
-const PROJECT_DIR = '/root/repos/blockether/mission-control';
+const PROJECT_DIR = '/root/repos/blockether/styrmann';
 const DB_CANDIDATES = [
     process.env.STYRMAN_DATABASE_PATH,
-  path.join(PROJECT_DIR, 'mission-control.db'),
-  path.join(PROJECT_DIR, 'styrmann.db'),
-  path.join(PROJECT_DIR, 'styrmann'),
+  path.join(PROJECT_DIR, 'styrman.db'),
 ].filter((value): value is string => Boolean(value));
 const DB_PATH = DB_CANDIDATES.find((candidate) => existsSync(candidate)) || DB_CANDIDATES[0];
 const ENV_FILE = `${PROJECT_DIR}/.env.local`;

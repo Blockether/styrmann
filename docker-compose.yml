@@ -12,7 +12,7 @@ services:
         required: false
     environment:
       NODE_ENV: production
-      DATABASE_PATH: /app/data/mission-control.db
+      DATABASE_PATH: /app/data/styrman.db
       WORKSPACE_BASE_PATH: /app/workspace
       PROJECTS_PATH: /app/workspace/projects
       # Set this if OpenClaw runs on the host machine:

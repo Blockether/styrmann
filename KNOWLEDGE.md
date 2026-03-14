@@ -630,7 +630,7 @@ Agents without direct filesystem access use upload/download endpoints:
 | `OPENCLAW_GATEWAY_TOKEN` | Yes | -- | Auth token for OpenClaw |
 | `STYRMAN_API_TOKEN` | No | -- | API auth token (enables Bearer auth) |
 | `STYRMAN_WEBHOOK_SECRET` | No | -- | HMAC secret for webhook verification |
-| `STYRMAN_DATABASE_PATH` | No | `./mission-control.db` | SQLite database path |
+| `STYRMAN_DATABASE_PATH` | No | `./styrman.db` | SQLite database path |
 | `STYRMAN_PROJECTS_PATH` | No | `/root/repos` | Repos base directory — scanned for `{org}/{repo}` git repos, auto-discovered as workspaces |
 | `STYRMAN_URL` | No | auto-detected | API URL for agent callbacks |
 

@@ -5,7 +5,7 @@ import type Database from 'better-sqlite3';
 const MAX_STORE_FILE_SIZE = 10 * 1024 * 1024;
 
 function getStoreBaseDir(): string {
-const dbPath = process.env.STYRMAN_DATABASE_PATH || pathModule.join(process.cwd(), 'mission-control.db');
+const dbPath = process.env.STYRMAN_DATABASE_PATH || pathModule.join(process.cwd(), 'styrman.db');
   return pathModule.join(pathModule.dirname(pathModule.resolve(dbPath)), 'deliverable-store');
 }
 

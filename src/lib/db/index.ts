@@ -5,7 +5,7 @@ import { schema } from './schema';
 import { runMigrations } from './migrations';
 import { discoverRepoWorkspaces } from '@/lib/repo-discovery';
 
-const DB_PATH = process.env.STYRMAN_DATABASE_PATH || path.join(process.cwd(), 'mission-control.db');
+const DB_PATH = process.env.STYRMAN_DATABASE_PATH || path.join(process.cwd(), 'styrman.db');
 
 let db: Database.Database | null = null;
 

@@ -93,7 +93,7 @@ Core stack:
 | Variable | Required | Description |
 |----------|:--------:|-------------|
 | `STYRMAN_API_TOKEN` | No | API Bearer auth token |
-| `STYRMAN_DATABASE_PATH` | No | SQLite path (default: `./styrmann.db`) |
+| `STYRMAN_DATABASE_PATH` | No | SQLite path (default: `./styrman.db`) |
 | `STYRMAN_PROJECTS_PATH` | No | Repos base directory (default: `/root/repos`) |
 | `STYRMAN_URL` | No | Server URL (auto-detected) |
 | `STYRMAN_WEBHOOK_SECRET` | No | HMAC verification secret |
