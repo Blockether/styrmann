@@ -571,18 +571,21 @@ export type SSEEventType =
   | 'agent_completed'
   | 'github_issues_synced'
   | 'agent_log_added'
-  | 'daemon_stats_updated';
+  | 'daemon_stats_updated'
+  | 'organization_created'
+  | 'organization_updated'
+  | 'organization_deleted';
 
 export interface SSEEvent {
   type: SSEEventType;
-  payload: Task | Agent | TaskActivity | PresentedTaskActivity | TaskDeliverable | {
+  payload: Task | Agent | TaskActivity | PresentedTaskActivity | TaskDeliverable | Organization | {
     taskId: string;
     sessionId: string;
     agentName?: string;
     summary?: string;
     deleted?: boolean;
   } | {
-    id: string;  // For task_deleted events
+    id: string;  // For task_deleted / organization_deleted events
   } | {
     workspace_id: string;  // For github_issues_synced events
   };

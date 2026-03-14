@@ -234,6 +234,22 @@ export const CreateCommitSchema = z.object({
   metadata: z.record(z.string(), z.unknown()).default({}),
 });
 
+export const CreateOrganizationSchema = z.object({
+  name: z.string().min(1).max(100),
+  slug: z.string().min(1).max(50).regex(/^[a-z0-9-]+$/),
+  description: z.string().optional(),
+  logo_url: z.string().url().optional(),
+});
+
+export const UpdateOrganizationSchema = z.object({
+  name: z.string().min(1).max(100).optional(),
+  description: z.string().optional().nullable(),
+  logo_url: z.string().url().optional().nullable(),
+});
+
+export type CreateOrganizationInput = z.infer<typeof CreateOrganizationSchema>;
+export type UpdateOrganizationInput = z.infer<typeof UpdateOrganizationSchema>;
+
 export type CreateOrgTicketInput = z.infer<typeof CreateOrgTicketSchema>;
 export type CreateMemoryInput = z.infer<typeof CreateMemorySchema>;
 export type CreateEntityLinkInput = z.infer<typeof CreateEntityLinkSchema>;
