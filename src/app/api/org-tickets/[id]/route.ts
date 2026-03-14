@@ -30,11 +30,15 @@ export async function GET(
     }
 
     const delegated_tasks = db.prepare('SELECT * FROM tasks WHERE org_ticket_id = ?').all(id);
+    const acceptance_criteria = db.prepare(
+      'SELECT * FROM org_ticket_acceptance_criteria WHERE org_ticket_id = ? ORDER BY sort_order ASC'
+    ).all(id);
 
     const result = {
       ...ticket,
       tags: JSON.parse(ticket.tags || '[]'),
       delegated_tasks,
+      acceptance_criteria,
     };
 
     return NextResponse.json(result);
