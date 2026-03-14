@@ -606,4 +606,100 @@ CREATE TABLE IF NOT EXISTS commits (
 CREATE INDEX IF NOT EXISTS idx_commits_workspace ON commits(workspace_id);
 CREATE INDEX IF NOT EXISTS idx_commits_committed_at ON commits(committed_at DESC);
 CREATE INDEX IF NOT EXISTS idx_commits_author ON commits(author_email);
+-- FTS5 virtual tables (external content pattern)
+CREATE VIRTUAL TABLE IF NOT EXISTS memories_fts USING fts5(
+  title, summary, body,
+  content='memories',
+  content_rowid='rowid',
+  tokenize='porter unicode61'
+);
+
+CREATE TRIGGER IF NOT EXISTS memories_ai AFTER INSERT ON memories BEGIN
+  INSERT INTO memories_fts(rowid, title, summary, body)
+  VALUES (new.rowid, new.title, new.summary, new.body);
+END;
+
+CREATE TRIGGER IF NOT EXISTS memories_ad AFTER DELETE ON memories BEGIN
+  INSERT INTO memories_fts(memories_fts, rowid, title, summary, body)
+  VALUES('delete', old.rowid, old.title, old.summary, old.body);
+END;
+
+CREATE TRIGGER IF NOT EXISTS memories_au AFTER UPDATE ON memories BEGIN
+  INSERT INTO memories_fts(memories_fts, rowid, title, summary, body)
+  VALUES('delete', old.rowid, old.title, old.summary, old.body);
+  INSERT INTO memories_fts(rowid, title, summary, body)
+  VALUES (new.rowid, new.title, new.summary, new.body);
+END;
+
+CREATE VIRTUAL TABLE IF NOT EXISTS knowledge_articles_fts USING fts5(
+  title, summary, body,
+  content='knowledge_articles',
+  content_rowid='rowid',
+  tokenize='porter unicode61'
+);
+
+CREATE TRIGGER IF NOT EXISTS knowledge_ai AFTER INSERT ON knowledge_articles BEGIN
+  INSERT INTO knowledge_articles_fts(rowid, title, summary, body)
+  VALUES (new.rowid, new.title, new.summary, new.body);
+END;
+
+CREATE TRIGGER IF NOT EXISTS knowledge_ad AFTER DELETE ON knowledge_articles BEGIN
+  INSERT INTO knowledge_articles_fts(knowledge_articles_fts, rowid, title, summary, body)
+  VALUES('delete', old.rowid, old.title, old.summary, old.body);
+END;
+
+CREATE TRIGGER IF NOT EXISTS knowledge_au AFTER UPDATE ON knowledge_articles BEGIN
+  INSERT INTO knowledge_articles_fts(knowledge_articles_fts, rowid, title, summary, body)
+  VALUES('delete', old.rowid, old.title, old.summary, old.body);
+  INSERT INTO knowledge_articles_fts(rowid, title, summary, body)
+  VALUES (new.rowid, new.title, new.summary, new.body);
+END;
+
+CREATE VIRTUAL TABLE IF NOT EXISTS org_tickets_fts USING fts5(
+  title, description,
+  content='org_tickets',
+  content_rowid='rowid',
+  tokenize='porter unicode61'
+);
+
+CREATE TRIGGER IF NOT EXISTS org_tickets_ai AFTER INSERT ON org_tickets BEGIN
+  INSERT INTO org_tickets_fts(rowid, title, description)
+  VALUES (new.rowid, new.title, new.description);
+END;
+
+CREATE TRIGGER IF NOT EXISTS org_tickets_ad AFTER DELETE ON org_tickets BEGIN
+  INSERT INTO org_tickets_fts(org_tickets_fts, rowid, title, description)
+  VALUES('delete', old.rowid, old.title, old.description);
+END;
+
+CREATE TRIGGER IF NOT EXISTS org_tickets_au AFTER UPDATE ON org_tickets BEGIN
+  INSERT INTO org_tickets_fts(org_tickets_fts, rowid, title, description)
+  VALUES('delete', old.rowid, old.title, old.description);
+  INSERT INTO org_tickets_fts(rowid, title, description)
+  VALUES (new.rowid, new.title, new.description);
+END;
+
+CREATE VIRTUAL TABLE IF NOT EXISTS commits_fts USING fts5(
+  message, author_name,
+  content='commits',
+  content_rowid='rowid',
+  tokenize='porter unicode61'
+);
+
+CREATE TRIGGER IF NOT EXISTS commits_ai AFTER INSERT ON commits BEGIN
+  INSERT INTO commits_fts(rowid, message, author_name)
+  VALUES (new.rowid, new.message, new.author_name);
+END;
+
+CREATE TRIGGER IF NOT EXISTS commits_ad AFTER DELETE ON commits BEGIN
+  INSERT INTO commits_fts(commits_fts, rowid, message, author_name)
+  VALUES('delete', old.rowid, old.message, old.author_name);
+END;
+
+CREATE TRIGGER IF NOT EXISTS commits_au AFTER UPDATE ON commits BEGIN
+  INSERT INTO commits_fts(commits_fts, rowid, message, author_name)
+  VALUES('delete', old.rowid, old.message, old.author_name);
+  INSERT INTO commits_fts(rowid, message, author_name)
+  VALUES (new.rowid, new.message, new.author_name);
+END;
 `;

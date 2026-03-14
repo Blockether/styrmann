@@ -409,3 +409,67 @@ describe('Migration 059: add_knowledge_articles_and_commits', () => {
     db.close();
   });
 });
+
+describe('Migration 060: add_fts5_tables', () => {
+  it('creates FTS5 virtual tables', () => {
+    const db = createTestDb();
+
+    for (const ftsTable of ['memories_fts', 'knowledge_articles_fts', 'org_tickets_fts', 'commits_fts']) {
+      const result = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=?").get(ftsTable);
+      expect(result).toBeDefined();
+    }
+
+    db.close();
+  });
+
+  it('FTS5 indexes memories on insert', () => {
+    const db = createTestDb();
+    const uniqueWord = `searchtest${Date.now()}`;
+
+    db.prepare("INSERT INTO memories (id, memory_type, title, body) VALUES (?, ?, ?, ?)")
+      .run(crypto.randomUUID(), 'fact', `Test memory about ${uniqueWord}`, `This fact contains the word ${uniqueWord}`);
+
+    const results = db.prepare('SELECT * FROM memories_fts WHERE memories_fts MATCH ?').all(uniqueWord);
+    expect(results.length).toBeGreaterThan(0);
+    db.close();
+  });
+
+  it('FTS5 removes memories on delete', () => {
+    const db = createTestDb();
+    const uniqueWord = `deletetest${Date.now()}`;
+    const id = crypto.randomUUID();
+
+    db.prepare("INSERT INTO memories (id, memory_type, title, body) VALUES (?, ?, ?, ?)")
+      .run(id, 'fact', `Delete test ${uniqueWord}`, uniqueWord);
+
+    let results = db.prepare('SELECT * FROM memories_fts WHERE memories_fts MATCH ?').all(uniqueWord);
+    expect(results.length).toBe(1);
+
+    db.prepare("DELETE FROM memories WHERE id = ?").run(id);
+
+    results = db.prepare('SELECT * FROM memories_fts WHERE memories_fts MATCH ?').all(uniqueWord);
+    expect(results.length).toBe(0);
+    db.close();
+  });
+
+  it('BM25 ranking returns more relevant result first', () => {
+    const db = createTestDb();
+    const keyword = `rankingtest${Date.now()}`;
+
+    db.prepare("INSERT INTO memories (id, memory_type, title, body) VALUES (?, ?, ?, ?)")
+      .run(crypto.randomUUID(), 'note', `${keyword} ${keyword} ${keyword}`, `${keyword} ${keyword}`);
+
+    db.prepare("INSERT INTO memories (id, memory_type, title, body) VALUES (?, ?, ?, ?)")
+      .run(crypto.randomUUID(), 'note', keyword, 'not very relevant at all');
+
+    const results = db.prepare(
+      `SELECT m.title, bm25(memories_fts) as rank FROM memories_fts
+       JOIN memories m ON m.rowid = memories_fts.rowid
+       WHERE memories_fts MATCH ? ORDER BY rank LIMIT 10`
+    ).all(keyword) as { title: string; rank: number }[];
+
+    expect(results.length).toBe(2);
+    expect(results[0].rank).toBeLessThanOrEqual(results[1].rank);
+    db.close();
+  });
+});

@@ -1,0 +1,14 @@
+stdout | src/lib/db/migrations.test.ts > Migration 060: add_fts5_tables > BM25 ranking returns more relevant result first
+[DB] Running migration 001: initial_schema
+[Migration 001] Baseline schema marker
+[DB] Migration 001 completed
+--
+stderr | src/lib/db/migrations.test.ts > Migration 060: add_fts5_tables > BM25 ranking returns more relevant result first
+[Migration 020] Restructuring hierarchy + agent schema...
+[Migration 020] Hierarchy + agent schema restructure complete
+[Migration 021] Adding github_issues table and tasks.github_issue_id...
+--
+ ✓ src/lib/db/migrations.test.ts > Migration 060: add_fts5_tables > BM25 ranking returns more relevant result first
+
+ Test Files  2 passed (2)
+      Tests  31 passed (31)

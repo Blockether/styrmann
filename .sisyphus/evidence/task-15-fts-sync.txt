@@ -1,0 +1,216 @@
+[Migration 060] Adding FTS5 virtual tables with sync triggers...
+[Migration 060] FTS5 virtual tables and sync triggers created
+[DB] Migration 060 completed
+
+stderr | src/lib/db/schema.test.ts > Database Schema > creates all tables
+--
+[Migration 060] Adding FTS5 virtual tables with sync triggers...
+[Migration 060] FTS5 virtual tables and sync triggers created
+[DB] Migration 060 completed
+
+stderr | src/lib/db/migrations.test.ts > Migration 055: add_organizations > creates organizations table with correct schema
+--
+[Migration 060] Adding FTS5 virtual tables with sync triggers...
+[Migration 060] FTS5 virtual tables and sync triggers created
+[DB] Migration 060 completed
+
+stderr | src/lib/db/migrations.test.ts > Migration 055: add_organizations > workspaces table has organization_id column
+--
+[Migration 060] Adding FTS5 virtual tables with sync triggers...
+[Migration 060] FTS5 virtual tables and sync triggers created
+[DB] Migration 060 completed
+
+stderr | src/lib/db/migrations.test.ts > Migration 055: add_organizations > organizations slug index exists
+--
+[Migration 060] Adding FTS5 virtual tables with sync triggers...
+[Migration 060] FTS5 virtual tables and sync triggers created
+[DB] Migration 060 completed
+
+stderr | src/lib/db/migrations.test.ts > Migration 055: add_organizations > workspaces organization_id index exists
+--
+[Migration 060] Adding FTS5 virtual tables with sync triggers...
+[Migration 060] FTS5 virtual tables and sync triggers created
+[DB] Migration 060 completed
+
+stderr | src/lib/db/migrations.test.ts > Migration 056: add_org_tickets > creates org_tickets table with correct schema
+--
+[Migration 060] Adding FTS5 virtual tables with sync triggers...
+[Migration 060] FTS5 virtual tables and sync triggers created
+[DB] Migration 060 completed
+
+stderr | src/lib/db/migrations.test.ts > Migration 056: add_org_tickets > tasks table has org_ticket_id column
+--
+[Migration 060] Adding FTS5 virtual tables with sync triggers...
+[Migration 060] FTS5 virtual tables and sync triggers created
+[DB] Migration 060 completed
+
+stderr | src/lib/db/migrations.test.ts > Migration 056: add_org_tickets > org_tickets indexes exist
+--
+[Migration 060] Adding FTS5 virtual tables with sync triggers...
+[Migration 060] FTS5 virtual tables and sync triggers created
+[DB] Migration 060 completed
+
+stderr | src/lib/db/migrations.test.ts > Migration 056: add_org_tickets > tasks org_ticket_id index exists
+--
+[Migration 060] Adding FTS5 virtual tables with sync triggers...
+[Migration 060] FTS5 virtual tables and sync triggers created
+[DB] Migration 060 completed
+
+stderr | src/lib/db/migrations.test.ts > Migration 056: add_org_tickets > validates status CHECK constraint on org_tickets
+--
+[Migration 060] Adding FTS5 virtual tables with sync triggers...
+[Migration 060] FTS5 virtual tables and sync triggers created
+[DB] Migration 060 completed
+
+stderr | src/lib/db/migrations.test.ts > Migration 056: add_org_tickets > validates priority CHECK constraint on org_tickets
+--
+[Migration 060] Adding FTS5 virtual tables with sync triggers...
+[Migration 060] FTS5 virtual tables and sync triggers created
+[DB] Migration 060 completed
+
+stderr | src/lib/db/migrations.test.ts > Migration 056: add_org_tickets > validates ticket_type CHECK constraint on org_tickets
+--
+[Migration 060] Adding FTS5 virtual tables with sync triggers...
+[Migration 060] FTS5 virtual tables and sync triggers created
+[DB] Migration 060 completed
+
+stderr | src/lib/db/migrations.test.ts > Migration 057: add_memories > creates memories table with correct schema
+--
+[Migration 060] Adding FTS5 virtual tables with sync triggers...
+[Migration 060] FTS5 virtual tables and sync triggers created
+[DB] Migration 060 completed
+
+stderr | src/lib/db/migrations.test.ts > Migration 057: add_memories > accepts all 8 memory types
+--
+[Migration 060] Adding FTS5 virtual tables with sync triggers...
+[Migration 060] FTS5 virtual tables and sync triggers created
+[DB] Migration 060 completed
+
+stderr | src/lib/db/migrations.test.ts > Migration 057: add_memories > rejects invalid memory type
+--
+[Migration 060] Adding FTS5 virtual tables with sync triggers...
+[Migration 060] FTS5 virtual tables and sync triggers created
+[DB] Migration 060 completed
+
+stderr | src/lib/db/migrations.test.ts > Migration 057: add_memories > memories indexes exist
+--
+[Migration 060] Adding FTS5 virtual tables with sync triggers...
+[Migration 060] FTS5 virtual tables and sync triggers created
+[DB] Migration 060 completed
+
+stderr | src/lib/db/migrations.test.ts > Migration 058: add_entity_links > creates entity_links table with correct schema
+--
+[Migration 060] Adding FTS5 virtual tables with sync triggers...
+[Migration 060] FTS5 virtual tables and sync triggers created
+[DB] Migration 060 completed
+
+stderr | src/lib/db/migrations.test.ts > Migration 058: add_entity_links > prevents self-links (from_entity_id == to_entity_id)
+--
+[Migration 060] Adding FTS5 virtual tables with sync triggers...
+[Migration 060] FTS5 virtual tables and sync triggers created
+[DB] Migration 060 completed
+
+stderr | src/lib/db/migrations.test.ts > Migration 058: add_entity_links > prevents duplicate links
+--
+[Migration 060] Adding FTS5 virtual tables with sync triggers...
+[Migration 060] FTS5 virtual tables and sync triggers created
+[DB] Migration 060 completed
+
+stderr | src/lib/db/migrations.test.ts > Migration 058: add_entity_links > graph traversal respects MAX_DEPTH
+--
+[Migration 060] Adding FTS5 virtual tables with sync triggers...
+[Migration 060] FTS5 virtual tables and sync triggers created
+[DB] Migration 060 completed
+
+stderr | src/lib/db/migrations.test.ts > Migration 054: drop_legacy_tables > drops legacy tables from database
+--
+[Migration 060] Adding FTS5 virtual tables with sync triggers...
+[Migration 060] FTS5 virtual tables and sync triggers created
+[DB] Migration 060 completed
+
+stderr | src/lib/db/migrations.test.ts > Migration 054: drop_legacy_tables > tasks table has no legacy columns after migration
+--
+[Migration 060] Adding FTS5 virtual tables with sync triggers...
+[Migration 060] FTS5 virtual tables and sync triggers created
+[DB] Migration 060 completed
+
+stderr | src/lib/db/migrations.test.ts > Migration 054: drop_legacy_tables > tasks table retains essential columns after migration
+--
+[Migration 060] Adding FTS5 virtual tables with sync triggers...
+[Migration 060] FTS5 virtual tables and sync triggers created
+[DB] Migration 060 completed
+
+stderr | src/lib/db/migrations.test.ts > Migration 059: add_knowledge_articles_and_commits > creates knowledge_articles table
+--
+[Migration 060] Adding FTS5 virtual tables with sync triggers...
+[Migration 060] FTS5 virtual tables and sync triggers created
+[DB] Migration 060 completed
+
+stderr | src/lib/db/migrations.test.ts > Migration 059: add_knowledge_articles_and_commits > knowledge_articles table has correct indexes
+--
+[Migration 060] Adding FTS5 virtual tables with sync triggers...
+[Migration 060] FTS5 virtual tables and sync triggers created
+[DB] Migration 060 completed
+
+stderr | src/lib/db/migrations.test.ts > Migration 059: add_knowledge_articles_and_commits > creates commits table with dedup constraint
+--
+[Migration 060] Adding FTS5 virtual tables with sync triggers...
+[Migration 060] FTS5 virtual tables and sync triggers created
+[DB] Migration 060 completed
+
+stderr | src/lib/db/migrations.test.ts > Migration 059: add_knowledge_articles_and_commits > commits table has correct indexes
+--
+stdout | src/lib/db/migrations.test.ts > Migration 060: add_fts5_tables > creates FTS5 virtual tables
+[DB] Running migration 001: initial_schema
+[Migration 001] Baseline schema marker
+[DB] Migration 001 completed
+--
+[Migration 060] Adding FTS5 virtual tables with sync triggers...
+[Migration 060] FTS5 virtual tables and sync triggers created
+[DB] Migration 060 completed
+
+stderr | src/lib/db/migrations.test.ts > Migration 060: add_fts5_tables > creates FTS5 virtual tables
+[Migration 020] Restructuring hierarchy + agent schema...
+[Migration 020] Hierarchy + agent schema restructure complete
+[Migration 021] Adding github_issues table and tasks.github_issue_id...
+--
+stdout | src/lib/db/migrations.test.ts > Migration 060: add_fts5_tables > FTS5 indexes memories on insert
+[DB] Running migration 001: initial_schema
+[Migration 001] Baseline schema marker
+[DB] Migration 001 completed
+--
+[Migration 060] Adding FTS5 virtual tables with sync triggers...
+[Migration 060] FTS5 virtual tables and sync triggers created
+[DB] Migration 060 completed
+
+stderr | src/lib/db/migrations.test.ts > Migration 060: add_fts5_tables > FTS5 indexes memories on insert
+[Migration 020] Restructuring hierarchy + agent schema...
+[Migration 020] Hierarchy + agent schema restructure complete
+[Migration 021] Adding github_issues table and tasks.github_issue_id...
+--
+stdout | src/lib/db/migrations.test.ts > Migration 060: add_fts5_tables > FTS5 removes memories on delete
+[DB] Running migration 001: initial_schema
+[Migration 001] Baseline schema marker
+[DB] Migration 001 completed
+--
+[Migration 060] Adding FTS5 virtual tables with sync triggers...
+[Migration 060] FTS5 virtual tables and sync triggers created
+[DB] Migration 060 completed
+
+stderr | src/lib/db/migrations.test.ts > Migration 060: add_fts5_tables > FTS5 removes memories on delete
+[Migration 020] Restructuring hierarchy + agent schema...
+[Migration 020] Hierarchy + agent schema restructure complete
+[Migration 021] Adding github_issues table and tasks.github_issue_id...
+--
+[Migration 060] Adding FTS5 virtual tables with sync triggers...
+[Migration 060] FTS5 virtual tables and sync triggers created
+[DB] Migration 060 completed
+
+stderr | src/lib/db/migrations.test.ts > Migration 060: add_fts5_tables > BM25 ranking returns more relevant result first
+--
+ ✓ src/lib/db/migrations.test.ts > Migration 060: add_fts5_tables > creates FTS5 virtual tables
+ ✓ src/lib/db/migrations.test.ts > Migration 060: add_fts5_tables > FTS5 indexes memories on insert
+ ✓ src/lib/db/migrations.test.ts > Migration 060: add_fts5_tables > FTS5 removes memories on delete
+ ✓ src/lib/db/migrations.test.ts > Migration 060: add_fts5_tables > BM25 ranking returns more relevant result first
+
+ Test Files  2 passed (2)
