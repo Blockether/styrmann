@@ -2296,6 +2296,47 @@ const migrations: Migration[] = [
 
       console.log('[Migration 055] Organizations migration complete');
     }
+  },
+  {
+    id: '056',
+    name: 'add_org_tickets',
+    up: (db) => {
+      console.log('[Migration 056] Adding org_tickets table...');
+
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS org_tickets (
+          id TEXT PRIMARY KEY,
+          organization_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+          title TEXT NOT NULL,
+          description TEXT,
+          status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'triaged', 'delegated', 'in_progress', 'resolved', 'closed')),
+          priority TEXT NOT NULL DEFAULT 'normal' CHECK (priority IN ('low', 'normal', 'high', 'urgent')),
+          ticket_type TEXT NOT NULL DEFAULT 'task' CHECK (ticket_type IN ('feature', 'bug', 'improvement', 'task', 'epic')),
+          external_ref TEXT,
+          external_system TEXT,
+          creator_name TEXT,
+          assignee_name TEXT,
+          due_date TEXT,
+          tags TEXT DEFAULT '[]',
+          created_at TEXT DEFAULT (datetime('now')),
+          updated_at TEXT DEFAULT (datetime('now'))
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_org_tickets_org ON org_tickets(organization_id);
+        CREATE INDEX IF NOT EXISTS idx_org_tickets_status ON org_tickets(status);
+        CREATE INDEX IF NOT EXISTS idx_org_tickets_external_ref ON org_tickets(external_ref);
+      `);
+
+      // Add org_ticket_id FK to tasks table
+      const taskCols = db.prepare("PRAGMA table_info(tasks)").all() as { name: string }[];
+      if (!taskCols.some(c => c.name === 'org_ticket_id')) {
+        db.exec(`ALTER TABLE tasks ADD COLUMN org_ticket_id TEXT REFERENCES org_tickets(id) ON DELETE SET NULL`);
+        db.exec(`CREATE INDEX IF NOT EXISTS idx_tasks_org_ticket ON tasks(org_ticket_id)`);
+        console.log('[Migration 056] Added org_ticket_id to tasks');
+      }
+
+      console.log('[Migration 056] org_tickets migration complete');
+    }
   }
 ];
 

@@ -108,6 +108,25 @@ CREATE TABLE IF NOT EXISTS milestone_dependencies (
   CHECK (depends_on_milestone_id IS NOT NULL OR depends_on_task_id IS NOT NULL)
 );
 
+-- Org tickets table (organizational ticket lifecycle)
+CREATE TABLE IF NOT EXISTS org_tickets (
+  id TEXT PRIMARY KEY,
+  organization_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  description TEXT,
+  status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'triaged', 'delegated', 'in_progress', 'resolved', 'closed')),
+  priority TEXT NOT NULL DEFAULT 'normal' CHECK (priority IN ('low', 'normal', 'high', 'urgent')),
+  ticket_type TEXT NOT NULL DEFAULT 'task' CHECK (ticket_type IN ('feature', 'bug', 'improvement', 'task', 'epic')),
+  external_ref TEXT,
+  external_system TEXT,
+  creator_name TEXT,
+  assignee_name TEXT,
+  due_date TEXT,
+  tags TEXT DEFAULT '[]',
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now'))
+);
+
 -- Sprints table
 CREATE TABLE IF NOT EXISTS sprints (
   id TEXT PRIMARY KEY,
@@ -142,7 +161,8 @@ CREATE TABLE IF NOT EXISTS tasks (
    due_date TEXT,
    workflow_template_id TEXT REFERENCES workflow_templates(id),
    workflow_plan_id TEXT,
-   status_reason TEXT,
+    status_reason TEXT,
+    org_ticket_id TEXT REFERENCES org_tickets(id) ON DELETE SET NULL,
   created_at TEXT DEFAULT (datetime('now')),
   updated_at TEXT DEFAULT (datetime('now'))
 );
@@ -422,6 +442,9 @@ CREATE TABLE IF NOT EXISTS task_provenance (
 
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_organizations_slug ON organizations(slug);
+CREATE INDEX IF NOT EXISTS idx_org_tickets_org ON org_tickets(organization_id);
+CREATE INDEX IF NOT EXISTS idx_org_tickets_status ON org_tickets(status);
+CREATE INDEX IF NOT EXISTS idx_org_tickets_external_ref ON org_tickets(external_ref);
 CREATE INDEX IF NOT EXISTS idx_workspaces_organization_id ON workspaces(organization_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
 CREATE INDEX IF NOT EXISTS idx_tasks_assigned ON tasks(assigned_agent_id);
@@ -446,6 +469,7 @@ CREATE INDEX IF NOT EXISTS idx_tasks_milestone ON tasks(milestone_id);
 CREATE INDEX IF NOT EXISTS idx_milestone_deps_milestone ON milestone_dependencies(milestone_id);
 CREATE INDEX IF NOT EXISTS idx_milestone_deps_depends ON milestone_dependencies(depends_on_milestone_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_type ON tasks(task_type);
+CREATE INDEX IF NOT EXISTS idx_tasks_org_ticket ON tasks(org_ticket_id);
 CREATE INDEX IF NOT EXISTS idx_sprints_workspace ON sprints(workspace_id);
 CREATE INDEX IF NOT EXISTS idx_milestones_workspace ON milestones(workspace_id);
 CREATE INDEX IF NOT EXISTS idx_github_issues_workspace ON github_issues(workspace_id);

@@ -44,6 +44,125 @@ describe('Migration 055: add_organizations', () => {
   });
 });
 
+describe('Migration 056: add_org_tickets', () => {
+  it('creates org_tickets table with correct schema', () => {
+    const db = createTestDb();
+    const result = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='org_tickets'").get();
+    expect(result).toBeDefined();
+
+    const cols = db.prepare("PRAGMA table_info(org_tickets)").all() as { name: string }[];
+    const colNames = cols.map((c: { name: string }) => c.name);
+
+    expect(colNames).toContain('id');
+    expect(colNames).toContain('organization_id');
+    expect(colNames).toContain('title');
+    expect(colNames).toContain('description');
+    expect(colNames).toContain('status');
+    expect(colNames).toContain('priority');
+    expect(colNames).toContain('ticket_type');
+    expect(colNames).toContain('external_ref');
+    expect(colNames).toContain('external_system');
+    expect(colNames).toContain('creator_name');
+    expect(colNames).toContain('assignee_name');
+    expect(colNames).toContain('due_date');
+    expect(colNames).toContain('tags');
+    expect(colNames).toContain('created_at');
+    expect(colNames).toContain('updated_at');
+    expect(cols.length).toBeGreaterThanOrEqual(14);
+
+    db.close();
+  });
+
+  it('tasks table has org_ticket_id column', () => {
+    const db = createTestDb();
+    const cols = db.prepare("PRAGMA table_info(tasks)").all() as { name: string }[];
+    const colNames = cols.map((c: { name: string }) => c.name);
+    expect(colNames).toContain('org_ticket_id');
+    db.close();
+  });
+
+  it('org_tickets indexes exist', () => {
+    const db = createTestDb();
+    const indexes = db.prepare("SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='org_tickets'").all() as { name: string }[];
+    const indexNames = indexes.map((i: { name: string }) => i.name);
+    expect(indexNames).toContain('idx_org_tickets_org');
+    expect(indexNames).toContain('idx_org_tickets_status');
+    expect(indexNames).toContain('idx_org_tickets_external_ref');
+    db.close();
+  });
+
+  it('tasks org_ticket_id index exists', () => {
+    const db = createTestDb();
+    const indexes = db.prepare("SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='tasks'").all() as { name: string }[];
+    const indexNames = indexes.map((i: { name: string }) => i.name);
+    expect(indexNames).toContain('idx_tasks_org_ticket');
+    db.close();
+  });
+
+  it('validates status CHECK constraint on org_tickets', () => {
+    const db = createTestDb();
+
+    const orgId = crypto.randomUUID();
+    db.prepare("INSERT INTO organizations (id, name, slug) VALUES (?, ?, ?)").run(orgId, 'TestOrg', 'test-org-056');
+
+    expect(() => {
+      db.prepare("INSERT INTO org_tickets (id, organization_id, title, status) VALUES (?, ?, ?, ?)").run(
+        crypto.randomUUID(), orgId, 'Valid Ticket', 'open'
+      );
+    }).not.toThrow();
+
+    expect(() => {
+      db.prepare("INSERT INTO org_tickets (id, organization_id, title, status) VALUES (?, ?, ?, ?)").run(
+        crypto.randomUUID(), orgId, 'Invalid Ticket', 'invalid_status'
+      );
+    }).toThrow();
+
+    db.close();
+  });
+
+  it('validates priority CHECK constraint on org_tickets', () => {
+    const db = createTestDb();
+
+    const orgId = crypto.randomUUID();
+    db.prepare("INSERT INTO organizations (id, name, slug) VALUES (?, ?, ?)").run(orgId, 'TestOrg2', 'test-org-056-pri');
+
+    expect(() => {
+      db.prepare("INSERT INTO org_tickets (id, organization_id, title, priority) VALUES (?, ?, ?, ?)").run(
+        crypto.randomUUID(), orgId, 'Urgent Ticket', 'urgent'
+      );
+    }).not.toThrow();
+
+    expect(() => {
+      db.prepare("INSERT INTO org_tickets (id, organization_id, title, priority) VALUES (?, ?, ?, ?)").run(
+        crypto.randomUUID(), orgId, 'Bad Priority', 'critical'
+      );
+    }).toThrow();
+
+    db.close();
+  });
+
+  it('validates ticket_type CHECK constraint on org_tickets', () => {
+    const db = createTestDb();
+
+    const orgId = crypto.randomUUID();
+    db.prepare("INSERT INTO organizations (id, name, slug) VALUES (?, ?, ?)").run(orgId, 'TestOrg3', 'test-org-056-type');
+
+    expect(() => {
+      db.prepare("INSERT INTO org_tickets (id, organization_id, title, ticket_type) VALUES (?, ?, ?, ?)").run(
+        crypto.randomUUID(), orgId, 'Epic Ticket', 'epic'
+      );
+    }).not.toThrow();
+
+    expect(() => {
+      db.prepare("INSERT INTO org_tickets (id, organization_id, title, ticket_type) VALUES (?, ?, ?, ?)").run(
+        crypto.randomUUID(), orgId, 'Bad Type', 'invalid_type'
+      );
+    }).toThrow();
+
+    db.close();
+  });
+});
+
 describe('Migration 054: drop_legacy_tables', () => {
   it('drops legacy tables from database', () => {
     const db = createTestDb();
