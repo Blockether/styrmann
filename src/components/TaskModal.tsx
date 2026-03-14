@@ -1,14 +1,14 @@
 'use client';
 
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { X, Save, Trash2, Activity, Package, Bot, Plus, Upload } from 'lucide-react';
+import { X, Save, Trash2, Activity, Package, Bot, Plus, Upload, Check, Loader2, Link2, AlertTriangle, Sparkles } from 'lucide-react';
 import { useStyrmann } from '@/lib/store';
 import { useScrollLock } from '@/hooks/useScrollLock';
 import { DeliverablesList } from './DeliverablesList';
 import { SessionsList } from './SessionsList';
 import { PlanningTab } from './PlanningTab';
 import { CreateMilestoneModal } from './CreateMilestoneModal';
-import type { Task, TaskPriority, TaskStatus, TaskType, GitHubIssue, Human } from '@/lib/types';
+import type { Task, TaskPriority, TaskStatus, TaskType, GitHubIssue, Human, TaskAcceptanceCriteria, TaskDependency } from '@/lib/types';
 
 type TabType = 'overview' | 'activity' | 'deliverables' | 'sessions';
 
@@ -66,6 +66,195 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
   const [milestones, setMilestones] = useState<{ id: string; name: string }[]>([]);
   const [humans, setHumans] = useState<Human[]>([]);
   const resolvedWorkspaceId = workspaceId || task?.workspace_id || 'default';
+
+  const [existingCriteria, setExistingCriteria] = useState<TaskAcceptanceCriteria[]>([]);
+  const [newExistingCriteriaDesc, setNewExistingCriteriaDesc] = useState('');
+  const [submittingExistingCriteria, setSubmittingExistingCriteria] = useState(false);
+
+  const loadExistingCriteria = useCallback(async () => {
+    if (!task) return;
+    try {
+      const res = await fetch(`/api/tasks/${task.id}/acceptance-criteria`);
+      if (res.ok) setExistingCriteria(await res.json());
+    } catch (err) {
+      console.error('Failed to load acceptance criteria:', err);
+    }
+  }, [task]);
+
+  useEffect(() => {
+    loadExistingCriteria();
+  }, [loadExistingCriteria]);
+
+  const handleToggleExistingCriteria = async (criteriaId: string, isMet: boolean) => {
+    if (!task) return;
+    try {
+      const res = await fetch(`/api/tasks/${task.id}/acceptance-criteria/${criteriaId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_met: isMet }),
+      });
+      if (res.ok) {
+        setExistingCriteria(prev => prev.map(c => c.id === criteriaId ? { ...c, is_met: isMet } : c));
+      }
+    } catch (err) {
+      console.error('Failed to toggle criteria:', err);
+    }
+  };
+
+  const handleAddExistingCriteria = async () => {
+    if (!task || !newExistingCriteriaDesc.trim()) return;
+    setSubmittingExistingCriteria(true);
+    try {
+      const res = await fetch(`/api/tasks/${task.id}/acceptance-criteria`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          description: newExistingCriteriaDesc.trim(),
+          required_for_status: 'done',
+          gate_type: 'manual',
+          create_subcriteria: true,
+        }),
+      });
+      if (res.ok) {
+        await loadExistingCriteria();
+        setNewExistingCriteriaDesc('');
+      }
+    } catch (err) {
+      console.error('Failed to add criteria:', err);
+    } finally {
+      setSubmittingExistingCriteria(false);
+    }
+  };
+
+  const handleDeleteExistingCriteria = async (criteriaId: string) => {
+    if (!task) return;
+    try {
+      const res = await fetch(`/api/tasks/${task.id}/acceptance-criteria/${criteriaId}`, {
+        method: 'DELETE',
+      });
+      if (res.ok) {
+        setExistingCriteria(prev => prev.filter(c => c.id !== criteriaId && c.parent_criteria_id !== criteriaId));
+      }
+    } catch (err) {
+      console.error('Failed to delete criteria:', err);
+    }
+  };
+
+  const [dependencies, setDependencies] = useState<TaskDependency[]>([]);
+  const [newDepTaskId, setNewDepTaskId] = useState('');
+  const [newDepStatus, setNewDepStatus] = useState<TaskStatus>('done');
+  const [submittingDep, setSubmittingDep] = useState(false);
+
+  const loadDependencies = useCallback(async () => {
+    if (!task) return;
+    try {
+      const res = await fetch(`/api/tasks/${task.id}/dependencies`);
+      if (res.ok) setDependencies(await res.json());
+    } catch (err) {
+      console.error('Failed to load dependencies:', err);
+    }
+  }, [task]);
+
+  useEffect(() => {
+    loadDependencies();
+  }, [loadDependencies]);
+
+  const handleAddDependency = async () => {
+    if (!task || !newDepTaskId.trim()) return;
+    setSubmittingDep(true);
+    try {
+      const res = await fetch(`/api/tasks/${task.id}/dependencies`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ depends_on_task_id: newDepTaskId.trim(), required_status: newDepStatus }),
+      });
+      if (res.ok) {
+        const dep = await res.json();
+        setDependencies(prev => [dep, ...prev]);
+        setNewDepTaskId('');
+        setNewDepStatus('done');
+      }
+    } catch (err) {
+      console.error('Failed to add dependency:', err);
+    } finally {
+      setSubmittingDep(false);
+    }
+  };
+
+  const handleDeleteDependency = async (depId: string) => {
+    if (!task) return;
+    try {
+      const res = await fetch(`/api/tasks/${task.id}/dependencies/${depId}`, { method: 'DELETE' });
+      if (res.ok) setDependencies(prev => prev.filter(d => d.id !== depId));
+    } catch (err) {
+      console.error('Failed to delete dependency:', err);
+    }
+  };
+
+  const [creatingFollowUpSpike, setCreatingFollowUpSpike] = useState(false);
+
+  const handleCreateFollowUpSpike = async () => {
+    if (!task) return;
+    setCreatingFollowUpSpike(true);
+    try {
+      const deliverablesRes = await fetch(`/api/tasks/${task.id}/deliverables`);
+      let lastDeliverableContent = '';
+      let lastDeliverableTitle = '';
+      if (deliverablesRes.ok) {
+        const deliverables = await deliverablesRes.json();
+        const contentDeliverables = (deliverables as Array<{ title?: string; content?: string; deliverable_type?: string }>)
+          .filter((d) => d.deliverable_type === 'file' && d.content);
+        const last = contentDeliverables[contentDeliverables.length - 1];
+        if (last) {
+          lastDeliverableContent = last.content || '';
+          lastDeliverableTitle = last.title || '';
+        }
+      }
+
+      const spikeDescription = [
+        `Follow-up spike from: "${task.title}"`,
+        '',
+        lastDeliverableTitle ? `Context from deliverable: ${lastDeliverableTitle}` : '',
+        '',
+        lastDeliverableContent ? lastDeliverableContent.slice(0, 4000) : 'No deliverable content found from parent spike.',
+      ].filter(Boolean).join('\n');
+
+      const createRes = await fetch('/api/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: `Follow-up: ${task.title}`,
+          description: spikeDescription,
+          task_type: 'spike',
+          priority: task.priority,
+          status: 'inbox',
+          workspace_id: task.workspace_id,
+          milestone_id: task.milestone_id || undefined,
+        }),
+      });
+
+      if (createRes.ok) {
+        const newTask = await createRes.json();
+        await fetch(`/api/tasks/${newTask.id}/dependencies`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ depends_on_task_id: task.id, required_status: 'done' }),
+        });
+        addTask(newTask);
+        addEvent({
+          id: newTask.id + '-followup',
+          type: 'task_created',
+          task_id: newTask.id,
+          message: `Follow-up spike from: ${task.title}`,
+          created_at: new Date().toISOString(),
+        });
+      }
+    } catch (err) {
+      console.error('Failed to create follow-up spike:', err);
+    } finally {
+      setCreatingFollowUpSpike(false);
+    }
+  };
 
   const loadMilestones = useCallback(async () => {
     try {
@@ -544,6 +733,188 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
                 </button>
               </div>
             </div>
+          )}
+
+          {task && (
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                Acceptance Criteria
+                {existingCriteria.filter(c => !c.parent_criteria_id).length > 0 && (
+                  <span className="ml-2 text-xs font-normal text-mc-text-secondary">
+                    {existingCriteria.filter(c => !c.parent_criteria_id && c.is_met).length}/{existingCriteria.filter(c => !c.parent_criteria_id).length} met
+                  </span>
+                )}
+              </label>
+              <div className="space-y-2 mb-2">
+                {existingCriteria.filter(c => !c.parent_criteria_id).map(criteria => {
+                  const children = existingCriteria.filter(c => c.parent_criteria_id === criteria.id);
+                  return (
+                    <div key={criteria.id} className="space-y-1">
+                      <div className="flex items-start gap-2 p-2 bg-mc-bg rounded border border-mc-border">
+                        <button
+                          type="button"
+                          onClick={() => handleToggleExistingCriteria(criteria.id, !criteria.is_met)}
+                          className={`w-5 h-5 rounded flex items-center justify-center flex-shrink-0 mt-0.5 ${
+                            criteria.is_met
+                              ? 'bg-mc-accent-green text-white'
+                              : 'bg-mc-bg-tertiary border border-mc-border'
+                          }`}
+                        >
+                          {criteria.is_met && <Check className="w-3 h-3" />}
+                        </button>
+                        <div className="min-w-0 flex-1">
+                          <span className={`text-sm ${criteria.is_met ? 'line-through text-mc-text-secondary' : ''}`}>
+                            {criteria.description}
+                          </span>
+                          <div className="text-[11px] text-mc-text-secondary mt-0.5">
+                            {criteria.gate_type || 'manual'} · {(criteria.required_for_status || 'done').replace(/_/g, ' ')}
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteExistingCriteria(criteria.id)}
+                          className="p-1 hover:bg-mc-accent-red/10 rounded text-mc-text-secondary hover:text-mc-accent-red flex-shrink-0"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                      {children.map(child => (
+                        <div key={child.id} className="ml-6 flex items-start gap-2 p-2 bg-mc-bg-secondary rounded border border-mc-border">
+                          <button
+                            type="button"
+                            onClick={() => handleToggleExistingCriteria(child.id, !child.is_met)}
+                            className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 mt-0.5 ${
+                              child.is_met
+                                ? 'bg-mc-accent-green text-white'
+                                : 'bg-mc-bg-tertiary border border-mc-border'
+                            }`}
+                          >
+                            {child.is_met && <Check className="w-3 h-3" />}
+                          </button>
+                          <div className="min-w-0 flex-1">
+                            <span className={`text-xs ${child.is_met ? 'line-through text-mc-text-secondary' : ''}`}>
+                              {child.description}
+                            </span>
+                            <div className="text-[11px] text-mc-text-secondary mt-0.5">
+                              {child.gate_type || 'manual'}{child.artifact_key ? ` · ${child.artifact_key}` : ''}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={newExistingCriteriaDesc}
+                  onChange={(e) => setNewExistingCriteriaDesc(e.target.value)}
+                  placeholder="Add acceptance criteria..."
+                  className="flex-1 min-h-10 bg-mc-bg border border-mc-border rounded px-3 py-1.5 text-sm focus:outline-none focus:border-mc-accent"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && newExistingCriteriaDesc.trim()) {
+                      e.preventDefault();
+                      handleAddExistingCriteria();
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={handleAddExistingCriteria}
+                  disabled={!newExistingCriteriaDesc.trim() || submittingExistingCriteria}
+                  className="min-h-10 px-3 bg-mc-accent text-white rounded text-sm hover:bg-mc-accent/90 disabled:opacity-50"
+                >
+                  {submittingExistingCriteria ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {task && (
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                <Link2 className="w-3.5 h-3.5 inline mr-1.5" />
+                Linked Tasks
+                {dependencies.length > 0 && (
+                  <span className="ml-2 text-xs font-normal text-mc-text-secondary">{dependencies.length}</span>
+                )}
+              </label>
+              {dependencies.length > 0 && (
+                <div className="space-y-2 mb-2">
+                  {dependencies.map(dep => {
+                    const currentStatus = dep.depends_on_task_status || dep.depends_on_task?.status || 'unknown';
+                    const resolved = currentStatus === dep.required_status;
+                    return (
+                      <div
+                        key={dep.id}
+                        className={`flex items-start gap-2 p-2 rounded border ${resolved ? 'bg-mc-bg border-mc-border' : 'bg-mc-accent-red/5 border-mc-accent-red/20'}`}
+                      >
+                        <div className={`w-5 h-5 rounded flex items-center justify-center flex-shrink-0 mt-0.5 ${resolved ? 'bg-mc-accent-green text-white' : 'bg-mc-accent-red/20 text-mc-accent-red border border-mc-accent-red/30'}`}>
+                          {resolved ? <Check className="w-3 h-3" /> : <AlertTriangle className="w-3 h-3" />}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm truncate">
+                            {dep.depends_on_task_title || dep.depends_on_task_id}
+                          </p>
+                          <p className="text-[11px] text-mc-text-secondary">
+                            requires {dep.required_status.replace(/_/g, ' ')} · currently {currentStatus.replace(/_/g, ' ')}
+                          </p>
+                        </div>
+                        <button type="button" onClick={() => handleDeleteDependency(dep.id)} className="p-1 hover:bg-mc-accent-red/10 rounded text-mc-text-secondary hover:text-mc-accent-red flex-shrink-0">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={newDepTaskId}
+                  onChange={(e) => setNewDepTaskId(e.target.value)}
+                  placeholder="Task ID to link..."
+                  className="flex-1 min-h-10 bg-mc-bg border border-mc-border rounded px-3 py-1.5 text-sm font-mono focus:outline-none focus:border-mc-accent"
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddDependency(); } }}
+                />
+                <select
+                  value={newDepStatus}
+                  onChange={(e) => setNewDepStatus(e.target.value as TaskStatus)}
+                  className="min-h-10 bg-mc-bg border border-mc-border rounded px-2 py-1.5 text-sm focus:outline-none focus:border-mc-accent"
+                >
+                  <option value="done">done</option>
+                  <option value="testing">testing</option>
+                  <option value="review">review</option>
+                  <option value="in_progress">in progress</option>
+                </select>
+                <button
+                  type="button"
+                  onClick={handleAddDependency}
+                  disabled={!newDepTaskId.trim() || submittingDep}
+                  className="min-h-10 px-3 bg-mc-accent text-white rounded text-sm hover:bg-mc-accent/90 disabled:opacity-50"
+                >
+                  {submittingDep ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {task && task.task_type === 'spike' && (
+            <button
+              type="button"
+              onClick={handleCreateFollowUpSpike}
+              disabled={creatingFollowUpSpike}
+              className="w-full flex items-center justify-center gap-2 min-h-10 px-4 py-2 rounded border border-mc-accent/30 bg-mc-accent/5 text-mc-accent text-sm font-medium hover:bg-mc-accent/10 disabled:opacity-50 transition-colors"
+            >
+              {creatingFollowUpSpike ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Sparkles className="w-4 h-4" />
+              )}
+              <span className="hidden sm:inline">Create Follow-up Spike from Last Deliverable</span>
+              <span className="sm:hidden">Follow-up Spike</span>
+            </button>
           )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
