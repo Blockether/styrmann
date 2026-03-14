@@ -192,6 +192,7 @@ export interface Task {
    workspace_id: string;
    milestone_id?: string;
    github_issue_id?: string | null;
+   org_ticket_id?: string | null;
    due_date?: string;
    workflow_template_id?: string;
    status_reason?: string;

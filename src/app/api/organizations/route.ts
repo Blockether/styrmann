@@ -10,10 +10,12 @@ export async function GET() {
   try {
     const db = getDb();
     const orgs = db.prepare(`
-      SELECT o.*, COUNT(w.id) as workspace_count
+      SELECT o.*,
+        COUNT(w.id) as workspace_count
       FROM organizations o
       LEFT JOIN workspaces w ON w.organization_id = o.id
       GROUP BY o.id
+      HAVING COUNT(CASE WHEN COALESCE(w.is_internal, 0) = 0 THEN 1 END) > 0
       ORDER BY o.name ASC
     `).all();
 
