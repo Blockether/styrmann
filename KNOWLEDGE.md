@@ -1,6 +1,6 @@
 # KNOWLEDGE.md -- Styrmann
 
-Last updated: 2026-03-14
+Last updated: 2026-03-14 (org-platform-fixes)
 
 ---
 
@@ -169,9 +169,13 @@ Organizations are the top-level grouping entity. They are auto-created during wo
 
 Org tickets are human-facing business tickets at the organization level, analogous to Jira issues. They represent work requests from stakeholders before that work is broken down into technical tasks.
 
-**Fields**: id, organization_id, title, description, status, priority, ticket_type, external_ref, external_system, creator_name, assignee_name, due_date, tags.
+**Fields**: id, organization_id, title, description, status, priority, ticket_type, external_ref, external_system, creator_name, assignee_name, due_date, tags, story_points.
 
 **ticket_type**: `feature | bug | improvement | task | epic`.
+
+**story_points**: Integer field on `org_tickets` for effort estimation. Stored directly (not computed). Exposed in list and detail responses.
+
+**Acceptance criteria**: Org tickets support a dedicated `acceptance_criteria` sub-resource. Each criterion has a description and an `is_met` boolean. Managed via `GET/POST /api/org-tickets/[id]/acceptance-criteria` and `PATCH/DELETE /api/org-tickets/[id]/acceptance-criteria/[criterionId]`.
 
 **Lifecycle**:
 ```
@@ -180,9 +184,13 @@ open -> triaged -> delegated -> in_progress -> resolved -> closed
 
 **Delegation**: `POST /api/org-tickets/[id]/delegate` converts an org ticket into one or more workspace tasks. The delegation module (`src/lib/delegation.ts`) uses LLM planning to decompose the ticket into 1-3 tasks with acceptance criteria. Falls back to a single task if LLM is unavailable. Each created task gets an `org_ticket_id` FK and a `delegates_to` entity link from the ticket to the task. The ticket status moves to `delegated` atomically.
 
+**Delegation workspace selector**: The delegate endpoint accepts an optional `workspace_id` body parameter. When provided, tasks are created in that specific workspace. When omitted, the system resolves the default workspace. This fixes the previous behavior where delegation always targeted a hardcoded workspace.
+
+**Delegation race condition fix**: The delegation transaction now uses a single atomic SQLite transaction for ticket status update + task creation + entity link creation. This prevents partial delegation states where the ticket moved to `delegated` but task creation failed.
+
 **Auth gate**: Delegation is the only authorized path to create workspace tasks in production. Direct `POST /api/tasks` is available but gated by the same auth middleware.
 
-**FTS**: `org_tickets_fts` virtual table enables full-text search on title and description.
+**FTS**: `org_tickets_fts` virtual table enables full-text search on title and description. FTS triggers use `COALESCE(NEW.column, '')` to prevent NULL insertion errors on optional fields.
 
 **API**:
 | Method | Endpoint | Purpose |
@@ -191,8 +199,10 @@ open -> triaged -> delegated -> in_progress -> resolved -> closed
 | POST | `/api/org-tickets` | Create org ticket |
 | GET | `/api/org-tickets/[id]` | Get org ticket |
 | PATCH | `/api/org-tickets/[id]` | Update org ticket |
-| DELETE | `/api/org-tickets/[id]` | Delete org ticket |
-| POST | `/api/org-tickets/[id]/delegate` | Delegate ticket to workspace tasks |
+| DELETE | `/api/org-tickets/[id]` | Delete org ticket (broadcasts `org_ticket_deleted` SSE event) |
+| POST | `/api/org-tickets/[id]/delegate` | Delegate ticket to workspace tasks (accepts optional `workspace_id`) |
+| GET/POST | `/api/org-tickets/[id]/acceptance-criteria` | List/create acceptance criteria for a ticket |
+| PATCH/DELETE | `/api/org-tickets/[id]/acceptance-criteria/[criterionId]` | Update/delete a single acceptance criterion |
 
 ---
 
@@ -333,6 +343,8 @@ Styrmann supports outbound webhooks for pushing events to external dev portals, 
 **HMAC signing**: `HMAC-SHA256` over the full JSON payload string. Signature format: `sha256=<hex>`.
 
 **Auto-disable**: Webhooks with `failure_count >= 10` are excluded from future deliveries. They must be manually re-enabled via PATCH.
+
+**failure_count fix**: The delivery handler previously failed to reset `failure_count` to 0 on successful delivery due to a column name mismatch in the UPDATE statement. Fixed in org-platform-fixes: successful delivery now correctly resets `failure_count = 0` and updates `last_delivery_at` and `last_delivery_status`.
 
 **Delivery tracking**: `webhook_deliveries` records every attempt with `response_status`, `response_body` (truncated to 1000 chars), and `attempts` count.
 
@@ -546,6 +558,8 @@ Events broadcast:
 - `agent_spawned`, `agent_completed`
 - `agent_updated`, `agent_log_added`, `github_issues_synced`, `daemon_stats_updated`
 - `organization_created`, `organization_updated`, `organization_deleted`, `org_ticket_created`, `org_ticket_updated`, `org_ticket_deleted`, `memory_created`, `memory_updated`, `entity_linked`, `commit_ingested`, `knowledge_synthesized`
+
+**SSE broadcast fix**: `org_ticket_deleted` was previously not broadcast on DELETE. Fixed in org-platform-fixes: the DELETE handler now calls `broadcast({ type: 'org_ticket_deleted', payload: { id } })` after successful deletion.
 Client: `src/hooks/useSSE.ts` with auto-reconnect (5s retry) and 30s keep-alive pings.
 Server: `src/lib/events.ts` manages connected clients.
 
@@ -634,8 +648,10 @@ Fallback: Agent Activity Dashboard polls every 20s; task-specific views use SSE 
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
 | GET/POST | `/api/org-tickets` | List/create org tickets |
-| GET/PATCH/DELETE | `/api/org-tickets/[id]` | Org ticket CRUD |
-| POST | `/api/org-tickets/[id]/delegate` | Delegate ticket to workspace tasks via orchestrator |
+| GET/PATCH/DELETE | `/api/org-tickets/[id]` | Org ticket CRUD (DELETE broadcasts `org_ticket_deleted` SSE) |
+| POST | `/api/org-tickets/[id]/delegate` | Delegate ticket to workspace tasks (accepts optional `workspace_id`) |
+| GET/POST | `/api/org-tickets/[id]/acceptance-criteria` | List/create acceptance criteria |
+| PATCH/DELETE | `/api/org-tickets/[id]/acceptance-criteria/[criterionId]` | Update/delete acceptance criterion |
 
 ### Memories
 | Method | Endpoint | Purpose |
@@ -676,11 +692,15 @@ Fallback: Agent Activity Dashboard polls every 20s; task-specific views use SSE 
 
 ## Database Schema
 
-62 migrations (001-062), auto-run on DB connection in `src/lib/db/index.ts`. Schema creation (`schema.ts`) only runs for fresh databases. After migrations, `discoverRepoWorkspaces()` scans `/root/repos/{org}/{repo}` for git repos and creates/syncs workspaces. Migrations 055-062 added the org/knowledge platform tables.
+3 migrations (100-102), auto-run on DB connection in `src/lib/db/index.ts`. The database was reset to a fresh state as part of the org-platform-fixes cleanup. All stale workspaces from previous discovery runs were removed. Only the Styrmann workspace (`blockether-styrmann`) remains as the active workspace. Schema creation (`schema.ts`) runs for fresh databases and includes all tables previously added by migrations 001-062. Migrations 100-102 add the org-platform enrichment on top of the consolidated schema:
+
+- **Migration 100**: Adds `story_points` column to `org_tickets`.
+- **Migration 101**: Adds `org_ticket_acceptance_criteria` table (id, org_ticket_id FK, description, is_met, sort_order, created_at, updated_at).
+- **Migration 102**: Fixes FTS5 triggers on `org_tickets_fts` to use `COALESCE(NEW.column, '')` for nullable columns, preventing NULL insertion errors during ticket creation.
 
 ### Core Tables
 - **organizations** -- id, name, slug (unique), description, logo_url. Auto-created from workspace discovery.
-- **workspaces** -- slug (`{org}-{repo}` format), name, description, icon, github_repo, owner_email, coordinator_email, logo_url, organization, organization_id (FK to organizations, nullable)
+- **workspaces** -- slug (`{org}-{repo}` format), name, description, icon, github_repo, owner_email, coordinator_email, logo_url, organization, organization_id (FK to organizations, nullable). Active workspace: `blockether-styrmann` only.
 - **agents** -- name, role, status, model, source, gateway_agent_id, session_key_prefix, agent_dir, agent_workspace_path, soul_md, user_md, agents_md. No `is_master` column.
 - **tasks** -- title, description, status, priority, task_type, effort, impact, assigned_agent_id, milestone_id, workflow_template_id, workflow_plan_id, due_date, github_issue_id (nullable FK to github_issues), org_ticket_id (nullable FK to org_tickets). No `sprint_id`. No `parent_task_id`.
 - **sprints** -- workspace_id, name, goal, sprint_number, start_date, end_date, status
@@ -689,7 +709,8 @@ Fallback: Agent Activity Dashboard polls every 20s; task-specific views use SSE 
 - **tags** / **task_tags** -- workspace-scoped tags, many-to-many with tasks
 
 ### Org/Knowledge Platform Tables
-- **org_tickets** -- organization_id, title, description, status, priority, ticket_type, external_ref, external_system, creator_name, assignee_name, due_date, tags (JSON)
+- **org_tickets** -- organization_id, title, description, status, priority, ticket_type, external_ref, external_system, creator_name, assignee_name, due_date, tags (JSON), story_points (integer)
+- **org_ticket_acceptance_criteria** -- org_ticket_id (FK), description, is_met (boolean), sort_order, created_at, updated_at
 - **memories** -- organization_id, workspace_id, memory_type (8 types), title, summary, body, source, source_ref, confidence (0-100), status, metadata (JSON), tags (JSON)
 - **entity_links** -- from_entity_type, from_entity_id, to_entity_type, to_entity_id, link_type (10 types), explanation. Self-link prevented by CHECK constraint.
 - **knowledge_articles** -- organization_id, workspace_id, title, summary, body, synthesis_model, synthesis_prompt_hash, source_memory_ids (JSON), status (draft/published/stale/archived), version, supersedes_id
@@ -891,7 +912,7 @@ Agents without direct filesystem access use upload/download endpoints:
 10. **Story points computed, not stored**: `story_points` on a milestone is computed at read time via `SUM(task.effort)`. It is never persisted in the database.
 11. **Milestone dependencies are informational in v1**: The `milestone_dependencies` table exists and is queryable, but no blocking behavior is enforced. Dependencies are for planning visibility only.
 
-12. **Repo-driven workspaces**: Standard repositories auto-discover from git repos at `/root/repos/{org}/{repo}`. On DB init, `discoverRepoWorkspaces()` scans for org directories containing git repos and creates/syncs a workspace per repo. Slug format: `{org}-{repo}` (e.g., `blockether-mission-control`). Styrmann is treated like any other discovered repository. The `default` workspace is reserved for the internal OpenClaw meta repository rooted at `/root/.openclaw`. Repositories are grouped by organization in the UI, with the meta repository under `System`.
+12. **Repo-driven workspaces**: Standard repositories auto-discover from git repos at `/root/repos/{org}/{repo}`. On DB init, `discoverRepoWorkspaces()` scans for org directories containing git repos and creates/syncs a workspace per repo. Slug format: `{org}-{repo}` (e.g., `blockether-styrmann`). Styrmann is treated like any other discovered repository. The `default` workspace is reserved for the internal OpenClaw meta repository rooted at `/root/.openclaw`. Repositories are grouped by organization in the UI, with the meta repository under `System`. **Current state**: After the org-platform-fixes database reset, only `blockether-styrmann` exists as an active workspace. All stale workspaces from prior discovery runs (e.g., `blockether-mission-control`, `blockether-spel`) were removed.
 13. **Workflow templates in code, not DB-cloned**: Template definitions (Simple, Standard, Strict, Auto-Train, Architecture) live in `src/lib/workflow-templates.ts` as TypeScript constants. New workspaces get templates provisioned from code, not cloned from another workspace's DB rows.
 14. **LLM-powered skill selection**: Workflow planning uses LLM inference to intelligently select the most relevant skills per agent per task step, rather than assigning all available skills. Falls back to rule-based selection when LLM is unavailable.
 15. **Standardized file upload UX**: Active file input areas across the UI use a consistent drag-and-drop zone pattern with Upload icon, dashed border, and "Drop file or click to browse" text.
@@ -901,6 +922,12 @@ Agents without direct filesystem access use upload/download endpoints:
 19. **Task creation lockdown via org tickets**: Org tickets are the intended entry point for all new work. `POST /api/org-tickets/[id]/delegate` is the authorized path that creates workspace tasks via LLM-powered decomposition. The delegation module enforces ticket status transitions and creates `delegates_to` entity links atomically. Direct task creation remains available but is treated as an internal/admin path.
 20. **Memory system without vectors**: The knowledge store uses SQLite FTS5 (porter tokenizer) for full-text search rather than vector embeddings. This keeps the system self-contained with no external vector DB dependency. Eight memory types cover the full range of development knowledge: fact, decision, event, tool_run, error, observation, note, patch. LLM synthesis converts raw memories into curated knowledge articles on a scheduled basis.
 21. **Outbound webhook system for external integration**: Styrmann pushes events to external dev portals via registered webhooks. HMAC-SHA256 signing ensures payload authenticity. Exponential backoff (3 attempts: 1s, 5s, 30s) handles transient failures. Webhooks with 10+ consecutive failures are auto-disabled to prevent noise. Delivery history is tracked in `webhook_deliveries` for debugging.
+
+22. **Org ticket acceptance criteria as a sub-resource**: Acceptance criteria for org tickets are managed as a dedicated sub-resource (`org_ticket_acceptance_criteria` table) rather than a JSON column. This mirrors the pattern used by `task_acceptance_criteria` and allows individual criteria to be updated or deleted without replacing the full list.
+
+23. **Pagination on activity log**: `GET /api/tasks/{id}/activities` supports `?limit` and `?offset` query parameters. The response includes `total`, `limit`, `offset`, and `hasMore` fields alongside the `activities` array. Default limit is 50.
+
+24. **Validation on org ticket creation**: `POST /api/org-tickets` validates that `organization_id` references an existing organization before inserting. Returns `400` with a descriptive error if the organization does not exist.
 ---
 
 ## Environment Variables
