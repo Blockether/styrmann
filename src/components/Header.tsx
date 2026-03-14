@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import Image from 'next/image';
 import Link from 'next/link';
 import {
   LayoutGrid,
@@ -12,6 +11,7 @@ import {
 import { useStyrmann } from '@/lib/store';
 import { format } from 'date-fns';
 import type { Workspace } from '@/lib/types';
+import { StyrmannLogo } from '@/components/StyrmannLogo';
 
 export type DashboardView = 'sprint' | 'backlog' | 'pareto' | 'issues' | 'discord';
 
@@ -61,9 +61,6 @@ export function Header({ workspace, isPortrait = true }: HeaderProps) {
 
 
   const portraitWorkspaceHeader = !!workspace && isPortrait;
-  const topBarLogoSrc = workspace?.is_internal && workspace.logo_url
-    ? workspace.logo_url
-    : '/logo.png';
 
   const workspaceSwitcherDropdown = showWorkspaceSwitcher && (
     <div className="absolute top-full left-0 mt-1 w-44 sm:w-64 bg-mc-bg-secondary border border-mc-border rounded-lg shadow-lg z-50 py-1 max-h-64 overflow-y-auto">
@@ -143,7 +140,7 @@ export function Header({ workspace, isPortrait = true }: HeaderProps) {
         <>
           <div className="flex items-center gap-2 md:gap-4 min-w-0">
             <Link href="/" className="hidden sm:flex items-center gap-2 rounded px-1 py-1 transition-colors hover:bg-mc-bg-tertiary">
-              <Image src={topBarLogoSrc} alt="Styrmann" width={24} height={24} className="rounded" />
+              <StyrmannLogo size={24} />
               <h1 className="font-semibold text-mc-text uppercase tracking-wider text-sm">Styrmann</h1>
             </Link>
 

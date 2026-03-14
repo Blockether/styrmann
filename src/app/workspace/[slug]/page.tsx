@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-import Image from 'next/image';
 import Link from 'next/link';
 import { ChevronLeft } from 'lucide-react';
 import { Header, type DashboardView } from '@/components/Header';
+import { StyrmannLogo } from '@/components/StyrmannLogo';
 
 import { ActiveSprint } from '@/components/ActiveSprint';
 import { BacklogView } from '@/components/BacklogView';
@@ -203,7 +203,7 @@ export default function WorkspacePage() {
     return (
       <div className="min-h-screen bg-mc-bg flex items-center justify-center">
         <div className="flex flex-col items-center">
-          <Image src="/logo.png" alt="Blockether" width={40} height={40} priority className="mb-4 animate-pulse rounded" />
+          <StyrmannLogo size={40} className="mb-4 animate-pulse" />
           <p className="text-mc-text-secondary">Loading workspace...</p>
         </div>
       </div>
