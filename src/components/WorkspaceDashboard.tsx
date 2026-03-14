@@ -172,6 +172,8 @@ export function WorkspaceDashboard() {
 function WorkspaceCard({ workspace, onDelete, onEdit }: { workspace: WorkspaceStats; onDelete: (id: string) => void; onEdit: (workspace: WorkspaceStats) => void }) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [forceDeleteMode, setForceDeleteMode] = useState(false);
+  const [forceDeleteName, setForceDeleteName] = useState('');
 
   const handleDelete = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -190,6 +192,8 @@ function WorkspaceCard({ workspace, onDelete, onEdit }: { workspace: WorkspaceSt
     } finally {
       setDeleting(false);
       setShowDeleteConfirm(false);
+      setForceDeleteMode(false);
+      setForceDeleteName('');
     }
   };
   
@@ -278,7 +282,7 @@ function WorkspaceCard({ workspace, onDelete, onEdit }: { workspace: WorkspaceSt
 
     {/* Delete Confirmation Modal */}
     {showDeleteConfirm && (
-      <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-3 sm:p-4" onClick={() => setShowDeleteConfirm(false)}>
+      <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-3 sm:p-4" onClick={() => { setShowDeleteConfirm(false); setForceDeleteMode(false); setForceDeleteName(''); }}>
         <div className="bg-mc-bg-secondary border border-mc-border rounded-t-xl sm:rounded-xl w-full max-w-md p-5 sm:p-6 pb-[calc(1.25rem+env(safe-area-inset-bottom))] sm:pb-6" onClick={e => e.stopPropagation()}>
           <div className="flex items-center gap-3 mb-4">
             <div className="p-3 bg-mc-accent-red/20 rounded-full">
@@ -290,29 +294,69 @@ function WorkspaceCard({ workspace, onDelete, onEdit }: { workspace: WorkspaceSt
             </div>
           </div>
           
-          <p className="text-mc-text-secondary mb-6">
+          <p className="text-mc-text-secondary mb-4">
             Are you sure you want to delete <strong>{workspace.name}</strong>? 
             {workspace.taskCounts.total > 0 && (
               <span className="block mt-2 text-mc-accent-red">
-                Warning: This workspace has {workspace.taskCounts.total} task(s). Delete them first.
+                Warning: This workspace has {workspace.taskCounts.total} task(s).
               </span>
             )}
           </p>
+
+          {forceDeleteMode && (
+            <div className="mb-4 p-3 rounded border border-mc-accent-red/30 bg-mc-accent-red/5">
+              <p className="text-sm text-mc-accent-red font-medium mb-2">
+                Type <strong>{workspace.name}</strong> to confirm permanent deletion of this workspace and all its tasks.
+              </p>
+              <input
+                type="text"
+                value={forceDeleteName}
+                onChange={(e) => setForceDeleteName(e.target.value)}
+                placeholder={workspace.name}
+                className="w-full min-h-10 bg-mc-bg border border-mc-accent-red/30 rounded px-3 py-2 text-sm font-mono focus:outline-none focus:border-mc-accent-red"
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && forceDeleteName === workspace.name) handleDelete(e as unknown as React.MouseEvent);
+                }}
+              />
+            </div>
+          )}
           
-          <div className="flex justify-end gap-3">
-            <button
-              onClick={() => setShowDeleteConfirm(false)}
-              className="px-4 py-2 text-mc-text-secondary hover:text-mc-text"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleDelete}
-              disabled={deleting || workspace.taskCounts.total > 0}
-              className="px-4 py-2 bg-mc-accent-red text-white rounded-lg font-medium hover:bg-mc-accent-red/90 disabled:opacity-50"
-            >
-              {deleting ? 'Deleting...' : 'Delete Workspace'}
-            </button>
+          <div className="flex flex-col gap-2">
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => { setShowDeleteConfirm(false); setForceDeleteMode(false); setForceDeleteName(''); }}
+                className="px-4 py-2 text-mc-text-secondary hover:text-mc-text"
+              >
+                Cancel
+              </button>
+              {!forceDeleteMode && (
+                <button
+                  onClick={handleDelete}
+                  disabled={deleting || workspace.taskCounts.total > 0}
+                  className="px-4 py-2 bg-mc-accent-red text-white rounded-lg font-medium hover:bg-mc-accent-red/90 disabled:opacity-50"
+                >
+                  {deleting ? 'Deleting...' : 'Delete Workspace'}
+                </button>
+              )}
+              {forceDeleteMode && (
+                <button
+                  onClick={handleDelete}
+                  disabled={deleting || forceDeleteName !== workspace.name}
+                  className="px-4 py-2 bg-mc-accent-red text-white rounded-lg font-medium hover:bg-mc-accent-red/90 disabled:opacity-50"
+                >
+                  {deleting ? 'Deleting...' : 'Permanently Delete'}
+                </button>
+              )}
+            </div>
+            {workspace.taskCounts.total > 0 && !forceDeleteMode && (
+              <button
+                onClick={() => setForceDeleteMode(true)}
+                className="text-xs text-mc-text-secondary hover:text-mc-accent-red text-right"
+              >
+                I know what I am doing. Delete everything.
+              </button>
+            )}
           </div>
         </div>
       </div>
