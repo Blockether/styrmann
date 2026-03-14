@@ -6,6 +6,7 @@ export interface DaemonConfig {
   schedulerIntervalMs: number;
   logPollIntervalMs: number;
   recoveryIntervalMs: number;
+  synthesisIntervalMs: number;
 }
 
 export interface ScheduledJob {
@@ -40,4 +41,6 @@ export interface DaemonStats {
   discordTasksCreated?: number;
   discordCompletionsSent?: number;
   discordVoiceResponses?: number;
+  synthesisCount?: number;
+  lastSynthesisTick?: string;
 }

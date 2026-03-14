@@ -9,6 +9,7 @@ import { startLogPoller } from './logs';
 import { startReporter } from './reporter';
 import { startRecovery } from './recovery';
 import { startDiscord } from './discord';
+import { startSynthesis } from './synthesis';
 import type { DaemonStats } from './types';
 
 const log = createLogger('daemon');
@@ -46,6 +47,7 @@ async function main() {
     schedulerIntervalMs: 10_000,
     logPollIntervalMs: 30_000,
     recoveryIntervalMs: 60_000,
+    synthesisIntervalMs: 3_600_000,
   };
 
   // Start all modules
@@ -58,9 +60,11 @@ async function main() {
   const stopRecovery = startRecovery(config, stats);
   const stopReporter = startReporter(config, stats);
   const stopDiscord = startDiscord(config, stats);
+  const stopSynthesis = startSynthesis(config, stats);
 
   const shutdown = () => {
     log.info('Shutting down...');
+    stopSynthesis();
     stopDiscord();
     stopReporter();
     stopRecovery();

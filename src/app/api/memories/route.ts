@@ -144,6 +144,14 @@ export async function POST(request: NextRequest) {
       JSON.stringify(tags),
     );
 
+    if (organization_id) {
+      db.prepare(`
+        UPDATE knowledge_articles 
+        SET status = 'stale', updated_at = datetime('now')
+        WHERE organization_id = ? AND status = 'published'
+      `).run(organization_id);
+    }
+
     const memory = db.prepare('SELECT * FROM memories WHERE id = ?').get(id) as Memory;
     const result = {
       ...memory,

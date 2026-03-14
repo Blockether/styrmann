@@ -51,6 +51,7 @@ export function startReporter(config: DaemonConfig, stats: DaemonStats): () => v
         discord_tasks_created: stats.discordTasksCreated || 0,
         discord_completions_sent: stats.discordCompletionsSent || 0,
         discord_voice_responses: stats.discordVoiceResponses || 0,
+        synthesis_count: stats.synthesisCount || 0,
         // Modules with intervals
         modules: [
           { name: 'health', interval_ms: 60_000, last_tick: stats.lastHealthTick },
@@ -61,6 +62,7 @@ export function startReporter(config: DaemonConfig, stats: DaemonStats): () => v
           { name: 'log_poller', interval_ms: config.logPollIntervalMs, last_tick: stats.lastLogPollTick },
           { name: 'recovery', interval_ms: config.recoveryIntervalMs, last_tick: stats.lastRecoveryTick },
           { name: 'reporter', interval_ms: 30_000, last_tick: new Date().toISOString() },
+          { name: 'synthesis', interval_ms: config.synthesisIntervalMs, last_tick: stats.lastSynthesisTick },
           ...(stats.discordConnected ? [{ name: 'discord', interval_ms: 30_000, last_tick: new Date().toISOString() }] : []),
         ],
         // Registered scheduled jobs
