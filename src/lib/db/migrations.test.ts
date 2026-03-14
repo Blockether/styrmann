@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { createTestDb } from './test-helpers';
+import { getConnectedEntities } from './entity-links';
 
 describe('Migration 055: add_organizations', () => {
   it('creates organizations table with correct schema', () => {
@@ -215,6 +216,66 @@ describe('Migration 057: add_memories', () => {
     expect(indexNames).toContain('idx_memories_type');
     expect(indexNames).toContain('idx_memories_status');
     expect(indexNames).toContain('idx_memories_created');
+    db.close();
+  });
+});
+
+describe('Migration 058: add_entity_links', () => {
+  it('creates entity_links table with correct schema', () => {
+    const db = createTestDb();
+    const result = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='entity_links'").get();
+    expect(result).toBeDefined();
+
+    const cols = db.prepare("PRAGMA table_info(entity_links)").all() as any[];
+    const colNames = cols.map((c: any) => c.name);
+    ['id', 'from_entity_type', 'from_entity_id', 'to_entity_type', 'to_entity_id', 'link_type', 'explanation'].forEach(col => {
+      expect(colNames).toContain(col);
+    });
+    db.close();
+  });
+
+  it('prevents self-links (from_entity_id == to_entity_id)', () => {
+    const db = createTestDb();
+    const entityId = crypto.randomUUID();
+
+    expect(() => {
+      db.prepare("INSERT INTO entity_links (id, from_entity_type, from_entity_id, to_entity_type, to_entity_id, link_type) VALUES (?, ?, ?, ?, ?, ?)")
+        .run(crypto.randomUUID(), 'task', entityId, 'task', entityId, 'relates_to');
+    }).toThrow();
+
+    db.close();
+  });
+
+  it('prevents duplicate links', () => {
+    const db = createTestDb();
+    const fromId = crypto.randomUUID();
+    const toId = crypto.randomUUID();
+
+    db.prepare("INSERT INTO entity_links (id, from_entity_type, from_entity_id, to_entity_type, to_entity_id, link_type) VALUES (?, ?, ?, ?, ?, ?)")
+      .run(crypto.randomUUID(), 'task', fromId, 'memory', toId, 'relates_to');
+
+    expect(() => {
+      db.prepare("INSERT INTO entity_links (id, from_entity_type, from_entity_id, to_entity_type, to_entity_id, link_type) VALUES (?, ?, ?, ?, ?, ?)")
+        .run(crypto.randomUUID(), 'task', fromId, 'memory', toId, 'relates_to');
+    }).toThrow();
+
+    db.close();
+  });
+
+  it('graph traversal respects MAX_DEPTH', () => {
+    const db = createTestDb();
+
+    const entities = Array.from({ length: 15 }, () => crypto.randomUUID());
+    for (let i = 0; i < entities.length - 1; i++) {
+      db.prepare("INSERT INTO entity_links (id, from_entity_type, from_entity_id, to_entity_type, to_entity_id, link_type) VALUES (?, ?, ?, ?, ?, ?)")
+        .run(crypto.randomUUID(), 'task', entities[i], 'task', entities[i + 1], 'relates_to');
+    }
+
+    const connected = getConnectedEntities(db, entities[0], 10);
+
+    const maxDistance = Math.max(...connected.map((e) => e.distance));
+    expect(maxDistance).toBeLessThanOrEqual(10);
+
     db.close();
   });
 });

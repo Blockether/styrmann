@@ -547,4 +547,23 @@ CREATE INDEX IF NOT EXISTS idx_memories_workspace ON memories(workspace_id);
 CREATE INDEX IF NOT EXISTS idx_memories_type ON memories(memory_type);
 CREATE INDEX IF NOT EXISTS idx_memories_status ON memories(status);
 CREATE INDEX IF NOT EXISTS idx_memories_created ON memories(created_at DESC);
+-- Entity links table (generic cross-entity relationships)
+CREATE TABLE IF NOT EXISTS entity_links (
+  id TEXT PRIMARY KEY,
+  from_entity_type TEXT NOT NULL,
+  from_entity_id TEXT NOT NULL,
+  to_entity_type TEXT NOT NULL,
+  to_entity_id TEXT NOT NULL,
+  link_type TEXT NOT NULL CHECK (link_type IN (
+    'delegates_to', 'blocks', 'relates_to', 'derived_from', 'references',
+    'parent_of', 'motivated_by', 'resolved_by', 'contains', 'touches'
+  )),
+  explanation TEXT,
+  created_at TEXT DEFAULT (datetime('now')),
+  CHECK (from_entity_id != to_entity_id)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_entity_links_unique ON entity_links(from_entity_id, to_entity_id, link_type);
+CREATE INDEX IF NOT EXISTS idx_entity_links_from ON entity_links(from_entity_id, from_entity_type);
+CREATE INDEX IF NOT EXISTS idx_entity_links_to ON entity_links(to_entity_id, to_entity_type);
+CREATE INDEX IF NOT EXISTS idx_entity_links_type ON entity_links(link_type);
 `;
