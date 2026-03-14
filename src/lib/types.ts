@@ -574,11 +574,14 @@ export type SSEEventType =
   | 'daemon_stats_updated'
   | 'organization_created'
   | 'organization_updated'
-  | 'organization_deleted';
+  | 'organization_deleted'
+  | 'org_ticket_created'
+  | 'org_ticket_updated'
+  | 'org_ticket_deleted';
 
 export interface SSEEvent {
   type: SSEEventType;
-  payload: Task | Agent | TaskActivity | PresentedTaskActivity | TaskDeliverable | Organization | {
+  payload: Task | Agent | TaskActivity | PresentedTaskActivity | TaskDeliverable | Organization | OrgTicket | {
     taskId: string;
     sessionId: string;
     agentName?: string;

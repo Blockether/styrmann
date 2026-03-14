@@ -250,7 +250,21 @@ export const UpdateOrganizationSchema = z.object({
 export type CreateOrganizationInput = z.infer<typeof CreateOrganizationSchema>;
 export type UpdateOrganizationInput = z.infer<typeof UpdateOrganizationSchema>;
 
+export const UpdateOrgTicketSchema = z.object({
+  title: z.string().min(1).max(500).optional(),
+  description: z.string().optional().nullable(),
+  status: z.enum(['open', 'triaged', 'delegated', 'in_progress', 'resolved', 'closed']).optional(),
+  priority: z.enum(['low', 'normal', 'high', 'urgent']).optional(),
+  ticket_type: z.enum(['feature', 'bug', 'improvement', 'task', 'epic']).optional(),
+  external_ref: z.string().optional().nullable(),
+  external_system: z.string().optional().nullable(),
+  assignee_name: z.string().optional().nullable(),
+  due_date: z.string().optional().nullable(),
+  tags: z.array(z.string()).optional(),
+});
+
 export type CreateOrgTicketInput = z.infer<typeof CreateOrgTicketSchema>;
+export type UpdateOrgTicketInput = z.infer<typeof UpdateOrgTicketSchema>;
 export type CreateMemoryInput = z.infer<typeof CreateMemorySchema>;
 export type CreateEntityLinkInput = z.infer<typeof CreateEntityLinkSchema>;
 export type CreateCommitInput = z.infer<typeof CreateCommitSchema>;
