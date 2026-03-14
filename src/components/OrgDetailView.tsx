@@ -1,9 +1,10 @@
 'use client';
-import { Ticket, BookOpen, Folder, ArrowLeft } from 'lucide-react';
+import { Ticket, BookOpen, Folder, ArrowLeft, Plus } from 'lucide-react';
 import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import type { OrgTicket, KnowledgeArticle } from '@/lib/types';
+import { OrgTicketCreateModal } from '@/components/OrgTicketCreateModal';
 
 interface OrgDetail {
   id: string;
@@ -21,6 +22,7 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
   const [tickets, setTickets] = useState<OrgTicket[]>([]);
   const [knowledge, setKnowledge] = useState<KnowledgeArticle[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
   useEffect(() => {
     fetch(`/api/organizations/${slug}`)
@@ -92,6 +94,13 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
           <div>
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-mono text-sm font-semibold text-mc-text">Tickets ({tickets.length})</h2>
+              <button
+                onClick={() => setShowCreateModal(true)}
+                className="px-3 py-1.5 text-xs font-mono bg-mc-accent text-white rounded hover:opacity-90 flex items-center gap-1"
+              >
+                <Plus size={12} />
+                <span className="hidden sm:inline">Create Ticket</span>
+              </button>
             </div>
             {tickets.length === 0 ? (
               <div className="text-sm text-mc-text-secondary">No tickets yet.</div>
@@ -169,6 +178,17 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
           </div>
         )}
       </div>
+
+      {showCreateModal && org && (
+        <OrgTicketCreateModal
+          organizationId={org.id}
+          onClose={() => setShowCreateModal(false)}
+          onCreated={(ticket) => {
+            setTickets(prev => [ticket, ...prev]);
+            setShowCreateModal(false);
+          }}
+        />
+      )}
     </div>
   );
 }
