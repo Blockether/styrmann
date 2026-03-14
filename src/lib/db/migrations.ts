@@ -2337,6 +2337,41 @@ const migrations: Migration[] = [
 
       console.log('[Migration 056] org_tickets migration complete');
     }
+  },
+  {
+    id: '057',
+    name: 'add_memories',
+    up: (db) => {
+      console.log('[Migration 057] Adding memories table...');
+
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS memories (
+          id TEXT PRIMARY KEY,
+          organization_id TEXT REFERENCES organizations(id) ON DELETE CASCADE,
+          workspace_id TEXT REFERENCES workspaces(id) ON DELETE CASCADE,
+          memory_type TEXT NOT NULL CHECK (memory_type IN ('fact', 'decision', 'event', 'tool_run', 'error', 'observation', 'note', 'patch')),
+          title TEXT NOT NULL,
+          summary TEXT,
+          body TEXT,
+          source TEXT,
+          source_ref TEXT,
+          confidence INTEGER CHECK (confidence IS NULL OR (confidence >= 0 AND confidence <= 100)),
+          status TEXT DEFAULT 'open' CHECK (status IN ('open', 'resolved', 'closed')),
+          metadata TEXT DEFAULT '{}',
+          tags TEXT DEFAULT '[]',
+          created_at TEXT DEFAULT (datetime('now')),
+          updated_at TEXT DEFAULT (datetime('now'))
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_memories_org ON memories(organization_id);
+        CREATE INDEX IF NOT EXISTS idx_memories_workspace ON memories(workspace_id);
+        CREATE INDEX IF NOT EXISTS idx_memories_type ON memories(memory_type);
+        CREATE INDEX IF NOT EXISTS idx_memories_status ON memories(status);
+        CREATE INDEX IF NOT EXISTS idx_memories_created ON memories(created_at DESC);
+      `);
+
+      console.log('[Migration 057] Memories table created');
+    }
   }
 ];
 

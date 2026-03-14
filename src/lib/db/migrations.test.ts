@@ -163,6 +163,62 @@ describe('Migration 056: add_org_tickets', () => {
   });
 });
 
+describe('Migration 057: add_memories', () => {
+  it('creates memories table with correct schema', () => {
+    const db = createTestDb();
+    const result = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='memories'").get();
+    expect(result).toBeDefined();
+
+    const cols = db.prepare("PRAGMA table_info(memories)").all() as { name: string }[];
+    const colNames = cols.map((c: { name: string }) => c.name);
+
+    ['id', 'organization_id', 'workspace_id', 'memory_type', 'title', 'summary', 'body',
+     'source', 'source_ref', 'confidence', 'status', 'metadata', 'tags'].forEach(col => {
+      expect(colNames).toContain(col);
+    });
+
+    db.close();
+  });
+
+  it('accepts all 8 memory types', () => {
+    const db = createTestDb();
+    const memoryTypes = ['fact', 'decision', 'event', 'tool_run', 'error', 'observation', 'note', 'patch'];
+
+    for (const memType of memoryTypes) {
+      expect(() => {
+        db.prepare("INSERT INTO memories (id, memory_type, title) VALUES (?, ?, ?)").run(crypto.randomUUID(), memType, `Test ${memType}`);
+      }).not.toThrow();
+    }
+
+    const count = (db.prepare("SELECT COUNT(*) as count FROM memories").get() as { count: number }).count;
+    expect(count).toBe(8);
+
+    db.close();
+  });
+
+  it('rejects invalid memory type', () => {
+    const db = createTestDb();
+
+    expect(() => {
+      db.prepare("INSERT INTO memories (id, memory_type, title) VALUES (?, ?, ?)").run(crypto.randomUUID(), 'invalid_type', 'Test');
+    }).toThrow();
+
+    db.close();
+  });
+
+  it('memories indexes exist', () => {
+    const db = createTestDb();
+    const indexes = db.prepare("SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='memories'").all() as { name: string }[];
+    const indexNames = indexes.map((i: { name: string }) => i.name);
+    expect(indexNames).toContain('idx_memories_org');
+    expect(indexNames).toContain('idx_memories_workspace');
+    expect(indexNames).toContain('idx_memories_type');
+    expect(indexNames).toContain('idx_memories_status');
+    expect(indexNames).toContain('idx_memories_created');
+    db.close();
+  });
+});
+
 describe('Migration 054: drop_legacy_tables', () => {
   it('drops legacy tables from database', () => {
     const db = createTestDb();
