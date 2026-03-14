@@ -177,3 +177,64 @@ export const UpdateAcceptanceCriteriaSchema = z.object({
 
 export type CreateAcceptanceCriteriaInput = z.infer<typeof CreateAcceptanceCriteriaSchema>;
 export type UpdateAcceptanceCriteriaInput = z.infer<typeof UpdateAcceptanceCriteriaSchema>;
+
+// Wave 2 Entity Schemas
+
+export const CreateOrgTicketSchema = z.object({
+  organization_id: z.string().min(1),
+  title: z.string().min(1).max(500),
+  description: z.string().optional(),
+  priority: z.enum(['low', 'normal', 'high', 'urgent']).default('normal'),
+  ticket_type: z.enum(['feature', 'bug', 'improvement', 'task', 'epic']).default('task'),
+  external_ref: z.string().optional(),
+  external_system: z.string().optional(),
+  creator_name: z.string().optional(),
+  assignee_name: z.string().optional(),
+  due_date: z.string().optional(),
+  tags: z.array(z.string()).default([]),
+});
+
+export const CreateMemorySchema = z.object({
+  organization_id: z.string().optional(),
+  workspace_id: z.string().optional(),
+  memory_type: z.enum(['fact', 'decision', 'event', 'tool_run', 'error', 'observation', 'note', 'patch']),
+  title: z.string().min(1).max(500),
+  summary: z.string().optional(),
+  body: z.string().optional(),
+  source: z.string().optional(),
+  source_ref: z.string().optional(),
+  confidence: z.number().min(0).max(100).optional(),
+  tags: z.array(z.string()).default([]),
+  metadata: z.record(z.string(), z.unknown()).default({}),
+});
+
+export const CreateEntityLinkSchema = z.object({
+  from_entity_type: z.string().min(1),
+  from_entity_id: z.string().min(1),
+  to_entity_type: z.string().min(1),
+  to_entity_id: z.string().min(1),
+  link_type: z.enum(['delegates_to', 'blocks', 'relates_to', 'derived_from', 'references', 'parent_of', 'motivated_by', 'resolved_by', 'contains', 'touches']),
+  explanation: z.string().optional(),
+}).refine(data => data.from_entity_id !== data.to_entity_id, {
+  message: 'Cannot link an entity to itself',
+  path: ['to_entity_id'],
+});
+
+export const CreateCommitSchema = z.object({
+  workspace_id: z.string().min(1),
+  commit_hash: z.string().min(1),
+  message: z.string().min(1),
+  author_name: z.string().optional(),
+  author_email: z.string().optional(),
+  branch: z.string().optional(),
+  files_changed: z.array(z.string()).default([]),
+  insertions: z.number().int().min(0).default(0),
+  deletions: z.number().int().min(0).default(0),
+  committed_at: z.string().min(1),
+  metadata: z.record(z.string(), z.unknown()).default({}),
+});
+
+export type CreateOrgTicketInput = z.infer<typeof CreateOrgTicketSchema>;
+export type CreateMemoryInput = z.infer<typeof CreateMemorySchema>;
+export type CreateEntityLinkInput = z.infer<typeof CreateEntityLinkSchema>;
+export type CreateCommitInput = z.infer<typeof CreateCommitSchema>;

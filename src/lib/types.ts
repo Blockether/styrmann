@@ -782,3 +782,104 @@ export interface ClarificationContext {
   created_at: string;
   resolved_at?: string | null;
 }
+
+// ── Wave 2 Entities ──────────────────────────────────────────────────────
+
+export interface Organization {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string | null;
+  logo_url?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type OrgTicketStatus = 'open' | 'triaged' | 'delegated' | 'in_progress' | 'resolved' | 'closed';
+export type OrgTicketType = 'feature' | 'bug' | 'improvement' | 'task' | 'epic';
+
+export interface OrgTicket {
+  id: string;
+  organization_id: string;
+  title: string;
+  description?: string | null;
+  status: OrgTicketStatus;
+  priority: 'low' | 'normal' | 'high' | 'urgent';
+  ticket_type: OrgTicketType;
+  external_ref?: string | null;
+  external_system?: string | null;
+  creator_name?: string | null;
+  assignee_name?: string | null;
+  due_date?: string | null;
+  tags: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export type MemoryType = 'fact' | 'decision' | 'event' | 'tool_run' | 'error' | 'observation' | 'note' | 'patch';
+
+export interface Memory {
+  id: string;
+  organization_id?: string | null;
+  workspace_id?: string | null;
+  memory_type: MemoryType;
+  title: string;
+  summary?: string | null;
+  body?: string | null;
+  source?: string | null;
+  source_ref?: string | null;
+  confidence?: number | null;
+  status: 'open' | 'resolved' | 'closed';
+  metadata: string;
+  tags: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export type LinkType = 'delegates_to' | 'blocks' | 'relates_to' | 'derived_from' | 'references' | 'parent_of' | 'motivated_by' | 'resolved_by' | 'contains' | 'touches';
+
+export interface EntityLink {
+  id: string;
+  from_entity_type: string;
+  from_entity_id: string;
+  to_entity_type: string;
+  to_entity_id: string;
+  link_type: LinkType;
+  explanation?: string | null;
+  created_at: string;
+}
+
+export type KnowledgeArticleStatus = 'draft' | 'published' | 'stale' | 'archived';
+
+export interface KnowledgeArticle {
+  id: string;
+  organization_id?: string | null;
+  workspace_id?: string | null;
+  title: string;
+  summary: string;
+  body: string;
+  synthesis_model?: string | null;
+  synthesis_prompt_hash?: string | null;
+  source_memory_ids: string;
+  status: KnowledgeArticleStatus;
+  version: number;
+  supersedes_id?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Commit {
+  id: string;
+  workspace_id: string;
+  commit_hash: string;
+  message: string;
+  author_name?: string | null;
+  author_email?: string | null;
+  branch?: string | null;
+  files_changed: string;
+  insertions: number;
+  deletions: number;
+  committed_at: string;
+  ingested_at: string;
+  metadata: string;
+}
