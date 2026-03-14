@@ -474,6 +474,75 @@ describe('Migration 060: add_fts5_tables', () => {
   });
 });
 
+describe('Migration 062: add_webhooks', () => {
+  it('creates webhooks and webhook_deliveries tables', () => {
+    const db = createTestDb();
+    const webhooks = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='webhooks'").get();
+    expect(webhooks).toBeDefined();
+    const deliveries = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='webhook_deliveries'").get();
+    expect(deliveries).toBeDefined();
+    db.close();
+  });
+
+  it('webhooks table has correct columns', () => {
+    const db = createTestDb();
+    const cols = db.prepare("PRAGMA table_info(webhooks)").all() as { name: string }[];
+    const colNames = cols.map((c: { name: string }) => c.name);
+    ['id', 'organization_id', 'url', 'secret', 'event_types', 'is_active',
+     'last_delivery_at', 'last_delivery_status', 'failure_count'].forEach(col => {
+      expect(colNames).toContain(col);
+    });
+    db.close();
+  });
+
+  it('webhook_deliveries table has correct columns', () => {
+    const db = createTestDb();
+    const cols = db.prepare("PRAGMA table_info(webhook_deliveries)").all() as { name: string }[];
+    const colNames = cols.map((c: { name: string }) => c.name);
+    ['id', 'webhook_id', 'event_type', 'payload', 'status', 'response_status',
+     'response_body', 'attempts'].forEach(col => {
+      expect(colNames).toContain(col);
+    });
+    db.close();
+  });
+
+  it('webhook_deliveries status CHECK constraint works', () => {
+    const db = createTestDb();
+    const webhookId = crypto.randomUUID();
+    db.prepare("INSERT INTO webhooks (id, url, event_types) VALUES (?, ?, '[]')").run(webhookId, 'https://example.com/hook');
+
+    expect(() => {
+      db.prepare("INSERT INTO webhook_deliveries (id, webhook_id, event_type, payload, status) VALUES (?, ?, ?, ?, ?)")
+        .run(crypto.randomUUID(), webhookId, 'test', '{}', 'delivered');
+    }).not.toThrow();
+
+    expect(() => {
+      db.prepare("INSERT INTO webhook_deliveries (id, webhook_id, event_type, payload, status) VALUES (?, ?, ?, ?, ?)")
+        .run(crypto.randomUUID(), webhookId, 'test', '{}', 'invalid_status');
+    }).toThrow();
+
+    db.close();
+  });
+
+  it('webhooks indexes exist', () => {
+    const db = createTestDb();
+    const indexes = db.prepare("SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='webhooks'").all() as { name: string }[];
+    const indexNames = indexes.map((i: { name: string }) => i.name);
+    expect(indexNames).toContain('idx_webhooks_org');
+    expect(indexNames).toContain('idx_webhooks_active');
+    db.close();
+  });
+
+  it('webhook_deliveries indexes exist', () => {
+    const db = createTestDb();
+    const indexes = db.prepare("SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='webhook_deliveries'").all() as { name: string }[];
+    const indexNames = indexes.map((i: { name: string }) => i.name);
+    expect(indexNames).toContain('idx_webhook_deliveries_webhook');
+    expect(indexNames).toContain('idx_webhook_deliveries_status');
+    db.close();
+  });
+});
+
 describe('Migration 061: backfill_org_tickets', () => {
   it('fresh DB has zero orphan tasks', () => {
     const db = createTestDb();

@@ -440,6 +440,34 @@ CREATE TABLE IF NOT EXISTS task_provenance (
   created_at TEXT DEFAULT (datetime('now'))
 );
 
+-- Webhooks table (external dev portal push registrations)
+CREATE TABLE IF NOT EXISTS webhooks (
+  id TEXT PRIMARY KEY,
+  organization_id TEXT REFERENCES organizations(id) ON DELETE CASCADE,
+  url TEXT NOT NULL,
+  secret TEXT,
+  event_types TEXT NOT NULL DEFAULT '[]',
+  is_active INTEGER NOT NULL DEFAULT 1,
+  last_delivery_at TEXT,
+  last_delivery_status TEXT,
+  failure_count INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now'))
+);
+
+-- Webhook deliveries table (outbound delivery tracking)
+CREATE TABLE IF NOT EXISTS webhook_deliveries (
+  id TEXT PRIMARY KEY,
+  webhook_id TEXT NOT NULL REFERENCES webhooks(id) ON DELETE CASCADE,
+  event_type TEXT NOT NULL,
+  payload TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'delivered', 'failed')),
+  response_status INTEGER,
+  response_body TEXT,
+  attempts INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_organizations_slug ON organizations(slug);
 CREATE INDEX IF NOT EXISTS idx_org_tickets_org ON org_tickets(organization_id);
@@ -484,6 +512,10 @@ CREATE INDEX IF NOT EXISTS idx_acp_bindings_status ON acp_bindings(status);
 CREATE INDEX IF NOT EXISTS idx_acp_bindings_thread ON acp_bindings(discord_thread_id);
 CREATE INDEX IF NOT EXISTS idx_task_provenance_task ON task_provenance(task_id);
 CREATE INDEX IF NOT EXISTS idx_task_provenance_session ON task_provenance(session_id);
+CREATE INDEX IF NOT EXISTS idx_webhooks_org ON webhooks(organization_id);
+CREATE INDEX IF NOT EXISTS idx_webhooks_active ON webhooks(is_active);
+CREATE INDEX IF NOT EXISTS idx_webhook_deliveries_webhook ON webhook_deliveries(webhook_id);
+CREATE INDEX IF NOT EXISTS idx_webhook_deliveries_status ON webhook_deliveries(status);
 -- Daemon tables
 CREATE TABLE IF NOT EXISTS agent_heartbeats (
   id TEXT PRIMARY KEY,

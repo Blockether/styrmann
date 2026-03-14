@@ -2641,6 +2641,49 @@ const migrations: Migration[] = [
       const remainingOrphan = (db.prepare('SELECT count(*) as c FROM tasks WHERE org_ticket_id IS NULL').get() as { c: number }).c;
       console.log(`[Migration 061] Backfill complete. Remaining orphan tasks: ${remainingOrphan}`);
     }
+  },
+  {
+    id: '062',
+    name: 'add_webhooks',
+    up: (db) => {
+      console.log('[Migration 062] Adding webhooks and webhook_deliveries tables...');
+
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS webhooks (
+          id TEXT PRIMARY KEY,
+          organization_id TEXT REFERENCES organizations(id) ON DELETE CASCADE,
+          url TEXT NOT NULL,
+          secret TEXT,
+          event_types TEXT NOT NULL DEFAULT '[]',
+          is_active INTEGER NOT NULL DEFAULT 1,
+          last_delivery_at TEXT,
+          last_delivery_status TEXT,
+          failure_count INTEGER NOT NULL DEFAULT 0,
+          created_at TEXT DEFAULT (datetime('now')),
+          updated_at TEXT DEFAULT (datetime('now'))
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_webhooks_org ON webhooks(organization_id);
+        CREATE INDEX IF NOT EXISTS idx_webhooks_active ON webhooks(is_active);
+
+        CREATE TABLE IF NOT EXISTS webhook_deliveries (
+          id TEXT PRIMARY KEY,
+          webhook_id TEXT NOT NULL REFERENCES webhooks(id) ON DELETE CASCADE,
+          event_type TEXT NOT NULL,
+          payload TEXT NOT NULL,
+          status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'delivered', 'failed')),
+          response_status INTEGER,
+          response_body TEXT,
+          attempts INTEGER NOT NULL DEFAULT 0,
+          created_at TEXT DEFAULT (datetime('now'))
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_webhook_deliveries_webhook ON webhook_deliveries(webhook_id);
+        CREATE INDEX IF NOT EXISTS idx_webhook_deliveries_status ON webhook_deliveries(status);
+      `);
+
+      console.log('[Migration 062] Webhooks tables created');
+    }
   }
 ];
 

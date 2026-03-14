@@ -4,6 +4,7 @@
  */
 
 import type { SSEEvent } from './types';
+import { deliverWebhookEvent } from './webhook-delivery';
 
 // Store active SSE client connections
 const clients = new Set<ReadableStreamDefaultController>();
@@ -43,6 +44,8 @@ export function broadcast(event: SSEEvent): void {
   }
 
   console.log(`[SSE] Broadcast ${event.type} to ${clients.size} client(s)`);
+
+  deliverWebhookEvent(event.type, (event.payload as Record<string, unknown>) || {}).catch(console.error);
 }
 
 /**
