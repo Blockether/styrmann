@@ -338,3 +338,74 @@ describe('Migration 054: drop_legacy_tables', () => {
     db.close();
   });
 });
+
+describe('Migration 059: add_knowledge_articles_and_commits', () => {
+  it('creates knowledge_articles table', () => {
+    const db = createTestDb();
+    const result = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='knowledge_articles'").get();
+    expect(result).toBeDefined();
+
+    const cols = db.prepare("PRAGMA table_info(knowledge_articles)").all() as { name: string }[];
+    const colNames = cols.map((c: { name: string }) => c.name);
+    expect(colNames).toContain('id');
+    expect(colNames).toContain('organization_id');
+    expect(colNames).toContain('workspace_id');
+    expect(colNames).toContain('title');
+    expect(colNames).toContain('summary');
+    expect(colNames).toContain('body');
+    expect(colNames).toContain('synthesis_model');
+    expect(colNames).toContain('synthesis_prompt_hash');
+    expect(colNames).toContain('source_memory_ids');
+    expect(colNames).toContain('status');
+    expect(colNames).toContain('version');
+    expect(colNames).toContain('supersedes_id');
+    expect(colNames).toContain('created_at');
+    expect(colNames).toContain('updated_at');
+
+    db.close();
+  });
+
+  it('knowledge_articles table has correct indexes', () => {
+    const db = createTestDb();
+    const indexes = db.prepare("SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='knowledge_articles'").all() as { name: string }[];
+    const indexNames = indexes.map((i: { name: string }) => i.name);
+    expect(indexNames).toContain('idx_knowledge_articles_org');
+    expect(indexNames).toContain('idx_knowledge_articles_workspace');
+    expect(indexNames).toContain('idx_knowledge_articles_status');
+    db.close();
+  });
+
+  it('creates commits table with dedup constraint', () => {
+    const db = createTestDb();
+    const result = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='commits'").get();
+    expect(result).toBeDefined();
+
+    const cols = db.prepare("PRAGMA table_info(commits)").all() as { name: string }[];
+    const colNames = cols.map((c: { name: string }) => c.name);
+    expect(colNames).toContain('id');
+    expect(colNames).toContain('workspace_id');
+    expect(colNames).toContain('commit_hash');
+    expect(colNames).toContain('message');
+    expect(colNames).toContain('author_name');
+    expect(colNames).toContain('author_email');
+    expect(colNames).toContain('branch');
+    expect(colNames).toContain('files_changed');
+    expect(colNames).toContain('insertions');
+    expect(colNames).toContain('deletions');
+    expect(colNames).toContain('committed_at');
+    expect(colNames).toContain('ingested_at');
+    expect(colNames).toContain('metadata');
+
+    db.close();
+  });
+
+  it('commits table has correct indexes', () => {
+    const db = createTestDb();
+    const indexes = db.prepare("SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='commits'").all() as { name: string }[];
+    const indexNames = indexes.map((i: { name: string }) => i.name);
+    expect(indexNames).toContain('idx_commits_workspace');
+    expect(indexNames).toContain('idx_commits_committed_at');
+    expect(indexNames).toContain('idx_commits_author');
+    db.close();
+  });
+});

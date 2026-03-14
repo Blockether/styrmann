@@ -566,4 +566,44 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_entity_links_unique ON entity_links(from_e
 CREATE INDEX IF NOT EXISTS idx_entity_links_from ON entity_links(from_entity_id, from_entity_type);
 CREATE INDEX IF NOT EXISTS idx_entity_links_to ON entity_links(to_entity_id, to_entity_type);
 CREATE INDEX IF NOT EXISTS idx_entity_links_type ON entity_links(link_type);
+-- Knowledge articles table (LLM-synthesized knowledge)
+CREATE TABLE IF NOT EXISTS knowledge_articles (
+  id TEXT PRIMARY KEY,
+  organization_id TEXT REFERENCES organizations(id) ON DELETE CASCADE,
+  workspace_id TEXT REFERENCES workspaces(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  summary TEXT NOT NULL,
+  body TEXT NOT NULL,
+  synthesis_model TEXT,
+  synthesis_prompt_hash TEXT,
+  source_memory_ids TEXT DEFAULT '[]',
+  status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'published', 'stale', 'archived')),
+  version INTEGER NOT NULL DEFAULT 1,
+  supersedes_id TEXT REFERENCES knowledge_articles(id) ON DELETE SET NULL,
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_knowledge_articles_org ON knowledge_articles(organization_id);
+CREATE INDEX IF NOT EXISTS idx_knowledge_articles_workspace ON knowledge_articles(workspace_id);
+CREATE INDEX IF NOT EXISTS idx_knowledge_articles_status ON knowledge_articles(status);
+-- Commits table (external commit ingestion)
+CREATE TABLE IF NOT EXISTS commits (
+  id TEXT PRIMARY KEY,
+  workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  commit_hash TEXT NOT NULL,
+  message TEXT NOT NULL,
+  author_name TEXT,
+  author_email TEXT,
+  branch TEXT,
+  files_changed TEXT DEFAULT '[]',
+  insertions INTEGER DEFAULT 0,
+  deletions INTEGER DEFAULT 0,
+  committed_at TEXT NOT NULL,
+  ingested_at TEXT DEFAULT (datetime('now')),
+  metadata TEXT DEFAULT '{}',
+  UNIQUE(workspace_id, commit_hash)
+);
+CREATE INDEX IF NOT EXISTS idx_commits_workspace ON commits(workspace_id);
+CREATE INDEX IF NOT EXISTS idx_commits_committed_at ON commits(committed_at DESC);
+CREATE INDEX IF NOT EXISTS idx_commits_author ON commits(author_email);
 `;
