@@ -577,11 +577,16 @@ export type SSEEventType =
   | 'organization_deleted'
   | 'org_ticket_created'
   | 'org_ticket_updated'
-  | 'org_ticket_deleted';
+  | 'org_ticket_deleted'
+  | 'memory_created'
+  | 'memory_updated'
+  | 'entity_linked'
+  | 'commit_ingested'
+  | 'knowledge_synthesized';
 
 export interface SSEEvent {
   type: SSEEventType;
-  payload: Task | Agent | TaskActivity | PresentedTaskActivity | TaskDeliverable | Organization | OrgTicket | {
+  payload: Task | Agent | TaskActivity | PresentedTaskActivity | TaskDeliverable | Organization | OrgTicket | Memory | EntityLink | Commit | KnowledgeArticle | {
     taskId: string;
     sessionId: string;
     agentName?: string;
