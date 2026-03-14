@@ -1,0 +1,21 @@
+=== Migration 061: backfill_org_tickets ===
+
+Migration applied: 061|backfill_org_tickets
+
+=== Post-migration verification ===
+Total tasks in DB: 3
+Orphan tasks (org_ticket_id IS NULL): 0
+Migrated tickets (title LIKE '[Migrated]%'): 0
+
+Note: All 3 existing tasks already had org_ticket_id set (hard cutover
+was already in effect for recent task creation). Migration found 0 orphans
+to backfill, confirming the invariant holds: every task has a parent org ticket.
+
+=== Test results ===
+Tests: 38 passed (38)
+- migrations.test.ts: 33 tests passed (includes 3 new migration 061 tests)
+- schema.test.ts: 1 test passed
+- delegation.test.ts: 4 tests passed
+
+TypeScript: npx tsc --noEmit -- clean
+Build: npm run build -- success (Next.js 16.1.6)

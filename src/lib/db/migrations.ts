@@ -2573,6 +2573,74 @@ const migrations: Migration[] = [
 
       console.log('[Migration 060] FTS5 virtual tables and sync triggers created');
     }
+  },
+  {
+    id: '061',
+    name: 'backfill_org_tickets',
+    up: (db) => {
+      console.log('[Migration 061] Backfilling org tickets for existing tasks...');
+
+      // Get all tasks without an org_ticket_id
+      const orphanTasks = db.prepare(`
+        SELECT t.id, t.title, t.description, t.task_type, t.priority,
+               w.organization_id
+        FROM tasks t
+        JOIN workspaces w ON w.id = t.workspace_id
+        WHERE t.org_ticket_id IS NULL
+      `).all() as { id: string; title: string; description: string | null; task_type: string; priority: string; organization_id: string | null }[];
+
+      console.log(`[Migration 061] Found ${orphanTasks.length} tasks without org tickets`);
+
+      // Map task_type to ticket_type
+      const typeMap: Record<string, string> = {
+        bug: 'bug',
+        feature: 'feature',
+        chore: 'task',
+        documentation: 'task',
+        research: 'task',
+        spike: 'task',
+      };
+
+      for (const task of orphanTasks) {
+        const orgId = task.organization_id;
+        if (!orgId) continue; // Skip tasks in workspaces without org
+
+        // Create org ticket
+        const ticketId = crypto.randomUUID();
+        const ticketType = typeMap[task.task_type] || 'task';
+        const priority = task.priority || 'normal';
+
+        db.prepare(`
+          INSERT INTO org_tickets (
+            id, organization_id, title, description, status, priority, ticket_type,
+            created_at, updated_at
+          ) VALUES (?, ?, ?, ?, 'delegated', ?, ?, datetime('now'), datetime('now'))
+        `).run(
+          ticketId,
+          orgId,
+          `[Migrated] ${task.title}`,
+          task.description || null,
+          priority,
+          ticketType
+        );
+
+        // Link task to org ticket
+        db.prepare(`
+          UPDATE tasks SET org_ticket_id = ? WHERE id = ?
+        `).run(ticketId, task.id);
+
+        // Create entity link
+        db.prepare(`
+          INSERT INTO entity_links (
+            id, from_entity_type, from_entity_id, to_entity_type, to_entity_id,
+            link_type, explanation, created_at
+          ) VALUES (?, 'org_ticket', ?, 'task', ?, 'delegates_to', 'Auto-migrated', datetime('now'))
+        `).run(crypto.randomUUID(), ticketId, task.id);
+      }
+
+      const remainingOrphan = (db.prepare('SELECT count(*) as c FROM tasks WHERE org_ticket_id IS NULL').get() as { c: number }).c;
+      console.log(`[Migration 061] Backfill complete. Remaining orphan tasks: ${remainingOrphan}`);
+    }
   }
 ];
 

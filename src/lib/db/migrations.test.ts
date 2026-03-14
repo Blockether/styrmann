@@ -473,3 +473,98 @@ describe('Migration 060: add_fts5_tables', () => {
     db.close();
   });
 });
+
+describe('Migration 061: backfill_org_tickets', () => {
+  it('fresh DB has zero orphan tasks', () => {
+    const db = createTestDb();
+    const orphanCount = (db.prepare('SELECT count(*) as c FROM tasks WHERE org_ticket_id IS NULL').get() as { c: number }).c;
+    expect(orphanCount).toBe(0);
+    db.close();
+  });
+
+  it('backfills tasks that lack org_ticket_id', () => {
+    const db = createTestDb();
+
+    const org = db.prepare("SELECT id FROM organizations LIMIT 1").get() as { id: string } | undefined;
+    if (!org) { db.close(); return; }
+
+    const workspace = db.prepare("SELECT id FROM workspaces WHERE organization_id = ? AND is_internal = 0 LIMIT 1").get(org.id) as { id: string } | undefined;
+    if (!workspace) { db.close(); return; }
+
+    const taskId = crypto.randomUUID();
+    db.prepare(`
+      INSERT INTO tasks (id, title, status, priority, task_type, workspace_id, assignee_type)
+      VALUES (?, ?, 'inbox', 'normal', 'feature', ?, 'ai')
+    `).run(taskId, 'Test orphan task', workspace.id);
+
+    let task = db.prepare("SELECT org_ticket_id FROM tasks WHERE id = ?").get(taskId) as { org_ticket_id: string | null };
+    expect(task.org_ticket_id).toBeNull();
+
+    const ticketId = crypto.randomUUID();
+    db.prepare(`
+      INSERT INTO org_tickets (id, organization_id, title, status, priority, ticket_type)
+      VALUES (?, ?, ?, 'delegated', 'normal', 'feature')
+    `).run(ticketId, org.id, '[Migrated] Test orphan task');
+
+    db.prepare("UPDATE tasks SET org_ticket_id = ? WHERE id = ?").run(ticketId, taskId);
+
+    db.prepare(`
+      INSERT INTO entity_links (id, from_entity_type, from_entity_id, to_entity_type, to_entity_id, link_type, explanation)
+      VALUES (?, 'org_ticket', ?, 'task', ?, 'delegates_to', 'Auto-migrated')
+    `).run(crypto.randomUUID(), ticketId, taskId);
+
+    task = db.prepare("SELECT org_ticket_id FROM tasks WHERE id = ?").get(taskId) as { org_ticket_id: string | null };
+    expect(task.org_ticket_id).toBe(ticketId);
+
+    const ticket = db.prepare("SELECT title, status, ticket_type FROM org_tickets WHERE id = ?").get(ticketId) as { title: string; status: string; ticket_type: string };
+    expect(ticket.title).toBe('[Migrated] Test orphan task');
+    expect(ticket.status).toBe('delegated');
+    expect(ticket.ticket_type).toBe('feature');
+
+    const link = db.prepare("SELECT link_type FROM entity_links WHERE from_entity_id = ? AND to_entity_id = ?").get(ticketId, taskId) as { link_type: string };
+    expect(link.link_type).toBe('delegates_to');
+
+    db.close();
+  });
+
+  it('maps task_type to correct ticket_type', () => {
+    const db = createTestDb();
+
+    const org = db.prepare("SELECT id FROM organizations LIMIT 1").get() as { id: string } | undefined;
+    if (!org) { db.close(); return; }
+
+    const workspace = db.prepare("SELECT id FROM workspaces WHERE organization_id = ? AND is_internal = 0 LIMIT 1").get(org.id) as { id: string } | undefined;
+    if (!workspace) { db.close(); return; }
+
+    const typeMap: Record<string, string> = {
+      bug: 'bug',
+      feature: 'feature',
+      chore: 'task',
+      documentation: 'task',
+      research: 'task',
+      spike: 'task',
+    };
+
+    for (const [taskType, expectedTicketType] of Object.entries(typeMap)) {
+      const taskId = crypto.randomUUID();
+      const ticketId = crypto.randomUUID();
+
+      db.prepare(`
+        INSERT INTO tasks (id, title, status, priority, task_type, workspace_id, assignee_type)
+        VALUES (?, ?, 'inbox', 'normal', ?, ?, 'ai')
+      `).run(taskId, `Test ${taskType}`, taskType, workspace.id);
+
+      db.prepare(`
+        INSERT INTO org_tickets (id, organization_id, title, status, priority, ticket_type)
+        VALUES (?, ?, ?, 'delegated', 'normal', ?)
+      `).run(ticketId, org.id, `[Migrated] Test ${taskType}`, expectedTicketType);
+
+      db.prepare("UPDATE tasks SET org_ticket_id = ? WHERE id = ?").run(ticketId, taskId);
+
+      const ticket = db.prepare("SELECT ticket_type FROM org_tickets WHERE id = ?").get(ticketId) as { ticket_type: string };
+      expect(ticket.ticket_type).toBe(expectedTicketType);
+    }
+
+    db.close();
+  });
+});
