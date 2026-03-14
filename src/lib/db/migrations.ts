@@ -1139,16 +1139,19 @@ const migrations: Migration[] = [
         db.exec(`ALTER TABLE agent_logs ADD COLUMN task_id TEXT REFERENCES tasks(id) ON DELETE SET NULL`);
       }
       db.exec(`CREATE INDEX IF NOT EXISTS idx_agent_logs_task ON agent_logs(task_id)`);
-      // Backfill: derive task_id from openclaw_sessions where session matches
-      db.exec(`
-        UPDATE agent_logs SET task_id = (
-          SELECT os.task_id FROM openclaw_sessions os
-          WHERE os.openclaw_session_id = agent_logs.openclaw_session_id
-          AND os.task_id IS NOT NULL
-          LIMIT 1
-        )
-        WHERE task_id IS NULL
-      `);
+      // Backfill: derive task_id from openclaw_sessions where session matches (if table exists)
+      const tableExists = db.prepare(`SELECT COUNT(*) as cnt FROM sqlite_master WHERE type='table' AND name='openclaw_sessions'`).get() as { cnt: number };
+      if (tableExists.cnt > 0) {
+        db.exec(`
+          UPDATE agent_logs SET task_id = (
+            SELECT os.task_id FROM openclaw_sessions os
+            WHERE os.openclaw_session_id = agent_logs.openclaw_session_id
+            AND os.task_id IS NOT NULL
+            LIMIT 1
+          )
+          WHERE task_id IS NULL
+        `);
+      }
       console.log('[Migration 024] agent_logs.task_id added and backfilled');
     }
   },
@@ -1566,32 +1569,35 @@ const migrations: Migration[] = [
         db.exec('ALTER TABLE task_deliverables ADD COLUMN openclaw_session_id TEXT');
       }
 
-      db.exec(`
-        UPDATE openclaw_sessions
-        SET task_id = (
-          SELECT ta.task_id
-          FROM task_activities ta
-          WHERE ta.activity_type = 'dispatch_invocation'
-            AND json_extract(ta.metadata, '$.openclaw_session_id') = openclaw_sessions.openclaw_session_id
-          ORDER BY ta.created_at DESC
-          LIMIT 1
-        )
-        WHERE task_id IS NULL
-          AND EXISTS (
-            SELECT 1
+      const tableExists = db.prepare(`SELECT COUNT(*) as cnt FROM sqlite_master WHERE type='table' AND name='openclaw_sessions'`).get() as { cnt: number };
+      if (tableExists.cnt > 0) {
+        db.exec(`
+          UPDATE openclaw_sessions
+          SET task_id = (
+            SELECT ta.task_id
             FROM task_activities ta
             WHERE ta.activity_type = 'dispatch_invocation'
               AND json_extract(ta.metadata, '$.openclaw_session_id') = openclaw_sessions.openclaw_session_id
+            ORDER BY ta.created_at DESC
+            LIMIT 1
           )
-      `);
+          WHERE task_id IS NULL
+            AND EXISTS (
+              SELECT 1
+              FROM task_activities ta
+              WHERE ta.activity_type = 'dispatch_invocation'
+                AND json_extract(ta.metadata, '$.openclaw_session_id') = openclaw_sessions.openclaw_session_id
+            )
+        `);
 
-      db.exec(`
-        UPDATE openclaw_sessions
-        SET session_type = 'subagent'
-        WHERE session_type = 'persistent'
-          AND openclaw_session_id LIKE 'mission-control-%'
-          AND task_id IS NOT NULL
-      `);
+        db.exec(`
+          UPDATE openclaw_sessions
+          SET session_type = 'subagent'
+          WHERE session_type = 'persistent'
+            AND openclaw_session_id LIKE 'mission-control-%'
+            AND task_id IS NOT NULL
+        `);
+      }
 
       db.exec(`
         UPDATE task_deliverables
@@ -2117,16 +2123,19 @@ const migrations: Migration[] = [
       db.exec('DROP INDEX IF EXISTS idx_agent_logs_content_hash');
       db.exec('DROP INDEX IF EXISTS idx_deliverables_session');
 
-      db.exec('ALTER TABLE openclaw_sessions RENAME TO sessions');
-      db.exec('ALTER TABLE sessions RENAME COLUMN openclaw_session_id TO session_id');
-      db.exec('ALTER TABLE agent_logs RENAME COLUMN openclaw_session_id TO session_id');
-      db.exec('ALTER TABLE task_deliverables RENAME COLUMN openclaw_session_id TO session_id');
-      db.exec('ALTER TABLE task_run_results RENAME COLUMN openclaw_session_id TO session_id');
+      const tableExists = db.prepare(`SELECT COUNT(*) as cnt FROM sqlite_master WHERE type='table' AND name='openclaw_sessions'`).get() as { cnt: number };
+      if (tableExists.cnt > 0) {
+        db.exec('ALTER TABLE openclaw_sessions RENAME TO sessions');
+        db.exec('ALTER TABLE sessions RENAME COLUMN openclaw_session_id TO session_id');
+        db.exec('ALTER TABLE agent_logs RENAME COLUMN openclaw_session_id TO session_id');
+        db.exec('ALTER TABLE task_deliverables RENAME COLUMN openclaw_session_id TO session_id');
+        db.exec('ALTER TABLE task_run_results RENAME COLUMN openclaw_session_id TO session_id');
 
-      db.exec('CREATE INDEX idx_sessions_task ON sessions(task_id)');
-      db.exec('CREATE INDEX idx_agent_logs_session ON agent_logs(session_id)');
-      db.exec('CREATE UNIQUE INDEX idx_agent_logs_content_hash ON agent_logs(content_hash)');
-      db.exec('CREATE INDEX idx_deliverables_session ON task_deliverables(session_id)');
+        db.exec('CREATE INDEX idx_sessions_task ON sessions(task_id)');
+        db.exec('CREATE INDEX idx_agent_logs_session ON agent_logs(session_id)');
+        db.exec('CREATE UNIQUE INDEX idx_agent_logs_content_hash ON agent_logs(content_hash)');
+        db.exec('CREATE INDEX idx_deliverables_session ON task_deliverables(session_id)');
+      }
     }
   },
   {

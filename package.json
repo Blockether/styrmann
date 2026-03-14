@@ -7,6 +7,8 @@
     "build": "next build",
     "start": "next start -p 4000",
     "lint": "eslint .",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "db:seed": "tsx src/lib/db/seed.ts",
     "db:backup": "sqlite3 styrman.db 'PRAGMA wal_checkpoint(TRUNCATE);' && cp styrman.db styrman.db.backup && echo 'Backed up to styrman.db.backup'",
     "db:restore": "cp styrman.db.backup styrman.db && echo 'Restored from backup'",
@@ -44,6 +46,7 @@
     "postcss": "8.5.8",
     "tailwindcss": "4.2.1",
     "tsx": "4.21.0",
-    "typescript": "5.9.3"
+    "typescript": "5.9.3",
+    "vitest": "^2.1.9"
   }
 }
