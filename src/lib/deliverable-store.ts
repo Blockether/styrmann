@@ -1,16 +1,13 @@
 import pathModule from 'path';
-import { copyFileSync, existsSync, mkdirSync, statSync } from 'fs';
+import { existsSync, readFileSync, statSync } from 'fs';
 import type Database from 'better-sqlite3';
 
 const MAX_STORE_FILE_SIZE = 10 * 1024 * 1024;
 
-function getStoreBaseDir(): string {
-const dbPath = process.env.STYRMAN_DATABASE_PATH || pathModule.join(process.cwd(), 'styrman.db');
-  return pathModule.join(pathModule.dirname(pathModule.resolve(dbPath)), 'deliverable-store');
-}
-
-export function getDeliverableStoreDir(): string {
-  return getStoreBaseDir();
+export interface StoredDeliverableFile {
+  content: Buffer;
+  fileName: string;
+  fileSize: number;
 }
 
 export function resolveDeliverablePath(
@@ -48,25 +45,54 @@ export function resolveDeliverablePath(
 }
 
 export function storeDeliverableFile(
-  taskId: string,
-  deliverableId: string,
+  _taskId: string,
+  _deliverableId: string,
   sourcePath: string,
-): string | null {
+): StoredDeliverableFile | null {
   if (!existsSync(sourcePath)) return null;
 
+  let fileSize = 0;
   try {
     const stats = statSync(sourcePath);
     if (!stats.isFile() || stats.size > MAX_STORE_FILE_SIZE) return null;
+    fileSize = stats.size;
   } catch {
     return null;
   }
 
-  const storeDir = pathModule.join(getStoreBaseDir(), taskId);
-  mkdirSync(storeDir, { recursive: true });
+  try {
+    const content = readFileSync(sourcePath);
+    const fileName = pathModule.basename(sourcePath);
+    return {
+      content,
+      fileName,
+      fileSize,
+    };
+  } catch {
+    return null;
+  }
+}
 
-  const fileName = pathModule.basename(sourcePath);
-  const destPath = pathModule.join(storeDir, `${deliverableId}_${fileName}`);
-  copyFileSync(sourcePath, destPath);
+export function getDeliverableContent(
+  db: Database.Database,
+  deliverableId: string,
+): StoredDeliverableFile | null {
+  const row = db.prepare(
+    `SELECT content, file_name, file_size
+     FROM task_deliverables
+     WHERE id = ? AND content IS NOT NULL
+     LIMIT 1`
+  ).get(deliverableId) as {
+    content?: Buffer | Uint8Array | null;
+    file_name?: string | null;
+    file_size?: number | null;
+  } | undefined;
 
-  return destPath;
+  if (!row?.content) return null;
+  const content = Buffer.isBuffer(row.content) ? row.content : Buffer.from(row.content);
+  return {
+    content,
+    fileName: row.file_name || '',
+    fileSize: typeof row.file_size === 'number' ? row.file_size : content.length,
+  };
 }

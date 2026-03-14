@@ -291,16 +291,20 @@ function ensureProblemStatementArtifact(args: {
   if (!existing) {
     const deliverableId = uuidv4();
     const now = new Date().toISOString();
-    const safePath = storeDeliverableFile(task.id, deliverableId, artifactPath) || artifactPath;
+    const storedFile = storeDeliverableFile(task.id, deliverableId, artifactPath);
 
     run(
-      `INSERT INTO task_deliverables (id, task_id, deliverable_type, title, path, description, session_id, source, created_at)
-       VALUES (?, ?, 'file', ?, ?, ?, ?, 'system', ?)`,
+      `INSERT INTO task_deliverables (
+         id, task_id, deliverable_type, title, path, content, file_name, file_size, description, session_id, source, created_at
+       ) VALUES (?, ?, 'file', ?, ?, ?, ?, ?, ?, ?, 'system', ?)`,
       [
         deliverableId,
         task.id,
         'task-problem-statement.md',
-        safePath,
+        artifactPath,
+        storedFile?.content || null,
+        storedFile?.fileName || null,
+        storedFile?.fileSize || null,
         buildDeliverableDescription(agentName, workflowStep, 'dispatch initialization'),
         agentSessionId,
         now,

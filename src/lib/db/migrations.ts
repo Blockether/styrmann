@@ -2270,6 +2270,26 @@ const migrations: Migration[] = [
 
       console.log('[Migration 052] Discord threads and clarification contexts ready');
     }
+  },
+  {
+    id: '053',
+    name: 'add_deliverable_blob_storage',
+    up: (db) => {
+      console.log('[Migration 053] Adding BLOB storage columns to task_deliverables...');
+
+      const cols = db.pragma('table_info(task_deliverables)') as { name: string }[];
+      if (!cols.some(c => c.name === 'content')) {
+        db.exec('ALTER TABLE task_deliverables ADD COLUMN content BLOB');
+      }
+      if (!cols.some(c => c.name === 'file_name')) {
+        db.exec('ALTER TABLE task_deliverables ADD COLUMN file_name TEXT');
+      }
+      if (!cols.some(c => c.name === 'file_size')) {
+        db.exec('ALTER TABLE task_deliverables ADD COLUMN file_size INTEGER');
+      }
+
+      console.log('[Migration 053] task_deliverables BLOB columns ready');
+    }
   }
 ];
 

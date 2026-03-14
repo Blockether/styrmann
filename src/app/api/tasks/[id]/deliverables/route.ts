@@ -183,14 +183,20 @@ export async function POST(
     }
 
     let storedPath = path || null;
+    let fileContent: Buffer | null = null;
+    let fileName: string | null = null;
+    let fileSize: number | null = null;
     let warning: string | undefined;
 
     if (deliverable_type === 'file' && path) {
       const resolvedPath = resolveDeliverablePath(db, taskId, path);
-      const safePath = storeDeliverableFile(taskId, id, resolvedPath);
+      const storedFile = storeDeliverableFile(taskId, id, resolvedPath);
 
-      if (safePath) {
-        storedPath = safePath;
+      if (storedFile) {
+        storedPath = resolvedPath;
+        fileContent = storedFile.content;
+        fileName = storedFile.fileName;
+        fileSize = storedFile.fileSize;
       } else if (existsSync(resolvedPath)) {
         storedPath = resolvedPath;
       } else {
@@ -201,9 +207,22 @@ export async function POST(
     }
 
     db.prepare(`
-      INSERT INTO task_deliverables (id, task_id, deliverable_type, title, path, description, session_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(id, taskId, deliverable_type, title, storedPath, description || null, linkedSessionId);
+      INSERT INTO task_deliverables (
+        id, task_id, deliverable_type, title, path, content, file_name, file_size, description, session_id
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      id,
+      taskId,
+      deliverable_type,
+      title,
+      storedPath,
+      fileContent,
+      fileName,
+      fileSize,
+      description || null,
+      linkedSessionId,
+    );
 
     const deliverable = db.prepare(
       'SELECT * FROM task_deliverables WHERE id = ?'

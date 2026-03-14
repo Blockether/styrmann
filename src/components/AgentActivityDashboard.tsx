@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import Image from 'next/image';
 import Link from 'next/link';
+import { StyrmannLogo } from '@/components/StyrmannLogo';
 import { ArrowLeft, AlertTriangle, Activity, Clock, Filter, RefreshCw, Loader2, ChevronRight, ChevronDown, FileText } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import type { Agent, Event, PresentedTaskActivity, Task, Workspace } from '@/lib/types';
@@ -231,7 +231,7 @@ export function AgentActivityDashboard({ workspace, embedded = false }: AgentAct
     return (
       <div className="min-h-screen bg-mc-bg flex items-center justify-center">
         <div className="flex flex-col items-center">
-          <Image src="/logo.png" alt="Blockether" width={40} height={40} priority className="mb-3 animate-pulse rounded" />
+          <StyrmannLogo size={40} className="mb-3 animate-pulse" />
           <p className="text-mc-text-secondary">Loading activity dashboard...</p>
         </div>
       </div>

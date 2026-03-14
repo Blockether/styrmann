@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { readFileSync, existsSync, statSync, realpathSync } from 'fs';
 import path from 'path';
 import { marked } from 'marked';
+import { getDb } from '@/lib/db';
 import { getStoredArtifactByPath } from '@/lib/task-run-results';
-import { getDeliverableStoreDir } from '@/lib/deliverable-store';
 
 export const dynamic = 'force-dynamic';
 
@@ -145,7 +145,6 @@ export async function GET(request: NextRequest) {
 
   const allowedPaths = [
     process.env.STYRMAN_PROJECTS_PATH?.replace(/^~/, process.env.HOME || ''),
-    getDeliverableStoreDir(),
   ].filter(Boolean) as string[];
 
   let pathToRead = normalizedPath;
@@ -167,12 +166,27 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Path not allowed' }, { status: 403 });
   }
 
-  const storedArtifact = !existsSync(normalizedPath) ? getStoredArtifactByPath(normalizedPath) : null;
-  if (!existsSync(normalizedPath) && !storedArtifact) {
+  const fileExists = existsSync(normalizedPath);
+  const storedArtifact = !fileExists ? getStoredArtifactByPath(normalizedPath) : null;
+  const deliverableBlob = !fileExists && !storedArtifact
+    ? getDb().prepare(
+        `SELECT content, file_name, file_size
+         FROM task_deliverables
+         WHERE path = ? AND content IS NOT NULL
+         ORDER BY created_at DESC
+         LIMIT 1`
+      ).get(normalizedPath) as {
+        content?: Buffer | Uint8Array | null;
+        file_name?: string | null;
+        file_size?: number | null;
+      } | undefined
+    : null;
+
+  if (!fileExists && !storedArtifact && !deliverableBlob?.content) {
     return NextResponse.json({ error: 'File not found' }, { status: 404 });
   }
 
-  if (existsSync(normalizedPath)) {
+  if (fileExists) {
     try {
       const resolvedPath = realpathSync(normalizedPath);
       const resolvedAllowed = resolvedAllowedPaths.length > 0 && resolvedAllowedPaths.some((allowed) =>
@@ -187,10 +201,19 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  const stats = existsSync(pathToRead) ? statSync(pathToRead) : null;
+  const stats = fileExists ? statSync(pathToRead) : null;
+  const blobSize = typeof deliverableBlob?.file_size === 'number'
+    ? deliverableBlob.file_size
+    : (deliverableBlob?.content ? Buffer.byteLength(Buffer.from(deliverableBlob.content)) : null);
   if (stats && stats.size > MAX_PREVIEW_SIZE) {
     return NextResponse.json(
       { error: `File too large for preview (${(stats.size / 1024).toFixed(0)}KB, max ${MAX_PREVIEW_SIZE / 1024}KB)` },
+      { status: 400 }
+    );
+  }
+  if (!stats && blobSize && blobSize > MAX_PREVIEW_SIZE) {
+    return NextResponse.json(
+      { error: `File too large for preview (${(blobSize / 1024).toFixed(0)}KB, max ${MAX_PREVIEW_SIZE / 1024}KB)` },
       { status: 400 }
     );
   }
@@ -198,12 +221,14 @@ export async function GET(request: NextRequest) {
   try {
     const content = storedArtifact
       ? storedArtifact.content_text
-      : readFileSync(pathToRead, 'utf-8');
+      : deliverableBlob?.content
+        ? Buffer.from(deliverableBlob.content).toString('utf-8')
+        : readFileSync(pathToRead, 'utf-8');
     if (typeof content !== 'string') {
       return NextResponse.json({ error: 'Stored preview is not available for this file type' }, { status: 404 });
     }
 
-    const fileName = path.basename(pathToRead);
+    const fileName = deliverableBlob?.file_name || path.basename(pathToRead);
     const escapedFileName = escapeHtml(fileName);
     const escapedContent = escapeHtml(content);
     const markdownHtml = isMarkdown
@@ -223,7 +248,7 @@ export async function GET(request: NextRequest) {
   <div class="header">
     <div class="file-info">
       <span class="filename">${escapedFileName}</span>
-      <span class="size">${(((storedArtifact?.size_bytes ?? stats?.size) || 0) / 1024).toFixed(1)}KB</span>
+      <span class="size">${(((storedArtifact?.size_bytes ?? stats?.size ?? blobSize) || 0) / 1024).toFixed(1)}KB</span>
     </div>
   </div>
   ${bodyContent}
