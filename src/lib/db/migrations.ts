@@ -325,14 +325,6 @@ const migrations: Migration[] = [
 
       // Table definitions with correct FK references to tasks(id)
       const tableDefinitions: Record<string, string> = {
-        conversations: `CREATE TABLE conversations (
-          id TEXT PRIMARY KEY,
-          title TEXT,
-          type TEXT DEFAULT 'direct' CHECK (type IN ('direct', 'group', 'task')),
-          task_id TEXT REFERENCES tasks(id),
-          created_at TEXT DEFAULT (datetime('now')),
-          updated_at TEXT DEFAULT (datetime('now'))
-        )`,
         events: `CREATE TABLE events (
           id TEXT PRIMARY KEY,
           type TEXT NOT NULL,
@@ -452,9 +444,6 @@ const migrations: Migration[] = [
         'task_activities',
         'task_deliverables',
         'knowledge_entries',
-        'messages',
-        'conversation_participants',
-        'conversations',
         'events',
         'openclaw_sessions',
         'agents',

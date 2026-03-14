@@ -137,21 +137,6 @@ async function seed() {
     ).run(agentId, agent.name, agent.role, agent.desc, 'standby', now, now);
   }
 
-  // Create a team conversation
-  const teamConvoId = uuidv4();
-  db.prepare(
-    `INSERT INTO conversations (id, title, type, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?)`
-  ).run(teamConvoId, 'Team Chat', 'group', now, now);
-
-  // Add all agents to the team conversation
-  for (const agentId of agentIds) {
-    db.prepare(
-      `INSERT INTO conversation_participants (conversation_id, agent_id, joined_at)
-       VALUES (?, ?, ?)`
-    ).run(teamConvoId, agentId, now);
-  }
-
   // Create some example tasks
   const tasks = [
     { title: 'Set up development environment', status: 'done', priority: 'high' },
@@ -185,24 +170,10 @@ async function seed() {
     ).run(uuidv4(), event.type, event.agentId || null, event.message, now);
   }
 
-  // Add a welcome message from the orchestrator
-  db.prepare(
-    `INSERT INTO messages (id, conversation_id, sender_agent_id, content, message_type, created_at)
-     VALUES (?, ?, ?, ?, ?, ?)`
-  ).run(
-    uuidv4(),
-    teamConvoId,
-    orchestratorId,
-    "Welcome to Styrmann, team. I'm your orchestrator. Let's get to work.",
-    'text',
-    now
-  );
-
   console.log('[Seed] Database seeded successfully!');
   console.log(`   - Created Orchestrator: ${orchestratorId}`);
   console.log(`   - Created ${agents.length} additional agents`);
   console.log(`   - Created ${tasks.length} sample tasks`);
-  console.log(`   - Created team conversation`);
 
   closeDb();
 }

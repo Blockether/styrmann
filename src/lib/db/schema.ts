@@ -267,36 +267,6 @@ CREATE TABLE IF NOT EXISTS task_acceptance_criteria (
   created_at TEXT DEFAULT (datetime('now'))
 );
 
-
--- Conversations table (agent-to-agent or task-related)
-CREATE TABLE IF NOT EXISTS conversations (
-  id TEXT PRIMARY KEY,
-  title TEXT,
-  type TEXT DEFAULT 'direct' CHECK (type IN ('direct', 'group', 'task')),
-  task_id TEXT REFERENCES tasks(id),
-  created_at TEXT DEFAULT (datetime('now')),
-  updated_at TEXT DEFAULT (datetime('now'))
-);
-
--- Conversation participants
-CREATE TABLE IF NOT EXISTS conversation_participants (
-  conversation_id TEXT REFERENCES conversations(id) ON DELETE CASCADE,
-  agent_id TEXT REFERENCES agents(id) ON DELETE CASCADE,
-  joined_at TEXT DEFAULT (datetime('now')),
-  PRIMARY KEY (conversation_id, agent_id)
-);
-
--- Messages table
-CREATE TABLE IF NOT EXISTS messages (
-  id TEXT PRIMARY KEY,
-  conversation_id TEXT REFERENCES conversations(id) ON DELETE CASCADE,
-  sender_agent_id TEXT REFERENCES agents(id),
-  content TEXT NOT NULL,
-  message_type TEXT DEFAULT 'text' CHECK (message_type IN ('text', 'system', 'task_update', 'file')),
-  metadata TEXT,
-  created_at TEXT DEFAULT (datetime('now'))
-);
-
 -- Events table (for live feed)
 CREATE TABLE IF NOT EXISTS events (
   id TEXT PRIMARY KEY,
@@ -463,7 +433,6 @@ CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
 CREATE INDEX IF NOT EXISTS idx_tasks_assigned ON tasks(assigned_agent_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_assigned_human ON tasks(assigned_human_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_workspace ON tasks(workspace_id);
-CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id);
 CREATE INDEX IF NOT EXISTS idx_events_created ON events(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_agents_status ON agents(status);
 CREATE INDEX IF NOT EXISTS idx_activities_task ON task_activities(task_id, created_at DESC);

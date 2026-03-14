@@ -155,15 +155,8 @@ export async function DELETE(
          db.prepare('DELETE FROM task_provenance WHERE task_id = ?').run(taskId);
          db.prepare('DELETE FROM sessions WHERE task_id = ?').run(taskId);
          db.prepare('DELETE FROM events WHERE task_id = ?').run(taskId);
-        db.prepare('DELETE FROM scheduled_job_runs WHERE task_id = ?').run(taskId);
-        // conversations.task_id has no CASCADE — delete messages/participants via cascade, then conversations
-        const convos = db.prepare('SELECT id FROM conversations WHERE task_id = ?').all(taskId) as { id: string }[];
-        for (const c of convos) {
-          db.prepare('DELETE FROM messages WHERE conversation_id = ?').run(c.id);
-          db.prepare('DELETE FROM conversation_participants WHERE conversation_id = ?').run(c.id);
-        }
-        db.prepare('DELETE FROM conversations WHERE task_id = ?').run(taskId);
-      }
+         db.prepare('DELETE FROM scheduled_job_runs WHERE task_id = ?').run(taskId);
+       }
       // Workspace-level children (must come before tasks/milestones/sprints/workspaces)
       db.prepare('DELETE FROM task_workflow_plans WHERE workspace_id = ?').run(id);
       db.prepare('DELETE FROM task_findings WHERE workspace_id = ?').run(id);

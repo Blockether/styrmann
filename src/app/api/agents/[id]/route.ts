@@ -144,8 +144,6 @@ export async function DELETE(
 
     run('DELETE FROM sessions WHERE agent_id = ?', [id]);
     run('DELETE FROM events WHERE agent_id = ?', [id]);
-    run('DELETE FROM messages WHERE sender_agent_id = ?', [id]);
-    run('DELETE FROM conversation_participants WHERE agent_id = ?', [id]);
     run('DELETE FROM task_roles WHERE agent_id = ?', [id]);
     run('DELETE FROM agent_heartbeats WHERE agent_id = ?', [id]);
     run('DELETE FROM agent_logs WHERE agent_id = ?', [id]);

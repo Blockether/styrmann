@@ -2,19 +2,15 @@
 
 import { create } from 'zustand';
 import { debug } from './debug';
-import type { Agent, Task, Conversation, Message, Event, TaskStatus, AgentSession } from './types';
+import type { Agent, Task, Event, TaskStatus, AgentSession } from './types';
 
 interface StyrmannState {
   // Data
   agents: Agent[];
   tasks: Task[];
-  conversations: Conversation[];
   events: Event[];
-  currentConversation: Conversation | null;
-  messages: Message[];
 
   agentSessions: Record<string, AgentSession | null>;
-  agentMessages: Message[];
 
   // UI State
   selectedAgent: Agent | null;
@@ -25,12 +21,8 @@ interface StyrmannState {
   // Actions
   setAgents: (agents: Agent[]) => void;
   setTasks: (tasks: Task[]) => void;
-  setConversations: (conversations: Conversation[]) => void;
   setEvents: (events: Event[]) => void;
   addEvent: (event: Event) => void;
-  setCurrentConversation: (conversation: Conversation | null) => void;
-  setMessages: (messages: Message[]) => void;
-  addMessage: (message: Message) => void;
   setSelectedAgent: (agent: Agent | null) => void;
   setSelectedTask: (task: Task | null) => void;
   setSelectedSprintId: (id: string | null) => void;
@@ -47,20 +39,14 @@ interface StyrmannState {
   addAgent: (agent: Agent) => void;
 
   setAgentSession: (agentId: string, session: AgentSession | null) => void;
-  setAgentMessages: (messages: Message[]) => void;
-  addAgentMessage: (message: Message) => void;
 }
 
 export const useStyrmann = create<StyrmannState>((set) => ({
   // Initial state
   agents: [],
   tasks: [],
-  conversations: [],
   events: [],
-  currentConversation: null,
-  messages: [],
   agentSessions: {},
-  agentMessages: [],
   selectedAgent: null,
   selectedTask: null,
   selectedSprintId: null,
@@ -74,14 +60,9 @@ export const useStyrmann = create<StyrmannState>((set) => ({
     debug.store('setTasks called', { count: tasks.length });
     set({ tasks });
   },
-  setConversations: (conversations) => set({ conversations }),
   setEvents: (events) => set({ events }),
   addEvent: (event) =>
     set((state) => ({ events: [event, ...state.events].slice(0, 100) })),
-  setCurrentConversation: (conversation) => set({ currentConversation: conversation }),
-  setMessages: (messages) => set({ messages }),
-  addMessage: (message) =>
-    set((state) => ({ messages: [...state.messages, message] })),
   setSelectedAgent: (agent) => set({ selectedAgent: agent }),
   setSelectedTask: (task) => {
     debug.store('setSelectedTask called', { id: task?.id, status: task?.status });
@@ -153,7 +134,4 @@ export const useStyrmann = create<StyrmannState>((set) => ({
     set((state) => ({
       agentSessions: { ...state.agentSessions, [agentId]: session },
     })),
-  setAgentMessages: (messages: Message[]) => set({ agentMessages: messages }),
-  addAgentMessage: (message: Message) =>
-    set((state) => ({ agentMessages: [...state.agentMessages, message] })),
 }));

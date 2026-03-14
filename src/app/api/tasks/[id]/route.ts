@@ -591,9 +591,6 @@ export async function DELETE(
     if (tableHasColumn('github_issues', 'task_id')) {
       run('UPDATE github_issues SET task_id = NULL WHERE task_id = ?', [id]);
     }
-    if (tableHasColumn('conversations', 'task_id')) {
-      run('DELETE FROM conversations WHERE task_id = ?', [id]);
-    }
 
     run('DELETE FROM tasks WHERE id = ?', [id]);
 

@@ -8,7 +8,7 @@ export type TaskPriority = 'low' | 'normal' | 'high' | 'urgent';
 
 export type MessageType = 'text' | 'system' | 'task_update' | 'file';
 
-export type ConversationType = 'direct' | 'group' | 'task';
+
 
 export type EventType =
   | 'task_created'
@@ -212,29 +212,9 @@ export interface Task {
   blocked_reason?: string | null;
 }
 
-export interface Conversation {
-  id: string;
-  title?: string;
-  type: ConversationType;
-  task_id?: string;
-  created_at: string;
-  updated_at: string;
-  // Joined fields
-  participants?: Agent[];
-  last_message?: Message;
-}
 
-export interface Message {
-  id: string;
-  conversation_id: string;
-  sender_agent_id?: string;
-  content: string;
-  message_type: MessageType;
-  metadata?: string;
-  created_at: string;
-  // Joined fields
-  sender?: Agent;
-}
+
+
 
 export interface Event {
   id: string;
@@ -533,13 +513,7 @@ export interface Human {
   updated_at: string;
 }
 
-export interface SendMessageRequest {
-  conversation_id: string;
-  sender_agent_id: string;
-  content: string;
-  message_type?: MessageType;
-  metadata?: string;
-}
+
 
 export interface AgentMessage {
   id?: number;
