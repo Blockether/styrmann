@@ -209,6 +209,17 @@ export const CreateMemorySchema = z.object({
   metadata: z.record(z.string(), z.unknown()).default({}),
 });
 
+export const UpdateMemorySchema = z.object({
+  title: z.string().min(1).max(500).optional(),
+  summary: z.string().nullable().optional(),
+  body: z.string().nullable().optional(),
+  status: z.enum(['open', 'resolved', 'closed']).optional(),
+  memory_type: z.enum(['fact', 'decision', 'event', 'tool_run', 'error', 'observation', 'note', 'patch']).optional(),
+  tags: z.array(z.string()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+  confidence: z.number().min(0).max(100).nullable().optional(),
+});
+
 export const CreateEntityLinkSchema = z.object({
   from_entity_type: z.string().min(1),
   from_entity_id: z.string().min(1),
@@ -282,5 +293,6 @@ export type UpdateOrgTicketAcceptanceCriteriaInput = z.infer<typeof UpdateOrgTic
 export type CreateOrgTicketInput = z.infer<typeof CreateOrgTicketSchema>;
 export type UpdateOrgTicketInput = z.infer<typeof UpdateOrgTicketSchema>;
 export type CreateMemoryInput = z.infer<typeof CreateMemorySchema>;
+export type UpdateMemoryInput = z.infer<typeof UpdateMemorySchema>;
 export type CreateEntityLinkInput = z.infer<typeof CreateEntityLinkSchema>;
 export type CreateCommitInput = z.infer<typeof CreateCommitSchema>;

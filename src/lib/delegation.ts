@@ -107,12 +107,22 @@ async function buildDelegationPlan(ticket: OrgTicketRow, workspace: WorkspaceRow
   try {
     const result = await llmJsonInfer<DelegationPlan>(systemPrompt, userPrompt);
     if (result && Array.isArray(result.tasks) && result.tasks.length > 0) {
-      return {
-        plan: {
-          tasks: result.tasks.slice(0, 3),
-        },
-        llmUsed: true,
-      };
+      const validTasks = result.tasks.filter((task) => {
+        if (typeof task.title !== 'string' || task.title.trim().length === 0) return false;
+        return true;
+      }).map((task) => ({
+        ...task,
+        effort: clampScore(task.effort, 3),
+        impact: clampScore(task.impact, 3),
+      }));
+      if (validTasks.length > 0) {
+        return {
+          plan: {
+            tasks: validTasks.slice(0, 3),
+          },
+          llmUsed: true,
+        };
+      }
     }
   } catch (error) {
     console.warn('[Delegation] LLM planning failed, fallback activated:', error);

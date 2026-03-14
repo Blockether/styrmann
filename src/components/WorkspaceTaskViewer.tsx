@@ -37,8 +37,6 @@ export function WorkspaceTaskViewer({ task, onClose }: Props) {
           </div>
           {task.description && <p className="text-sm text-mc-text">{task.description}</p>}
           <div className="flex gap-4 text-xs text-mc-text-secondary">
-            {task.effort != null && <span>Effort: {task.effort}/5</span>}
-            {task.impact != null && <span>Impact: {task.impact}/5</span>}
             {task.due_date && <span className="flex items-center gap-1"><Clock size={10} />{task.due_date}</span>}
           </div>
         </div>

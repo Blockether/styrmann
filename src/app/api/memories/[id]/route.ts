@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { broadcast } from '@/lib/events';
+import { UpdateMemorySchema } from '@/lib/validation';
 import type { Memory } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
@@ -52,6 +53,12 @@ export async function PATCH(
 
   try {
     const body = await request.json();
+    const validation = UpdateMemorySchema.safeParse(body);
+    
+    if (!validation.success) {
+      return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
+    }
+
     const db = getDb();
 
     const existing = db.prepare('SELECT * FROM memories WHERE id = ?').get(id) as Memory | undefined;
@@ -61,30 +68,39 @@ export async function PATCH(
 
     const updates: string[] = [];
     const values: unknown[] = [];
+    const validatedData = validation.data;
 
-    if (body.title !== undefined) {
+    if (validatedData.title !== undefined) {
       updates.push('title = ?');
-      values.push(body.title);
+      values.push(validatedData.title);
     }
-    if (body.summary !== undefined) {
+    if (validatedData.summary !== undefined) {
       updates.push('summary = ?');
-      values.push(body.summary);
+      values.push(validatedData.summary);
     }
-    if (body.body !== undefined) {
+    if (validatedData.body !== undefined) {
       updates.push('body = ?');
-      values.push(body.body);
+      values.push(validatedData.body);
     }
-    if (body.status !== undefined) {
+    if (validatedData.status !== undefined) {
       updates.push('status = ?');
-      values.push(body.status);
+      values.push(validatedData.status);
     }
-    if (body.tags !== undefined) {
+    if (validatedData.memory_type !== undefined) {
+      updates.push('memory_type = ?');
+      values.push(validatedData.memory_type);
+    }
+    if (validatedData.tags !== undefined) {
       updates.push('tags = ?');
-      values.push(JSON.stringify(body.tags));
+      values.push(JSON.stringify(validatedData.tags));
     }
-    if (body.metadata !== undefined) {
+    if (validatedData.metadata !== undefined) {
       updates.push('metadata = ?');
-      values.push(JSON.stringify(body.metadata));
+      values.push(JSON.stringify(validatedData.metadata));
+    }
+    if (validatedData.confidence !== undefined) {
+      updates.push('confidence = ?');
+      values.push(validatedData.confidence);
     }
 
     if (updates.length === 0) {
