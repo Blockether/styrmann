@@ -17,7 +17,7 @@ CYAN='\033[0;36m'
 NC='\033[0m'
 BOLD='\033[1m'
 
-PROJECT_DIR="/root/repos/blockether/mission-control"
+PROJECT_DIR="/root/repos/blockether/styrmann"
 SCRIPTS_DIR="${PROJECT_DIR}/scripts"
 
 for arg in "$@"; do
@@ -81,5 +81,5 @@ if [ "$FAILED" -gt 0 ]; then
   exit 1
 else
   echo -e "${GREEN}${BOLD}PRE-DEPLOY CHECK PASSED${NC} - Safe to deploy"
-  echo -e "Run: ${CYAN}/root/repos/blockether/mission-control/scripts/deploy.sh${NC}"
+  echo -e "Run: ${CYAN}/root/repos/blockether/styrmann/scripts/deploy.sh${NC}"
 fi

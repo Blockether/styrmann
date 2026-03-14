@@ -16,7 +16,7 @@ CYAN='\033[0;36m'
 NC='\033[0m'
 BOLD='\033[1m'
 
-PROJECT_DIR="/root/repos/blockether/mission-control"
+PROJECT_DIR="/root/repos/blockether/styrmann"
 FIX_FLAG=""
 
 for arg in "$@"; do
