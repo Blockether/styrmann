@@ -86,8 +86,6 @@ export function ActiveSprint({ workspaceId, mobileMode = false, isPortrait = tru
   const [selectedSprintId, setSelectedSprintId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [showSprintDropdown, setShowSprintDropdown] = useState(false);
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [createTaskMilestoneId, setCreateTaskMilestoneId] = useState<string | undefined>(undefined);
   const [showCreateMilestoneModal, setShowCreateMilestoneModal] = useState(false);
   const { linkedTask, initialTab, openTask, closeTask, updateTab } = useTaskDeepLink();
   const [editingTask, setEditingTask] = useState<Task | null>(null);
@@ -100,11 +98,6 @@ export function ActiveSprint({ workspaceId, mobileMode = false, isPortrait = tru
   const [selectedBoardStatus, setSelectedBoardStatus] = useState<TaskStatus>('planning');
   const [draggedTask, setDraggedTask] = useState<Task | null>(null);
   const [expandedMilestones, setExpandedMilestones] = useState<Set<string>>(new Set());
-
-  const openCreateTaskModal = (milestoneId?: string) => {
-    setCreateTaskMilestoneId(milestoneId);
-    setShowCreateModal(true);
-  };
 
   // Sync store-selected sprint to local state (from sidebar history navigation)
   useEffect(() => {
@@ -487,14 +480,6 @@ export function ActiveSprint({ workspaceId, mobileMode = false, isPortrait = tru
             <Target className="w-4 h-4" />
             <span className="hidden sm:inline">New Milestone</span>
           </button>
-          <button
-            onClick={() => openCreateTaskModal(undefined)}
-            aria-label="Create new task"
-            className="flex items-center gap-2 px-4 min-h-11 bg-mc-accent text-white rounded text-sm font-medium hover:bg-mc-accent/90"
-          >
-            <Plus className="w-4 h-4" />
-            New Task
-          </button>
         </div>
       </div>
 
@@ -522,7 +507,7 @@ export function ActiveSprint({ workspaceId, mobileMode = false, isPortrait = tru
               <Flag className="w-6 h-6 text-mc-text-secondary" />
             </div>
             <h3 className="text-base font-medium mb-1">No Tasks in This Sprint</h3>
-            <p className="text-sm text-mc-text-secondary">Use the New Task button above to add tasks.</p>
+            <p className="text-sm text-mc-text-secondary">Tasks are created via org ticket delegation.</p>
           </div>
         ) : viewMode === 'list' ? (
           <div className={`space-y-6 ${isPortrait ? '' : 'space-y-4'}`}>
@@ -540,17 +525,16 @@ export function ActiveSprint({ workspaceId, mobileMode = false, isPortrait = tru
                   milestone={milestone ?? null}
                   coordinator={coordinator ?? null}
                   tasks={tasks}
-                  done={done}
-                  total={total}
-                  progress={progress}
-                  isPortrait={isPortrait}
-                  isExpanded={isExpanded}
-                  onToggle={() => toggleMilestone(milestoneId)}
-                  onTaskClick={handleTaskClick}
-                  onMoveStatus={setStatusMoveTask}
-                  onCreateTask={openCreateTaskModal}
-                  mobileMode={mobileMode}
-                />
+                   done={done}
+                   total={total}
+                   progress={progress}
+                   isPortrait={isPortrait}
+                   isExpanded={isExpanded}
+                   onToggle={() => toggleMilestone(milestoneId)}
+                   onTaskClick={handleTaskClick}
+                   onMoveStatus={setStatusMoveTask}
+                   mobileMode={mobileMode}
+                 />
               );
             })}
 
@@ -562,14 +546,13 @@ export function ActiveSprint({ workspaceId, mobileMode = false, isPortrait = tru
                 done={tasksByMilestone['ungrouped'].filter((t) => DONE_STATUSES.includes(t.status)).length}
                 total={tasksByMilestone['ungrouped'].length}
                 progress={tasksByMilestone['ungrouped'].length > 0 ? (tasksByMilestone['ungrouped'].filter((t) => DONE_STATUSES.includes(t.status)).length / tasksByMilestone['ungrouped'].length) * 100 : 0}
-                isPortrait={isPortrait}
-                isExpanded={expandedMilestones.has('ungrouped')}
-                onToggle={() => toggleMilestone('ungrouped')}
-                onTaskClick={handleTaskClick}
-                onMoveStatus={setStatusMoveTask}
-                onCreateTask={openCreateTaskModal}
-                mobileMode={mobileMode}
-              />
+                 isPortrait={isPortrait}
+                 isExpanded={expandedMilestones.has('ungrouped')}
+                 onToggle={() => toggleMilestone('ungrouped')}
+                 onTaskClick={handleTaskClick}
+                 onMoveStatus={setStatusMoveTask}
+                 mobileMode={mobileMode}
+               />
             )}
           </div>
         ) : mobileMode ? (
@@ -658,17 +641,6 @@ export function ActiveSprint({ workspaceId, mobileMode = false, isPortrait = tru
         )}
       </div>
 
-      {showCreateModal && (
-        <TaskModal
-          onClose={() => {
-            setShowCreateModal(false);
-            setCreateTaskMilestoneId(undefined);
-          }}
-          workspaceId={workspaceId}
-          defaultSprintId={selectedSprintId || undefined}
-          defaultMilestoneId={createTaskMilestoneId}
-        />
-      )}
       {activeEditingTask && (
         <TaskModal
           task={activeEditingTask}
@@ -744,7 +716,6 @@ interface MilestoneGroupProps {
   onToggle: () => void;
   onTaskClick: (task: Task) => void;
   onMoveStatus: (task: Task) => void;
-  onCreateTask: (milestoneId?: string) => void;
   mobileMode: boolean;
 }
 
@@ -760,7 +731,6 @@ function MilestoneGroup({
   onToggle,
   onTaskClick,
   onMoveStatus,
-  onCreateTask,
   mobileMode,
 }: MilestoneGroupProps) {
   const sortedTasks = [...tasks].sort((a, b) => {
@@ -815,17 +785,6 @@ function MilestoneGroup({
             )}
           </div>
           <div className="flex items-center gap-3 flex-shrink-0">
-            <button
-              type="button"
-              onClick={(event) => {
-                event.stopPropagation();
-                onCreateTask(milestone?.id);
-              }}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs border border-mc-border rounded text-mc-text-secondary hover:text-mc-text hover:bg-mc-bg"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">New Task</span>
-            </button>
             <span className={`text-sm font-medium ${done === total && total > 0 ? 'text-mc-accent-green' : 'text-mc-text-secondary'}`}>
               {done}/{total}
             </span>
@@ -839,21 +798,13 @@ function MilestoneGroup({
         </div>
       </button>
 
-      {isExpanded && (
-        <div className="divide-y divide-mc-border">
-          {sortedTasks.length === 0 ? (
-            <div className="px-4 py-4 text-sm text-mc-text-secondary flex items-center justify-between gap-3 flex-wrap">
-              <span>No tasks yet in this milestone.</span>
-              <button
-                type="button"
-                onClick={() => onCreateTask(milestone?.id)}
-                className="inline-flex items-center gap-2 px-3 py-2 text-xs border border-mc-border rounded text-mc-text-secondary hover:text-mc-text hover:bg-mc-bg"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                Create Task
-              </button>
-            </div>
-          ) : (
+       {isExpanded && (
+         <div className="divide-y divide-mc-border">
+           {sortedTasks.length === 0 ? (
+             <div className="px-4 py-4 text-sm text-mc-text-secondary">
+               <span>No tasks yet in this milestone.</span>
+             </div>
+           ) : (
             sortedTasks.map((task) => (
               <TaskRow
                 key={task.id}

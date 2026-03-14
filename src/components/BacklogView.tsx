@@ -58,7 +58,6 @@ export function BacklogView({ workspaceId }: BacklogViewProps) {
   const [showFilters, setShowFilters] = useState(false);
   const [hideDone, setHideDone] = useState(true);
 
-  const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const { linkedTask, initialTab, openTask, closeTask, updateTab } = useTaskDeepLink();
   const activeEditingTask = editingTask || linkedTask;
@@ -264,13 +263,6 @@ export function BacklogView({ workspaceId }: BacklogViewProps) {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="flex items-center gap-2 px-4 min-h-9 bg-mc-accent text-white rounded-md text-sm font-medium hover:bg-mc-accent/90"
-          >
-            <Plus className="w-4 h-4" />
-            <span className="hidden sm:inline">New Task</span>
-          </button>
         </div>
       </div>
 
@@ -326,18 +318,11 @@ export function BacklogView({ workspaceId }: BacklogViewProps) {
           <div className="p-12 text-center">
             <Circle className="w-12 h-12 text-mc-border mx-auto mb-4" />
             <h3 className="text-lg font-medium mb-2">No Tasks Found</h3>
-            <p className="text-sm text-mc-text-secondary mb-4">
+            <p className="text-sm text-mc-text-secondary">
               {tasks.length === 0
-                ? 'Create your first task to get started.'
+                ? 'Tasks are created via org ticket delegation.'
                 : 'No tasks match the current filters.'}
             </p>
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="inline-flex items-center gap-2 px-4 min-h-11 bg-mc-accent text-white rounded text-sm font-medium hover:bg-mc-accent/90"
-            >
-              <Plus className="w-4 h-4" />
-              New Task
-            </button>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -472,12 +457,6 @@ export function BacklogView({ workspaceId }: BacklogViewProps) {
         )}
       </div>
 
-      {showCreateModal && (
-        <TaskModal
-          onClose={() => setShowCreateModal(false)}
-          workspaceId={workspaceId}
-        />
-      )}
       {activeEditingTask && (
         <TaskModal
           task={activeEditingTask}
