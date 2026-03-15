@@ -1,9 +1,9 @@
 'use client';
-import { Ticket, BookOpen, Folder, Plus, Zap } from 'lucide-react';
+import { Ticket, BookOpen, Folder, Plus, Zap, Layers, ChevronDown, ChevronRight } from 'lucide-react';
 import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import type { OrgTicket, KnowledgeArticle } from '@/lib/types';
+import type { OrgTicket, OrgSprint, KnowledgeArticle } from '@/lib/types';
 import { OrgTicketCreateModal } from '@/components/OrgTicketCreateModal';
 import { Header } from '@/components/Header';
 
@@ -29,13 +29,22 @@ interface OrgDetail {
 
 function OrgDetailViewInner({ slug }: { slug: string }) {
   const searchParams = useSearchParams();
-  const activeTab = (searchParams.get('tab') || 'tickets') as 'tickets' | 'knowledge' | 'workspaces';
+  const activeTab = (searchParams.get('tab') || 'tickets') as 'sprints' | 'tickets' | 'knowledge' | 'workspaces';
 
   const [org, setOrg] = useState<OrgDetail | null>(null);
   const [tickets, setTickets] = useState<OrgTicket[]>([]);
+  const [sprints, setSprints] = useState<OrgSprint[]>([]);
   const [knowledge, setKnowledge] = useState<KnowledgeArticle[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showSprintForm, setShowSprintForm] = useState(false);
+  const [sprintName, setSprintName] = useState('');
+  const [sprintStatus, setSprintStatus] = useState<'planned' | 'active' | 'completed'>('planned');
+  const [sprintStartDate, setSprintStartDate] = useState('');
+  const [sprintEndDate, setSprintEndDate] = useState('');
+  const [sprintSubmitting, setSprintSubmitting] = useState(false);
+  const [expandedSprint, setExpandedSprint] = useState<string | null>(null);
+  const [sprintTickets, setSprintTickets] = useState<Map<string, OrgTicket[]>>(new Map());
   const [delegationInfo, setDelegationInfo] = useState<Map<string, DelegationInfo>>(new Map());
 
   useEffect(() => {
@@ -51,10 +60,12 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
           Promise.all([
             fetch(`/api/org-tickets?organization_id=${data.id}`).then(r => r.json()),
             fetch(`/api/knowledge?organization_id=${data.id}`).then(r => r.json()),
-          ]).then(([t, k]) => {
+            fetch(`/api/org-sprints?organization_id=${data.id}`).then(r => r.json()),
+          ]).then(([t, k, s]) => {
             const ticketsList = Array.isArray(t) ? t : [];
             setTickets(ticketsList);
             setKnowledge(Array.isArray(k) ? k : []);
+            setSprints(Array.isArray(s) ? s : []);
 
             const delegatedTickets = ticketsList.filter((ticket: OrgTicket) =>
               ['delegated', 'in_progress'].includes(ticket.status)
@@ -109,7 +120,7 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
       )}
 
       <div className="flex gap-0 border-b border-mc-border bg-mc-bg-secondary">
-        {(['tickets', 'knowledge', 'workspaces'] as const).map(tab => (
+        {(['sprints', 'tickets', 'knowledge', 'workspaces'] as const).map(tab => (
           <Link
             key={tab}
             href={`?tab=${tab}`}
@@ -119,6 +130,7 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
                 : 'border-transparent text-mc-text-secondary hover:text-mc-text'
             }`}
           >
+            {tab === 'sprints' && <><Layers size={12} className="inline mr-1" /><span className="hidden sm:inline">Sprints</span><span className="sm:hidden">S</span></>}
             {tab === 'tickets' && <><Ticket size={12} className="inline mr-1" /><span className="hidden sm:inline">Tickets</span><span className="sm:hidden">T</span></>}
             {tab === 'knowledge' && <><BookOpen size={12} className="inline mr-1" /><span className="hidden sm:inline">Knowledge</span><span className="sm:hidden">K</span></>}
             {tab === 'workspaces' && <><Folder size={12} className="inline mr-1" /><span className="hidden sm:inline">Workspaces</span><span className="sm:hidden">W</span></>}
@@ -127,6 +139,185 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
       </div>
 
       <div className="p-6 max-w-5xl mx-auto">
+        {activeTab === 'sprints' && (
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-mono text-sm font-semibold text-mc-text">Sprints ({sprints.length})</h2>
+              <button
+                onClick={() => setShowSprintForm(!showSprintForm)}
+                className="px-3 py-1.5 text-xs font-mono bg-mc-accent text-white rounded hover:opacity-90 flex items-center gap-1"
+              >
+                <Plus size={12} />
+                <span className="hidden sm:inline">Create Sprint</span>
+              </button>
+            </div>
+
+            {showSprintForm && (
+              <div className="p-3 rounded border border-mc-border bg-mc-bg-secondary mb-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-mono text-mc-text-secondary mb-1">Name *</label>
+                    <input
+                      type="text"
+                      value={sprintName}
+                      onChange={e => setSprintName(e.target.value)}
+                      className="w-full px-2 py-1.5 text-sm font-mono border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
+                      placeholder="Sprint name"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-mono text-mc-text-secondary mb-1">Status</label>
+                    <select
+                      value={sprintStatus}
+                      onChange={e => setSprintStatus(e.target.value as typeof sprintStatus)}
+                      className="w-full px-2 py-1.5 text-sm font-mono border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
+                    >
+                      <option value="planned">Planned</option>
+                      <option value="active">Active</option>
+                      <option value="completed">Completed</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-mono text-mc-text-secondary mb-1">Start Date</label>
+                    <input
+                      type="date"
+                      value={sprintStartDate}
+                      onChange={e => setSprintStartDate(e.target.value)}
+                      className="w-full px-2 py-1.5 text-sm font-mono border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-mono text-mc-text-secondary mb-1">End Date</label>
+                    <input
+                      type="date"
+                      value={sprintEndDate}
+                      onChange={e => setSprintEndDate(e.target.value)}
+                      className="w-full px-2 py-1.5 text-sm font-mono border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
+                    />
+                  </div>
+                </div>
+                <div className="mt-3 flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => { setShowSprintForm(false); setSprintName(''); setSprintStartDate(''); setSprintEndDate(''); setSprintStatus('planned'); }}
+                    className="px-3 py-1.5 text-xs font-mono text-mc-text-secondary hover:text-mc-text border border-mc-border rounded"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    disabled={sprintSubmitting || !sprintName.trim()}
+                    onClick={async () => {
+                      if (!sprintName.trim() || !org) return;
+                      setSprintSubmitting(true);
+                      try {
+                        const res = await fetch('/api/org-sprints', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            organization_id: org.id,
+                            name: sprintName.trim(),
+                            status: sprintStatus,
+                            start_date: sprintStartDate || undefined,
+                            end_date: sprintEndDate || undefined,
+                          }),
+                        });
+                        if (res.ok) {
+                          const created = await res.json();
+                          setSprints(prev => [created, ...prev]);
+                          setShowSprintForm(false);
+                          setSprintName('');
+                          setSprintStartDate('');
+                          setSprintEndDate('');
+                          setSprintStatus('planned');
+                        }
+                      } finally {
+                        setSprintSubmitting(false);
+                      }
+                    }}
+                    className="px-3 py-1.5 text-xs font-mono bg-mc-accent text-white rounded hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                  >
+                    <Plus size={12} />
+                    Create
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {sprints.length === 0 ? (
+              <div className="text-sm text-mc-text-secondary">No sprints yet.</div>
+            ) : (
+              <div className="space-y-2">
+                {sprints.map(sprint => {
+                  const ticketCount = tickets.filter(t => t.org_sprint_id === sprint.id).length;
+                  const isExpanded = expandedSprint === sprint.id;
+                  const SPRINT_STATUS_COLORS: Record<string, string> = {
+                    planned: 'bg-gray-100 text-gray-700',
+                    active: 'bg-green-100 text-green-800',
+                    completed: 'bg-blue-100 text-blue-800',
+                  };
+                  return (
+                    <div key={sprint.id} className="rounded border border-mc-border bg-mc-bg-secondary">
+                      <button
+                        type="button"
+                        className="w-full p-3 text-left"
+                        onClick={() => {
+                          const next = isExpanded ? null : sprint.id;
+                          setExpandedSprint(next);
+                          if (next && !sprintTickets.has(sprint.id)) {
+                            fetch(`/api/org-sprints/${sprint.id}`)
+                              .then(r => r.json())
+                              .then(data => {
+                                if (data.tickets) {
+                                  setSprintTickets(prev => new Map(prev).set(sprint.id, data.tickets));
+                                }
+                              })
+                              .catch(() => {});
+                          }
+                        }}
+                      >
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <div className="flex items-center gap-2">
+                            {isExpanded ? <ChevronDown size={14} className="text-mc-text-secondary" /> : <ChevronRight size={14} className="text-mc-text-secondary" />}
+                            <span className="font-mono text-sm text-mc-text">{sprint.name}</span>
+                            <span className={`text-xs px-1.5 py-0.5 rounded font-mono ${SPRINT_STATUS_COLORS[sprint.status] || 'bg-gray-100 text-gray-700'}`}>
+                              {sprint.status}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-3 text-xs text-mc-text-secondary font-mono">
+                            {sprint.start_date && sprint.end_date && (
+                              <span>{sprint.start_date} - {sprint.end_date}</span>
+                            )}
+                            <span>{ticketCount} ticket{ticketCount !== 1 ? 's' : ''}</span>
+                          </div>
+                        </div>
+                      </button>
+                      {isExpanded && (
+                        <div className="px-3 pb-3 border-t border-mc-border">
+                          {(sprintTickets.get(sprint.id) || []).length === 0 ? (
+                            <p className="text-xs text-mc-text-secondary pt-2">No tickets assigned to this sprint.</p>
+                          ) : (
+                            <div className="space-y-1 pt-2">
+                              {(sprintTickets.get(sprint.id) || []).map(t => (
+                                <div key={t.id} className="flex items-center justify-between gap-2 p-2 rounded bg-mc-bg border border-mc-border">
+                                  <span className="text-xs font-mono text-mc-text truncate">{t.title}</span>
+                                  <span className={`text-xs px-1.5 py-0.5 rounded font-mono shrink-0 ${STATUS_COLORS[t.status] || 'bg-gray-100 text-gray-600'}`}>
+                                    {t.status}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
         {activeTab === 'tickets' && (
           <div>
             <div className="flex items-center justify-between mb-4">
@@ -146,8 +337,15 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
                 {tickets.map(ticket => (
                   <div key={ticket.id} className="p-3 rounded border border-mc-border bg-mc-bg-secondary">
                     <div className="flex items-center justify-between gap-2 flex-wrap">
-                       <span className="font-mono text-sm text-mc-text">{ticket.title}</span>
-                       <span className={`text-xs px-1.5 py-0.5 rounded font-mono ${STATUS_COLORS[ticket.status] || 'bg-gray-100 text-gray-600'}`}>
+                       <div className="flex items-center gap-2 min-w-0">
+                         <span className="font-mono text-sm text-mc-text truncate">{ticket.title}</span>
+                         {ticket.org_sprint_id && sprints.find(s => s.id === ticket.org_sprint_id) && (
+                           <span className="text-xs px-1.5 py-0.5 rounded font-mono bg-mc-bg border border-mc-border text-mc-text-secondary shrink-0">
+                             {sprints.find(s => s.id === ticket.org_sprint_id)?.name}
+                           </span>
+                         )}
+                       </div>
+                       <span className={`text-xs px-1.5 py-0.5 rounded font-mono shrink-0 ${STATUS_COLORS[ticket.status] || 'bg-gray-100 text-gray-600'}`}>
                          {ticket.status}
                        </span>
                      </div>

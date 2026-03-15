@@ -204,6 +204,19 @@ open -> triaged -> delegated -> in_progress -> resolved -> closed
 | GET/POST | `/api/org-tickets/[id]/acceptance-criteria` | List/create acceptance criteria for a ticket |
 | PATCH/DELETE | `/api/org-tickets/[id]/acceptance-criteria/[criterionId]` | Update/delete a single acceptance criterion |
 
+**Org Sprints API**:
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET | `/api/org-sprints` | List org sprints (filter: organization_id, status) |
+| POST | `/api/org-sprints` | Create org sprint |
+| GET | `/api/org-sprints/[id]` | Get org sprint with assigned tickets |
+| PATCH | `/api/org-sprints/[id]` | Update org sprint |
+| DELETE | `/api/org-sprints/[id]` | Delete org sprint (org_tickets.org_sprint_id SET NULL by FK) |
+
+SSE events: `org_sprint_created`, `org_sprint_updated`, `org_sprint_deleted`.
+
+**OrgDetailView Sprints tab**: The org detail page includes a Sprints tab showing all sprints for the organization with inline creation form (name, status, start/end dates). Sprint cards are expandable to show assigned tickets. Ticket cards in the Tickets tab show sprint assignment badges.
+
 ---
 
 ## Memory System
@@ -557,7 +570,7 @@ Events broadcast:
 - `activity_logged`, `activity_presented`, `deliverable_added`, `deliverable_deleted`
 - `agent_spawned`, `agent_completed`
 - `agent_updated`, `agent_log_added`, `github_issues_synced`, `daemon_stats_updated`
-- `organization_created`, `organization_updated`, `organization_deleted`, `org_ticket_created`, `org_ticket_updated`, `org_ticket_deleted`, `memory_created`, `memory_updated`, `entity_linked`, `commit_ingested`, `knowledge_synthesized`
+- `organization_created`, `organization_updated`, `organization_deleted`, `org_ticket_created`, `org_ticket_updated`, `org_ticket_deleted`, `org_sprint_created`, `org_sprint_updated`, `org_sprint_deleted`, `memory_created`, `memory_updated`, `entity_linked`, `commit_ingested`, `knowledge_synthesized`
 
 **SSE broadcast fix**: `org_ticket_deleted` was previously not broadcast on DELETE. Fixed in org-platform-fixes: the DELETE handler now calls `broadcast({ type: 'org_ticket_deleted', payload: { id } })` after successful deletion.
 Client: `src/hooks/useSSE.ts` with auto-reconnect (5s retry) and 30s keep-alive pings.
@@ -652,6 +665,12 @@ Fallback: Agent Activity Dashboard polls every 20s; task-specific views use SSE 
 | POST | `/api/org-tickets/[id]/delegate` | Delegate ticket to workspace tasks (accepts optional `workspace_id`) |
 | GET/POST | `/api/org-tickets/[id]/acceptance-criteria` | List/create acceptance criteria |
 | PATCH/DELETE | `/api/org-tickets/[id]/acceptance-criteria/[criterionId]` | Update/delete acceptance criterion |
+
+### Org Sprints
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET/POST | `/api/org-sprints` | List/create org sprints (filter: organization_id, status) |
+| GET/PATCH/DELETE | `/api/org-sprints/[id]` | Org sprint CRUD (GET includes assigned tickets) |
 
 ### Memories
 | Method | Endpoint | Purpose |

@@ -588,11 +588,14 @@ export type SSEEventType =
   | 'commit_ingested'
   | 'knowledge_synthesized'
   | 'knowledge_article_archived'
-  | 'webhook_deleted';
+  | 'webhook_deleted'
+  | 'org_sprint_created'
+  | 'org_sprint_updated'
+  | 'org_sprint_deleted';
 
 export interface SSEEvent {
   type: SSEEventType;
-  payload: Task | Agent | TaskActivity | PresentedTaskActivity | TaskDeliverable | Organization | OrgTicket | Memory | EntityLink | Commit | KnowledgeArticle | {
+  payload: Task | Agent | TaskActivity | PresentedTaskActivity | TaskDeliverable | Organization | OrgTicket | OrgSprint | Memory | EntityLink | Commit | KnowledgeArticle | {
     taskId: string;
     sessionId: string;
     agentName?: string;
