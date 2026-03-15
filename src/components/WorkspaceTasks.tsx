@@ -247,8 +247,8 @@ export function WorkspaceTasks({ workspaceId, mobileMode = false, isPortrait = t
         )}
       </div>
 
-      <div className={`flex-1 overflow-y-auto ${viewMode === 'board' ? 'overflow-hidden' : ''} ${isPortrait && viewMode === 'list' ? 'p-3 pb-[calc(1rem+env(safe-area-inset-bottom))]' : viewMode === 'list' ? 'p-3' : ''}`}>
-        {workspaceTasks.length === 0 ? (
+      {workspaceTasks.length === 0 ? (
+        <div className="flex-1 flex items-start justify-center p-3">
           <div className="text-center py-12">
             <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-mc-bg-tertiary flex items-center justify-center">
               <Target className="w-6 h-6 text-mc-text-secondary" />
@@ -256,7 +256,10 @@ export function WorkspaceTasks({ workspaceId, mobileMode = false, isPortrait = t
             <h3 className="text-base font-medium mb-1">No tasks yet</h3>
             <p className="text-sm text-mc-text-secondary">Tasks are created automatically when org tickets are delegated.</p>
           </div>
-        ) : viewMode === 'list' ? (
+        </div>
+      ) : (
+      <div className={`flex-1 overflow-y-auto ${viewMode === 'board' ? 'overflow-hidden' : ''} ${isPortrait && viewMode === 'list' ? 'p-3 pb-[calc(1rem+env(safe-area-inset-bottom))]' : viewMode === 'list' ? 'p-3' : ''}`}>
+        {viewMode === 'list' ? (
           <div className={`space-y-2 ${isPortrait ? '' : 'space-y-1.5'}`}>
             {workspaceTasks.map((task) => (
               <TaskRow
@@ -361,8 +364,9 @@ export function WorkspaceTasks({ workspaceId, mobileMode = false, isPortrait = t
             setDraggedTask={setDraggedTask}
             updateTaskStatusWithPersist={updateTaskStatusWithPersist}
           />
-        )}
+         )}
       </div>
+      )}
 
       {activeEditingTask && (
         <TaskModal
