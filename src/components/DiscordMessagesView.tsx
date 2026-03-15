@@ -74,7 +74,7 @@ export function DiscordMessagesView({ workspaceId }: DiscordMessagesViewProps) {
       data-component="src/components/DiscordMessagesView"
       className="flex-1 flex flex-col overflow-hidden"
     >
-      <div className="p-3 border-b border-mc-border bg-mc-bg-secondary flex items-center justify-between gap-2 flex-wrap">
+      <div className="p-3 min-h-12 border-b border-mc-border bg-mc-bg-secondary flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-2">
           <span className="font-mono font-medium">Discord Messages</span>
           {messages.length > 0 && (

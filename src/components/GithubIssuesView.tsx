@@ -174,7 +174,7 @@ export function GithubIssuesView({ workspaceId, workspace }: GithubIssuesViewPro
         data-component="src/components/GithubIssuesView"
         className="flex-1 flex flex-col overflow-hidden"
       >
-        <div className="p-3 border-b border-mc-border bg-mc-bg-secondary flex items-center justify-between gap-2 flex-wrap">
+        <div className="p-3 min-h-12 border-b border-mc-border bg-mc-bg-secondary flex items-center justify-between gap-2 flex-wrap">
           <div className="flex items-center gap-2">
             <span className="font-mono font-medium">GitHub Issues</span>
           </div>
@@ -198,7 +198,7 @@ export function GithubIssuesView({ workspaceId, workspace }: GithubIssuesViewPro
       className="flex-1 flex flex-col overflow-hidden"
     >
       {/* Toolbar */}
-      <div className="p-3 border-b border-mc-border bg-mc-bg-secondary flex items-center justify-between gap-2 flex-wrap">
+      <div className="p-3 min-h-12 border-b border-mc-border bg-mc-bg-secondary flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-2">
           <span className="font-mono font-medium">GitHub Issues</span>
           {lastSyncedAt && (

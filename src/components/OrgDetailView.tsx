@@ -20,7 +20,7 @@ import { Header } from '@/components/Header';
 import { OrgTicketCreateModal } from '@/components/OrgTicketCreateModal';
 import { OrgTicketModal } from '@/components/OrgTicketModal';
 import { useOrgSSE } from '@/hooks/useOrgSSE';
-import type { KnowledgeArticle, OrgMilestone, OrgSprint, OrgTicket } from '@/lib/types';
+import type { KnowledgeArticle, OrgMilestone, OrgSprint, OrgTicket, Workspace } from '@/lib/types';
 
 interface OrgDetail {
   id: string;
@@ -119,6 +119,7 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
   const [milestones, setMilestones] = useState<OrgMilestone[]>([]);
   const [knowledge, setKnowledge] = useState<KnowledgeArticle[]>([]);
   const [workspaceSummaries, setWorkspaceSummaries] = useState<Record<string, WorkspaceSummary>>({});
+  const [fullWorkspaces, setFullWorkspaces] = useState<Workspace[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [selectedSprintId, setSelectedSprintId] = useState<string>('backlog');
@@ -170,18 +171,23 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
   const loadWorkspaceSummaries = useCallback(async (workspaces: NonNullable<OrgDetail['workspaces']>) => {
     if (workspaces.length === 0) {
       setWorkspaceSummaries({});
+      setFullWorkspaces([]);
       return;
     }
 
-    let workspaceStats: WorkspaceStats[] = [];
+    let workspaceStats: (WorkspaceStats & Workspace)[] = [];
     try {
       const statsRes = await fetch('/api/workspaces?stats=true');
       if (statsRes.ok) {
-        workspaceStats = (await statsRes.json()) as WorkspaceStats[];
+        workspaceStats = (await statsRes.json()) as (WorkspaceStats & Workspace)[];
       }
     } catch {
       workspaceStats = [];
     }
+
+    const orgWorkspaceIds = new Set(workspaces.map((w) => w.id));
+    const orgFullWorkspaces = workspaceStats.filter((w) => orgWorkspaceIds.has(w.id));
+    setFullWorkspaces(orgFullWorkspaces);
 
     const statsByWorkspaceId = new Map(workspaceStats.map((entry) => [entry.id, entry]));
 
@@ -916,9 +922,32 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
             <DiscordMessagesView workspaceId={primaryWorkspaceId} />
           ) : null
         ) : activeTab === 'issues' ? (
-          primaryWorkspaceId && org.workspaces?.[0] ? (
-            <GithubIssuesView workspaceId={primaryWorkspaceId} workspace={org.workspaces[0] as any} />
-          ) : null
+          (() => {
+            const workspacesWithRepo = fullWorkspaces.filter((w) => w.github_repo && w.github_repo.trim() !== '');
+            if (workspacesWithRepo.length === 0) {
+              return (
+                <div className="flex-1 flex items-center justify-center p-6">
+                  <div className="text-center">
+                    <CircleDot className="w-12 h-12 text-mc-border mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold mb-2 text-mc-text">No GitHub repositories configured</h3>
+                    <p className="text-sm text-mc-text-secondary">Configure a GitHub repository on a workspace to see issues here.</p>
+                  </div>
+                </div>
+              );
+            }
+            if (workspacesWithRepo.length === 1) {
+              return <GithubIssuesView workspaceId={workspacesWithRepo[0].id} workspace={workspacesWithRepo[0]} />;
+            }
+            return (
+              <div className="flex-1 overflow-y-auto">
+                {workspacesWithRepo.map((workspace) => (
+                  <div key={workspace.id} className="border-b border-mc-border last:border-b-0" style={{ height: '50vh', minHeight: '400px' }}>
+                    <GithubIssuesView workspaceId={workspace.id} workspace={workspace} />
+                  </div>
+                ))}
+              </div>
+            );
+          })()
         ) : null}
       </main>
 
