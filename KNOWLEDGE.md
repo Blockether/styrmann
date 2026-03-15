@@ -193,6 +193,10 @@ open -> triaged -> delegated -> in_progress -> resolved -> closed
 
 **Delegation**: `POST /api/org-tickets/[id]/delegate` converts an org ticket into one or more workspace tasks. The delegation module (`src/lib/delegation.ts`) uses LLM planning to decompose the ticket into 1-3 tasks with acceptance criteria. Falls back to a single task if LLM is unavailable. Each created task gets an `org_ticket_id` FK and a `delegates_to` entity link from the ticket to the task. The ticket status moves to `delegated` atomically.
 
+**Ticket vs task model**: Org tickets are planning/triage artifacts owned at the organization level. Workspace tasks are execution artifacts owned by a workspace. A delegated org ticket may fan out into one or more workspace tasks. The org ticket remains the planning source of truth, while the delegated workspace task(s) hold execution progress, traces, runs, deliverables, and implementation artifacts.
+
+**Delegated ticket modal behavior**: `OrgTicketModal` is editable only before delegation. Once a ticket has delegated workspace tasks (or status `delegated`), the overview switches to read-only mode, write actions are disabled, and the delegated task list exposes direct links to the workspace task overview and its Deliverables tab. Users are expected to continue execution from the workspace task after delegation.
+
 **Delegation workspace selector**: The delegate endpoint accepts an optional `workspace_id` body parameter. When provided, tasks are created in that specific workspace. When omitted, the system resolves the default workspace. This fixes the previous behavior where delegation always targeted a hardcoded workspace.
 
 **Delegation race condition fix**: The delegation transaction now uses a single atomic SQLite transaction for ticket status update + task creation + entity link creation. This prevents partial delegation states where the ticket moved to `delegated` but task creation failed.
@@ -205,9 +209,9 @@ open -> triaged -> delegated -> in_progress -> resolved -> closed
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
 | GET | `/api/org-tickets` | List org tickets (filter: organization_id, status, priority) |
-| POST | `/api/org-tickets` | Create org ticket |
+| POST | `/api/org-tickets` | Create org ticket (supports `org_sprint_id` and `org_milestone_id`) |
 | GET | `/api/org-tickets/[id]` | Get org ticket |
-| PATCH | `/api/org-tickets/[id]` | Update org ticket |
+| PATCH | `/api/org-tickets/[id]` | Update org ticket (supports `org_sprint_id`, `org_milestone_id`, `story_points`) |
 | DELETE | `/api/org-tickets/[id]` | Delete org ticket (broadcasts `org_ticket_deleted` SSE event) |
 | POST | `/api/org-tickets/[id]/delegate` | Delegate ticket to workspace tasks (accepts optional `workspace_id`) |
 | GET/POST | `/api/org-tickets/[id]/acceptance-criteria` | List/create acceptance criteria for a ticket |
@@ -224,7 +228,7 @@ open -> triaged -> delegated -> in_progress -> resolved -> closed
 
 SSE events: `org_sprint_created`, `org_sprint_updated`, `org_sprint_deleted`.
 
-**OrgDetailView tabs**: The organization detail page is organized as `Board | Issues | Discord | Knowledge | Workspaces`. The Board tab is a sprint-scoped milestone board (`Sprint -> Milestone -> Ticket`) with a sprint selector (including `Backlog`), inline sprint/milestone creation, and ticket rows that open `OrgTicketModal`. Issues and Discord tabs reuse workspace-scoped integration views by binding to the first workspace in `org.workspaces` (single-workspace org mode). Org-level updates refresh via `useOrgSSE` listening to `/api/events` for ticket/sprint/milestone/knowledge events.
+**OrgDetailView tabs**: The organization detail page is organized as `Board | Issues | Discord | Knowledge | Workspaces`. The Board tab is a sprint-scoped milestone board (`Sprint -> Milestone -> Ticket`) with a sprint selector where `Backlog` is a virtual filter for unassigned tickets/milestones (not a real sprint row), inline sprint/milestone creation, and ticket rows that open `OrgTicketModal`. The Issues tab aggregates GitHub issues from all org workspaces that have `github_repo` configured; the Discord tab binds to the primary workspace. Org-level updates refresh via `useOrgSSE` listening to `/api/events` for ticket/sprint/milestone/knowledge events.
 
 ---
 
