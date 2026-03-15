@@ -546,7 +546,7 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
                 </div>
 
                 {selectedSprint && (
-                  <div className="rounded-lg border border-mc-border bg-mc-bg-secondary px-4 py-3">
+                  <div className="hidden sm:block rounded-lg border border-mc-border bg-mc-bg-secondary px-4 py-3">
                     <div className="flex items-center justify-between gap-3 flex-wrap">
                       <div className="flex items-center gap-3 min-w-0">
                         <span className="text-sm font-semibold text-mc-text truncate">{selectedSprint.name}</span>
@@ -706,8 +706,8 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
             )}
 
             {showNoSprintEmptyState && (
-              <div className="rounded-lg border border-mc-border bg-mc-bg-secondary min-h-[320px] flex items-center justify-center px-6">
-                <div className="flex flex-col items-center justify-center py-16 text-center">
+              <div className="rounded-lg border border-mc-border bg-mc-bg-secondary flex items-center justify-center px-6">
+                <div className="flex flex-col items-center justify-center py-8 sm:py-12 text-center">
                   <Layers size={32} className="text-mc-text-secondary mb-4" />
                   <h3 className="text-lg font-semibold mb-2 text-mc-text">Get started with your first sprint</h3>
                   <p className="text-sm text-mc-text-secondary max-w-md mb-6">
@@ -741,8 +741,8 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
             )}
 
             {showNoTicketEmptyState && (
-              <div className="rounded border border-mc-border bg-mc-bg-secondary min-h-[220px] flex items-center justify-center px-6">
-                <div className="flex flex-col items-center justify-center py-16 text-center">
+              <div className="rounded border border-mc-border bg-mc-bg-secondary flex items-center justify-center px-6">
+                <div className="flex flex-col items-center justify-center py-8 sm:py-12 text-center">
                   <Ticket size={32} className="text-mc-text-secondary mb-4" />
                   <h3 className="text-lg font-semibold mb-2 text-mc-text">
                     No tickets in {selectedSprint?.name || 'this sprint'}
@@ -842,7 +842,7 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
           <div className="flex-1 min-w-0 overflow-y-auto p-3 md:p-4">
             <div className="space-y-2">
             {knowledge.length === 0 ? (
-              <div className="flex-1 flex items-center justify-center p-6 min-h-[320px]">
+              <div className="flex-1 flex items-center justify-center p-6">
                 <div className="flex flex-col items-center justify-center py-16 text-center">
                   <BookOpen size={32} className="text-mc-text-secondary mb-4" />
                   <h3 className="text-lg font-semibold mb-2 text-mc-text">No knowledge articles yet</h3>
@@ -909,7 +909,7 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
               </Link>
             ))}
             {(org.workspaces || []).length === 0 && (
-              <div className="sm:col-span-2 flex items-center justify-center p-6 min-h-[260px]">
+              <div className="sm:col-span-2 flex items-center justify-center p-6">
                 <div className="flex flex-col items-center justify-center py-16 text-center">
                   <Folder size={32} className="text-mc-text-secondary mb-4" />
                   <h3 className="text-lg font-semibold mb-2 text-mc-text">No workspaces in this organization</h3>
