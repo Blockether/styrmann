@@ -194,8 +194,19 @@ export function ActiveSprint({ workspaceId, mobileMode = false, isPortrait = tru
 
   return (
     <div data-component="src/components/ActiveSprint" className="flex-1 flex flex-col overflow-hidden">
-      <div className="p-3 border-b border-mc-border bg-mc-bg-secondary shrink-0 space-y-2">
-        <div className={`flex items-center justify-end gap-2 ${mobileMode && isPortrait ? 'flex-wrap' : ''}`}>
+      <div className="p-3 border-b border-mc-border bg-mc-bg-secondary shrink-0">
+        <div className="flex items-center justify-between gap-2 flex-wrap mb-2">
+          <div className="flex items-center gap-3 text-xs flex-wrap">
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border border-mc-border bg-mc-bg text-mc-text-secondary">
+              Total: <span className="font-medium text-mc-text">{totalTasks}</span>
+            </span>
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border border-mc-border bg-mc-bg text-mc-text-secondary">
+              In Progress: <span className="font-medium text-mc-text">{inProgressTasks}</span>
+            </span>
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border border-green-200 bg-green-50 text-green-700">
+              Done: <span className="font-medium">{completedTasks} ({completionPercent}%)</span>
+            </span>
+          </div>
           <div className="flex items-center bg-mc-bg-tertiary rounded-lg p-0.5" role="tablist" aria-label="View mode">
             <button
               onClick={() => setViewMode('list')}
@@ -221,21 +232,6 @@ export function ActiveSprint({ workspaceId, mobileMode = false, isPortrait = tru
               <Columns3 className="w-4 h-4" />
               <span className="hidden sm:inline">Board</span>
             </button>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs">
-          <div className="p-2.5 rounded-lg border border-mc-border bg-mc-bg">
-            <div className="text-mc-text-secondary">Total Tasks</div>
-            <div className="text-mc-text font-semibold mt-0.5">{totalTasks}</div>
-          </div>
-          <div className="p-2.5 rounded-lg border border-mc-border bg-mc-bg">
-            <div className="text-mc-text-secondary">In Progress</div>
-            <div className="text-mc-text font-semibold mt-0.5">{inProgressTasks}</div>
-          </div>
-          <div className="p-2.5 rounded-lg border border-green-200 bg-green-50 col-span-2 md:col-span-1">
-            <div className="text-green-700">Completed</div>
-            <div className="text-green-700 font-semibold mt-0.5">{completedTasks} ({completionPercent}%)</div>
           </div>
         </div>
         {milestones.length > 0 && (
