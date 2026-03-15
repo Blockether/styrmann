@@ -28,8 +28,16 @@ export function GithubIssuesView({ workspaceId, workspace }: GithubIssuesViewPro
   const [error, setError] = useState<string | null>(null);
   const [creatingTicket, setCreatingTicket] = useState<string | null>(null);
   const [ticketSuccess, setTicketSuccess] = useState<string | null>(null);
+  const hasGithubRepo = workspace.github_repo && workspace.github_repo.trim() !== '';
 
   const fetchIssues = useCallback(async () => {
+    if (!hasGithubRepo) {
+      setIssues([]);
+      setError(null);
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
@@ -48,7 +56,7 @@ export function GithubIssuesView({ workspaceId, workspace }: GithubIssuesViewPro
     } finally {
       setLoading(false);
     }
-  }, [workspaceId, stateFilter]);
+  }, [workspaceId, stateFilter, hasGithubRepo]);
 
   useEffect(() => {
     fetchIssues();
@@ -126,7 +134,6 @@ export function GithubIssuesView({ workspaceId, workspace }: GithubIssuesViewPro
   };
 
   const lastSyncedAt = issues.length > 0 ? issues[0].synced_at : null;
-  const hasGithubRepo = workspace.github_repo && workspace.github_repo.trim() !== '';
 
   const parseLabels = (labelsJson: string): { name: string; color: string }[] => {
     try {
@@ -175,9 +182,9 @@ export function GithubIssuesView({ workspaceId, workspace }: GithubIssuesViewPro
         <div className="flex-1 flex items-center justify-center p-6">
           <div className="text-center">
             <Github className="w-12 h-12 text-mc-border mx-auto mb-4" />
-            <h3 className="text-lg font-semibold mb-2">No GitHub Repository</h3>
+            <h3 className="text-lg font-semibold mb-2">No GitHub repository configured</h3>
             <p className="text-sm text-mc-text-secondary">
-              Configure a GitHub repo in workspace settings to view issues.
+              No GitHub repository configured for this workspace.
             </p>
           </div>
         </div>

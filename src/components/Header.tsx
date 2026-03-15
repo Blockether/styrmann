@@ -143,8 +143,9 @@ export function Header({ workspace, orgName, orgSlug, isPortrait = true }: Heade
         <>
           <div className="flex items-center justify-between gap-2 min-w-0">
             <div className="flex items-center gap-2 min-w-0 flex-1">
-              <Link href="/" className="flex items-center rounded px-1 py-1 transition-colors hover:bg-mc-bg-tertiary shrink-0">
+              <Link href="/" className="flex items-center gap-2 rounded px-1 py-1 transition-colors hover:bg-mc-bg-tertiary shrink-0">
                 <StyrmannLogo size={20} />
+                <h1 className="font-semibold text-mc-text uppercase tracking-wider text-xs sm:text-sm">Styrmann</h1>
               </Link>
 
               {workspace ? (
@@ -210,6 +211,7 @@ export function Header({ workspace, orgName, orgSlug, isPortrait = true }: Heade
             </div>
 
             <div className="flex items-center gap-2 shrink-0">
+              <span className="text-mc-text-secondary text-xs sm:text-sm font-mono">{format(currentTime, 'HH:mm:ss')}</span>
               <span
                 title={isOnline ? "System Online" : "System Offline"}
                 className={`w-3 h-3 rounded-full shrink-0 cursor-default ${

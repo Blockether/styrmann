@@ -23,6 +23,7 @@ import { provisionWorkflowTemplates } from './workflow-templates';
 import { getDefaultOrgName } from './org-config';
 
 const REPOS_BASE = '/root/repos';
+const EXCLUDED_REPOS = ['spel'];
 
 interface DiscoveredRepo {
   org: string;
@@ -58,6 +59,11 @@ function scanRepos(): DiscoveredRepo[] {
     for (const repoDir of repoDirs) {
       const org = orgDir.name;
       const repo = repoDir.name;
+
+      if (EXCLUDED_REPOS.includes(repo)) {
+        continue;
+      }
+
       const capitalizedOrg = org.charAt(0).toUpperCase() + org.slice(1);
       const capitalizedRepo = repo
         .split('-')

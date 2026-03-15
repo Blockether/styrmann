@@ -35,6 +35,7 @@ export function DiscordMessagesView({ workspaceId }: DiscordMessagesViewProps) {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<ClassificationFilter>('all');
   const [error, setError] = useState<string | null>(null);
+  const [isConfigured, setIsConfigured] = useState(true);
 
   const fetchMessages = useCallback(async () => {
     try {
@@ -47,9 +48,17 @@ export function DiscordMessagesView({ workspaceId }: DiscordMessagesViewProps) {
       if (res.ok) {
         const data = await res.json();
         setMessages(Array.isArray(data) ? data : []);
+        setIsConfigured(true);
       } else {
         const errData = await res.json().catch(() => ({ error: 'Failed to fetch messages' }));
-        setError(errData.error || 'Failed to fetch messages');
+        const message = errData.error || 'Failed to fetch messages';
+        const discordNotConfigured =
+          message.toLowerCase().includes('not configured') ||
+          message.includes('DISCORD_BOT_TOKEN') ||
+          message.includes('DISCORD_CHANNEL_ID');
+
+        setIsConfigured(!discordNotConfigured);
+        setError(discordNotConfigured ? null : message);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch messages');
@@ -91,14 +100,16 @@ export function DiscordMessagesView({ workspaceId }: DiscordMessagesViewProps) {
             <option value="conversation">Conversations</option>
             <option value="clarification">Clarifications</option>
           </select>
-          <button
-            onClick={fetchMessages}
-            disabled={loading}
-            className="flex items-center gap-2 px-3 min-h-9 border border-mc-border rounded text-sm hover:bg-mc-bg-tertiary disabled:opacity-50 transition-colors"
-          >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-            <span className="hidden sm:inline">Refresh</span>
-          </button>
+          {isConfigured && (
+            <button
+              onClick={fetchMessages}
+              disabled={loading}
+              className="flex items-center gap-2 px-3 min-h-9 border border-mc-border rounded text-sm hover:bg-mc-bg-tertiary disabled:opacity-50 transition-colors"
+            >
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">Refresh</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -106,6 +117,14 @@ export function DiscordMessagesView({ workspaceId }: DiscordMessagesViewProps) {
         {loading ? (
           <div className="flex items-center justify-center py-12">
             <RefreshCw className="w-6 h-6 animate-spin text-mc-text-secondary" />
+          </div>
+        ) : !isConfigured ? (
+          <div className="text-center py-12">
+            <MessageSquare className="w-12 h-12 text-mc-border mx-auto mb-4" />
+            <h3 className="text-lg font-semibold mb-2">Discord integration not configured</h3>
+            <p className="text-sm text-mc-text-secondary max-w-xl mx-auto">
+              Discord integration not configured. Set DISCORD_BOT_TOKEN and DISCORD_CHANNEL_ID in your environment to enable Discord message tracking.
+            </p>
           </div>
         ) : error ? (
           <div className="text-center py-12">

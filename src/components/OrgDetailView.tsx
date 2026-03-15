@@ -46,7 +46,6 @@ interface WorkspaceStats {
 
 interface WorkspaceSummary {
   taskCount: number;
-  activeSprintName: string;
   lastActivity: string;
 }
 
@@ -186,20 +185,6 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
 
     const summaryEntries = await Promise.all(
       workspaces.map(async (workspace) => {
-        let activeSprintName = 'No active sprint';
-
-        try {
-          const sprintRes = await fetch(`/api/sprints?workspace_id=${workspace.id}`);
-          if (sprintRes.ok) {
-            const workspaceSprints = (await sprintRes.json()) as Array<{ name: string; status: string }>;
-            const activeSprint = workspaceSprints.find((sprint) => sprint.status === 'active');
-            const plannedSprint = workspaceSprints.find((sprint) => sprint.status === 'planning');
-            activeSprintName = activeSprint?.name || plannedSprint?.name || 'No active sprint';
-          }
-        } catch {
-          activeSprintName = 'No active sprint';
-        }
-
         const taskCount = statsByWorkspaceId.get(workspace.id)?.taskCounts?.total ?? 0;
         const lastActivity = formatRelativeTime(workspace.updated_at || workspace.created_at);
 
@@ -207,7 +192,6 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
           workspace.id,
           {
             taskCount,
-            activeSprintName,
             lastActivity,
           },
         ] as const;
@@ -414,7 +398,7 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
         <div className="px-8 py-3 border-b border-mc-border text-sm text-mc-text-secondary">{org.description}</div>
       )}
 
-      <div className="p-8 space-y-4">
+      <div className="p-8">
         <div className="flex gap-0 border-b border-mc-border bg-mc-bg-secondary">
           {(['board', 'issues', 'discord', 'knowledge', 'workspaces'] as const).map((tab) => (
             <Link
@@ -460,8 +444,9 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
           ))}
         </div>
 
-        {activeTab === 'board' && (
-          <div className="space-y-4">
+        <div className="pt-6">
+          {activeTab === 'board' && (
+            <div className="space-y-4">
             <div className="grid grid-cols-3 gap-3">
               <div className="p-4 rounded-lg border border-mc-border bg-mc-bg-secondary">
                 <div className="text-sm text-mc-text-secondary">Open Tickets</div>
@@ -762,19 +747,19 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
                 })}
               </div>
             )}
-          </div>
-        )}
+            </div>
+          )}
 
-        {activeTab === 'discord' && primaryWorkspaceId && (
-          <DiscordMessagesView workspaceId={primaryWorkspaceId} />
-        )}
+          {activeTab === 'discord' && primaryWorkspaceId && (
+            <DiscordMessagesView workspaceId={primaryWorkspaceId} />
+          )}
 
-        {activeTab === 'issues' && primaryWorkspaceId && org.workspaces?.[0] && (
-          <GithubIssuesView workspaceId={primaryWorkspaceId} workspace={org.workspaces[0] as any} />
-        )}
+          {activeTab === 'issues' && primaryWorkspaceId && org.workspaces?.[0] && (
+            <GithubIssuesView workspaceId={primaryWorkspaceId} workspace={org.workspaces[0] as any} />
+          )}
 
-        {activeTab === 'knowledge' && (
-          <div className="space-y-2">
+          {activeTab === 'knowledge' && (
+            <div className="space-y-2">
             {knowledge.length === 0 ? (
               <div className="rounded border border-mc-border bg-mc-bg-secondary min-h-[320px] flex items-center justify-center px-6">
                 <div className="flex flex-col items-center justify-center py-16 text-center">
@@ -817,11 +802,11 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
                 </article>
               ))
             )}
-          </div>
-        )}
+            </div>
+          )}
 
-        {activeTab === 'workspaces' && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {activeTab === 'workspaces' && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {(org.workspaces || []).map((workspace) => (
               <Link
                 key={workspace.id}
@@ -841,7 +826,6 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
                 </div>
                 <div className="mt-3 flex flex-wrap gap-4 text-sm text-mc-text-secondary">
                   <span>{workspaceSummaries[workspace.id]?.taskCount ?? 0} tasks</span>
-                  <span>{workspaceSummaries[workspace.id]?.activeSprintName ?? 'No active sprint'}</span>
                   <span>{workspaceSummaries[workspace.id]?.lastActivity ?? 'No recent activity'}</span>
                 </div>
               </Link>
@@ -860,8 +844,9 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
                 </div>
               </div>
             )}
-          </div>
-        )}
+            </div>
+          )}
+        </div>
       </div>
 
       {showCreateTicketModal && (
