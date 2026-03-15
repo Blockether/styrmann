@@ -134,8 +134,8 @@ else
   WEB_HEALTHY=false
   for i in $(seq 1 12); do
     sleep 5
-    HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$URL" 2>/dev/null || echo "000")
-    if [ "$HTTP_CODE" = "200" ]; then
+    HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -L "$URL" 2>/dev/null || echo "000")
+    if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "307" ]; then
       WEB_HEALTHY=true
       break
     fi
@@ -143,7 +143,7 @@ else
   done
 
   if [ "$WEB_HEALTHY" = true ]; then
-    ok "Web: $URL responding 200"
+    ok "Web: $URL responding (follows redirects)"
   else
     fail "Web: $URL not responding after 60s"
     systemctl status "$WEB_SERVICE" --no-pager | tail -5
