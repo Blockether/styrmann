@@ -399,12 +399,12 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
       )}
 
       <div className="p-8">
-        <div className="flex gap-0 border-b border-mc-border bg-mc-bg-secondary">
+        <div className="flex gap-0 border-b border-mc-border bg-mc-bg-secondary overflow-x-auto">
           {(['board', 'issues', 'discord', 'knowledge', 'workspaces'] as const).map((tab) => (
             <Link
               key={tab}
               href={`?tab=${tab}`}
-               className={`px-4 py-2 text-sm border-b-2 transition-colors flex items-center gap-1 ${
+               className={`px-4 py-2 text-sm border-b-2 transition-colors flex items-center gap-1 whitespace-nowrap shrink-0 ${
                 activeTab === tab
                   ? 'border-mc-accent text-mc-text'
                   : 'border-transparent text-mc-text-secondary hover:text-mc-text'
