@@ -129,12 +129,14 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
 
   const [showSprintForm, setShowSprintForm] = useState(false);
   const [newSprintName, setNewSprintName] = useState('');
+  const [newSprintDescription, setNewSprintDescription] = useState('');
   const [newSprintStartDate, setNewSprintStartDate] = useState('');
   const [newSprintEndDate, setNewSprintEndDate] = useState('');
   const [creatingSprint, setCreatingSprint] = useState(false);
 
   const [showMilestoneForm, setShowMilestoneForm] = useState(false);
   const [newMilestoneName, setNewMilestoneName] = useState('');
+  const [newMilestoneDescription, setNewMilestoneDescription] = useState('');
   const [newMilestoneSprintId, setNewMilestoneSprintId] = useState('');
   const [newMilestonePriority, setNewMilestonePriority] = useState<'low' | 'normal' | 'high' | 'urgent'>('normal');
   const [newMilestoneDueDate, setNewMilestoneDueDate] = useState('');
@@ -317,6 +319,7 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
         body: JSON.stringify({
           organization_id: org.id,
           name: newSprintName.trim(),
+          description: newSprintDescription.trim() || undefined,
           status: 'planned',
           start_date: newSprintStartDate || undefined,
           end_date: newSprintEndDate || undefined,
@@ -328,6 +331,7 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
         setSelectedSprintId(sprint.id);
         setShowSprintForm(false);
         setNewSprintName('');
+        setNewSprintDescription('');
         setNewSprintStartDate('');
         setNewSprintEndDate('');
         await refetchAll();
@@ -350,6 +354,7 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
         body: JSON.stringify({
           organization_id: org.id,
           name: newMilestoneName.trim(),
+          description: newMilestoneDescription.trim() || undefined,
           priority: newMilestonePriority,
           due_date: newMilestoneDueDate || undefined,
           org_sprint_id: newMilestoneSprintId || undefined,
@@ -361,6 +366,7 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
         setExpandedMilestones((prev) => new Set(prev).add(milestone.id));
         setShowMilestoneForm(false);
         setNewMilestoneName('');
+        setNewMilestoneDescription('');
         setNewMilestonePriority('normal');
         setNewMilestoneDueDate('');
         await refetchAll();
@@ -558,7 +564,7 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
                 <div className="p-4 border-b border-mc-border bg-mc-bg-tertiary/30">
                   <h4 className="text-sm font-semibold text-mc-text">Create New Sprint</h4>
                 </div>
-                <div className="p-4">
+                <div className="p-4 space-y-3">
                   <div>
                     <label className="block text-xs uppercase tracking-wide text-mc-text-secondary font-medium mb-1.5">Name</label>
                     <input
@@ -569,12 +575,23 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
                       className="w-full px-3 py-1.5 text-sm border border-mc-border rounded bg-mc-bg text-mc-text placeholder:text-mc-text-secondary/50 focus:outline-none focus:border-mc-accent"
                     />
                   </div>
+                  <div>
+                    <label className="block text-xs uppercase tracking-wide text-mc-text-secondary font-medium mb-1.5">Description</label>
+                    <textarea
+                      value={newSprintDescription}
+                      onChange={(event) => setNewSprintDescription(event.target.value)}
+                      placeholder="Optional sprint description"
+                      rows={2}
+                      className="w-full px-3 py-1.5 text-sm border border-mc-border rounded bg-mc-bg text-mc-text placeholder:text-mc-text-secondary/50 focus:outline-none focus:border-mc-accent resize-none"
+                    />
+                  </div>
                 </div>
                 <div className="px-4 py-3 border-t border-mc-border flex justify-end gap-2">
                   <button
                     onClick={() => {
                       setShowSprintForm(false);
                       setNewSprintName('');
+                      setNewSprintDescription('');
                       setNewSprintStartDate('');
                       setNewSprintEndDate('');
                     }}
@@ -598,8 +615,8 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
                 <div className="p-4 border-b border-mc-border bg-mc-bg-tertiary/30">
                   <h4 className="text-sm font-semibold text-mc-text">Add New Milestone</h4>
                 </div>
-                <div className="p-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 min-w-0">
+                <div className="p-4 space-y-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 min-w-0">
                     <div className="min-w-0">
                       <label className="block text-xs uppercase tracking-wide text-mc-text-secondary font-medium mb-1.5">Name</label>
                       <input
@@ -638,7 +655,16 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
                         <option value="urgent">Urgent</option>
                       </select>
                     </div>
-
+                  </div>
+                  <div>
+                    <label className="block text-xs uppercase tracking-wide text-mc-text-secondary font-medium mb-1.5">Description</label>
+                    <textarea
+                      value={newMilestoneDescription}
+                      onChange={(event) => setNewMilestoneDescription(event.target.value)}
+                      placeholder="Optional milestone description"
+                      rows={2}
+                      className="w-full px-3 py-1.5 text-sm border border-mc-border rounded bg-mc-bg text-mc-text placeholder:text-mc-text-secondary/50 focus:outline-none focus:border-mc-accent resize-none"
+                    />
                   </div>
                 </div>
                 <div className="px-4 py-3 border-t border-mc-border flex justify-end gap-2">
@@ -646,6 +672,7 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
                     onClick={() => {
                       setShowMilestoneForm(false);
                       setNewMilestoneName('');
+                      setNewMilestoneDescription('');
                       setNewMilestoneDueDate('');
                       setNewMilestonePriority('normal');
                     }}
