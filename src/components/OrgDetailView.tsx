@@ -475,21 +475,21 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
         </div>
 
         {activeTab === 'board' ? (
-        <div className="flex-1 min-w-0 overflow-y-auto p-3 md:p-4">
+        <div className="flex-1 min-w-0 overflow-y-auto p-2 sm:p-3 md:p-4">
           {activeTab === 'board' && (
-            <div className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-               <div className="px-4 py-3 rounded-lg border border-mc-border bg-mc-bg-secondary">
-                 <div className="text-xs uppercase tracking-wide text-mc-text-secondary font-medium">Open Tickets</div>
-                 <div className="text-3xl font-semibold mt-0.5 text-mc-text">{openTickets}</div>
+            <div className="space-y-3">
+            <div className="grid grid-cols-3 gap-2">
+               <div className="px-3 py-2 rounded-lg border border-mc-border bg-mc-bg-secondary">
+                 <div className="text-xs uppercase tracking-wide text-mc-text-secondary font-medium">Open</div>
+                 <div className="text-xl sm:text-3xl font-semibold mt-0.5 text-mc-text">{openTickets}</div>
                </div>
-               <div className="px-4 py-3 rounded-lg border border-mc-border bg-mc-bg-secondary">
+               <div className="px-3 py-2 rounded-lg border border-mc-border bg-mc-bg-secondary">
                  <div className="text-xs uppercase tracking-wide text-mc-text-secondary font-medium">Milestones</div>
-                 <div className="text-3xl font-semibold mt-0.5 text-mc-text">{milestones.length}</div>
+                 <div className="text-xl sm:text-3xl font-semibold mt-0.5 text-mc-text">{milestones.length}</div>
                </div>
-               <div className="px-4 py-3 rounded-lg border border-mc-border bg-mc-bg-secondary">
+               <div className="px-3 py-2 rounded-lg border border-mc-border bg-mc-bg-secondary">
                  <div className="text-xs uppercase tracking-wide text-mc-text-secondary font-medium">Delegated</div>
-                 <div className="text-3xl font-semibold mt-0.5 text-mc-text">{delegatedCount}</div>
+                 <div className="text-xl sm:text-3xl font-semibold mt-0.5 text-mc-text">{delegatedCount}</div>
                </div>
              </div>
 
