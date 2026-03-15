@@ -126,7 +126,7 @@ export function OrgTicketCreateModal({
         <div className="p-3 border-b border-mc-border flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <Ticket size={16} className="text-mc-accent" />
-            <span className="font-mono text-sm font-semibold text-mc-text">Create Ticket</span>
+            <span className="text-lg font-semibold text-mc-text">Create Ticket</span>
           </div>
           <button onClick={onClose} className="text-mc-text-secondary hover:text-mc-text">
             <X size={16} />
@@ -137,28 +137,28 @@ export function OrgTicketCreateModal({
           <div className="p-4 overflow-y-auto flex-1 space-y-4">
             {error && (
               <div className="p-3 rounded bg-red-50 border border-red-200">
-                <p className="text-xs font-mono text-red-800">{error}</p>
+                <p className="text-sm text-red-800">{error}</p>
               </div>
             )}
 
             <div>
-              <label className="block text-xs font-mono text-mc-text-secondary mb-1">Title *</label>
+              <label className="block text-sm text-mc-text-secondary mb-1">Title *</label>
               <input
                 type="text"
                 value={title}
                 onChange={e => setTitle(e.target.value)}
-                className="w-full px-2 py-1.5 text-sm font-mono border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
+                className="w-full px-2 py-1.5 text-sm border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
                 placeholder="Ticket title"
                 required
               />
             </div>
 
             <div>
-              <label className="block text-xs font-mono text-mc-text-secondary mb-1">Description</label>
+              <label className="block text-sm text-mc-text-secondary mb-1">Description</label>
               <textarea
                 value={description}
                 onChange={e => setDescription(e.target.value)}
-                className="w-full px-2 py-1.5 text-sm font-mono border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent resize-none"
+                className="w-full px-2 py-1.5 text-sm border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent resize-none"
                 placeholder="Describe the ticket..."
                 rows={3}
               />
@@ -166,11 +166,11 @@ export function OrgTicketCreateModal({
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-mono text-mc-text-secondary mb-1">Priority</label>
+                <label className="block text-sm text-mc-text-secondary mb-1">Priority</label>
                 <select
                   value={priority}
                   onChange={e => setPriority(e.target.value as typeof priority)}
-                  className="w-full px-2 py-1.5 text-sm font-mono border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
+                  className="w-full px-2 py-1.5 text-sm border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
                 >
                   <option value="low">Low</option>
                   <option value="normal">Normal</option>
@@ -180,11 +180,11 @@ export function OrgTicketCreateModal({
               </div>
 
               <div>
-                <label className="block text-xs font-mono text-mc-text-secondary mb-1">Type</label>
+                <label className="block text-sm text-mc-text-secondary mb-1">Type</label>
                 <select
                   value={ticketType}
                   onChange={e => setTicketType(e.target.value as typeof ticketType)}
-                  className="w-full px-2 py-1.5 text-sm font-mono border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
+                  className="w-full px-2 py-1.5 text-sm border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
                 >
                   <option value="task">Task</option>
                   <option value="feature">Feature</option>
@@ -197,59 +197,59 @@ export function OrgTicketCreateModal({
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-mono text-mc-text-secondary mb-1">Story Points</label>
+                <label className="block text-sm text-mc-text-secondary mb-1">Story Points</label>
                 <input
                   type="number"
                   min={0}
                   max={100}
                   value={storyPoints}
                   onChange={e => setStoryPoints(e.target.value === '' ? '' : parseInt(e.target.value, 10))}
-                  className="w-full px-2 py-1.5 text-sm font-mono border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
+                  className="w-full px-2 py-1.5 text-sm border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
                   placeholder="0-100"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-mono text-mc-text-secondary mb-1">Due Date</label>
+                <label className="block text-sm text-mc-text-secondary mb-1">Due Date</label>
                 <input
                   type="date"
                   value={dueDate}
                   onChange={e => setDueDate(e.target.value)}
-                  className="w-full px-2 py-1.5 text-sm font-mono border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
+                  className="w-full px-2 py-1.5 text-sm border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-mono text-mc-text-secondary mb-1">Assignee</label>
+              <label className="block text-sm text-mc-text-secondary mb-1">Assignee</label>
               <input
                 type="text"
                 value={assignee}
                 onChange={e => setAssignee(e.target.value)}
-                className="w-full px-2 py-1.5 text-sm font-mono border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
+                className="w-full px-2 py-1.5 text-sm border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
                 placeholder="Assignee name"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-mono text-mc-text-secondary mb-1">External Reference</label>
+              <label className="block text-sm text-mc-text-secondary mb-1">External Reference</label>
               <input
                 type="text"
                 value={externalRef}
                 onChange={e => setExternalRef(e.target.value)}
-                className="w-full px-2 py-1.5 text-sm font-mono border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
+                className="w-full px-2 py-1.5 text-sm border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
                 placeholder="JIRA-123"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-mono text-mc-text-secondary mb-1">Acceptance Criteria</label>
+              <label className="block text-sm text-mc-text-secondary mb-1">Acceptance Criteria</label>
               <div className="space-y-2">
                 {criteria.length > 0 && (
                   <div className="space-y-1">
                     {criteria.map(c => (
                       <div key={c.id} className="flex items-center gap-2 p-2 bg-mc-bg border border-mc-border rounded">
-                        <span className="flex-1 text-xs text-mc-text truncate">{c.description}</span>
+                        <span className="flex-1 text-sm text-mc-text truncate">{c.description}</span>
                         <button
                           type="button"
                           onClick={() => removeCriterion(c.id)}
@@ -267,14 +267,14 @@ export function OrgTicketCreateModal({
                     value={newCriterion}
                     onChange={e => setNewCriterion(e.target.value)}
                     onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addCriterion(); } }}
-                    className="flex-1 px-2 py-1.5 text-sm font-mono border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
+                    className="flex-1 px-2 py-1.5 text-sm border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
                     placeholder="Add acceptance criterion..."
                   />
                   <button
                     type="button"
                     onClick={addCriterion}
                     disabled={!newCriterion.trim()}
-                    className="px-2 py-1.5 text-xs font-mono bg-mc-bg border border-mc-border rounded hover:border-mc-accent text-mc-text-secondary hover:text-mc-text disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                    className="px-2 py-1.5 text-sm bg-mc-bg border border-mc-border rounded hover:border-mc-accent text-mc-text-secondary hover:text-mc-text disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
                   >
                     <Plus size={12} />
                     <span className="hidden sm:inline">Add</span>
@@ -285,7 +285,7 @@ export function OrgTicketCreateModal({
 
             {/* Attachments */}
             <div>
-              <label className="block text-xs font-mono text-mc-text-secondary mb-1">Attachments</label>
+              <label className="block text-sm text-mc-text-secondary mb-1">Attachments</label>
               <div
                 className="border-2 border-dashed border-mc-border rounded p-4 text-center cursor-pointer hover:border-mc-accent transition-colors"
                 onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
@@ -333,14 +333,14 @@ export function OrgTicketCreateModal({
             <button
               type="button"
               onClick={onClose}
-              className="px-3 py-1.5 text-xs font-mono text-mc-text-secondary hover:text-mc-text border border-mc-border rounded"
+              className="px-3 py-1.5 text-sm text-mc-text-secondary hover:text-mc-text border border-mc-border rounded"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={submitting || !title.trim()}
-              className="px-3 py-1.5 text-xs font-mono bg-mc-accent text-white rounded hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+              className="px-3 py-1.5 text-sm bg-mc-accent text-white rounded hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
             >
               {submitting ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
               {submitting ? 'Creating...' : 'Create Ticket'}

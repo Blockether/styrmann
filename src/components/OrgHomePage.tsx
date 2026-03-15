@@ -30,7 +30,7 @@ export function OrgHomePage() {
       <Header />
 
       <div className="p-6 max-w-5xl mx-auto">
-        <h1 className="font-mono text-lg font-bold text-mc-text mb-6">Organizations</h1>
+        <h1 className="text-lg font-semibold text-mc-text mb-6">Organizations</h1>
 
         {loading && (
           <div className="text-sm text-mc-text-secondary">Loading...</div>
@@ -41,7 +41,18 @@ export function OrgHomePage() {
         )}
 
         {!loading && !error && orgs.length === 0 && (
-          <div className="text-sm text-mc-text-secondary">No organizations found.</div>
+          <div className="rounded border border-mc-border bg-mc-bg-secondary min-h-[260px] flex items-center justify-center px-6">
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <Building2 size={32} className="text-mc-text-secondary mb-4" />
+              <h2 className="text-lg font-semibold mb-2 text-mc-text">No organizations found</h2>
+              <p className="text-sm text-mc-text-secondary max-w-md mb-6">
+                Organizations appear here after at least one workspace is linked to an organization.
+              </p>
+              <Link href="/" className="px-4 py-2 text-sm border border-mc-border rounded hover:bg-mc-bg">
+                Browse all workspaces
+              </Link>
+            </div>
+          </div>
         )}
 
         {!loading && orgs.length > 0 && (
@@ -55,14 +66,14 @@ export function OrgHomePage() {
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-center gap-2">
                     <Building2 size={16} className="text-mc-accent shrink-0 mt-0.5" />
-                    <span className="font-mono text-sm font-semibold text-mc-text">{org.name}</span>
+                    <span className="text-base font-semibold text-mc-text">{org.name}</span>
                   </div>
                   <ChevronRight size={14} className="text-mc-text-secondary shrink-0 mt-0.5" />
                 </div>
                 {org.description && (
-                  <p className="mt-2 text-xs text-mc-text-secondary line-clamp-2">{org.description}</p>
+                  <p className="mt-2 text-sm text-mc-text-secondary line-clamp-2">{org.description}</p>
                 )}
-                <div className="mt-3 flex items-center gap-1 text-xs text-mc-text-secondary">
+                <div className="mt-3 flex items-center gap-1 text-sm text-mc-text-secondary">
                   <Folder size={12} />
                   <span>{org.workspace_count} workspace{org.workspace_count !== 1 ? 's' : ''}</span>
                 </div>

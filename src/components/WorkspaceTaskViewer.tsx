@@ -24,12 +24,12 @@ export function WorkspaceTaskViewer({ task, onClose }: Props) {
         <div className="p-3 border-b border-mc-border flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <CheckCircle2 size={16} className={STATUS_COLORS[task.status] || 'text-mc-text-secondary'} />
-            <span className="font-mono text-sm font-semibold text-mc-text truncate">{task.title}</span>
+            <span className="text-lg font-semibold text-mc-text truncate">{task.title}</span>
           </div>
           <button onClick={onClose} className="text-mc-text-secondary hover:text-mc-text"><X size={16} /></button>
         </div>
         <div className="p-4 overflow-y-auto flex-1 space-y-3">
-          <div className="text-xs text-mc-text-secondary font-mono uppercase tracking-wide">Read-only -- managed by orchestrator</div>
+          <div className="text-sm text-mc-text-secondary">Read-only - managed by orchestrator</div>
           <div className="flex flex-wrap gap-2">
             <span className="text-xs px-2 py-0.5 rounded font-mono bg-mc-bg border border-mc-border text-mc-text-secondary">{task.status}</span>
             <span className="text-xs px-2 py-0.5 rounded font-mono bg-mc-bg border border-mc-border text-mc-text-secondary">{task.priority}</span>
@@ -40,15 +40,15 @@ export function WorkspaceTaskViewer({ task, onClose }: Props) {
             <div className="flex items-center gap-1 text-sm text-mc-text-secondary">
               <Ticket size={14} className="text-mc-accent" />
               <span className="font-medium">Delegated from org ticket</span>
-              <span className="font-mono">{task.org_ticket_id}</span>
+              <span>{task.org_ticket_id}</span>
             </div>
           )}
-          <div className="flex gap-4 text-xs text-mc-text-secondary">
-            {task.due_date && <span className="flex items-center gap-1"><Clock size={10} />{task.due_date}</span>}
+          <div className="flex gap-4 text-sm text-mc-text-secondary">
+            {task.due_date && <span className="flex items-center gap-1"><Clock size={12} />{task.due_date}</span>}
           </div>
         </div>
         <div className="p-3 border-t border-mc-border flex justify-end">
-          <button onClick={onClose} className="px-3 py-1.5 text-xs font-mono text-mc-text-secondary hover:text-mc-text border border-mc-border rounded">Close</button>
+          <button onClick={onClose} className="px-3 py-1.5 text-sm text-mc-text-secondary hover:text-mc-text border border-mc-border rounded">Close</button>
         </div>
       </div>
     </div>

@@ -24,7 +24,57 @@ interface OrgDetail {
   name: string;
   slug: string;
   description: string | null;
-  workspaces?: Array<{ id: string; name: string; slug: string }>;
+  workspaces?: Array<{
+    id: string;
+    name: string;
+    slug: string;
+    description?: string | null;
+    updated_at?: string;
+    created_at?: string;
+  }>;
+}
+
+interface WorkspaceStats {
+  id: string;
+  taskCounts?: {
+    total: number;
+  };
+}
+
+interface WorkspaceSummary {
+  taskCount: number;
+  activeSprintName: string;
+  lastActivity: string;
+}
+
+function formatRelativeTime(timestamp?: string): string {
+  if (!timestamp) {
+    return 'No recent activity';
+  }
+
+  const when = new Date(timestamp);
+  if (Number.isNaN(when.getTime())) {
+    return 'No recent activity';
+  }
+
+  const diffMs = Date.now() - when.getTime();
+  const diffMinutes = Math.floor(diffMs / 60000);
+
+  if (diffMinutes < 1) {
+    return 'Updated just now';
+  }
+
+  if (diffMinutes < 60) {
+    return `Updated ${diffMinutes} minute${diffMinutes === 1 ? '' : 's'} ago`;
+  }
+
+  const diffHours = Math.floor(diffMinutes / 60);
+  if (diffHours < 24) {
+    return `Updated ${diffHours} hour${diffHours === 1 ? '' : 's'} ago`;
+  }
+
+  const diffDays = Math.floor(diffHours / 24);
+  return `Updated ${diffDays} day${diffDays === 1 ? '' : 's'} ago`;
 }
 
 const SPRINT_STATUS_COLORS: Record<string, string> = {
@@ -66,6 +116,7 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
   const [sprints, setSprints] = useState<OrgSprint[]>([]);
   const [milestones, setMilestones] = useState<OrgMilestone[]>([]);
   const [knowledge, setKnowledge] = useState<KnowledgeArticle[]>([]);
+  const [workspaceSummaries, setWorkspaceSummaries] = useState<Record<string, WorkspaceSummary>>({});
   const [loading, setLoading] = useState(true);
 
   const [selectedSprintId, setSelectedSprintId] = useState<string>('backlog');
@@ -112,6 +163,57 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
     setKnowledge(knowledgeRes.ok ? ((await knowledgeRes.json()) as KnowledgeArticle[]) : []);
   }, []);
 
+  const loadWorkspaceSummaries = useCallback(async (workspaces: NonNullable<OrgDetail['workspaces']>) => {
+    if (workspaces.length === 0) {
+      setWorkspaceSummaries({});
+      return;
+    }
+
+    let workspaceStats: WorkspaceStats[] = [];
+    try {
+      const statsRes = await fetch('/api/workspaces?stats=true');
+      if (statsRes.ok) {
+        workspaceStats = (await statsRes.json()) as WorkspaceStats[];
+      }
+    } catch {
+      workspaceStats = [];
+    }
+
+    const statsByWorkspaceId = new Map(workspaceStats.map((entry) => [entry.id, entry]));
+
+    const summaryEntries = await Promise.all(
+      workspaces.map(async (workspace) => {
+        let activeSprintName = 'No active sprint';
+
+        try {
+          const sprintRes = await fetch(`/api/sprints?workspace_id=${workspace.id}`);
+          if (sprintRes.ok) {
+            const workspaceSprints = (await sprintRes.json()) as Array<{ name: string; status: string }>;
+            const activeSprint = workspaceSprints.find((sprint) => sprint.status === 'active');
+            const plannedSprint = workspaceSprints.find((sprint) => sprint.status === 'planning');
+            activeSprintName = activeSprint?.name || plannedSprint?.name || 'No active sprint';
+          }
+        } catch {
+          activeSprintName = 'No active sprint';
+        }
+
+        const taskCount = statsByWorkspaceId.get(workspace.id)?.taskCounts?.total ?? 0;
+        const lastActivity = formatRelativeTime(workspace.updated_at || workspace.created_at);
+
+        return [
+          workspace.id,
+          {
+            taskCount,
+            activeSprintName,
+            lastActivity,
+          },
+        ] as const;
+      })
+    );
+
+    setWorkspaceSummaries(Object.fromEntries(summaryEntries));
+  }, []);
+
   const refetchAll = useCallback(async () => {
     if (!org?.id) {
       return;
@@ -128,7 +230,7 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
         if (!orgData || !mounted) {
           return;
         }
-        await loadOrgResources(orgData.id);
+        await Promise.all([loadOrgResources(orgData.id), loadWorkspaceSummaries(orgData.workspaces || [])]);
       } finally {
         if (mounted) {
           setLoading(false);
@@ -145,7 +247,7 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
     return () => {
       mounted = false;
     };
-  }, [loadOrganization, loadOrgResources]);
+  }, [loadOrganization, loadOrgResources, loadWorkspaceSummaries]);
 
   useEffect(() => {
     if (selectedSprintId !== 'backlog' && sprints.some((s) => s.id === selectedSprintId)) {
@@ -292,18 +394,26 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
   const selectedSprint = selectedSprintId === 'backlog' ? null : sprints.find((sprint) => sprint.id === selectedSprintId) || null;
   const hasSprints = sprints.length > 0;
   const hasTicketsInSelection = filteredTickets.length > 0;
+  const openTickets = tickets.filter((ticket) => !['resolved', 'closed'].includes(ticket.status)).length;
+  const delegatedCount = tickets.filter((ticket) => ticket.status === 'delegated').length;
   const unassignedTickets = milestoneTicketMap.get('no-milestone') || [];
   const showUnassignedSection = unassignedTickets.length > 0;
-  const showNoSprintEmptyState = activeTab === 'board' && !hasSprints;
+  const showNoSprintEmptyState = activeTab === 'board' && !hasSprints && tickets.length === 0;
   const showNoTicketEmptyState = activeTab === 'board' && hasSprints && !hasTicketsInSelection;
 
   return (
     <div data-component="src/components/OrgDetailView" className="min-h-screen bg-mc-bg">
       <Header />
 
-      <div className="px-6 py-2 border-b border-mc-border bg-mc-bg-secondary flex items-center gap-2">
-        <Building2 size={16} className="text-mc-accent" />
-        <span className="text-sm font-semibold text-mc-text">{org.name}</span>
+      <div className="px-6 py-3 border-b border-mc-border bg-mc-bg flex items-center justify-between gap-2 flex-wrap">
+        <div className="flex items-center gap-3 min-w-0">
+          <Building2 size={20} className="text-mc-accent shrink-0" />
+          <h2 className="text-lg font-semibold text-mc-text truncate">{org.name}</h2>
+        </div>
+        <div className="flex items-center gap-4 text-sm text-mc-text-secondary">
+          <span>{tickets.length} tickets</span>
+          <span>{sprints.length} sprints</span>
+        </div>
       </div>
 
       {org.description && (
@@ -316,7 +426,7 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
             <Link
               key={tab}
               href={`?tab=${tab}`}
-              className={`px-4 py-2 text-sm font-mono border-b-2 transition-colors ${
+               className={`px-4 py-2 text-sm border-b-2 transition-colors flex items-center gap-1 ${
                 activeTab === tab
                   ? 'border-mc-accent text-mc-text'
                   : 'border-transparent text-mc-text-secondary hover:text-mc-text'
@@ -324,21 +434,21 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
             >
               {tab === 'board' && (
                 <>
-                  <Layers size={14} className="inline mr-1" />
+                  <Layers size={14} className="shrink-0" />
                   <span className="hidden sm:inline">Board</span>
                   <span className="sm:hidden">B</span>
                 </>
               )}
               {tab === 'knowledge' && (
                 <>
-                  <BookOpen size={14} className="inline mr-1" />
+                  <BookOpen size={14} className="shrink-0" />
                   <span className="hidden sm:inline">Knowledge</span>
                   <span className="sm:hidden">K</span>
                 </>
               )}
               {tab === 'workspaces' && (
                 <>
-                  <Folder size={14} className="inline mr-1" />
+                  <Folder size={14} className="shrink-0" />
                   <span className="hidden sm:inline">Workspaces</span>
                   <span className="sm:hidden">W</span>
                 </>
@@ -349,8 +459,23 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
 
         {activeTab === 'board' && (
           <div className="space-y-4">
-            {hasSprints && (
-              <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="p-4 rounded-lg border border-mc-border bg-mc-bg-secondary">
+                <div className="text-sm text-mc-text-secondary">Open Tickets</div>
+                <div className="text-2xl font-semibold mt-1 text-mc-text">{openTickets}</div>
+              </div>
+              <div className="p-4 rounded-lg border border-mc-border bg-mc-bg-secondary">
+                <div className="text-sm text-mc-text-secondary">Milestones</div>
+                <div className="text-2xl font-semibold mt-1 text-mc-text">{milestones.length}</div>
+              </div>
+              <div className="p-4 rounded-lg border border-mc-border bg-mc-bg-secondary">
+                <div className="text-sm text-mc-text-secondary">Delegated</div>
+                <div className="text-2xl font-semibold mt-1 text-mc-text">{delegatedCount}</div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              {hasSprints ? (
                 <div className="flex items-center gap-2 flex-wrap">
                   <select
                     value={selectedSprintId}
@@ -365,43 +490,46 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
                     ))}
                   </select>
                   {selectedSprint && (
-                    <span className={`px-2 py-1 rounded text-sm font-mono ${SPRINT_STATUS_COLORS[selectedSprint.status] || 'bg-gray-100 text-gray-700'}`}>
+                    <span className={`px-2 py-0.5 rounded text-xs font-mono ${SPRINT_STATUS_COLORS[selectedSprint.status] || 'bg-gray-100 text-gray-700'}`}>
                       {selectedSprint.status}
                     </span>
                   )}
                 </div>
+              ) : (
+                <span className="text-sm text-mc-text-secondary">Create a sprint to organize tickets into iterations.</span>
+              )}
 
-                <div className="flex items-center gap-2 flex-wrap">
-                  <button
-                    onClick={() => setShowCreateTicketModal(true)}
-                    className="px-3 py-1.5 text-sm font-mono bg-mc-accent text-white rounded hover:opacity-90 flex items-center gap-1"
-                  >
-                    <Plus size={14} />
-                    <span className="hidden sm:inline">Ticket</span>
-                  </button>
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  onClick={() => {
+                    setShowSprintForm((prev) => !prev);
+                    setShowMilestoneForm(false);
+                  }}
+                  className="px-3 py-1.5 text-sm bg-mc-accent text-white rounded hover:opacity-90"
+                >
+                  Create Sprint
+                </button>
+                <button
+                  onClick={() => setShowCreateTicketModal(true)}
+                  className="px-3 py-1.5 text-sm border border-mc-border rounded hover:bg-mc-bg-secondary flex items-center gap-1"
+                >
+                  <Plus size={14} />
+                  <span className="hidden sm:inline">Create Ticket</span>
+                  <span className="sm:hidden">Ticket</span>
+                </button>
+                {selectedSprint && (
                   <button
                     onClick={() => {
-                      setShowSprintForm((prev) => !prev);
-                      setShowMilestoneForm(false);
+                      setShowMilestoneForm((prev) => !prev);
+                      setShowSprintForm(false);
                     }}
                     className="px-3 py-1.5 text-sm border border-mc-border rounded hover:bg-mc-bg-secondary"
                   >
-                    Create Sprint
+                    Add Milestone
                   </button>
-                  {selectedSprint && (
-                    <button
-                      onClick={() => {
-                        setShowMilestoneForm((prev) => !prev);
-                        setShowSprintForm(false);
-                      }}
-                      className="px-3 py-1.5 text-sm border border-mc-border rounded hover:bg-mc-bg-secondary"
-                    >
-                      Add Milestone
-                    </button>
-                  )}
-                </div>
+                )}
               </div>
-            )}
+            </div>
 
             {showSprintForm && (
               <div className="p-4 rounded border border-mc-border bg-mc-bg-secondary">
@@ -515,26 +643,24 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
 
             {showNoSprintEmptyState && (
               <div className="rounded border border-mc-border bg-mc-bg-secondary min-h-[320px] flex items-center justify-center px-6">
-                <div className="max-w-md text-center space-y-4">
-                  <div className="mx-auto w-12 h-12 rounded-full bg-mc-bg flex items-center justify-center border border-mc-border">
-                    <Layers size={22} className="text-mc-accent" />
-                  </div>
-                  <div className="space-y-2">
-                    <h3 className="text-xl font-semibold text-mc-text">No sprints yet</h3>
-                    <p className="text-sm text-mc-text-secondary">Create your first sprint to start organizing work.</p>
-                  </div>
+                <div className="flex flex-col items-center justify-center py-16 text-center">
+                  <Layers size={32} className="text-mc-text-secondary mb-4" />
+                  <h3 className="text-lg font-semibold mb-2 text-mc-text">Get started with your first sprint</h3>
+                  <p className="text-sm text-mc-text-secondary max-w-md mb-6">
+                    Sprints help you organize work into time-boxed iterations. Create a sprint, add tickets, and delegate them to your engineering team.
+                  </p>
                   <div className="flex items-center justify-center gap-3 flex-wrap">
                     <button
                       onClick={() => setShowSprintForm(true)}
                       className="px-4 py-2 text-sm bg-mc-accent text-white rounded hover:opacity-90"
                     >
-                      Create Sprint
+                      Create First Sprint
                     </button>
                     <button
                       onClick={() => setShowCreateTicketModal(true)}
-                      className="px-4 py-2 text-sm border border-mc-border rounded hover:bg-mc-bg"
+                      className="px-4 py-2 text-sm text-mc-text-secondary hover:text-mc-text border border-mc-border rounded hover:bg-mc-bg"
                     >
-                      Create Ticket
+                      or create a ticket directly
                     </button>
                   </div>
                 </div>
@@ -543,14 +669,14 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
 
             {showNoTicketEmptyState && (
               <div className="rounded border border-mc-border bg-mc-bg-secondary min-h-[220px] flex items-center justify-center px-6">
-                <div className="max-w-md text-center space-y-4">
-                  <div className="mx-auto w-12 h-12 rounded-full bg-mc-bg flex items-center justify-center border border-mc-border">
-                    <Ticket size={22} className="text-mc-accent" />
-                  </div>
-                  <div className="space-y-1">
-                    <h3 className="text-lg font-semibold text-mc-text">No tickets in this sprint yet.</h3>
-                    <p className="text-sm text-mc-text-secondary">Create a ticket to get started.</p>
-                  </div>
+                <div className="flex flex-col items-center justify-center py-16 text-center">
+                  <Ticket size={32} className="text-mc-text-secondary mb-4" />
+                  <h3 className="text-lg font-semibold mb-2 text-mc-text">
+                    No tickets in {selectedSprint?.name || 'this sprint'}
+                  </h3>
+                  <p className="text-sm text-mc-text-secondary max-w-md mb-6">
+                    Add a ticket to start tracking work in this sprint.
+                  </p>
                   <button
                     onClick={() => setShowCreateTicketModal(true)}
                     className="px-4 py-2 text-sm bg-mc-accent text-white rounded hover:opacity-90"
@@ -582,9 +708,9 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
                         <div className="flex items-center justify-between gap-3 flex-wrap">
                           <div className="flex items-center gap-2 min-w-0">
                             {isOpen ? <ChevronDown size={16} className="text-mc-text-secondary" /> : <ChevronRight size={16} className="text-mc-text-secondary" />}
-                            <span className="font-mono text-base text-mc-text truncate">{milestone.name}</span>
+                            <span className="text-base font-semibold text-mc-text truncate">{milestone.name}</span>
                             {milestone.id !== 'no-milestone' && (
-                              <span className={`px-2 py-0.5 rounded text-sm font-mono ${statusClass}`}>{milestone.status}</span>
+                              <span className={`px-2 py-0.5 rounded text-xs font-mono ${statusClass}`}>{milestone.status}</span>
                             )}
                           </div>
                           <div className="flex items-center gap-2 text-sm text-mc-text-secondary">
@@ -606,18 +732,18 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
                               >
                                 <div className="flex items-start justify-between gap-3">
                                   <div className="flex items-center gap-2 min-w-0">
-                                    <span className={`px-2 py-0.5 rounded text-sm font-mono ${typeConfig.color}`}>{typeConfig.label}</span>
+                                    <span className={`px-2 py-0.5 rounded text-xs font-mono ${typeConfig.color}`}>{typeConfig.label}</span>
                                     <span className="text-sm text-mc-text truncate">{ticket.title}</span>
                                   </div>
                                   <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
-                                    <span className={`px-2 py-0.5 rounded text-sm font-mono ${STATUS_COLORS[ticket.status] || 'bg-gray-100 text-gray-700'}`}>
+                                    <span className={`px-2 py-0.5 rounded text-xs font-mono ${STATUS_COLORS[ticket.status] || 'bg-gray-100 text-gray-700'}`}>
                                       {ticket.status}
                                     </span>
-                                    <span className={`px-2 py-0.5 rounded text-sm font-mono ${PRIORITY_COLORS[ticket.priority] || 'bg-slate-100 text-slate-700'}`}>
+                                    <span className={`px-2 py-0.5 rounded text-xs font-mono ${PRIORITY_COLORS[ticket.priority] || 'bg-slate-100 text-slate-700'}`}>
                                       {ticket.priority}
                                     </span>
                                     {typeof ticket.story_points === 'number' && (
-                                      <span className="px-2 py-0.5 rounded text-sm font-mono bg-mc-bg-secondary border border-mc-border text-mc-text-secondary">
+                                      <span className="px-2 py-0.5 rounded text-xs font-mono bg-mc-bg-secondary border border-mc-border text-mc-text-secondary">
                                         {ticket.story_points}sp
                                       </span>
                                     )}
@@ -642,15 +768,40 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
         {activeTab === 'knowledge' && (
           <div className="space-y-2">
             {knowledge.length === 0 ? (
-              <div className="p-3 rounded border border-mc-border bg-mc-bg-secondary text-sm text-mc-text-secondary">
-                No knowledge articles yet.
+              <div className="rounded border border-mc-border bg-mc-bg-secondary min-h-[320px] flex items-center justify-center px-6">
+                <div className="flex flex-col items-center justify-center py-16 text-center">
+                  <BookOpen size={32} className="text-mc-text-secondary mb-4" />
+                  <h3 className="text-lg font-semibold mb-2 text-mc-text">No knowledge articles yet</h3>
+                  <p className="text-sm text-mc-text-secondary max-w-md mb-4">
+                    Knowledge articles are automatically synthesized from your team&apos;s memories and decisions. Start by recording memories through the API.
+                  </p>
+                  <pre className="text-sm font-mono text-left rounded border border-mc-border bg-mc-bg p-3 mb-4 overflow-x-auto">
+{`POST /api/memories
+{
+  "memory_type": "decision",
+  "title": "We chose PostgreSQL",
+  "body": "Because of..."
+}`}
+                  </pre>
+                  <p className="text-sm text-mc-text-secondary max-w-md mb-6">
+                    Once you have enough memories, knowledge synthesis runs automatically.
+                  </p>
+                  <a
+                    href="/api/memories"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="px-4 py-2 text-sm border border-mc-border rounded hover:bg-mc-bg"
+                  >
+                    Open Memories API
+                  </a>
+                </div>
               </div>
             ) : (
               knowledge.map((article) => (
                 <article key={article.id} className="p-3 rounded border border-mc-border bg-mc-bg-secondary">
                   <div className="flex items-center justify-between gap-2 flex-wrap">
-                    <h3 className="font-mono text-base text-mc-text">{article.title}</h3>
-                    <span className={`px-2 py-0.5 rounded text-sm font-mono ${article.status === 'stale' ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'}`}>
+                    <h3 className="text-base font-semibold text-mc-text">{article.title}</h3>
+                    <span className={`px-2 py-0.5 rounded text-xs font-mono ${article.status === 'stale' ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'}`}>
                       {article.status}
                     </span>
                   </div>
@@ -667,18 +818,38 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
               <Link
                 key={workspace.id}
                 href={`/workspace/${workspace.slug}`}
-                className="block p-3 rounded border border-mc-border bg-mc-bg-secondary hover:border-mc-accent transition-colors"
+                className="block p-4 rounded-lg border border-mc-border bg-mc-bg-secondary hover:border-mc-accent transition-colors"
               >
-                <div className="flex items-center gap-2">
-                  <Folder size={14} className="text-mc-accent shrink-0" />
-                  <span className="font-mono text-base text-mc-text">{workspace.name}</span>
+                <div className="flex items-center gap-3">
+                  <Folder size={18} className="text-mc-accent shrink-0" />
+                  <div className="min-w-0">
+                    <span className="text-base font-semibold text-mc-text block truncate">{workspace.name}</span>
+                    {workspace.description ? (
+                      <p className="text-sm text-mc-text-secondary mt-0.5 line-clamp-2">{workspace.description}</p>
+                    ) : (
+                      <p className="text-sm text-mc-text-secondary mt-0.5">Tasks managed by AI agents</p>
+                    )}
+                  </div>
                 </div>
-                <p className="mt-1 text-sm text-mc-text-secondary">{workspace.slug}</p>
+                <div className="mt-3 flex flex-wrap gap-4 text-sm text-mc-text-secondary">
+                  <span>{workspaceSummaries[workspace.id]?.taskCount ?? 0} tasks</span>
+                  <span>{workspaceSummaries[workspace.id]?.activeSprintName ?? 'No active sprint'}</span>
+                  <span>{workspaceSummaries[workspace.id]?.lastActivity ?? 'No recent activity'}</span>
+                </div>
               </Link>
             ))}
             {(org.workspaces || []).length === 0 && (
-              <div className="p-3 rounded border border-mc-border bg-mc-bg-secondary text-sm text-mc-text-secondary">
-                No workspaces in this organization.
+              <div className="sm:col-span-2 rounded border border-mc-border bg-mc-bg-secondary min-h-[260px] flex items-center justify-center px-6">
+                <div className="flex flex-col items-center justify-center py-16 text-center">
+                  <Folder size={32} className="text-mc-text-secondary mb-4" />
+                  <h3 className="text-lg font-semibold mb-2 text-mc-text">No workspaces in this organization</h3>
+                  <p className="text-sm text-mc-text-secondary max-w-md mb-6">
+                    Workspaces are where delegated tasks are executed. Create or connect a workspace to start routing org tickets.
+                  </p>
+                  <Link href="/" className="px-4 py-2 text-sm border border-mc-border rounded hover:bg-mc-bg">
+                    Browse all workspaces
+                  </Link>
+                </div>
               </div>
             )}
           </div>

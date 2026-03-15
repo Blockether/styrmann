@@ -370,7 +370,7 @@ export function OrgTicketModal({ ticketId, organizationId, onClose, onUpdated }:
       <div data-component="src/components/OrgTicketModal" className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-4">
         <div className="bg-mc-bg-secondary border border-mc-border rounded w-full max-w-2xl shadow-lg p-6">
           <p className="text-sm text-mc-text-secondary">{error || 'Ticket not found'}</p>
-          <button onClick={onClose} className="mt-4 px-3 py-1.5 text-xs font-mono border border-mc-border rounded hover:bg-mc-bg">Close</button>
+          <button onClick={onClose} className="mt-4 px-3 py-1.5 text-sm border border-mc-border rounded hover:bg-mc-bg">Close</button>
         </div>
       </div>
     );
@@ -385,7 +385,7 @@ export function OrgTicketModal({ ticketId, organizationId, onClose, onUpdated }:
         <div className="p-3 border-b border-mc-border flex items-center justify-between gap-2 flex-shrink-0">
           <div className="flex items-center gap-2 min-w-0">
             <Ticket size={16} className="text-mc-accent shrink-0" />
-            <span className="font-mono text-sm font-semibold text-mc-text truncate">{ticket.title}</span>
+            <span className="text-lg font-semibold text-mc-text truncate">{ticket.title}</span>
           </div>
           <button onClick={onClose} className="text-mc-text-secondary hover:text-mc-text shrink-0">
             <X size={16} />
@@ -398,7 +398,7 @@ export function OrgTicketModal({ ticketId, organizationId, onClose, onUpdated }:
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`px-4 py-2 text-xs font-mono border-b-2 transition-colors ${
+              className={`px-4 py-2 text-sm border-b-2 transition-colors ${
                 activeTab === tab.id
                   ? 'border-mc-accent text-mc-text'
                   : 'border-transparent text-mc-text-secondary hover:text-mc-text'
@@ -413,7 +413,7 @@ export function OrgTicketModal({ ticketId, organizationId, onClose, onUpdated }:
         <div ref={contentRef} className="flex-1 overflow-y-auto p-4">
           {error && (
             <div className="mb-4 p-3 rounded bg-red-50 border border-red-200">
-              <p className="text-xs font-mono text-red-800">{error}</p>
+              <p className="text-sm text-red-800">{error}</p>
             </div>
           )}
 
@@ -421,47 +421,47 @@ export function OrgTicketModal({ ticketId, organizationId, onClose, onUpdated }:
           {activeTab === 'overview' && (
             <div className="space-y-4">
               <div>
-                <label className="block text-xs font-mono text-mc-text-secondary mb-1">Title</label>
+                <label className="block text-sm text-mc-text-secondary mb-1">Title</label>
                 <input
                   type="text"
                   value={form.title}
                   onChange={e => setForm({ ...form, title: e.target.value })}
-                  className="w-full px-2 py-1.5 text-sm font-mono border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
+                  className="w-full px-2 py-1.5 text-sm border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-mono text-mc-text-secondary mb-1">Description</label>
+                <label className="block text-sm text-mc-text-secondary mb-1">Description</label>
                 <textarea
                   value={form.description}
                   onChange={e => setForm({ ...form, description: e.target.value })}
                   rows={3}
-                  className="w-full px-2 py-1.5 text-sm font-mono border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent resize-none"
+                  className="w-full px-2 py-1.5 text-sm border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent resize-none"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-mono text-mc-text-secondary mb-1">Status</label>
+                  <label className="block text-sm text-mc-text-secondary mb-1">Status</label>
                   <select
                     value={form.status}
                     onChange={e => setForm({ ...form, status: e.target.value as OrgTicketStatus })}
-                    className="w-full px-2 py-1.5 text-sm font-mono border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
+                    className="w-full px-2 py-1.5 text-sm border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
                   >
                     <option value={ticket.status}>{ticket.status}</option>
                     {STATUS_TRANSITIONS[ticket.status]?.map(s => (
                       <option key={s} value={s}>{s}</option>
                     ))}
                   </select>
-                  <p className="text-xs text-mc-text-secondary mt-1">Valid transitions from {ticket.status}</p>
+                  <p className="text-sm text-mc-text-secondary mt-1">Valid transitions from {ticket.status}</p>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-mono text-mc-text-secondary mb-1">Priority</label>
+                  <label className="block text-sm text-mc-text-secondary mb-1">Priority</label>
                   <select
                     value={form.priority}
                     onChange={e => setForm({ ...form, priority: e.target.value as typeof form.priority })}
-                    className="w-full px-2 py-1.5 text-sm font-mono border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
+                    className="w-full px-2 py-1.5 text-sm border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
                   >
                     <option value="low">Low</option>
                     <option value="normal">Normal</option>
@@ -473,11 +473,11 @@ export function OrgTicketModal({ ticketId, organizationId, onClose, onUpdated }:
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-mono text-mc-text-secondary mb-1">Ticket Type</label>
+                  <label className="block text-sm text-mc-text-secondary mb-1">Ticket Type</label>
                   <select
                     value={form.ticket_type}
                     onChange={e => setForm({ ...form, ticket_type: e.target.value as OrgTicketType })}
-                    className="w-full px-2 py-1.5 text-sm font-mono border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
+                    className="w-full px-2 py-1.5 text-sm border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
                   >
                     <option value="task">Task</option>
                     <option value="feature">Feature</option>
@@ -488,48 +488,48 @@ export function OrgTicketModal({ ticketId, organizationId, onClose, onUpdated }:
                 </div>
 
                 <div>
-                  <label className="block text-xs font-mono text-mc-text-secondary mb-1">Story Points</label>
+                  <label className="block text-sm text-mc-text-secondary mb-1">Story Points</label>
                   <input
                     type="number"
                     min={0}
                     max={100}
                     value={form.story_points}
                     onChange={e => setForm({ ...form, story_points: e.target.value === '' ? '' : parseInt(e.target.value, 10) })}
-                    className="w-full px-2 py-1.5 text-sm font-mono border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
+                    className="w-full px-2 py-1.5 text-sm border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
                     placeholder="0-100"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-mono text-mc-text-secondary mb-1">Due Date</label>
+                <label className="block text-sm text-mc-text-secondary mb-1">Due Date</label>
                 <input
                   type="date"
                   value={form.due_date}
                   onChange={e => setForm({ ...form, due_date: e.target.value })}
-                  className="w-full px-2 py-1.5 text-sm font-mono border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
+                  className="w-full px-2 py-1.5 text-sm border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-mono text-mc-text-secondary mb-1">Assignee</label>
+                <label className="block text-sm text-mc-text-secondary mb-1">Assignee</label>
                 <input
                   type="text"
                   value={form.assignee}
                   onChange={e => setForm({ ...form, assignee: e.target.value })}
-                  className="w-full px-2 py-1.5 text-sm font-mono border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
+                  className="w-full px-2 py-1.5 text-sm border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
                   placeholder="Assignee name"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-mono text-mc-text-secondary mb-1">External Reference</label>
+                  <label className="block text-sm text-mc-text-secondary mb-1">External Reference</label>
                   <input
                     type="text"
                     value={form.external_ref}
                     onChange={e => setForm({ ...form, external_ref: e.target.value })}
-                    className="w-full px-2 py-1.5 text-sm font-mono border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
+                    className="w-full px-2 py-1.5 text-sm border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
                     placeholder="JIRA-123"
                   />
                 </div>
@@ -543,9 +543,9 @@ export function OrgTicketModal({ ticketId, organizationId, onClose, onUpdated }:
           {activeTab === 'criteria' && (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-mono font-semibold text-mc-text">Acceptance Criteria</h3>
+                <h3 className="text-base font-semibold text-mc-text">Acceptance Criteria</h3>
                 {criteria.length > 0 && (
-                  <span className="text-xs text-mc-text-secondary">
+                  <span className="text-sm text-mc-text-secondary">
                     {criteria.filter(c => c.is_met).length}/{criteria.length} met
                   </span>
                 )}
@@ -573,18 +573,18 @@ export function OrgTicketModal({ ticketId, organizationId, onClose, onUpdated }:
                               value={editingCriterionDesc}
                               onChange={e => setEditingCriterionDesc(e.target.value)}
                               onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleEditCriteria(c.id); } }}
-                              className="flex-1 px-2 py-1 text-xs font-mono border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
+                              className="flex-1 px-2 py-1 text-sm border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
                               autoFocus
                             />
                             <button
                               onClick={() => handleEditCriteria(c.id)}
-                              className="px-2 py-1 text-xs font-mono bg-mc-accent text-white rounded hover:opacity-90"
+                              className="px-2 py-1 text-sm bg-mc-accent text-white rounded hover:opacity-90"
                             >
                               Save
                             </button>
                             <button
                               onClick={() => { setEditingCriterionId(null); setEditingCriterionDesc(''); }}
-                              className="px-2 py-1 text-xs font-mono border border-mc-border rounded hover:bg-mc-bg"
+                              className="px-2 py-1 text-sm border border-mc-border rounded hover:bg-mc-bg"
                             >
                               Cancel
                             </button>
@@ -625,12 +625,12 @@ export function OrgTicketModal({ ticketId, organizationId, onClose, onUpdated }:
                   onChange={e => setNewCriterionDesc(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddCriteria(); } }}
                   placeholder="Add acceptance criterion..."
-                  className="flex-1 px-2 py-1.5 text-sm font-mono border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
+                  className="flex-1 px-2 py-1.5 text-sm border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
                 />
                 <button
                   onClick={handleAddCriteria}
                   disabled={!newCriterionDesc.trim() || submittingCriteria}
-                  className="px-3 py-1.5 text-xs font-mono bg-mc-accent text-white rounded hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                  className="px-3 py-1.5 text-sm bg-mc-accent text-white rounded hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
                 >
                   {submittingCriteria ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
                   <span className="hidden sm:inline">Add</span>
@@ -643,9 +643,9 @@ export function OrgTicketModal({ ticketId, organizationId, onClose, onUpdated }:
           {activeTab === 'attachments' && (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-mono font-semibold text-mc-text">Attachments</h3>
+                <h3 className="text-base font-semibold text-mc-text">Attachments</h3>
                 {attachments.length > 0 && (
-                  <span className="text-xs text-mc-text-secondary">{attachments.length} file(s)</span>
+                  <span className="text-sm text-mc-text-secondary">{attachments.length} file(s)</span>
                 )}
               </div>
 
@@ -690,7 +690,7 @@ export function OrgTicketModal({ ticketId, organizationId, onClose, onUpdated }:
                   <button
                     onClick={handleUploadFiles}
                     disabled={uploadingFiles}
-                    className="px-3 py-1.5 text-xs font-mono bg-mc-accent text-white rounded hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                    className="px-3 py-1.5 text-sm bg-mc-accent text-white rounded hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
                   >
                     {uploadingFiles ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
                     {uploadingFiles ? 'Uploading...' : 'Upload Files'}
@@ -706,7 +706,7 @@ export function OrgTicketModal({ ticketId, organizationId, onClose, onUpdated }:
                         <Paperclip size={14} className="text-mc-text-secondary shrink-0" />
                         <div className="min-w-0">
                           <div className="text-sm text-mc-text truncate">{att.file_name}</div>
-                          <div className="text-xs text-mc-text-secondary">
+                          <div className="text-sm text-mc-text-secondary">
                             {att.file_size ? `${(att.file_size / 1024).toFixed(0)} KB` : 'Unknown size'}
                             {att.mime_type ? ` - ${att.mime_type}` : ''}
                           </div>
@@ -741,19 +741,19 @@ export function OrgTicketModal({ ticketId, organizationId, onClose, onUpdated }:
           {/* Delegation Tab */}
           {activeTab === 'delegation' && (
             <div className="space-y-4">
-              <h3 className="text-sm font-mono font-semibold text-mc-text">Delegation</h3>
+              <h3 className="text-base font-semibold text-mc-text">Delegation</h3>
 
               {delegationResult && (
                 <div className="p-3 rounded bg-green-50 border border-green-200">
-                  <p className="text-xs font-mono text-green-800 font-semibold">Delegated successfully</p>
-                  <p className="text-xs text-green-700 mt-1">{delegationResult.task_ids.length} workspace task(s) created</p>
+                  <p className="text-sm text-green-800 font-semibold">Delegated successfully</p>
+                  <p className="text-sm text-green-700 mt-1">{delegationResult.task_ids.length} workspace task(s) created</p>
                 </div>
               )}
 
               {/* Existing delegated tasks */}
               {ticket.delegated_tasks && ticket.delegated_tasks.length > 0 && (
                 <div>
-                  <p className="text-xs font-mono text-mc-text-secondary mb-2">Delegated Tasks</p>
+                  <p className="text-sm text-mc-text-secondary mb-2">Delegated Tasks</p>
                   <div className="space-y-2">
                     {ticket.delegated_tasks.map(task => (
                       <div key={task.id} className="p-2 bg-mc-bg border border-mc-border rounded">
@@ -764,7 +764,7 @@ export function OrgTicketModal({ ticketId, organizationId, onClose, onUpdated }:
                           </span>
                         </div>
                         {task.workspace_name && (
-                          <div className="mt-1 flex items-center gap-1 text-xs text-mc-text-secondary">
+                          <div className="mt-1 flex items-center gap-1 text-sm text-mc-text-secondary">
                             <Folder size={10} />
                             <span>{task.workspace_name}</span>
                           </div>
@@ -779,24 +779,24 @@ export function OrgTicketModal({ ticketId, organizationId, onClose, onUpdated }:
               {canDelegate && (
                 <div className="space-y-3">
                   <div>
-                    <label className="block text-xs font-mono text-mc-text-secondary mb-1">Target Workspace</label>
+                    <label className="block text-sm text-mc-text-secondary mb-1">Target Workspace</label>
                     <select
                       value={selectedWorkspaceId}
                       onChange={e => setSelectedWorkspaceId(e.target.value)}
-                      className="w-full px-2 py-1.5 text-sm font-mono border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
+                      className="w-full px-2 py-1.5 text-sm border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
                     >
                       <option value="">Select workspace...</option>
                       {workspaces.map(ws => (
                         <option key={ws.id} value={ws.id}>{ws.name}</option>
                       ))}
                     </select>
-                    <p className="text-xs text-mc-text-secondary mt-1">Creates a workspace task linked to this org ticket</p>
+                    <p className="text-sm text-mc-text-secondary mt-1">Creates a workspace task linked to this org ticket.</p>
                   </div>
 
                   <button
                     onClick={handleDelegate}
                     disabled={!selectedWorkspaceId || delegating}
-                    className="w-full px-3 py-2 text-xs font-mono bg-mc-accent text-white rounded hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    className="w-full px-3 py-2 text-sm bg-mc-accent text-white rounded hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
                     {delegating ? <Loader2 size={12} className="animate-spin" /> : <Zap size={12} />}
                     {delegating ? 'Delegating...' : 'Delegate to Workspace'}
@@ -805,7 +805,7 @@ export function OrgTicketModal({ ticketId, organizationId, onClose, onUpdated }:
               )}
 
               {!canDelegate && (
-                <p className="text-xs text-mc-text-secondary">This ticket cannot be delegated in its current status.</p>
+                <p className="text-sm text-mc-text-secondary">This ticket cannot be delegated in its current status.</p>
               )}
             </div>
           )}
@@ -815,7 +815,7 @@ export function OrgTicketModal({ ticketId, organizationId, onClose, onUpdated }:
         <div className="p-3 border-t border-mc-border flex items-center justify-end gap-2 flex-shrink-0">
           <button
             onClick={onClose}
-            className="px-3 py-1.5 text-xs font-mono text-mc-text-secondary hover:text-mc-text border border-mc-border rounded"
+            className="px-3 py-1.5 text-sm text-mc-text-secondary hover:text-mc-text border border-mc-border rounded"
           >
             Close
           </button>
@@ -823,7 +823,7 @@ export function OrgTicketModal({ ticketId, organizationId, onClose, onUpdated }:
             <button
               onClick={handleSave}
               disabled={!isDirty || saving}
-              className="px-3 py-1.5 text-xs font-mono bg-mc-accent text-white rounded hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+              className="px-3 py-1.5 text-sm bg-mc-accent text-white rounded hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
             >
               {saving ? <Loader2 size={12} className="animate-spin" /> : null}
               {saving ? 'Saving...' : 'Save Changes'}
