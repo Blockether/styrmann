@@ -801,28 +801,30 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
                                 key={ticket.id}
                                 type="button"
                                 onClick={() => setSelectedTicketId(ticket.id)}
-                                className="w-full px-3 py-2.5 rounded border border-mc-border bg-mc-bg text-left hover:border-mc-accent hover:bg-mc-bg-secondary"
+                                className="w-full px-3 py-2 rounded border border-mc-border bg-mc-bg text-left hover:border-mc-accent hover:bg-mc-bg-secondary"
                               >
-                                <div className="flex items-center gap-2.5">
-                                  <span className={`px-2 py-0.5 rounded-full text-xs font-mono shrink-0 ${typeConfig.color}`}>{typeConfig.label}</span>
-                                  <span className="text-sm text-mc-text truncate flex-1 min-w-0">{ticket.title}</span>
-                                  <div className="flex items-center gap-1.5 shrink-0">
-                                    <span className={`px-2 py-0.5 rounded-full text-xs font-mono ${STATUS_COLORS[ticket.status] || 'bg-mc-bg-tertiary text-mc-text-secondary'}`}>
-                                      {ticket.status}
-                                    </span>
-                                    <span className={`px-2 py-0.5 rounded-full text-xs font-mono ${PRIORITY_COLORS[ticket.priority] || 'bg-mc-bg-tertiary text-mc-text-secondary'}`}>
-                                      {ticket.priority}
-                                    </span>
-                                    {typeof ticket.story_points === 'number' && (
-                                      <span className="px-2 py-0.5 rounded-full text-xs font-mono bg-mc-bg-tertiary text-mc-text-secondary">
-                                        {ticket.story_points}sp
+                                <div className="flex items-start gap-2 min-w-0">
+                                  <span className={`px-2 py-0.5 rounded-full text-xs font-mono shrink-0 mt-0.5 ${typeConfig.color}`}>{typeConfig.label}</span>
+                                  <div className="flex-1 min-w-0">
+                                    <span className="text-sm text-mc-text line-clamp-2">{ticket.title}</span>
+                                    <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                                      <span className={`px-2 py-0.5 rounded-full text-xs font-mono ${STATUS_COLORS[ticket.status] || 'bg-mc-bg-tertiary text-mc-text-secondary'}`}>
+                                        {ticket.status}
                                       </span>
+                                      <span className={`px-2 py-0.5 rounded-full text-xs font-mono ${PRIORITY_COLORS[ticket.priority] || 'bg-mc-bg-tertiary text-mc-text-secondary'}`}>
+                                        {ticket.priority}
+                                      </span>
+                                      {typeof ticket.story_points === 'number' && (
+                                        <span className="px-2 py-0.5 rounded-full text-xs font-mono bg-mc-bg-tertiary text-mc-text-secondary">
+                                          {ticket.story_points}sp
+                                        </span>
+                                      )}
+                                    </div>
+                                    {ticket.description && (
+                                      <p className="mt-1 text-xs text-mc-text-secondary line-clamp-1">{ticket.description}</p>
                                     )}
                                   </div>
                                 </div>
-                                {ticket.description && (
-                                  <p className="mt-1.5 text-xs text-mc-text-secondary line-clamp-1 pl-14">{ticket.description}</p>
-                                )}
                               </button>
                             );
                           })}
