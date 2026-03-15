@@ -2,6 +2,7 @@
 import { Building2, Folder, ChevronRight } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { Header } from '@/components/Header';
 
 interface OrgSummary {
   id: string;
@@ -26,10 +27,7 @@ export function OrgHomePage() {
 
   return (
     <div data-component="src/components/OrgHomePage" className="min-h-screen bg-mc-bg">
-      <div className="p-3 border-b border-mc-border bg-mc-bg-secondary flex items-center justify-between gap-2 flex-wrap">
-        <span className="font-mono text-sm font-semibold text-mc-text">Styrmann</span>
-        <span className="text-xs text-mc-text-secondary">Organizations</span>
-      </div>
+      <Header />
 
       <div className="p-6 max-w-5xl mx-auto">
         <h1 className="font-mono text-lg font-bold text-mc-text mb-6">Organizations</h1>

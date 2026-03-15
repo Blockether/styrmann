@@ -1,10 +1,11 @@
 'use client';
-import { Ticket, BookOpen, Folder, ArrowLeft, Plus, Zap } from 'lucide-react';
+import { Ticket, BookOpen, Folder, Plus, Zap } from 'lucide-react';
 import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import type { OrgTicket, KnowledgeArticle } from '@/lib/types';
 import { OrgTicketCreateModal } from '@/components/OrgTicketCreateModal';
+import { Header } from '@/components/Header';
 
 interface DelegatedTask {
   id: string;
@@ -101,14 +102,7 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
 
   return (
     <div data-component="src/components/OrgDetailView" className="min-h-screen bg-mc-bg">
-      <div className="p-3 border-b border-mc-border bg-mc-bg-secondary flex items-center justify-between gap-2 flex-wrap">
-        <div className="flex items-center gap-2">
-          <Link href="/" className="text-mc-text-secondary hover:text-mc-text transition-colors">
-            <ArrowLeft size={16} />
-          </Link>
-          <span className="font-mono text-sm font-semibold text-mc-text">{org.name}</span>
-        </div>
-      </div>
+      <Header />
 
       {org.description && (
         <div className="px-6 py-2 border-b border-mc-border text-xs text-mc-text-secondary">{org.description}</div>
