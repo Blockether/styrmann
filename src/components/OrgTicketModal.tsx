@@ -30,8 +30,6 @@ interface Props {
   onUpdated?: () => void;
 }
 
-type TabType = 'overview' | 'criteria' | 'attachments' | 'delegation';
-
 const STATUS_TRANSITIONS: Record<OrgTicketStatus, OrgTicketStatus[]> = {
   open: ['triaged', 'closed'],
   triaged: ['delegated', 'closed'],
@@ -42,24 +40,24 @@ const STATUS_TRANSITIONS: Record<OrgTicketStatus, OrgTicketStatus[]> = {
 };
 
 const STATUS_COLORS: Record<string, string> = {
-  open: 'bg-blue-100 text-blue-800',
-  triaged: 'bg-yellow-100 text-yellow-800',
-  delegated: 'bg-purple-100 text-purple-800',
-  in_progress: 'bg-orange-100 text-orange-800',
-  resolved: 'bg-green-100 text-green-800',
-  closed: 'bg-gray-100 text-gray-600',
+  open: 'bg-mc-accent/15 text-mc-accent',
+  triaged: 'bg-mc-accent-yellow/15 text-mc-accent-yellow',
+  delegated: 'bg-mc-accent-purple/15 text-mc-accent-purple',
+  in_progress: 'bg-mc-accent-yellow/15 text-mc-accent-yellow',
+  resolved: 'bg-mc-accent-green/15 text-mc-accent-green',
+  closed: 'bg-mc-bg-tertiary text-mc-text-secondary',
 };
 
 const TASK_STATUS_COLORS: Record<string, string> = {
-  pending_dispatch: 'bg-gray-100 text-gray-600',
-  planning: 'bg-blue-100 text-blue-800',
-  inbox: 'bg-gray-100 text-gray-600',
-  assigned: 'bg-yellow-100 text-yellow-800',
-  in_progress: 'bg-orange-100 text-orange-800',
-  testing: 'bg-purple-100 text-purple-800',
-  review: 'bg-indigo-100 text-indigo-800',
-  verification: 'bg-teal-100 text-teal-800',
-  done: 'bg-green-100 text-green-800',
+  pending_dispatch: 'bg-mc-bg-tertiary text-mc-text-secondary',
+  planning: 'bg-mc-accent/15 text-mc-accent',
+  inbox: 'bg-mc-bg-tertiary text-mc-text-secondary',
+  assigned: 'bg-mc-accent-yellow/15 text-mc-accent-yellow',
+  in_progress: 'bg-mc-accent-yellow/15 text-mc-accent-yellow',
+  testing: 'bg-mc-accent-purple/15 text-mc-accent-purple',
+  review: 'bg-mc-accent-cyan/15 text-mc-accent-cyan',
+  verification: 'bg-mc-accent-cyan/15 text-mc-accent-cyan',
+  done: 'bg-mc-accent-green/15 text-mc-accent-green',
 };
 
 export function OrgTicketModal({ ticketId, organizationId, onClose, onUpdated }: Props) {
@@ -67,7 +65,6 @@ export function OrgTicketModal({ ticketId, organizationId, onClose, onUpdated }:
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<TabType>('overview');
   const contentRef = useRef<HTMLDivElement>(null);
 
   // Form state for overview
@@ -155,13 +152,6 @@ export function OrgTicketModal({ ticketId, organizationId, onClose, onUpdated }:
     };
     loadWorkspaces();
   }, [organizationId]);
-
-  // Reset scroll when tab changes
-  useEffect(() => {
-    if (contentRef.current) {
-      contentRef.current.scrollTop = 0;
-    }
-  }, [activeTab]);
 
   const handleSave = async () => {
     if (!ticket || !isDirty) return;
@@ -348,13 +338,6 @@ export function OrgTicketModal({ ticketId, organizationId, onClose, onUpdated }:
     }
   };
 
-  const tabs: { id: TabType; label: string }[] = [
-    { id: 'overview', label: 'Overview' },
-    { id: 'criteria', label: 'Acceptance Criteria' },
-    { id: 'attachments', label: 'Attachments' },
-    { id: 'delegation', label: 'Delegation' },
-  ];
-
   if (loading) {
     return (
       <div data-component="src/components/OrgTicketModal" className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-4">
@@ -392,33 +375,14 @@ export function OrgTicketModal({ ticketId, organizationId, onClose, onUpdated }:
           </button>
         </div>
 
-        {/* Tabs */}
-        <div className="flex border-b border-mc-border bg-mc-bg-secondary flex-shrink-0">
-          {tabs.map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`px-4 py-2 text-sm border-b-2 transition-colors ${
-                activeTab === tab.id
-                  ? 'border-mc-accent text-mc-text'
-                  : 'border-transparent text-mc-text-secondary hover:text-mc-text'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Content */}
         <div ref={contentRef} className="flex-1 overflow-y-auto p-4">
           {error && (
-            <div className="mb-4 p-3 rounded bg-red-50 border border-red-200">
-              <p className="text-sm text-red-800">{error}</p>
+            <div className="mb-4 p-3 rounded bg-mc-accent-red/10 border border-mc-accent-red/30">
+              <p className="text-sm text-mc-accent-red">{error}</p>
             </div>
           )}
 
-          {/* Overview Tab */}
-          {activeTab === 'overview' && (
+          {(
             <div className="space-y-4">
               <div>
                 <label className="block text-sm text-mc-text-secondary mb-1">Title</label>
@@ -501,15 +465,7 @@ export function OrgTicketModal({ ticketId, organizationId, onClose, onUpdated }:
                 </div>
               </div>
 
-              <div>
-                <label className="block text-sm text-mc-text-secondary mb-1">Due Date</label>
-                <input
-                  type="date"
-                  value={form.due_date}
-                  onChange={e => setForm({ ...form, due_date: e.target.value })}
-                  className="w-full px-2 py-1.5 text-sm border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
-                />
-              </div>
+
 
               <div>
                 <label className="block text-sm text-mc-text-secondary mb-1">Assignee</label>
@@ -539,8 +495,9 @@ export function OrgTicketModal({ ticketId, organizationId, onClose, onUpdated }:
             </div>
           )}
 
-          {/* Acceptance Criteria Tab */}
-          {activeTab === 'criteria' && (
+          <div className="border-t border-mc-border my-4" />
+
+          {(
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <h3 className="text-base font-semibold text-mc-text">Acceptance Criteria</h3>
@@ -639,8 +596,9 @@ export function OrgTicketModal({ ticketId, organizationId, onClose, onUpdated }:
             </div>
           )}
 
-          {/* Attachments Tab */}
-          {activeTab === 'attachments' && (
+          <div className="border-t border-mc-border my-4" />
+
+          {(
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <h3 className="text-base font-semibold text-mc-text">Attachments</h3>
@@ -738,8 +696,9 @@ export function OrgTicketModal({ ticketId, organizationId, onClose, onUpdated }:
             </div>
           )}
 
-          {/* Delegation Tab */}
-          {activeTab === 'delegation' && (
+          <div className="border-t border-mc-border my-4" />
+
+          {(
             <div className="space-y-4">
               <h3 className="text-base font-semibold text-mc-text">Delegation</h3>
 
@@ -819,16 +778,14 @@ export function OrgTicketModal({ ticketId, organizationId, onClose, onUpdated }:
           >
             Close
           </button>
-          {activeTab === 'overview' && (
-            <button
-              onClick={handleSave}
-              disabled={!isDirty || saving}
-              className="px-3 py-1.5 text-sm bg-mc-accent text-white rounded hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
-            >
-              {saving ? <Loader2 size={12} className="animate-spin" /> : null}
-              {saving ? 'Saving...' : 'Save Changes'}
-            </button>
-          )}
+          <button
+            onClick={handleSave}
+            disabled={!isDirty || saving}
+            className="px-3 py-1.5 text-sm bg-mc-accent text-white rounded hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+          >
+            {saving ? <Loader2 size={12} className="animate-spin" /> : null}
+            {saving ? 'Saving...' : 'Save Changes'}
+          </button>
         </div>
       </div>
     </div>
