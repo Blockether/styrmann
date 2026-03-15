@@ -832,7 +832,23 @@ export interface OrgTicket {
   due_date?: string | null;
   story_points?: number | null;
   org_sprint_id?: string | null;
+  org_milestone_id?: string | null;
   tags: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export type OrgMilestoneStatus = 'open' | 'closed';
+
+export interface OrgMilestone {
+  id: string;
+  organization_id: string;
+  org_sprint_id?: string | null;
+  name: string;
+  description?: string | null;
+  due_date?: string | null;
+  status: OrgMilestoneStatus;
+  priority: 'low' | 'normal' | 'high' | 'urgent';
   created_at: string;
   updated_at: string;
 }

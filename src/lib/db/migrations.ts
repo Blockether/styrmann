@@ -176,6 +176,35 @@ const migrations: Migration[] = [
          db.exec("CREATE INDEX IF NOT EXISTS idx_org_tickets_sprint ON org_tickets(org_sprint_id)");
        }
        console.log('[Migration 104] Added org_sprints table');
+      }
+   },
+   {
+     id: '105',
+     name: 'add_org_milestones',
+     up: (db) => {
+       db.exec(`
+         CREATE TABLE IF NOT EXISTS org_milestones (
+           id TEXT PRIMARY KEY,
+           organization_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+           org_sprint_id TEXT REFERENCES org_sprints(id) ON DELETE SET NULL,
+           name TEXT NOT NULL,
+           description TEXT,
+           due_date TEXT,
+           status TEXT DEFAULT 'open' CHECK (status IN ('open', 'closed')),
+           priority TEXT DEFAULT 'normal' CHECK (priority IN ('low', 'normal', 'high', 'urgent')),
+           created_at TEXT DEFAULT (datetime('now')),
+           updated_at TEXT DEFAULT (datetime('now'))
+         );
+         CREATE INDEX IF NOT EXISTS idx_org_milestones_org ON org_milestones(organization_id);
+         CREATE INDEX IF NOT EXISTS idx_org_milestones_sprint ON org_milestones(org_sprint_id);
+         CREATE INDEX IF NOT EXISTS idx_org_milestones_status ON org_milestones(status);
+       `);
+       const cols = (db.prepare("PRAGMA table_info(org_tickets)").all() as { name: string }[]).map(c => c.name);
+       if (!cols.includes('org_milestone_id')) {
+         db.exec("ALTER TABLE org_tickets ADD COLUMN org_milestone_id TEXT REFERENCES org_milestones(id) ON DELETE SET NULL");
+         db.exec("CREATE INDEX IF NOT EXISTS idx_org_tickets_milestone ON org_tickets(org_milestone_id)");
+       }
+       console.log('[Migration 105] Added org_milestones table');
      }
    },
  ];

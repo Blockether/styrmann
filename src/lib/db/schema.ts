@@ -124,6 +124,7 @@ CREATE TABLE IF NOT EXISTS org_tickets (
   story_points INTEGER CHECK (story_points IS NULL OR (story_points >= 0 AND story_points <= 100)),
   tags TEXT DEFAULT '[]',
   org_sprint_id TEXT REFERENCES org_sprints(id) ON DELETE SET NULL,
+  org_milestone_id TEXT REFERENCES org_milestones(id) ON DELETE SET NULL,
   created_at TEXT DEFAULT (datetime('now')),
   updated_at TEXT DEFAULT (datetime('now'))
 );
@@ -143,6 +144,24 @@ CREATE TABLE IF NOT EXISTS org_sprints (
 
 CREATE INDEX IF NOT EXISTS idx_org_sprints_org ON org_sprints(organization_id);
 CREATE INDEX IF NOT EXISTS idx_org_sprints_status ON org_sprints(status);
+
+-- Org milestones table (organization-level milestone tracking)
+CREATE TABLE IF NOT EXISTS org_milestones (
+  id TEXT PRIMARY KEY,
+  organization_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  org_sprint_id TEXT REFERENCES org_sprints(id) ON DELETE SET NULL,
+  name TEXT NOT NULL,
+  description TEXT,
+  due_date TEXT,
+  status TEXT DEFAULT 'open' CHECK (status IN ('open', 'closed')),
+  priority TEXT DEFAULT 'normal' CHECK (priority IN ('low', 'normal', 'high', 'urgent')),
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_org_milestones_org ON org_milestones(organization_id);
+CREATE INDEX IF NOT EXISTS idx_org_milestones_sprint ON org_milestones(org_sprint_id);
+CREATE INDEX IF NOT EXISTS idx_org_milestones_status ON org_milestones(status);
 
 -- Org ticket acceptance criteria
 CREATE TABLE IF NOT EXISTS org_ticket_acceptance_criteria (
@@ -503,6 +522,7 @@ CREATE INDEX IF NOT EXISTS idx_org_tickets_org ON org_tickets(organization_id);
 CREATE INDEX IF NOT EXISTS idx_org_tickets_status ON org_tickets(status);
 CREATE INDEX IF NOT EXISTS idx_org_tickets_external_ref ON org_tickets(external_ref);
 CREATE INDEX IF NOT EXISTS idx_org_tickets_sprint ON org_tickets(org_sprint_id);
+CREATE INDEX IF NOT EXISTS idx_org_tickets_milestone ON org_tickets(org_milestone_id);
 CREATE INDEX IF NOT EXISTS idx_workspaces_organization_id ON workspaces(organization_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
 CREATE INDEX IF NOT EXISTS idx_tasks_assigned ON tasks(assigned_agent_id);

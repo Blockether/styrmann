@@ -193,6 +193,7 @@ export const CreateOrgTicketSchema = z.object({
   story_points: z.number().int().min(0).max(100).optional(),
   tags: z.array(z.string()).default([]),
   org_sprint_id: z.string().optional().nullable(),
+  org_milestone_id: z.string().optional().nullable(),
 });
 
 export const CreateMemorySchema = z.object({
@@ -274,7 +275,30 @@ export const UpdateOrgTicketSchema = z.object({
   story_points: z.number().int().min(0).max(100).optional().nullable(),
   tags: z.array(z.string()).optional(),
   org_sprint_id: z.string().optional().nullable(),
+  org_milestone_id: z.string().optional().nullable(),
 });
+
+export const CreateOrgMilestoneSchema = z.object({
+  organization_id: z.string().min(1),
+  org_sprint_id: z.string().optional().nullable(),
+  name: z.string().min(1).max(200),
+  description: z.string().optional(),
+  due_date: z.string().optional(),
+  status: z.enum(['open', 'closed']).default('open'),
+  priority: z.enum(['low', 'normal', 'high', 'urgent']).default('normal'),
+});
+
+export const UpdateOrgMilestoneSchema = z.object({
+  name: z.string().min(1).max(200).optional(),
+  description: z.string().optional().nullable(),
+  due_date: z.string().optional().nullable(),
+  status: z.enum(['open', 'closed']).optional(),
+  priority: z.enum(['low', 'normal', 'high', 'urgent']).optional(),
+  org_sprint_id: z.string().optional().nullable(),
+});
+
+export type CreateOrgMilestoneInput = z.infer<typeof CreateOrgMilestoneSchema>;
+export type UpdateOrgMilestoneInput = z.infer<typeof UpdateOrgMilestoneSchema>;
 
 export const CreateOrgSprintSchema = z.object({
   organization_id: z.string().min(1),

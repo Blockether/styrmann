@@ -14,6 +14,7 @@ describe('Database Schema', () => {
       'tags',
       'task_activities',
       'task_deliverables',
+      'org_milestones',
     ];
     
     for (const tableName of tables) {
