@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import {
+  Building2,
   LayoutGrid,
   Folder,
   ChevronDown,
@@ -17,10 +18,11 @@ export type DashboardView = 'sprint' | 'backlog' | 'pareto' | 'issues' | 'discor
 
 interface HeaderProps {
   workspace?: Workspace;
+  orgName?: string;
   isPortrait?: boolean;
 }
 
-export function Header({ workspace, isPortrait = true }: HeaderProps) {
+export function Header({ workspace, orgName, isPortrait = true }: HeaderProps) {
   const { isOnline } = useStyrmann();
   const [currentTime, setCurrentTime] = useState(new Date());
   const [showWorkspaceSwitcher, setShowWorkspaceSwitcher] = useState(false);
@@ -60,7 +62,7 @@ export function Header({ workspace, isPortrait = true }: HeaderProps) {
   }, [showWorkspaceSwitcher]);
 
 
-  const portraitWorkspaceHeader = !!workspace && isPortrait;
+  const portraitContextHeader = isPortrait && (!!workspace || !!orgName);
 
   const workspaceSwitcherDropdown = showWorkspaceSwitcher && (
     <div className="absolute top-full left-0 mt-1 w-44 sm:w-64 bg-mc-bg-secondary border border-mc-border rounded-lg shadow-lg z-50 py-1 max-h-64 overflow-y-auto">
@@ -99,30 +101,46 @@ export function Header({ workspace, isPortrait = true }: HeaderProps) {
     <header
       data-component="src/components/Header"
       className={`bg-mc-bg-secondary px-3 md:px-4 ${
-        portraitWorkspaceHeader ? 'py-2.5 space-y-2.5 border-b border-mc-border' : 'h-14 flex items-center justify-between gap-2'
+        portraitContextHeader ? 'py-2.5 space-y-2.5 border-b border-mc-border' : 'h-14 flex items-center justify-between gap-2'
       }`}
     >
-      {portraitWorkspaceHeader ? (
+      {portraitContextHeader ? (
         <>
           <div className="flex items-center justify-between gap-2 min-w-0">
             <div className="flex items-center gap-2 min-w-0 flex-1">
-              <div ref={switcherRef} className="relative min-w-0">
-              <button
-                onClick={() => setShowWorkspaceSwitcher(!showWorkspaceSwitcher)}
-                aria-label="Switch workspace"
-                className="flex items-center gap-2 px-2.5 py-1.5 bg-mc-bg-tertiary rounded min-w-0 overflow-hidden hover:bg-mc-bg transition-colors"
-              >
-                  {workspace.logo_url ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={workspace.logo_url} alt={workspace.name} className="w-4 h-4 rounded object-contain shrink-0" />
-                  ) : (
-                    <Folder className="w-4 h-4 text-mc-accent shrink-0" />
-                  )}
-                  <span className="font-medium truncate text-sm">{workspace.name}</span>
-                  <ChevronDown className="w-3.5 h-3.5 text-mc-text-secondary shrink-0" />
-                </button>
-                {workspaceSwitcherDropdown}
-              </div>
+              <Link href="/" className="flex items-center rounded px-1 py-1 transition-colors hover:bg-mc-bg-tertiary shrink-0">
+                <StyrmannLogo size={20} />
+              </Link>
+
+              {workspace ? (
+                <div ref={switcherRef} className="relative min-w-0">
+                  <button
+                    onClick={() => setShowWorkspaceSwitcher(!showWorkspaceSwitcher)}
+                    aria-label="Switch workspace"
+                    className="flex items-center gap-2 px-2.5 py-1.5 bg-mc-bg-tertiary rounded min-w-0 overflow-hidden hover:bg-mc-bg transition-colors"
+                  >
+                    {workspace.logo_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={workspace.logo_url} alt={workspace.name} className="w-4 h-4 rounded object-contain shrink-0" />
+                    ) : (
+                      <Folder className="w-4 h-4 text-mc-accent shrink-0" />
+                    )}
+                    <span className="font-medium truncate text-sm">{workspace.name}</span>
+                    <ChevronDown className="w-3.5 h-3.5 text-mc-text-secondary shrink-0" />
+                  </button>
+                  {workspaceSwitcherDropdown}
+                </div>
+              ) : orgName ? (
+                <div className="flex items-center gap-2 px-2.5 py-1.5 bg-mc-bg-tertiary rounded min-w-0 overflow-hidden">
+                  <Building2 className="w-4 h-4 text-mc-accent shrink-0" />
+                  <span className="font-medium truncate text-sm">{orgName}</span>
+                </div>
+              ) : (
+                <Link href="/" className="flex items-center gap-2 px-2.5 py-1.5 bg-mc-bg-tertiary rounded hover:bg-mc-bg transition-colors">
+                  <LayoutGrid className="w-4 h-4" />
+                  <span className="text-sm">All Organizations</span>
+                </Link>
+              )}
             </div>
 
             <div className="flex items-center gap-2 shrink-0">
@@ -139,7 +157,7 @@ export function Header({ workspace, isPortrait = true }: HeaderProps) {
       ) : (
         <>
           <div className="flex items-center gap-2 md:gap-4 min-w-0">
-            <Link href="/" className="hidden sm:flex items-center gap-2 rounded px-1 py-1 transition-colors hover:bg-mc-bg-tertiary">
+            <Link href="/" className="flex items-center gap-2 rounded px-1 py-1 transition-colors hover:bg-mc-bg-tertiary">
               <StyrmannLogo size={24} />
               <h1 className="font-semibold text-mc-text uppercase tracking-wider text-sm">Styrmann</h1>
             </Link>
@@ -162,10 +180,15 @@ export function Header({ workspace, isPortrait = true }: HeaderProps) {
                 </button>
                 {workspaceSwitcherDropdown}
               </div>
+            ) : orgName ? (
+              <div className="flex items-center gap-2 px-3 py-1 bg-mc-bg-tertiary rounded">
+                <Building2 className="w-4 h-4 text-mc-accent" />
+                <span className="font-medium text-sm md:text-base">{orgName}</span>
+              </div>
             ) : (
               <Link href="/" className="flex items-center gap-2 px-3 py-1 bg-mc-bg-tertiary rounded hover:bg-mc-bg transition-colors">
                 <LayoutGrid className="w-4 h-4" />
-                <span className="text-sm">All Workspaces</span>
+                <span className="text-sm">All Organizations</span>
               </Link>
             )}
           </div>

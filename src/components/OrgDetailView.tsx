@@ -4,7 +4,6 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Building2,
   BookOpen,
   ChevronDown,
   ChevronRight,
@@ -398,23 +397,13 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
   const delegatedCount = tickets.filter((ticket) => ticket.status === 'delegated').length;
   const unassignedTickets = milestoneTicketMap.get('no-milestone') || [];
   const showUnassignedSection = unassignedTickets.length > 0;
+  const showSprintActionBar = hasSprints;
   const showNoSprintEmptyState = activeTab === 'board' && !hasSprints && tickets.length === 0;
   const showNoTicketEmptyState = activeTab === 'board' && hasSprints && !hasTicketsInSelection;
 
   return (
     <div data-component="src/components/OrgDetailView" className="min-h-screen bg-mc-bg">
-      <Header />
-
-      <div className="px-6 py-3 border-b border-mc-border bg-mc-bg flex items-center justify-between gap-2 flex-wrap">
-        <div className="flex items-center gap-3 min-w-0">
-          <Building2 size={20} className="text-mc-accent shrink-0" />
-          <h2 className="text-lg font-semibold text-mc-text truncate">{org.name}</h2>
-        </div>
-        <div className="flex items-center gap-4 text-sm text-mc-text-secondary">
-          <span>{tickets.length} tickets</span>
-          <span>{sprints.length} sprints</span>
-        </div>
-      </div>
+      <Header orgName={org.name} />
 
       {org.description && (
         <div className="px-8 py-3 border-b border-mc-border text-sm text-mc-text-secondary">{org.description}</div>
@@ -435,22 +424,19 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
               {tab === 'board' && (
                 <>
                   <Layers size={14} className="shrink-0" />
-                  <span className="hidden sm:inline">Board</span>
-                  <span className="sm:hidden">B</span>
+                  <span>Board</span>
                 </>
               )}
               {tab === 'knowledge' && (
                 <>
                   <BookOpen size={14} className="shrink-0" />
-                  <span className="hidden sm:inline">Knowledge</span>
-                  <span className="sm:hidden">K</span>
+                  <span>Knowledge</span>
                 </>
               )}
               {tab === 'workspaces' && (
                 <>
                   <Folder size={14} className="shrink-0" />
-                  <span className="hidden sm:inline">Workspaces</span>
-                  <span className="sm:hidden">W</span>
+                  <span>Workspaces</span>
                 </>
               )}
             </Link>
@@ -459,7 +445,7 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
 
         {activeTab === 'board' && (
           <div className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-3 gap-3">
               <div className="p-4 rounded-lg border border-mc-border bg-mc-bg-secondary">
                 <div className="text-sm text-mc-text-secondary">Open Tickets</div>
                 <div className="text-2xl font-semibold mt-1 text-mc-text">{openTickets}</div>
@@ -474,8 +460,8 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
               </div>
             </div>
 
-            <div className="flex items-center justify-between gap-3 flex-wrap">
-              {hasSprints ? (
+            {showSprintActionBar && (
+              <div className="flex items-center justify-between gap-3 flex-wrap">
                 <div className="flex items-center gap-2 flex-wrap">
                   <select
                     value={selectedSprintId}
@@ -495,41 +481,38 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
                     </span>
                   )}
                 </div>
-              ) : (
-                <span className="text-sm text-mc-text-secondary">Create a sprint to organize tickets into iterations.</span>
-              )}
-
-              <div className="flex items-center gap-2 flex-wrap">
-                <button
-                  onClick={() => {
-                    setShowSprintForm((prev) => !prev);
-                    setShowMilestoneForm(false);
-                  }}
-                  className="px-3 py-1.5 text-sm bg-mc-accent text-white rounded hover:opacity-90"
-                >
-                  Create Sprint
-                </button>
-                <button
-                  onClick={() => setShowCreateTicketModal(true)}
-                  className="px-3 py-1.5 text-sm border border-mc-border rounded hover:bg-mc-bg-secondary flex items-center gap-1"
-                >
-                  <Plus size={14} />
-                  <span className="hidden sm:inline">Create Ticket</span>
-                  <span className="sm:hidden">Ticket</span>
-                </button>
-                {selectedSprint && (
+                <div className="flex items-center gap-2 flex-wrap">
                   <button
                     onClick={() => {
-                      setShowMilestoneForm((prev) => !prev);
-                      setShowSprintForm(false);
+                      setShowSprintForm((prev) => !prev);
+                      setShowMilestoneForm(false);
                     }}
-                    className="px-3 py-1.5 text-sm border border-mc-border rounded hover:bg-mc-bg-secondary"
+                    className="px-3 py-1.5 text-sm bg-mc-accent text-white rounded hover:opacity-90"
                   >
-                    Add Milestone
+                    Create Sprint
                   </button>
-                )}
+                  <button
+                    onClick={() => setShowCreateTicketModal(true)}
+                    className="px-3 py-1.5 text-sm border border-mc-border rounded hover:bg-mc-bg-secondary flex items-center gap-1"
+                  >
+                    <Plus size={14} />
+                    <span className="hidden sm:inline">Create Ticket</span>
+                    <span className="sm:hidden">Ticket</span>
+                  </button>
+                  {selectedSprint && (
+                    <button
+                      onClick={() => {
+                        setShowMilestoneForm((prev) => !prev);
+                        setShowSprintForm(false);
+                      }}
+                      className="px-3 py-1.5 text-sm border border-mc-border rounded hover:bg-mc-bg-secondary"
+                    >
+                      Add Milestone
+                    </button>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
 
             {showSprintForm && (
               <div className="p-4 rounded border border-mc-border bg-mc-bg-secondary">
@@ -654,13 +637,13 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
                       onClick={() => setShowSprintForm(true)}
                       className="px-4 py-2 text-sm bg-mc-accent text-white rounded hover:opacity-90"
                     >
-                      Create First Sprint
+                      Create Sprint
                     </button>
                     <button
                       onClick={() => setShowCreateTicketModal(true)}
                       className="px-4 py-2 text-sm text-mc-text-secondary hover:text-mc-text border border-mc-border rounded hover:bg-mc-bg"
                     >
-                      or create a ticket directly
+                      or create a ticket
                     </button>
                   </div>
                 </div>
