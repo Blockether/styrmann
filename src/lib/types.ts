@@ -591,11 +591,14 @@ export type SSEEventType =
   | 'webhook_deleted'
   | 'org_sprint_created'
   | 'org_sprint_updated'
-  | 'org_sprint_deleted';
+  | 'org_sprint_deleted'
+  | 'org_milestone_created'
+  | 'org_milestone_updated'
+  | 'org_milestone_deleted';
 
 export interface SSEEvent {
   type: SSEEventType;
-  payload: Task | Agent | TaskActivity | PresentedTaskActivity | TaskDeliverable | Organization | OrgTicket | OrgSprint | Memory | EntityLink | Commit | KnowledgeArticle | {
+  payload: Task | Agent | TaskActivity | PresentedTaskActivity | TaskDeliverable | Organization | OrgTicket | OrgSprint | OrgMilestone | Memory | EntityLink | Commit | KnowledgeArticle | {
     taskId: string;
     sessionId: string;
     agentName?: string;

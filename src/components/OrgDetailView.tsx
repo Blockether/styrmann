@@ -3,7 +3,7 @@ import { Ticket, BookOpen, Folder, Plus, Zap, Layers, ChevronDown, ChevronRight 
 import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import type { OrgTicket, OrgSprint, KnowledgeArticle } from '@/lib/types';
+import type { OrgTicket, OrgSprint, OrgMilestone, KnowledgeArticle } from '@/lib/types';
 import { OrgTicketCreateModal } from '@/components/OrgTicketCreateModal';
 import { Header } from '@/components/Header';
 
@@ -46,6 +46,13 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
   const [expandedSprint, setExpandedSprint] = useState<string | null>(null);
   const [sprintTickets, setSprintTickets] = useState<Map<string, OrgTicket[]>>(new Map());
   const [delegationInfo, setDelegationInfo] = useState<Map<string, DelegationInfo>>(new Map());
+  const [milestones, setMilestones] = useState<OrgMilestone[]>([]);
+  const [showMilestoneForm, setShowMilestoneForm] = useState(false);
+  const [milestoneName, setMilestoneName] = useState('');
+  const [milestonePriority, setMilestonePriority] = useState<'low' | 'normal' | 'high' | 'urgent'>('normal');
+  const [milestoneDueDate, setMilestoneDueDate] = useState('');
+  const [milestoneSprintId, setMilestoneSprintId] = useState('');
+  const [milestoneSubmitting, setMilestoneSubmitting] = useState(false);
 
   useEffect(() => {
     fetch(`/api/organizations/${slug}`)
@@ -61,11 +68,13 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
             fetch(`/api/org-tickets?organization_id=${data.id}`).then(r => r.json()),
             fetch(`/api/knowledge?organization_id=${data.id}`).then(r => r.json()),
             fetch(`/api/org-sprints?organization_id=${data.id}`).then(r => r.json()),
-          ]).then(([t, k, s]) => {
+            fetch(`/api/org-milestones?organization_id=${data.id}`).then(r => r.json()),
+          ]).then(([t, k, s, m]) => {
             const ticketsList = Array.isArray(t) ? t : [];
             setTickets(ticketsList);
             setKnowledge(Array.isArray(k) ? k : []);
             setSprints(Array.isArray(s) ? s : []);
+            setMilestones(Array.isArray(m) ? m : []);
 
             const delegatedTickets = ticketsList.filter((ticket: OrgTicket) =>
               ['delegated', 'in_progress'].includes(ticket.status)
@@ -315,6 +324,159 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
                 })}
               </div>
             )}
+
+            <div className="mt-8 pt-6 border-t border-mc-border">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="font-mono text-sm font-semibold text-mc-text">Milestones ({milestones.length})</h2>
+                <button
+                  onClick={() => setShowMilestoneForm(!showMilestoneForm)}
+                  className="px-3 py-1.5 text-xs font-mono bg-mc-accent text-white rounded hover:opacity-90 flex items-center gap-1"
+                >
+                  <Plus size={12} />
+                  <span className="hidden sm:inline">Add Milestone</span>
+                </button>
+              </div>
+
+              {showMilestoneForm && (
+                <div className="p-3 rounded border border-mc-border bg-mc-bg-secondary mb-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-mono text-mc-text-secondary mb-1">Name *</label>
+                      <input
+                        type="text"
+                        value={milestoneName}
+                        onChange={e => setMilestoneName(e.target.value)}
+                        className="w-full px-2 py-1.5 text-sm border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
+                        placeholder="Milestone name"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-mono text-mc-text-secondary mb-1">Sprint</label>
+                      <select
+                        value={milestoneSprintId}
+                        onChange={e => setMilestoneSprintId(e.target.value)}
+                        className="w-full px-2 py-1.5 text-sm border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
+                      >
+                        <option value="">No sprint</option>
+                        {sprints.map(s => (
+                          <option key={s.id} value={s.id}>{s.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-mono text-mc-text-secondary mb-1">Priority</label>
+                      <select
+                        value={milestonePriority}
+                        onChange={e => setMilestonePriority(e.target.value as typeof milestonePriority)}
+                        className="w-full px-2 py-1.5 text-sm border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
+                      >
+                        <option value="low">Low</option>
+                        <option value="normal">Normal</option>
+                        <option value="high">High</option>
+                        <option value="urgent">Urgent</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-mono text-mc-text-secondary mb-1">Due Date</label>
+                      <input
+                        type="date"
+                        value={milestoneDueDate}
+                        onChange={e => setMilestoneDueDate(e.target.value)}
+                        className="w-full px-2 py-1.5 text-sm border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
+                      />
+                    </div>
+                  </div>
+                  <div className="mt-3 flex justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => { setShowMilestoneForm(false); setMilestoneName(''); setMilestoneDueDate(''); setMilestonePriority('normal'); setMilestoneSprintId(''); }}
+                      className="px-3 py-1.5 text-xs font-mono text-mc-text-secondary hover:text-mc-text border border-mc-border rounded"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      disabled={milestoneSubmitting || !milestoneName.trim()}
+                      onClick={async () => {
+                        if (!milestoneName.trim() || !org) return;
+                        setMilestoneSubmitting(true);
+                        try {
+                          const res = await fetch('/api/org-milestones', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              organization_id: org.id,
+                              name: milestoneName.trim(),
+                              priority: milestonePriority,
+                              due_date: milestoneDueDate || undefined,
+                              org_sprint_id: milestoneSprintId || undefined,
+                            }),
+                          });
+                          if (res.ok) {
+                            const created = await res.json();
+                            setMilestones(prev => [created, ...prev]);
+                            setShowMilestoneForm(false);
+                            setMilestoneName('');
+                            setMilestoneDueDate('');
+                            setMilestonePriority('normal');
+                            setMilestoneSprintId('');
+                          }
+                        } finally {
+                          setMilestoneSubmitting(false);
+                        }
+                      }}
+                      className="px-3 py-1.5 text-xs font-mono bg-mc-accent text-white rounded hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                    >
+                      <Plus size={12} />
+                      Create
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {milestones.length === 0 ? (
+                <div className="text-sm text-mc-text-secondary">No milestones yet.</div>
+              ) : (
+                <div className="space-y-2">
+                  {milestones.map(ms => {
+                    const MILESTONE_STATUS_COLORS: Record<string, string> = {
+                      open: 'bg-blue-100 text-blue-800',
+                      closed: 'bg-green-100 text-green-800',
+                    };
+                    const PRIORITY_COLORS: Record<string, string> = {
+                      low: 'text-mc-text-secondary',
+                      normal: 'text-mc-text-secondary',
+                      high: 'text-orange-600',
+                      urgent: 'text-red-600',
+                    };
+                    const assignedSprint = ms.org_sprint_id ? sprints.find(s => s.id === ms.org_sprint_id) : null;
+                    return (
+                      <div key={ms.id} className="p-3 rounded border border-mc-border bg-mc-bg-secondary">
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="font-mono text-sm text-mc-text truncate">{ms.name}</span>
+                            <span className={`text-xs px-1.5 py-0.5 rounded font-mono ${MILESTONE_STATUS_COLORS[ms.status] || 'bg-gray-100 text-gray-600'}`}>
+                              {ms.status}
+                            </span>
+                            {ms.priority !== 'normal' && (
+                              <span className={`text-xs font-mono ${PRIORITY_COLORS[ms.priority] || ''}`}>
+                                {ms.priority}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-3 text-xs text-mc-text-secondary font-mono">
+                            {assignedSprint && (
+                              <span className="px-1.5 py-0.5 rounded bg-mc-bg border border-mc-border">{assignedSprint.name}</span>
+                            )}
+                            {ms.due_date && <span>{ms.due_date}</span>}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
