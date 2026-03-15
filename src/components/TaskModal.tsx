@@ -572,6 +572,8 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
     { id: 'deliverables' as TabType, label: 'Deliverables', icon: <Package className="w-4 h-4" /> },
   ];
 
+  const isDelegatedTask = Boolean(task?.org_ticket_id);
+
   return (
     <div data-component="src/components/TaskModal" className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-0 sm:p-4 overflow-hidden">
       <div className="bg-mc-bg-secondary border border-mc-border rounded-none md:rounded-lg w-full md:w-4/5 xl:w-3/5 h-[95vh] flex flex-col overflow-hidden">
@@ -612,6 +614,62 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
         <div ref={contentRef} className="flex-1 overflow-y-auto p-2 sm:p-4">
           {/* Overview Tab */}
           {activeTab === 'overview' && (
+            task && isDelegatedTask ? (
+              <div className="space-y-4">
+                <div className="rounded-xl border border-mc-border bg-mc-bg p-4 space-y-4">
+                  <div className="flex items-center justify-between gap-3 flex-wrap">
+                    <div>
+                      <div className="text-xs uppercase tracking-wide text-mc-text-secondary font-medium">Delegated Workspace Task</div>
+                      <div className="text-sm text-mc-text-secondary mt-1">This task comes from org ticket `#{task.org_ticket_id}` and stays read-only here. Continue execution through sessions and deliverables.</div>
+                    </div>
+                    <span className="px-2 py-0.5 rounded-full text-xs font-mono bg-mc-accent-purple/15 text-mc-accent-purple">read-only</span>
+                  </div>
+
+                  <div>
+                    <div className="text-xs uppercase tracking-wide text-mc-text-secondary font-medium mb-1">Title</div>
+                    <div className="text-sm text-mc-text">{task.title}</div>
+                  </div>
+
+                  {task.description && (
+                    <div>
+                      <div className="text-xs uppercase tracking-wide text-mc-text-secondary font-medium mb-1">Description</div>
+                      <div className="text-sm text-mc-text whitespace-pre-wrap break-words">{task.description}</div>
+                    </div>
+                  )}
+
+                  <div className="flex flex-wrap gap-2">
+                    <span className="px-2 py-0.5 rounded-full text-xs font-mono bg-mc-bg-secondary border border-mc-border text-mc-text-secondary">{task.status}</span>
+                    <span className="px-2 py-0.5 rounded-full text-xs font-mono bg-mc-accent/15 text-mc-accent">{task.priority}</span>
+                    <span className="px-2 py-0.5 rounded-full text-xs font-mono bg-mc-bg-secondary border border-mc-border text-mc-text-secondary">{task.task_type}</span>
+                    {typeof task.effort === 'number' && <span className="px-2 py-0.5 rounded-full text-xs font-mono bg-mc-bg-secondary border border-mc-border text-mc-text-secondary">effort {task.effort}</span>}
+                    {typeof task.impact === 'number' && <span className="px-2 py-0.5 rounded-full text-xs font-mono bg-mc-bg-secondary border border-mc-border text-mc-text-secondary">impact {task.impact}</span>}
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <div className="text-xs uppercase tracking-wide text-mc-text-secondary font-medium mb-1">Assignee Type</div>
+                      <div className="text-mc-text">{task.assignee_type || 'ai'}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs uppercase tracking-wide text-mc-text-secondary font-medium mb-1">Milestone</div>
+                      <div className="text-mc-text">{task.milestone?.name || 'No milestone yet'}</div>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    <button type="button" onClick={() => handleTabChange('activity')} className="min-h-10 px-3 py-2 border border-mc-border rounded text-sm text-mc-text-secondary hover:text-mc-text hover:bg-mc-bg-tertiary">
+                      Activity
+                    </button>
+                    <button type="button" onClick={() => handleTabChange('sessions')} className="min-h-10 px-3 py-2 border border-mc-border rounded text-sm text-mc-text-secondary hover:text-mc-text hover:bg-mc-bg-tertiary">
+                      Sessions
+                    </button>
+                    <button type="button" onClick={() => handleTabChange('deliverables')} className="min-h-10 px-3 py-2 border border-mc-border rounded text-sm text-mc-text-secondary hover:text-mc-text hover:bg-mc-bg-tertiary">
+                      Deliverables
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
           {/* Title */}
           <div>
@@ -908,7 +966,7 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
             </div>
           )}
 
-          {task && task.task_type === 'spike' && (
+          {task && task.task_type === 'spike' && !isDelegatedTask && (
             <button
               type="button"
               onClick={() => setShowFollowUpModal(true)}
@@ -1068,6 +1126,7 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
             </div>
           )}
             </form>
+            )
           )}
 
           {activeTab === 'activity' && task && (
@@ -1096,7 +1155,7 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
               >
                 Cancel
               </button>
-              {task && (
+              {task && !isDelegatedTask && (
                 <button
                   type="button"
                   onClick={handleDelete}
@@ -1108,7 +1167,7 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
               )}
             </div>
             <div className="flex items-center gap-2">
-              {task && ['review', 'verification'].includes(task.status) && (
+              {task && !isDelegatedTask && ['review', 'verification'].includes(task.status) && (
                 <>
                   <button
                     type="button"
@@ -1139,14 +1198,16 @@ export function TaskModal({ task, onClose, workspaceId, defaultSprintId: _defaul
                   <span className="hidden sm:inline">{isSubmitting ? 'Creating...' : 'Create & Add Another'}</span>
                 </button>
               )}
-              <button
-                onClick={handleSubmit}
-                disabled={isSubmitting}
-                className="min-h-11 flex items-center gap-1.5 px-3 py-2 bg-mc-accent text-white rounded text-sm font-medium hover:bg-mc-accent/90 disabled:opacity-50"
-              >
-                <Save className="w-4 h-4" />
-                <span className="hidden sm:inline">{isSubmitting ? (task ? 'Saving changes...' : 'Creating task...') : (task ? 'Save Changes' : 'Create Task')}</span>
-              </button>
+              {!isDelegatedTask && (
+                <button
+                  onClick={handleSubmit}
+                  disabled={isSubmitting}
+                  className="min-h-11 flex items-center gap-1.5 px-3 py-2 bg-mc-accent text-white rounded text-sm font-medium hover:bg-mc-accent/90 disabled:opacity-50"
+                >
+                  <Save className="w-4 h-4" />
+                  <span className="hidden sm:inline">{isSubmitting ? (task ? 'Saving changes...' : 'Creating task...') : (task ? 'Save Changes' : 'Create Task')}</span>
+                </button>
+              )}
             </div>
           </div>
         )}

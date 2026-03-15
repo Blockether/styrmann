@@ -197,6 +197,8 @@ open -> triaged -> delegated -> in_progress -> resolved -> closed
 
 **Delegated ticket modal behavior**: `OrgTicketModal` is editable only before delegation. Once a ticket has delegated workspace tasks (or status `delegated`), the overview switches to read-only mode, write actions are disabled, and the delegated task list exposes direct links to the workspace task overview and its Deliverables tab. Users are expected to continue execution from the workspace task after delegation.
 
+**Delegated workspace task behavior**: `TaskModal` treats any workspace task with a non-null `org_ticket_id` as delegated. The Overview tab becomes read-only, mutation controls are hidden, and the modal serves as a read-only execution viewer with quick navigation into Activity, Sessions, and Deliverables. Delegated work should be reviewed through traces, sessions, and deliverables rather than edited in-place.
+
 **Delegation workspace selector**: The delegate endpoint accepts an optional `workspace_id` body parameter. When provided, tasks are created in that specific workspace. When omitted, the system resolves the default workspace. This fixes the previous behavior where delegation always targeted a hardcoded workspace.
 
 **Delegation race condition fix**: The delegation transaction now uses a single atomic SQLite transaction for ticket status update + task creation + entity link creation. This prevents partial delegation states where the ticket moved to `delegated` but task creation failed.
