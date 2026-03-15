@@ -454,6 +454,7 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
           </div>
         </div>
 
+        {(activeTab === 'board' || activeTab === 'knowledge' || activeTab === 'workspaces') ? (
         <div className="flex-1 min-w-0 overflow-y-auto p-3 md:p-4">
           {activeTab === 'board' && (
             <div className="space-y-4">
@@ -760,14 +761,6 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
             </div>
           )}
 
-          {activeTab === 'discord' && primaryWorkspaceId && (
-            <DiscordMessagesView workspaceId={primaryWorkspaceId} />
-          )}
-
-          {activeTab === 'issues' && primaryWorkspaceId && org.workspaces?.[0] && (
-            <GithubIssuesView workspaceId={primaryWorkspaceId} workspace={org.workspaces[0] as any} />
-          )}
-
           {activeTab === 'knowledge' && (
             <div className="space-y-2">
             {knowledge.length === 0 ? (
@@ -857,6 +850,15 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
             </div>
           )}
         </div>
+        ) : activeTab === 'discord' ? (
+          primaryWorkspaceId ? (
+            <DiscordMessagesView workspaceId={primaryWorkspaceId} />
+          ) : null
+        ) : activeTab === 'issues' ? (
+          primaryWorkspaceId && org.workspaces?.[0] ? (
+            <GithubIssuesView workspaceId={primaryWorkspaceId} workspace={org.workspaces[0] as any} />
+          ) : null
+        ) : null}
       </main>
 
       {showCreateTicketModal && (
