@@ -80,33 +80,33 @@ function formatRelativeTime(timestamp?: string): string {
 }
 
 const SPRINT_STATUS_COLORS: Record<string, string> = {
-  planned: 'bg-gray-100 text-gray-700',
-  active: 'bg-green-100 text-green-800',
-  completed: 'bg-blue-100 text-blue-800',
+  planned: 'bg-mc-bg-tertiary text-mc-text-secondary',
+  active: 'bg-mc-accent-green/15 text-mc-accent-green',
+  completed: 'bg-mc-accent-cyan/15 text-mc-accent-cyan',
 };
 
 const STATUS_COLORS: Record<string, string> = {
-  open: 'bg-blue-100 text-blue-800',
-  triaged: 'bg-yellow-100 text-yellow-800',
-  delegated: 'bg-purple-100 text-purple-800',
-  in_progress: 'bg-orange-100 text-orange-800',
-  resolved: 'bg-green-100 text-green-800',
-  closed: 'bg-gray-100 text-gray-600',
+  open: 'bg-mc-accent/15 text-mc-accent',
+  triaged: 'bg-mc-accent-yellow/15 text-mc-accent-yellow',
+  delegated: 'bg-mc-accent-purple/15 text-mc-accent-purple',
+  in_progress: 'bg-mc-accent-yellow/15 text-mc-accent-yellow',
+  resolved: 'bg-mc-accent-green/15 text-mc-accent-green',
+  closed: 'bg-mc-bg-tertiary text-mc-text-secondary',
 };
 
 const PRIORITY_COLORS: Record<string, string> = {
-  low: 'bg-gray-100 text-gray-700',
-  normal: 'bg-slate-100 text-slate-700',
-  high: 'bg-orange-100 text-orange-800',
-  urgent: 'bg-red-100 text-red-800',
+  low: 'bg-mc-bg-tertiary text-mc-text-secondary',
+  normal: 'bg-mc-accent/15 text-mc-accent',
+  high: 'bg-mc-accent-yellow/15 text-mc-accent-yellow',
+  urgent: 'bg-mc-accent-red/15 text-mc-accent-red',
 };
 
 const TYPE_CONFIG: Record<string, { label: string; color: string }> = {
-  feature: { label: 'FEA', color: 'bg-emerald-100 text-emerald-800' },
-  bug: { label: 'BUG', color: 'bg-red-100 text-red-800' },
-  improvement: { label: 'IMP', color: 'bg-blue-100 text-blue-800' },
-  task: { label: 'TSK', color: 'bg-slate-100 text-slate-700' },
-  epic: { label: 'EPI', color: 'bg-purple-100 text-purple-800' },
+  feature: { label: 'FEA', color: 'bg-mc-accent-green/15 text-mc-accent-green' },
+  bug: { label: 'BUG', color: 'bg-mc-accent-red/15 text-mc-accent-red' },
+  improvement: { label: 'IMP', color: 'bg-mc-accent-cyan/15 text-mc-accent-cyan' },
+  task: { label: 'TSK', color: 'bg-mc-bg-tertiary text-mc-text-secondary' },
+  epic: { label: 'EPI', color: 'bg-mc-accent-purple/15 text-mc-accent-purple' },
 };
 
 function OrgDetailViewInner({ slug }: { slug: string }) {
@@ -413,10 +413,10 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
               <Link
                 key={tab}
                 href={`?tab=${tab}`}
-                className={`px-4 py-3 text-sm border-b-2 transition-colors flex items-center gap-1 whitespace-nowrap shrink-0 ${
+                className={`px-4 py-2.5 text-sm border-b-2 flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
                   activeTab === tab
-                    ? 'border-mc-accent text-mc-text'
-                    : 'border-transparent text-mc-text-secondary hover:text-mc-text'
+                    ? 'border-mc-accent text-mc-text font-medium bg-mc-bg-tertiary/30'
+                    : 'border-transparent text-mc-text-secondary hover:text-mc-text hover:bg-mc-bg-tertiary/20'
                 }`}
               >
                 {tab === 'board' && (
@@ -459,19 +459,19 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
           {activeTab === 'board' && (
             <div className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div className="p-4 rounded-lg border border-mc-border bg-mc-bg-secondary">
-                <div className="text-sm text-mc-text-secondary">Open Tickets</div>
-                <div className="text-2xl font-semibold mt-1 text-mc-text">{openTickets}</div>
-              </div>
-              <div className="p-4 rounded-lg border border-mc-border bg-mc-bg-secondary">
-                <div className="text-sm text-mc-text-secondary">Milestones</div>
-                <div className="text-2xl font-semibold mt-1 text-mc-text">{milestones.length}</div>
-              </div>
-              <div className="p-4 rounded-lg border border-mc-border bg-mc-bg-secondary">
-                <div className="text-sm text-mc-text-secondary">Delegated</div>
-                <div className="text-2xl font-semibold mt-1 text-mc-text">{delegatedCount}</div>
-              </div>
-            </div>
+               <div className="px-4 py-3 rounded-lg border border-mc-border bg-mc-bg-secondary">
+                 <div className="text-xs uppercase tracking-wide text-mc-text-secondary font-medium">Open Tickets</div>
+                 <div className="text-3xl font-semibold mt-0.5 text-mc-text">{openTickets}</div>
+               </div>
+               <div className="px-4 py-3 rounded-lg border border-mc-border bg-mc-bg-secondary">
+                 <div className="text-xs uppercase tracking-wide text-mc-text-secondary font-medium">Milestones</div>
+                 <div className="text-3xl font-semibold mt-0.5 text-mc-text">{milestones.length}</div>
+               </div>
+               <div className="px-4 py-3 rounded-lg border border-mc-border bg-mc-bg-secondary">
+                 <div className="text-xs uppercase tracking-wide text-mc-text-secondary font-medium">Delegated</div>
+                 <div className="text-3xl font-semibold mt-0.5 text-mc-text">{delegatedCount}</div>
+               </div>
+             </div>
 
             {showSprintActionBar && (
               <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -479,7 +479,7 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
                   <select
                     value={selectedSprintId}
                     onChange={(event) => setSelectedSprintId(event.target.value)}
-                    className="px-3 py-2 text-sm border border-mc-border rounded bg-mc-bg-secondary text-mc-text focus:outline-none focus:border-mc-accent"
+                    className="px-3 py-1.5 text-sm border border-mc-border rounded bg-mc-bg-secondary text-mc-text focus:outline-none focus:border-mc-accent"
                   >
                     <option value="backlog">Backlog</option>
                     {sprints.map((sprint) => (
@@ -489,24 +489,15 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
                     ))}
                   </select>
                   {selectedSprint && (
-                    <span className={`px-2 py-0.5 rounded text-xs font-mono ${SPRINT_STATUS_COLORS[selectedSprint.status] || 'bg-gray-100 text-gray-700'}`}>
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-mono ${SPRINT_STATUS_COLORS[selectedSprint.status] || 'bg-mc-bg-tertiary text-mc-text-secondary'}`}>
                       {selectedSprint.status}
                     </span>
                   )}
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
                   <button
-                    onClick={() => {
-                      setShowSprintForm((prev) => !prev);
-                      setShowMilestoneForm(false);
-                    }}
-                    className="px-3 py-1.5 text-sm bg-mc-accent text-white rounded hover:opacity-90"
-                  >
-                    Create Sprint
-                  </button>
-                  <button
                     onClick={() => setShowCreateTicketModal(true)}
-                    className="px-3 py-1.5 text-sm border border-mc-border rounded hover:bg-mc-bg-secondary flex items-center gap-1"
+                    className="px-3 py-1.5 text-sm bg-mc-accent text-white rounded hover:opacity-90 flex items-center gap-1.5"
                   >
                     <Plus size={14} />
                     <span className="hidden sm:inline">Create Ticket</span>
@@ -518,41 +509,62 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
                         setShowMilestoneForm((prev) => !prev);
                         setShowSprintForm(false);
                       }}
-                      className="px-3 py-1.5 text-sm border border-mc-border rounded hover:bg-mc-bg-secondary"
+                      className="px-3 py-1.5 text-sm border border-mc-border rounded hover:bg-mc-bg-tertiary"
                     >
                       Add Milestone
                     </button>
                   )}
+                  <button
+                    onClick={() => {
+                      setShowSprintForm((prev) => !prev);
+                      setShowMilestoneForm(false);
+                    }}
+                    className="px-3 py-1.5 text-sm border border-mc-border rounded hover:bg-mc-bg-tertiary"
+                  >
+                    Create Sprint
+                  </button>
                 </div>
               </div>
             )}
 
             {showSprintForm && (
-              <div className="p-4 rounded border border-mc-border bg-mc-bg-secondary">
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <input
-                    type="text"
-                    value={newSprintName}
-                    onChange={(event) => setNewSprintName(event.target.value)}
-                    placeholder="Sprint name"
-                    className="w-full px-3 py-2 text-sm border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
-                  />
-                  <input
-                    type="date"
-                    value={newSprintStartDate}
-                    onChange={(event) => setNewSprintStartDate(event.target.value)}
-                    placeholder="Start"
-                    className="w-full px-3 py-2 text-sm border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
-                  />
-                  <input
-                    type="date"
-                    value={newSprintEndDate}
-                    onChange={(event) => setNewSprintEndDate(event.target.value)}
-                    placeholder="End"
-                    className="w-full px-3 py-2 text-sm border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
-                  />
+              <div className="rounded-lg border border-mc-border bg-mc-bg-secondary overflow-hidden">
+                <div className="p-4 border-b border-mc-border bg-mc-bg-tertiary/30">
+                  <h4 className="text-sm font-semibold text-mc-text">Create New Sprint</h4>
                 </div>
-                <div className="mt-3 flex justify-end gap-2">
+                <div className="p-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-xs uppercase tracking-wide text-mc-text-secondary font-medium mb-1.5">Name</label>
+                      <input
+                        type="text"
+                        value={newSprintName}
+                        onChange={(event) => setNewSprintName(event.target.value)}
+                        placeholder="Sprint name"
+                        className="w-full px-3 py-1.5 text-sm border border-mc-border rounded bg-mc-bg text-mc-text placeholder:text-mc-text-secondary/50 focus:outline-none focus:border-mc-accent"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs uppercase tracking-wide text-mc-text-secondary font-medium mb-1.5">Start Date</label>
+                      <input
+                        type="date"
+                        value={newSprintStartDate}
+                        onChange={(event) => setNewSprintStartDate(event.target.value)}
+                        className="w-full px-3 py-1.5 text-sm border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs uppercase tracking-wide text-mc-text-secondary font-medium mb-1.5">End Date</label>
+                      <input
+                        type="date"
+                        value={newSprintEndDate}
+                        onChange={(event) => setNewSprintEndDate(event.target.value)}
+                        className="w-full px-3 py-1.5 text-sm border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div className="px-4 py-3 border-t border-mc-border flex justify-end gap-2">
                   <button
                     onClick={() => {
                       setShowSprintForm(false);
@@ -560,61 +572,78 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
                       setNewSprintStartDate('');
                       setNewSprintEndDate('');
                     }}
-                    className="px-3 py-1.5 text-sm border border-mc-border rounded"
+                    className="px-3 py-1.5 text-sm border border-mc-border rounded hover:bg-mc-bg-tertiary"
                   >
                     Cancel
                   </button>
                   <button
                     disabled={creatingSprint || !newSprintName.trim()}
                     onClick={createSprint}
-                    className="px-3 py-1.5 text-sm bg-mc-accent text-white rounded disabled:opacity-50"
+                    className="px-3 py-1.5 text-sm bg-mc-accent text-white rounded hover:opacity-90 disabled:opacity-50"
                   >
-                    Create
+                    Create Sprint
                   </button>
                 </div>
               </div>
             )}
 
             {showMilestoneForm && (
-              <div className="p-4 rounded border border-mc-border bg-mc-bg-secondary">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <input
-                    type="text"
-                    value={newMilestoneName}
-                    onChange={(event) => setNewMilestoneName(event.target.value)}
-                    placeholder="Milestone name"
-                    className="w-full px-3 py-2 text-sm border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
-                  />
-                  <select
-                    value={newMilestoneSprintId}
-                    onChange={(event) => setNewMilestoneSprintId(event.target.value)}
-                    className="w-full px-3 py-2 text-sm border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
-                  >
-                    <option value="">Backlog</option>
-                    {sprints.map((sprint) => (
-                      <option key={sprint.id} value={sprint.id}>
-                        {sprint.name}
-                      </option>
-                    ))}
-                  </select>
-                  <select
-                    value={newMilestonePriority}
-                    onChange={(event) => setNewMilestonePriority(event.target.value as 'low' | 'normal' | 'high' | 'urgent')}
-                    className="w-full px-3 py-2 text-sm border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
-                  >
-                    <option value="low">Low</option>
-                    <option value="normal">Normal</option>
-                    <option value="high">High</option>
-                    <option value="urgent">Urgent</option>
-                  </select>
-                  <input
-                    type="date"
-                    value={newMilestoneDueDate}
-                    onChange={(event) => setNewMilestoneDueDate(event.target.value)}
-                    className="w-full px-3 py-2 text-sm border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
-                  />
+              <div className="rounded-lg border border-mc-border bg-mc-bg-secondary overflow-hidden">
+                <div className="p-4 border-b border-mc-border bg-mc-bg-tertiary/30">
+                  <h4 className="text-sm font-semibold text-mc-text">Add New Milestone</h4>
                 </div>
-                <div className="mt-3 flex justify-end gap-2">
+                <div className="p-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs uppercase tracking-wide text-mc-text-secondary font-medium mb-1.5">Name</label>
+                      <input
+                        type="text"
+                        value={newMilestoneName}
+                        onChange={(event) => setNewMilestoneName(event.target.value)}
+                        placeholder="Milestone name"
+                        className="w-full px-3 py-1.5 text-sm border border-mc-border rounded bg-mc-bg text-mc-text placeholder:text-mc-text-secondary/50 focus:outline-none focus:border-mc-accent"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs uppercase tracking-wide text-mc-text-secondary font-medium mb-1.5">Sprint</label>
+                      <select
+                        value={newMilestoneSprintId}
+                        onChange={(event) => setNewMilestoneSprintId(event.target.value)}
+                        className="w-full px-3 py-1.5 text-sm border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
+                      >
+                        <option value="">Backlog</option>
+                        {sprints.map((sprint) => (
+                          <option key={sprint.id} value={sprint.id}>
+                            {sprint.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs uppercase tracking-wide text-mc-text-secondary font-medium mb-1.5">Priority</label>
+                      <select
+                        value={newMilestonePriority}
+                        onChange={(event) => setNewMilestonePriority(event.target.value as 'low' | 'normal' | 'high' | 'urgent')}
+                        className="w-full px-3 py-1.5 text-sm border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
+                      >
+                        <option value="low">Low</option>
+                        <option value="normal">Normal</option>
+                        <option value="high">High</option>
+                        <option value="urgent">Urgent</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs uppercase tracking-wide text-mc-text-secondary font-medium mb-1.5">Due Date</label>
+                      <input
+                        type="date"
+                        value={newMilestoneDueDate}
+                        onChange={(event) => setNewMilestoneDueDate(event.target.value)}
+                        className="w-full px-3 py-1.5 text-sm border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div className="px-4 py-3 border-t border-mc-border flex justify-end gap-2">
                   <button
                     onClick={() => {
                       setShowMilestoneForm(false);
@@ -622,16 +651,16 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
                       setNewMilestoneDueDate('');
                       setNewMilestonePriority('normal');
                     }}
-                    className="px-3 py-1.5 text-sm border border-mc-border rounded"
+                    className="px-3 py-1.5 text-sm border border-mc-border rounded hover:bg-mc-bg-tertiary"
                   >
                     Cancel
                   </button>
                   <button
                     disabled={creatingMilestone || !newMilestoneName.trim()}
                     onClick={createMilestone}
-                    className="px-3 py-1.5 text-sm bg-mc-accent text-white rounded disabled:opacity-50"
+                    className="px-3 py-1.5 text-sm bg-mc-accent text-white rounded hover:opacity-90 disabled:opacity-50"
                   >
-                    Create
+                    Add Milestone
                   </button>
                 </div>
               </div>
@@ -692,31 +721,31 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
                   const milestoneKey = milestone.id;
                   const milestoneTickets = milestoneTicketMap.get(milestoneKey) || [];
                   const isOpen = expandedMilestones.has(milestoneKey);
-                  const statusClass = STATUS_COLORS[milestone.status] || 'bg-gray-100 text-gray-700';
+                  const statusClass = STATUS_COLORS[milestone.status] || 'bg-mc-bg-tertiary text-mc-text-secondary';
 
                   return (
-                    <section key={milestoneKey} className="rounded border border-mc-border bg-mc-bg-secondary">
+                    <section key={milestoneKey} className="rounded-lg border border-mc-border bg-mc-bg-secondary overflow-hidden">
                       <button
                         type="button"
                         onClick={() => toggleMilestone(milestoneKey)}
-                        className="w-full p-3 border-b border-mc-border/50 text-left"
+                        className="w-full px-4 py-3 border-b border-mc-border/60 text-left hover:bg-mc-bg-tertiary/30"
                       >
-                        <div className="flex items-center justify-between gap-3 flex-wrap">
-                          <div className="flex items-center gap-2 min-w-0">
-                            {isOpen ? <ChevronDown size={16} className="text-mc-text-secondary" /> : <ChevronRight size={16} className="text-mc-text-secondary" />}
-                            <span className="text-base font-semibold text-mc-text truncate">{milestone.name}</span>
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            {isOpen ? <ChevronDown size={16} className="text-mc-text-secondary shrink-0" /> : <ChevronRight size={16} className="text-mc-text-secondary shrink-0" />}
+                            <span className="text-sm font-semibold text-mc-text truncate">{milestone.name}</span>
                             {milestone.id !== 'no-milestone' && (
-                              <span className={`px-2 py-0.5 rounded text-xs font-mono ${statusClass}`}>{milestone.status}</span>
+                              <span className={`px-2 py-0.5 rounded-full text-xs font-mono ${statusClass}`}>{milestone.status}</span>
                             )}
                           </div>
-                          <div className="flex items-center gap-2 text-sm text-mc-text-secondary">
-                            <span>{milestoneTickets.length} ticket{milestoneTickets.length === 1 ? '' : 's'}</span>
+                          <div className="flex items-center gap-2 text-xs text-mc-text-secondary">
+                            <span className="font-mono">{milestoneTickets.length}</span>
                           </div>
                         </div>
                       </button>
 
                       {isOpen && (
-                        <div className="p-3 space-y-2">
+                        <div className="p-2 space-y-1.5">
                           {milestoneTickets.map((ticket) => {
                             const typeConfig = TYPE_CONFIG[ticket.ticket_type] || TYPE_CONFIG.task;
                             return (
@@ -724,29 +753,27 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
                                 key={ticket.id}
                                 type="button"
                                 onClick={() => setSelectedTicketId(ticket.id)}
-                                className="w-full p-3 rounded border border-mc-border bg-mc-bg text-left hover:border-mc-accent transition-colors"
+                                className="w-full px-3 py-2.5 rounded border border-mc-border bg-mc-bg text-left hover:border-mc-accent hover:bg-mc-bg-secondary"
                               >
-                                <div className="flex items-start justify-between gap-3">
-                                  <div className="flex items-center gap-2 min-w-0">
-                                    <span className={`px-2 py-0.5 rounded text-xs font-mono ${typeConfig.color}`}>{typeConfig.label}</span>
-                                    <span className="text-sm text-mc-text truncate">{ticket.title}</span>
-                                  </div>
-                                  <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
-                                    <span className={`px-2 py-0.5 rounded text-xs font-mono ${STATUS_COLORS[ticket.status] || 'bg-gray-100 text-gray-700'}`}>
+                                <div className="flex items-center gap-2.5">
+                                  <span className={`px-2 py-0.5 rounded-full text-xs font-mono shrink-0 ${typeConfig.color}`}>{typeConfig.label}</span>
+                                  <span className="text-sm text-mc-text truncate flex-1 min-w-0">{ticket.title}</span>
+                                  <div className="flex items-center gap-1.5 shrink-0">
+                                    <span className={`px-2 py-0.5 rounded-full text-xs font-mono ${STATUS_COLORS[ticket.status] || 'bg-mc-bg-tertiary text-mc-text-secondary'}`}>
                                       {ticket.status}
                                     </span>
-                                    <span className={`px-2 py-0.5 rounded text-xs font-mono ${PRIORITY_COLORS[ticket.priority] || 'bg-slate-100 text-slate-700'}`}>
+                                    <span className={`px-2 py-0.5 rounded-full text-xs font-mono ${PRIORITY_COLORS[ticket.priority] || 'bg-mc-bg-tertiary text-mc-text-secondary'}`}>
                                       {ticket.priority}
                                     </span>
                                     {typeof ticket.story_points === 'number' && (
-                                      <span className="px-2 py-0.5 rounded text-xs font-mono bg-mc-bg-secondary border border-mc-border text-mc-text-secondary">
+                                      <span className="px-2 py-0.5 rounded-full text-xs font-mono bg-mc-bg-tertiary text-mc-text-secondary">
                                         {ticket.story_points}sp
                                       </span>
                                     )}
                                   </div>
                                 </div>
                                 {ticket.description && (
-                                  <p className="mt-2 text-sm text-mc-text-secondary line-clamp-2">{ticket.description}</p>
+                                  <p className="mt-1.5 text-xs text-mc-text-secondary line-clamp-1 pl-14">{ticket.description}</p>
                                 )}
                               </button>
                             );
@@ -764,14 +791,14 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
           {activeTab === 'knowledge' && (
             <div className="space-y-2">
             {knowledge.length === 0 ? (
-              <div className="rounded border border-mc-border bg-mc-bg-secondary min-h-[320px] flex items-center justify-center px-6">
+              <div className="rounded-lg border border-mc-border bg-mc-bg-secondary min-h-[320px] flex items-center justify-center px-6">
                 <div className="flex flex-col items-center justify-center py-16 text-center">
                   <BookOpen size={32} className="text-mc-text-secondary mb-4" />
                   <h3 className="text-lg font-semibold mb-2 text-mc-text">No knowledge articles yet</h3>
                   <p className="text-sm text-mc-text-secondary max-w-md mb-4">
                     Knowledge articles are automatically synthesized from your team&apos;s memories and decisions. Start by recording memories through the API.
                   </p>
-                  <pre className="text-sm font-mono text-left rounded border border-mc-border bg-mc-bg p-3 mb-4 overflow-x-auto">
+                  <pre className="text-xs font-mono text-left rounded-lg border border-mc-border bg-mc-bg p-3 mb-4 overflow-x-auto">
 {`POST /api/memories
 {
   "memory_type": "decision",
@@ -786,7 +813,7 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
                     href="/api/memories"
                     target="_blank"
                     rel="noreferrer"
-                    className="px-4 py-2 text-sm border border-mc-border rounded hover:bg-mc-bg"
+                    className="px-4 py-2 text-sm border border-mc-border rounded hover:bg-mc-bg-tertiary"
                   >
                     Open Memories API
                   </a>
@@ -794,14 +821,14 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
               </div>
             ) : (
               knowledge.map((article) => (
-                <article key={article.id} className="p-3 rounded border border-mc-border bg-mc-bg-secondary">
-                  <div className="flex items-center justify-between gap-2 flex-wrap">
-                    <h3 className="text-base font-semibold text-mc-text">{article.title}</h3>
-                    <span className={`px-2 py-0.5 rounded text-xs font-mono ${article.status === 'stale' ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'}`}>
+                <article key={article.id} className="px-4 py-3 rounded-lg border border-mc-border bg-mc-bg-secondary">
+                  <div className="flex items-center justify-between gap-2">
+                    <h3 className="text-sm font-semibold text-mc-text truncate">{article.title}</h3>
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-mono shrink-0 ${article.status === 'stale' ? 'bg-mc-accent-yellow/15 text-mc-accent-yellow' : 'bg-mc-accent-green/15 text-mc-accent-green'}`}>
                       {article.status}
                     </span>
                   </div>
-                  <p className="mt-2 text-sm text-mc-text-secondary line-clamp-2">{article.summary}</p>
+                  <p className="mt-1.5 text-sm text-mc-text-secondary line-clamp-2">{article.summary}</p>
                 </article>
               ))
             )}
@@ -814,34 +841,34 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
               <Link
                 key={workspace.id}
                 href={`/workspace/${workspace.slug}`}
-                className="block p-4 rounded-lg border border-mc-border bg-mc-bg-secondary hover:border-mc-accent transition-colors"
+                className="block px-4 py-3 rounded-lg border border-mc-border bg-mc-bg-secondary hover:border-mc-accent hover:bg-mc-bg-tertiary/30"
               >
                 <div className="flex items-center gap-3">
                   <Folder size={18} className="text-mc-accent shrink-0" />
-                  <div className="min-w-0">
-                    <span className="text-base font-semibold text-mc-text block truncate">{workspace.name}</span>
+                  <div className="min-w-0 flex-1">
+                    <span className="text-sm font-semibold text-mc-text block truncate">{workspace.name}</span>
                     {workspace.description ? (
-                      <p className="text-sm text-mc-text-secondary mt-0.5 line-clamp-2">{workspace.description}</p>
+                      <p className="text-xs text-mc-text-secondary mt-0.5 line-clamp-1">{workspace.description}</p>
                     ) : (
-                      <p className="text-sm text-mc-text-secondary mt-0.5">Tasks managed by AI agents</p>
+                      <p className="text-xs text-mc-text-secondary mt-0.5">Tasks managed by AI agents</p>
                     )}
                   </div>
                 </div>
-                <div className="mt-3 flex flex-wrap gap-4 text-sm text-mc-text-secondary">
+                <div className="mt-2.5 flex flex-wrap gap-4 text-xs text-mc-text-secondary font-mono">
                   <span>{workspaceSummaries[workspace.id]?.taskCount ?? 0} tasks</span>
                   <span>{workspaceSummaries[workspace.id]?.lastActivity ?? 'No recent activity'}</span>
                 </div>
               </Link>
             ))}
             {(org.workspaces || []).length === 0 && (
-              <div className="sm:col-span-2 rounded border border-mc-border bg-mc-bg-secondary min-h-[260px] flex items-center justify-center px-6">
+              <div className="sm:col-span-2 rounded-lg border border-mc-border bg-mc-bg-secondary min-h-[260px] flex items-center justify-center px-6">
                 <div className="flex flex-col items-center justify-center py-16 text-center">
                   <Folder size={32} className="text-mc-text-secondary mb-4" />
                   <h3 className="text-lg font-semibold mb-2 text-mc-text">No workspaces in this organization</h3>
                   <p className="text-sm text-mc-text-secondary max-w-md mb-6">
                     Workspaces are where delegated tasks are executed. Create or connect a workspace to start routing org tickets.
                   </p>
-                  <Link href="/" className="px-4 py-2 text-sm border border-mc-border rounded hover:bg-mc-bg">
+                  <Link href="/" className="px-4 py-2 text-sm border border-mc-border rounded hover:bg-mc-bg-tertiary">
                     Browse all workspaces
                   </Link>
                 </div>
