@@ -1,5 +1,5 @@
 'use client';
-import { X, CheckCircle2, Clock } from 'lucide-react';
+import { X, CheckCircle2, Clock, Ticket } from 'lucide-react';
 import type { Task } from '@/lib/types';
 
 interface Props {
@@ -36,6 +36,13 @@ export function WorkspaceTaskViewer({ task, onClose }: Props) {
             <span className="text-xs px-2 py-0.5 rounded font-mono bg-mc-bg border border-mc-border text-mc-text-secondary">{task.task_type}</span>
           </div>
           {task.description && <p className="text-sm text-mc-text">{task.description}</p>}
+          {task.org_ticket_id && (
+            <div className="flex items-center gap-1 text-sm text-mc-text-secondary">
+              <Ticket size={14} className="text-mc-accent" />
+              <span className="font-medium">Delegated from org ticket</span>
+              <span className="font-mono">{task.org_ticket_id}</span>
+            </div>
+          )}
           <div className="flex gap-4 text-xs text-mc-text-secondary">
             {task.due_date && <span className="flex items-center gap-1"><Clock size={10} />{task.due_date}</span>}
           </div>

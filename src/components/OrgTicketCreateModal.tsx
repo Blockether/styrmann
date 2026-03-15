@@ -5,6 +5,8 @@ import type { OrgTicket } from '@/lib/types';
 
 interface Props {
   organizationId: string;
+  initialSprintId?: string | null;
+  initialMilestoneId?: string | null;
   onClose: () => void;
   onCreated: (ticket: OrgTicket) => void;
 }
@@ -14,7 +16,13 @@ interface AcceptanceCriterion {
   description: string;
 }
 
-export function OrgTicketCreateModal({ organizationId, onClose, onCreated }: Props) {
+export function OrgTicketCreateModal({
+  organizationId,
+  initialSprintId,
+  initialMilestoneId,
+  onClose,
+  onCreated,
+}: Props) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState<'low' | 'normal' | 'high' | 'urgent'>('normal');
@@ -65,6 +73,8 @@ export function OrgTicketCreateModal({ organizationId, onClose, onCreated }: Pro
           due_date: dueDate || undefined,
           assignee_name: assignee.trim() || undefined,
           external_ref: externalRef.trim() || undefined,
+          org_sprint_id: initialSprintId || undefined,
+          org_milestone_id: initialMilestoneId || undefined,
           tags: [],
         }),
       });
@@ -97,7 +107,11 @@ export function OrgTicketCreateModal({ organizationId, onClose, onCreated }: Pro
         });
       }
 
-      onCreated(ticket as OrgTicket);
+      onCreated({
+        ...(ticket as OrgTicket),
+        org_sprint_id: (ticket as OrgTicket).org_sprint_id ?? initialSprintId ?? null,
+        org_milestone_id: (ticket as OrgTicket).org_milestone_id ?? initialMilestoneId ?? null,
+      });
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create ticket');

@@ -215,7 +215,7 @@ open -> triaged -> delegated -> in_progress -> resolved -> closed
 
 SSE events: `org_sprint_created`, `org_sprint_updated`, `org_sprint_deleted`.
 
-**OrgDetailView Sprints tab**: The org detail page includes a Sprints tab showing all sprints for the organization with inline creation form (name, status, start/end dates). Sprint cards are expandable to show assigned tickets. Ticket cards in the Tickets tab show sprint assignment badges.
+**OrgDetailView unified board**: The organization detail page is now organized as `Board | Knowledge | Workspaces`. The Board tab is a sprint-scoped milestone board (`Sprint -> Milestone -> Ticket`) with a sprint selector (including `Backlog`), inline sprint/milestone creation, and ticket rows that open `OrgTicketModal`. Org-level updates refresh via `useOrgSSE` listening to `/api/events` for ticket/sprint/milestone/knowledge events.
 
 ---
 
@@ -385,7 +385,7 @@ Auto-named `SPRINT-N` per workspace (auto-incremented `sprint_number`). Users ca
 - When a sprint is completed, all non-done tasks are unassigned from the sprint (via their milestones).
 - Cannot delete a sprint that has milestones.
 
-**Kanban board** (ActiveSprint): Sprint-scoped. Shows tasks grouped by milestone, where the milestone belongs to the selected sprint. Two view modes: List (milestone-grouped) and Board (drag-and-drop columns for all 8 statuses, with milestone swimlanes).
+**Kanban board** (ActiveSprint): Sprint-scoped read view. Shows tasks grouped by milestone, where the milestone belongs to the selected sprint. Two view modes: List (milestone-grouped) and Board (drag-and-drop columns for all 8 statuses, with milestone swimlanes). Sprint/milestone creation actions were removed from this workspace surface and are managed from the organization board.
 
 ---
 

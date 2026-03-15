@@ -50,7 +50,7 @@ export const useStyrmann = create<StyrmannState>((set) => ({
   selectedAgent: null,
   selectedTask: null,
   selectedSprintId: null,
-  isOnline: false,
+  isOnline: true,
   isLoading: true,
 
 

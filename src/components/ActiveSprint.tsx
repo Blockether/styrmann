@@ -1,12 +1,11 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { Plus, ChevronDown, CheckCircle2, Loader2, Flag, Calendar, ChevronRight, ArrowRightLeft, LayoutList, Columns3, GripVertical, Target, AlertCircle, Crown, Bug, Lightbulb, Wrench, BookOpen, FlaskConical, Zap } from 'lucide-react';
+import { ChevronDown, CheckCircle2, Loader2, Flag, Calendar, ChevronRight, ArrowRightLeft, LayoutList, Columns3, GripVertical, Target, AlertCircle, Crown, Bug, Lightbulb, Wrench, BookOpen, FlaskConical, Zap } from 'lucide-react';
 import { useStyrmann } from '@/lib/store';
 import { triggerAutoDispatch, shouldTriggerAutoDispatch } from '@/lib/auto-dispatch';
 import type { Task, TaskStatus, TaskType, Sprint, Milestone, Agent } from '@/lib/types';
 import { TaskModal } from './TaskModal';
-import { CreateMilestoneModal } from './CreateMilestoneModal';
 import { AgentInitials } from './AgentInitials';
 import { formatDistanceToNow } from 'date-fns';
 import { useTaskDeepLink } from '@/hooks/useTaskDeepLink';
@@ -86,13 +85,11 @@ export function ActiveSprint({ workspaceId, mobileMode = false, isPortrait = tru
   const [selectedSprintId, setSelectedSprintId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [showSprintDropdown, setShowSprintDropdown] = useState(false);
-  const [showCreateMilestoneModal, setShowCreateMilestoneModal] = useState(false);
   const { linkedTask, initialTab, openTask, closeTask, updateTab } = useTaskDeepLink();
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const activeEditingTask = editingTask || linkedTask;
   const handleTaskClick = (task: Task) => { setEditingTask(task); openTask(task); };
   const [endingSprint, setEndingSprint] = useState(false);
-  const [creatingSprint, setCreatingSprint] = useState(false);
   const [statusMoveTask, setStatusMoveTask] = useState<Task | null>(null);
   const [viewMode, setViewMode] = useState<'list' | 'board'>('list');
   const [selectedBoardStatus, setSelectedBoardStatus] = useState<TaskStatus>('planning');
@@ -273,34 +270,6 @@ export function ActiveSprint({ workspaceId, mobileMode = false, isPortrait = tru
     }
   };
 
-  const handleCreateNextSprint = async () => {
-    if (!workspaceId) return;
-    setCreatingSprint(true);
-    try {
-      const now = new Date();
-      const twoWeeksLater = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
-      const res = await fetch('/api/sprints', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          workspace_id: workspaceId,
-          start_date: now.toISOString().split('T')[0],
-          end_date: twoWeeksLater.toISOString().split('T')[0],
-        }),
-      });
-
-      if (res.ok) {
-        const newSprint = await res.json();
-        setSprints((prev) => [...prev, newSprint]);
-        setSelectedSprintId(newSprint.id);
-      }
-    } catch (error) {
-      console.error('Failed to create sprint:', error);
-    } finally {
-      setCreatingSprint(false);
-    }
-  };
-
   const getMilestoneProgress = (milestoneId: string) => {
     const tasks = tasksByMilestone[milestoneId] || [];
     const done = tasks.filter((t) => DONE_STATUSES.includes(t.status)).length;
@@ -339,16 +308,8 @@ export function ActiveSprint({ workspaceId, mobileMode = false, isPortrait = tru
         <Calendar className="w-12 h-12 text-mc-border mb-4" />
         <h3 className="text-lg font-semibold mb-2">No Sprints Yet</h3>
         <p className="text-sm text-mc-text-secondary text-center mb-4">
-          Create your first sprint to start organizing tasks.
+          Sprints are managed from the organization board.
         </p>
-        <button
-          onClick={handleCreateNextSprint}
-          disabled={creatingSprint}
-          className="flex items-center gap-2 px-4 min-h-11 bg-mc-accent text-white rounded text-sm font-medium hover:bg-mc-accent/90 disabled:opacity-50"
-        >
-          {creatingSprint ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-          Create First Sprint
-        </button>
       </div>
     );
   }
@@ -359,16 +320,8 @@ export function ActiveSprint({ workspaceId, mobileMode = false, isPortrait = tru
         <Flag className="w-12 h-12 text-mc-border mb-4" />
         <h3 className="text-lg font-semibold mb-2">No Active Sprint</h3>
         <p className="text-sm text-mc-text-secondary text-center mb-4">
-          Select a sprint from the dropdown or create a new one.
+          Select a sprint from the dropdown.
         </p>
-        <button
-          onClick={handleCreateNextSprint}
-          disabled={creatingSprint}
-          className="flex items-center gap-2 px-4 min-h-11 bg-mc-accent text-white rounded text-sm font-medium hover:bg-mc-accent/90 disabled:opacity-50"
-        >
-          {creatingSprint ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-          Create Sprint
-        </button>
       </div>
     );
   }
@@ -417,19 +370,6 @@ export function ActiveSprint({ workspaceId, mobileMode = false, isPortrait = tru
                     </span>
                   </button>
                 ))}
-                <div className="border-t border-mc-border mt-1 pt-1">
-                  <button
-                    onClick={() => {
-                      handleCreateNextSprint();
-                      setShowSprintDropdown(false);
-                    }}
-                    disabled={creatingSprint}
-                    className="w-full px-3 py-2 text-left text-sm text-mc-accent hover:bg-mc-bg-tertiary flex items-center gap-2"
-                  >
-                    {creatingSprint ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-                    Create Next Sprint
-                  </button>
-                </div>
               </div>
             )}
           </div>
@@ -472,14 +412,6 @@ export function ActiveSprint({ workspaceId, mobileMode = false, isPortrait = tru
               <span className="hidden sm:inline">End Sprint</span>
             </button>
           )}
-          <button
-            onClick={() => setShowCreateMilestoneModal(true)}
-            aria-label="Create new milestone"
-            className="flex items-center gap-2 px-3 min-h-11 border border-mc-border rounded text-sm text-mc-text-secondary hover:bg-mc-bg-tertiary"
-          >
-            <Target className="w-4 h-4" />
-            <span className="hidden sm:inline">New Milestone</span>
-          </button>
         </div>
       </div>
 
@@ -652,22 +584,6 @@ export function ActiveSprint({ workspaceId, mobileMode = false, isPortrait = tru
         />
       )}
 
-      {showCreateMilestoneModal && workspaceId && (
-        <CreateMilestoneModal
-          workspaceId={workspaceId}
-          sprintId={selectedSprintId || undefined}
-          onClose={() => setShowCreateMilestoneModal(false)}
-          onCreated={() => {
-            const url = selectedSprintId
-              ? `/api/milestones?workspace_id=${workspaceId}&sprint_id=${selectedSprintId}`
-              : `/api/milestones?workspace_id=${workspaceId}`;
-            fetch(url).then(r => r.json()).then(data => {
-              setMilestones(data);
-              setExpandedMilestones(new Set(data.map((m: Milestone) => m.id)));
-            }).catch(() => {});
-          }}
-        />
-      )}
       {mobileMode && statusMoveTask && (
         <div className="fixed inset-0 z-50 bg-black/60 p-4 flex items-end sm:items-center sm:justify-center" onClick={() => setStatusMoveTask(null)}>
           <div
