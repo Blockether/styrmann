@@ -147,8 +147,35 @@ const migrations: Migration[] = [
          db.exec("ALTER TABLE org_tickets DROP COLUMN external_system");
          console.log('[Migration 103] Dropped external_system column from org_tickets');
        } else {
-         console.log('[Migration 103] external_system column not found, skipping');
+        console.log('[Migration 103] external_system column not found, skipping');
+        }
+      }
+   },
+   {
+     id: '104',
+     name: 'add_org_sprints',
+     up: (db) => {
+       db.exec(`
+         CREATE TABLE IF NOT EXISTS org_sprints (
+           id TEXT PRIMARY KEY,
+           organization_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+           name TEXT NOT NULL,
+           description TEXT,
+           status TEXT NOT NULL DEFAULT 'planned' CHECK (status IN ('planned', 'active', 'completed')),
+           start_date TEXT,
+           end_date TEXT,
+           created_at TEXT DEFAULT (datetime('now')),
+           updated_at TEXT DEFAULT (datetime('now'))
+         );
+         CREATE INDEX IF NOT EXISTS idx_org_sprints_org ON org_sprints(organization_id);
+         CREATE INDEX IF NOT EXISTS idx_org_sprints_status ON org_sprints(status);
+       `);
+       const cols = (db.prepare("PRAGMA table_info(org_tickets)").all() as { name: string }[]).map(c => c.name);
+       if (!cols.includes('org_sprint_id')) {
+         db.exec("ALTER TABLE org_tickets ADD COLUMN org_sprint_id TEXT REFERENCES org_sprints(id) ON DELETE SET NULL");
+         db.exec("CREATE INDEX IF NOT EXISTS idx_org_tickets_sprint ON org_tickets(org_sprint_id)");
        }
+       console.log('[Migration 104] Added org_sprints table');
      }
    },
  ];

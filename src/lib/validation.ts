@@ -192,6 +192,7 @@ export const CreateOrgTicketSchema = z.object({
   due_date: z.string().optional(),
   story_points: z.number().int().min(0).max(100).optional(),
   tags: z.array(z.string()).default([]),
+  org_sprint_id: z.string().optional().nullable(),
 });
 
 export const CreateMemorySchema = z.object({
@@ -272,7 +273,28 @@ export const UpdateOrgTicketSchema = z.object({
   due_date: z.string().optional().nullable(),
   story_points: z.number().int().min(0).max(100).optional().nullable(),
   tags: z.array(z.string()).optional(),
+  org_sprint_id: z.string().optional().nullable(),
 });
+
+export const CreateOrgSprintSchema = z.object({
+  organization_id: z.string().min(1),
+  name: z.string().min(1).max(200),
+  description: z.string().optional(),
+  status: z.enum(['planned', 'active', 'completed']).default('planned'),
+  start_date: z.string().optional(),
+  end_date: z.string().optional(),
+});
+
+export const UpdateOrgSprintSchema = z.object({
+  name: z.string().min(1).max(200).optional(),
+  description: z.string().optional().nullable(),
+  status: z.enum(['planned', 'active', 'completed']).optional(),
+  start_date: z.string().optional().nullable(),
+  end_date: z.string().optional().nullable(),
+});
+
+export type CreateOrgSprintInput = z.infer<typeof CreateOrgSprintSchema>;
+export type UpdateOrgSprintInput = z.infer<typeof UpdateOrgSprintSchema>;
 
 export const CreateOrgTicketAcceptanceCriteriaSchema = z.object({
   description: z.string().min(1).max(1000),

@@ -123,9 +123,26 @@ CREATE TABLE IF NOT EXISTS org_tickets (
   due_date TEXT,
   story_points INTEGER CHECK (story_points IS NULL OR (story_points >= 0 AND story_points <= 100)),
   tags TEXT DEFAULT '[]',
+  org_sprint_id TEXT REFERENCES org_sprints(id) ON DELETE SET NULL,
   created_at TEXT DEFAULT (datetime('now')),
   updated_at TEXT DEFAULT (datetime('now'))
 );
+
+-- Org sprints table (organization-level sprint planning)
+CREATE TABLE IF NOT EXISTS org_sprints (
+  id TEXT PRIMARY KEY,
+  organization_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  description TEXT,
+  status TEXT NOT NULL DEFAULT 'planned' CHECK (status IN ('planned', 'active', 'completed')),
+  start_date TEXT,
+  end_date TEXT,
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_org_sprints_org ON org_sprints(organization_id);
+CREATE INDEX IF NOT EXISTS idx_org_sprints_status ON org_sprints(status);
 
 -- Org ticket acceptance criteria
 CREATE TABLE IF NOT EXISTS org_ticket_acceptance_criteria (
@@ -485,6 +502,7 @@ CREATE INDEX IF NOT EXISTS idx_organizations_slug ON organizations(slug);
 CREATE INDEX IF NOT EXISTS idx_org_tickets_org ON org_tickets(organization_id);
 CREATE INDEX IF NOT EXISTS idx_org_tickets_status ON org_tickets(status);
 CREATE INDEX IF NOT EXISTS idx_org_tickets_external_ref ON org_tickets(external_ref);
+CREATE INDEX IF NOT EXISTS idx_org_tickets_sprint ON org_tickets(org_sprint_id);
 CREATE INDEX IF NOT EXISTS idx_workspaces_organization_id ON workspaces(organization_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
 CREATE INDEX IF NOT EXISTS idx_tasks_assigned ON tasks(assigned_agent_id);

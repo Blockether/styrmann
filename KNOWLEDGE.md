@@ -692,11 +692,13 @@ Fallback: Agent Activity Dashboard polls every 20s; task-specific views use SSE 
 
 ## Database Schema
 
-3 migrations (100-102), auto-run on DB connection in `src/lib/db/index.ts`. The database was reset to a fresh state as part of the org-platform-fixes cleanup. All stale workspaces from previous discovery runs were removed. Only the Styrmann workspace (`blockether-styrmann`) remains as the active workspace. Schema creation (`schema.ts`) runs for fresh databases and includes all tables previously added by migrations 001-062. Migrations 100-102 add the org-platform enrichment on top of the consolidated schema:
+5 migrations (100-104), auto-run on DB connection in `src/lib/db/index.ts`. The database was reset to a fresh state as part of the org-platform-fixes cleanup. All stale workspaces from previous discovery runs were removed. Only the Styrmann workspace (`blockether-styrmann`) remains as the active workspace. Schema creation (`schema.ts`) runs for fresh databases and includes all tables previously added by migrations 001-062. Migrations 100-104 add the org-platform enrichment on top of the consolidated schema:
 
 - **Migration 100**: Adds `story_points` column to `org_tickets`.
 - **Migration 101**: Adds `org_ticket_acceptance_criteria` table (id, org_ticket_id FK, description, is_met, sort_order, created_at, updated_at).
 - **Migration 102**: Fixes FTS5 triggers on `org_tickets_fts` to use `COALESCE(NEW.column, '')` for nullable columns, preventing NULL insertion errors during ticket creation.
+- **Migration 103**: Drops `external_system` column from `org_tickets`.
+- **Migration 104**: Adds `org_sprints` table for organization-level sprint planning. Adds `org_sprint_id` FK column on `org_tickets`.
 
 ### Core Tables
 - **organizations** -- id, name, slug (unique), description, logo_url. Auto-created from workspace discovery.
@@ -709,7 +711,8 @@ Fallback: Agent Activity Dashboard polls every 20s; task-specific views use SSE 
 - **tags** / **task_tags** -- workspace-scoped tags, many-to-many with tasks
 
 ### Org/Knowledge Platform Tables
-- **org_tickets** -- organization_id, title, description, status, priority, ticket_type, external_ref, external_system, creator_name, assignee_name, due_date, tags (JSON), story_points (integer)
+- **org_sprints** -- organization_id (FK), name, description, status ('planned'|'active'|'completed'), start_date, end_date
+- **org_tickets** -- organization_id, title, description, status, priority, ticket_type, external_ref, creator_name, assignee_name, due_date, tags (JSON), story_points (integer), org_sprint_id (nullable FK to org_sprints)
 - **org_ticket_acceptance_criteria** -- org_ticket_id (FK), description, is_met (boolean), sort_order, created_at, updated_at
 - **memories** -- organization_id, workspace_id, memory_type (8 types), title, summary, body, source, source_ref, confidence (0-100), status, metadata (JSON), tags (JSON)
 - **entity_links** -- from_entity_type, from_entity_id, to_entity_type, to_entity_id, link_type (10 types), explanation. Self-link prevented by CHECK constraint.

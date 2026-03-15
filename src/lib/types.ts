@@ -828,7 +828,22 @@ export interface OrgTicket {
   assignee_name?: string | null;
   due_date?: string | null;
   story_points?: number | null;
+  org_sprint_id?: string | null;
   tags: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export type OrgSprintStatus = 'planned' | 'active' | 'completed';
+
+export interface OrgSprint {
+  id: string;
+  organization_id: string;
+  name: string;
+  description?: string | null;
+  status: OrgSprintStatus;
+  start_date?: string | null;
+  end_date?: string | null;
   created_at: string;
   updated_at: string;
 }
