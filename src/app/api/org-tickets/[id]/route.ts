@@ -126,6 +126,18 @@ export async function PATCH(
       updates.push('status = ?');
       values.push(newStatus);
     }
+    if (parsed.data.story_points !== undefined) {
+      updates.push('story_points = ?');
+      values.push(parsed.data.story_points);
+    }
+    if (parsed.data.org_sprint_id !== undefined) {
+      updates.push('org_sprint_id = ?');
+      values.push(parsed.data.org_sprint_id);
+    }
+    if (parsed.data.org_milestone_id !== undefined) {
+      updates.push('org_milestone_id = ?');
+      values.push(parsed.data.org_milestone_id);
+    }
 
     if (updates.length === 0) {
       return NextResponse.json({ error: 'No fields to update' }, { status: 400 });

@@ -71,6 +71,8 @@ export async function POST(request: NextRequest) {
       assignee_name,
       due_date,
       tags,
+      org_sprint_id,
+      org_milestone_id,
     } = parsed.data;
 
     const db = getDb();
@@ -86,8 +88,9 @@ export async function POST(request: NextRequest) {
     db.prepare(`
       INSERT INTO org_tickets (
         id, organization_id, title, description, status, priority, ticket_type,
-        external_ref, creator_name, assignee_name, due_date, tags
-      ) VALUES (?, ?, ?, ?, 'open', ?, ?, ?, ?, ?, ?, ?)
+        external_ref, creator_name, assignee_name, due_date, tags,
+        org_sprint_id, org_milestone_id
+      ) VALUES (?, ?, ?, ?, 'open', ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id,
       organization_id,
@@ -100,6 +103,8 @@ export async function POST(request: NextRequest) {
       assignee_name ?? null,
       due_date ?? null,
       JSON.stringify(tags),
+      org_sprint_id ?? null,
+      org_milestone_id ?? null,
     );
 
     const ticket = db.prepare('SELECT * FROM org_tickets WHERE id = ?').get(id) as OrgTicket;
