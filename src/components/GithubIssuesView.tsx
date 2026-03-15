@@ -211,7 +211,7 @@ export function GithubIssuesView({ workspaceId, workspace }: GithubIssuesViewPro
           <select
             value={stateFilter}
             onChange={(e) => setStateFilter(e.target.value as IssueStateFilter)}
-            className="min-h-9 px-2 py-1 bg-mc-bg border border-mc-border rounded text-sm focus:outline-none focus:border-mc-accent"
+            className="px-2 py-1.5 bg-mc-bg border border-mc-border rounded text-sm focus:outline-none focus:border-mc-accent"
           >
             <option value="open">Open</option>
             <option value="closed">Closed</option>
@@ -220,10 +220,10 @@ export function GithubIssuesView({ workspaceId, workspace }: GithubIssuesViewPro
           <button
             onClick={handleSync}
             disabled={syncing}
-            className="flex items-center gap-2 px-3 min-h-9 border border-mc-border rounded text-sm hover:bg-mc-bg-tertiary disabled:opacity-50 transition-colors"
+            className="flex items-center gap-1.5 px-2 py-1.5 border border-mc-border rounded text-sm hover:bg-mc-bg-tertiary disabled:opacity-50 transition-colors"
           >
-            <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
-            <span className="hidden sm:inline">{syncing ? 'Syncing...' : 'Sync Now'}</span>
+            <RefreshCw className={`w-3.5 h-3.5 shrink-0 ${syncing ? 'animate-spin' : ''}`} />
+            <span className="hidden sm:inline">{syncing ? 'Syncing...' : 'Sync'}</span>
           </button>
         </div>
       </div>

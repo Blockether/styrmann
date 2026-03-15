@@ -87,7 +87,7 @@ export function DiscordMessagesView({ workspaceId }: DiscordMessagesViewProps) {
           <select
             value={filter}
             onChange={(e) => setFilter(e.target.value as ClassificationFilter)}
-            className="min-h-9 px-2 py-1 bg-mc-bg border border-mc-border rounded text-sm focus:outline-none focus:border-mc-accent"
+            className="px-2 py-1.5 bg-mc-bg border border-mc-border rounded text-sm focus:outline-none focus:border-mc-accent"
           >
             <option value="all">All</option>
             <option value="task">Tasks</option>
@@ -98,9 +98,9 @@ export function DiscordMessagesView({ workspaceId }: DiscordMessagesViewProps) {
             <button
               onClick={fetchMessages}
               disabled={loading}
-              className="flex items-center gap-2 px-3 min-h-9 border border-mc-border rounded text-sm hover:bg-mc-bg-tertiary disabled:opacity-50 transition-colors"
+              className="flex items-center gap-1.5 px-2 py-1.5 border border-mc-border rounded text-sm hover:bg-mc-bg-tertiary disabled:opacity-50 transition-colors"
             >
-              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`w-3.5 h-3.5 shrink-0 ${loading ? 'animate-spin' : ''}`} />
               <span className="hidden sm:inline">Refresh</span>
             </button>
           )}
