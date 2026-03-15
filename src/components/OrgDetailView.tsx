@@ -123,7 +123,7 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
   const [loading, setLoading] = useState(true);
 
   const [selectedSprintId, setSelectedSprintId] = useState<string>('backlog');
-  const [expandedMilestones, setExpandedMilestones] = useState<Set<string>>(new Set(['no-milestone']));
+  const [expandedMilestones, setExpandedMilestones] = useState<Set<string>>(new Set());
 
   const [showCreateTicketModal, setShowCreateTicketModal] = useState(false);
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
@@ -263,6 +263,8 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
     }
   }, [selectedSprintId]);
 
+
+
   useOrgSSE({
     onTicketChange: refetchAll,
     onSprintChange: refetchAll,
@@ -299,6 +301,12 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
   }, [filteredMilestones, filteredTickets]);
 
   const defaultTicketMilestoneId = filteredMilestones[0]?.id;
+
+  useEffect(() => {
+    const allKeys = new Set(filteredMilestones.map((m) => m.id));
+    allKeys.add('no-milestone');
+    setExpandedMilestones(allKeys);
+  }, [filteredMilestones]);
 
   const toggleMilestone = (milestoneKey: string) => {
     setExpandedMilestones((prev) => {
