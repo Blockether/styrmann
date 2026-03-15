@@ -21,6 +21,7 @@ import { OrgTicketCreateModal } from '@/components/OrgTicketCreateModal';
 import { OrgTicketModal } from '@/components/OrgTicketModal';
 import { useOrgSSE } from '@/hooks/useOrgSSE';
 import type { KnowledgeArticle, OrgMilestone, OrgSprint, OrgTicket, Workspace } from '@/lib/types';
+import { RESERVED_SPRINT_NAMES } from '@/lib/validation';
 
 interface OrgDetail {
   id: string;
@@ -134,6 +135,7 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
   const [newSprintStartDate, setNewSprintStartDate] = useState('');
   const [newSprintEndDate, setNewSprintEndDate] = useState('');
   const [creatingSprint, setCreatingSprint] = useState(false);
+  const [sprintNameError, setSprintNameError] = useState<string | null>(null);
 
   const [showMilestoneForm, setShowMilestoneForm] = useState(false);
   const [newMilestoneName, setNewMilestoneName] = useState('');
@@ -325,6 +327,12 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
       return;
     }
 
+    if (RESERVED_SPRINT_NAMES.includes(newSprintName.trim().toLowerCase())) {
+      setSprintNameError('"Backlog" is a reserved name and cannot be used as a sprint name');
+      return;
+    }
+
+    setSprintNameError(null);
     setCreatingSprint(true);
     try {
       const res = await fetch('/api/org-sprints', {
@@ -348,6 +356,7 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
         setNewSprintDescription('');
         setNewSprintStartDate('');
         setNewSprintEndDate('');
+        setSprintNameError(null);
         await refetchAll();
       }
     } finally {
@@ -502,12 +511,16 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
                       onChange={(event) => setSelectedSprintId(event.target.value)}
                       className="px-3 py-1.5 text-sm border border-mc-border rounded bg-mc-bg-secondary text-mc-text focus:outline-none focus:border-mc-accent"
                     >
-                      <option value="backlog">Backlog</option>
-                      {sprints.map((sprint) => (
-                        <option key={sprint.id} value={sprint.id}>
-                          {sprint.name} ({sprint.status})
-                        </option>
-                      ))}
+                      <option value="backlog">Backlog (unassigned)</option>
+                      {sprints.length > 0 && (
+                        <optgroup label="Sprints">
+                          {sprints.map((sprint) => (
+                            <option key={sprint.id} value={sprint.id}>
+                              {sprint.name} ({sprint.status})
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
                     </select>
                     {selectedSprint && (
                       <span className={`px-2 py-0.5 rounded-full text-xs font-mono ${SPRINT_STATUS_COLORS[selectedSprint.status] || 'bg-mc-bg-tertiary text-mc-text-secondary'}`}>
@@ -584,10 +597,16 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
                     <input
                       type="text"
                       value={newSprintName}
-                      onChange={(event) => setNewSprintName(event.target.value)}
+                      onChange={(event) => {
+                        setNewSprintName(event.target.value);
+                        if (sprintNameError) setSprintNameError(null);
+                      }}
                       placeholder="Sprint name"
-                      className="w-full px-3 py-1.5 text-sm border border-mc-border rounded bg-mc-bg text-mc-text placeholder:text-mc-text-secondary/50 focus:outline-none focus:border-mc-accent"
+                      className={`w-full px-3 py-1.5 text-sm border rounded bg-mc-bg text-mc-text placeholder:text-mc-text-secondary/50 focus:outline-none ${sprintNameError ? 'border-mc-accent-red focus:border-mc-accent-red' : 'border-mc-border focus:border-mc-accent'}`}
                     />
+                    {sprintNameError && (
+                      <p className="mt-1 text-xs text-mc-accent-red">{sprintNameError}</p>
+                    )}
                   </div>
                   <div>
                     <label className="block text-xs uppercase tracking-wide text-mc-text-secondary font-medium mb-1.5">Description</label>
@@ -608,6 +627,7 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
                       setNewSprintDescription('');
                       setNewSprintStartDate('');
                       setNewSprintEndDate('');
+                      setSprintNameError(null);
                     }}
                     className="px-3 py-1.5 text-sm border border-mc-border rounded hover:bg-mc-bg-tertiary"
                   >
@@ -648,12 +668,16 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
                         onChange={(event) => setNewMilestoneSprintId(event.target.value)}
                         className="w-full min-w-0 px-3 py-1.5 text-sm border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
                       >
-                        <option value="">Backlog</option>
-                        {sprints.map((sprint) => (
-                          <option key={sprint.id} value={sprint.id}>
-                            {sprint.name}
-                          </option>
-                        ))}
+                        <option value="">Backlog (unassigned)</option>
+                        {sprints.length > 0 && (
+                          <optgroup label="Sprints">
+                            {sprints.map((sprint) => (
+                              <option key={sprint.id} value={sprint.id}>
+                                {sprint.name}
+                              </option>
+                            ))}
+                          </optgroup>
+                        )}
                       </select>
                     </div>
                     <div className="min-w-0">
