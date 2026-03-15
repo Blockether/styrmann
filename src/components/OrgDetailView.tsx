@@ -793,7 +793,7 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
                       </button>
 
                       {isOpen && (
-                        <div className="p-2 space-y-1.5">
+                        <div className="p-2 flex flex-col gap-1.5">
                           {milestoneTickets.map((ticket) => {
                             const typeConfig = TYPE_CONFIG[ticket.ticket_type] || TYPE_CONFIG.task;
                             return (
@@ -801,7 +801,7 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
                                 key={ticket.id}
                                 type="button"
                                 onClick={() => setSelectedTicketId(ticket.id)}
-                                className="w-full px-3 py-2 rounded border border-mc-border bg-mc-bg text-left hover:border-mc-accent hover:bg-mc-bg-secondary"
+                                className="block w-full px-3 py-2 rounded border border-mc-border bg-mc-bg text-left hover:border-mc-accent hover:bg-mc-bg-secondary"
                               >
                                 <div className="flex items-start gap-2 min-w-0">
                                   <span className={`px-2 py-0.5 rounded-full text-xs font-mono shrink-0 mt-0.5 ${typeConfig.color}`}>{typeConfig.label}</span>
