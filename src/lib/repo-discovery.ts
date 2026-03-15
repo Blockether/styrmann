@@ -20,6 +20,7 @@ import fs from 'fs';
 import path from 'path';
 import Database from 'better-sqlite3';
 import { provisionWorkflowTemplates } from './workflow-templates';
+import { getDefaultOrgName } from './org-config';
 
 const REPOS_BASE = '/root/repos';
 
@@ -87,7 +88,7 @@ function ensureOrganization(db: Database.Database, orgName: string): string {
   if (existing) return existing.id;
 
   const id = crypto.randomUUID();
-  const displayName = orgName.charAt(0).toUpperCase() + orgName.slice(1);
+  const displayName = getDefaultOrgName() || orgName.charAt(0).toUpperCase() + orgName.slice(1);
   db.prepare('INSERT INTO organizations (id, name, slug) VALUES (?, ?, ?)').run(id, displayName, slug);
   console.log(`[RepoDiscovery] Created organization: ${displayName} (${slug})`);
   return id;

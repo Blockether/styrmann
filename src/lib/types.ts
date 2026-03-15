@@ -824,7 +824,6 @@ export interface OrgTicket {
   priority: 'low' | 'normal' | 'high' | 'urgent';
   ticket_type: OrgTicketType;
   external_ref?: string | null;
-  external_system?: string | null;
   creator_name?: string | null;
   assignee_name?: string | null;
   due_date?: string | null;

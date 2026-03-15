@@ -80,7 +80,6 @@ export function OrgTicketModal({ ticketId, organizationId, onClose, onUpdated }:
     due_date: '',
     assignee: '',
     external_ref: '',
-    external_system: '',
   });
 
   // Acceptance criteria state
@@ -121,7 +120,6 @@ export function OrgTicketModal({ ticketId, organizationId, onClose, onUpdated }:
           due_date: data.due_date || '',
           assignee: data.assignee_name || '',
           external_ref: data.external_ref || '',
-          external_system: data.external_system || '',
         };
         setForm(formData);
         setOriginalForm(formData);
@@ -172,7 +170,6 @@ export function OrgTicketModal({ ticketId, organizationId, onClose, onUpdated }:
         due_date: form.due_date || null,
         assignee_name: form.assignee.trim() || null,
         external_ref: form.external_ref.trim() || null,
-        external_system: form.external_system.trim() || null,
       };
 
       const res = await fetch(`/api/org-tickets/${ticket.id}`, {
@@ -198,7 +195,6 @@ export function OrgTicketModal({ ticketId, organizationId, onClose, onUpdated }:
         due_date: updated.due_date || '',
         assignee: updated.assignee_name || '',
         external_ref: updated.external_ref || '',
-        external_system: updated.external_system || '',
       };
       setForm(formData);
       setOriginalForm(formData);
@@ -492,16 +488,7 @@ export function OrgTicketModal({ ticketId, organizationId, onClose, onUpdated }:
                   />
                 </div>
 
-                <div>
-                  <label className="block text-xs font-mono text-mc-text-secondary mb-1">External System</label>
-                  <input
-                    type="text"
-                    value={form.external_system}
-                    onChange={e => setForm({ ...form, external_system: e.target.value })}
-                    className="w-full px-2 py-1.5 text-sm font-mono border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
-                    placeholder="jira, kits, etc."
-                  />
-                </div>
+
               </div>
             </div>
           )}

@@ -106,10 +106,6 @@ export async function PATCH(
       updates.push('external_ref = ?');
       values.push(parsed.data.external_ref);
     }
-    if (parsed.data.external_system !== undefined) {
-      updates.push('external_system = ?');
-      values.push(parsed.data.external_system);
-    }
     if (parsed.data.assignee_name !== undefined) {
       updates.push('assignee_name = ?');
       values.push(parsed.data.assignee_name);

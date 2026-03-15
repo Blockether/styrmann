@@ -23,7 +23,6 @@ export function OrgTicketCreateModal({ organizationId, onClose, onCreated }: Pro
   const [dueDate, setDueDate] = useState('');
   const [assignee, setAssignee] = useState('');
   const [externalRef, setExternalRef] = useState('');
-  const [externalSystem, setExternalSystem] = useState('');
   const [criteria, setCriteria] = useState<AcceptanceCriterion[]>([]);
   const [newCriterion, setNewCriterion] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -64,7 +63,6 @@ export function OrgTicketCreateModal({ organizationId, onClose, onCreated }: Pro
           due_date: dueDate || undefined,
           assignee_name: assignee.trim() || undefined,
           external_ref: externalRef.trim() || undefined,
-          external_system: externalSystem.trim() || undefined,
           tags: [],
         }),
       });
@@ -207,28 +205,15 @@ export function OrgTicketCreateModal({ organizationId, onClose, onCreated }: Pro
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-mono text-mc-text-secondary mb-1">External Reference</label>
-                <input
-                  type="text"
-                  value={externalRef}
-                  onChange={e => setExternalRef(e.target.value)}
-                  className="w-full px-2 py-1.5 text-sm font-mono border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
-                  placeholder="JIRA-123"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-mono text-mc-text-secondary mb-1">External System</label>
-                <input
-                  type="text"
-                  value={externalSystem}
-                  onChange={e => setExternalSystem(e.target.value)}
-                  className="w-full px-2 py-1.5 text-sm font-mono border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
-                  placeholder="jira, kits, etc."
-                />
-              </div>
+            <div>
+              <label className="block text-xs font-mono text-mc-text-secondary mb-1">External Reference</label>
+              <input
+                type="text"
+                value={externalRef}
+                onChange={e => setExternalRef(e.target.value)}
+                className="w-full px-2 py-1.5 text-sm font-mono border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
+                placeholder="JIRA-123"
+              />
             </div>
 
             <div>

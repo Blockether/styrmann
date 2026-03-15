@@ -67,7 +67,6 @@ export async function POST(request: NextRequest) {
       priority,
       ticket_type,
       external_ref,
-      external_system,
       creator_name,
       assignee_name,
       due_date,
@@ -87,8 +86,8 @@ export async function POST(request: NextRequest) {
     db.prepare(`
       INSERT INTO org_tickets (
         id, organization_id, title, description, status, priority, ticket_type,
-        external_ref, external_system, creator_name, assignee_name, due_date, tags
-      ) VALUES (?, ?, ?, ?, 'open', ?, ?, ?, ?, ?, ?, ?, ?)
+        external_ref, creator_name, assignee_name, due_date, tags
+      ) VALUES (?, ?, ?, ?, 'open', ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id,
       organization_id,
@@ -97,7 +96,6 @@ export async function POST(request: NextRequest) {
       priority,
       ticket_type,
       external_ref ?? null,
-      external_system ?? null,
       creator_name ?? null,
       assignee_name ?? null,
       due_date ?? null,

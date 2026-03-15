@@ -110,35 +110,48 @@ const migrations: Migration[] = [
         INSERT INTO org_tickets_fts(org_tickets_fts) VALUES('rebuild');
       `);
 
-      db.exec(`
-        DROP TRIGGER IF EXISTS commits_ai;
-        DROP TRIGGER IF EXISTS commits_ad;
-        DROP TRIGGER IF EXISTS commits_au;
+       db.exec(`
+         DROP TRIGGER IF EXISTS commits_ai;
+         DROP TRIGGER IF EXISTS commits_ad;
+         DROP TRIGGER IF EXISTS commits_au;
 
-        CREATE TRIGGER commits_ai AFTER INSERT ON commits BEGIN
-          INSERT INTO commits_fts(rowid, message, author_name)
-          VALUES (new.rowid, new.message, COALESCE(new.author_name, ''));
-        END;
+         CREATE TRIGGER commits_ai AFTER INSERT ON commits BEGIN
+           INSERT INTO commits_fts(rowid, message, author_name)
+           VALUES (new.rowid, new.message, COALESCE(new.author_name, ''));
+         END;
 
-        CREATE TRIGGER commits_ad AFTER DELETE ON commits BEGIN
-          INSERT INTO commits_fts(commits_fts, rowid, message, author_name)
-          VALUES('delete', old.rowid, old.message, COALESCE(old.author_name, ''));
-        END;
+         CREATE TRIGGER commits_ad AFTER DELETE ON commits BEGIN
+           INSERT INTO commits_fts(commits_fts, rowid, message, author_name)
+           VALUES('delete', old.rowid, old.message, COALESCE(old.author_name, ''));
+         END;
 
-        CREATE TRIGGER commits_au AFTER UPDATE ON commits BEGIN
-          INSERT INTO commits_fts(commits_fts, rowid, message, author_name)
-          VALUES('delete', old.rowid, old.message, COALESCE(old.author_name, ''));
-          INSERT INTO commits_fts(rowid, message, author_name)
-          VALUES (new.rowid, new.message, COALESCE(new.author_name, ''));
-        END;
+         CREATE TRIGGER commits_au AFTER UPDATE ON commits BEGIN
+           INSERT INTO commits_fts(commits_fts, rowid, message, author_name)
+           VALUES('delete', old.rowid, old.message, COALESCE(old.author_name, ''));
+           INSERT INTO commits_fts(rowid, message, author_name)
+           VALUES (new.rowid, new.message, COALESCE(new.author_name, ''));
+         END;
 
-        INSERT INTO commits_fts(commits_fts) VALUES('rebuild');
-      `);
+         INSERT INTO commits_fts(commits_fts) VALUES('rebuild');
+       `);
 
-      console.log('[Migration 102] Fixed FTS5 triggers with COALESCE for nullable columns');
-    }
-  },
-];
+       console.log('[Migration 102] Fixed FTS5 triggers with COALESCE for nullable columns');
+     }
+   },
+   {
+     id: '103',
+     name: 'remove_external_system',
+     up: (db) => {
+       const cols = (db.prepare("PRAGMA table_info(org_tickets)").all() as { name: string }[]).map(c => c.name);
+       if (cols.includes('external_system')) {
+         db.exec("ALTER TABLE org_tickets DROP COLUMN external_system");
+         console.log('[Migration 103] Dropped external_system column from org_tickets');
+       } else {
+         console.log('[Migration 103] external_system column not found, skipping');
+       }
+     }
+   },
+ ];
 
 export function runMigrations(db: Database.Database): void {
   db.exec(`

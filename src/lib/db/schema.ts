@@ -118,7 +118,6 @@ CREATE TABLE IF NOT EXISTS org_tickets (
   priority TEXT NOT NULL DEFAULT 'normal' CHECK (priority IN ('low', 'normal', 'high', 'urgent')),
   ticket_type TEXT NOT NULL DEFAULT 'task' CHECK (ticket_type IN ('feature', 'bug', 'improvement', 'task', 'epic')),
   external_ref TEXT,
-  external_system TEXT,
   creator_name TEXT,
   assignee_name TEXT,
   due_date TEXT,
