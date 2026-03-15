@@ -218,6 +218,29 @@ export default function WorkspacePage() {
         isPortrait={isPortrait} 
       />
 
+      <div className="border-b border-mc-border bg-mc-bg-secondary flex items-center px-3 gap-0 shrink-0 overflow-x-auto">
+        {[
+          { key: 'tasks', label: 'Tasks' },
+          { key: 'backlog', label: 'Backlog' },
+          { key: 'pareto', label: 'Pareto' },
+          { key: 'issues', label: 'Issues' },
+          { key: 'discord', label: 'Discord' },
+        ].map((tab) => (
+          <button
+            key={tab.key}
+            type="button"
+            onClick={() => handleViewChange(tab.key as DashboardView)}
+            className={`px-4 py-2.5 text-sm border-b-2 transition-colors whitespace-nowrap ${
+              view === tab.key
+                ? 'border-mc-accent text-mc-text font-medium'
+                : 'border-transparent text-mc-text-secondary hover:text-mc-text'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
       <main id="main-content" className="flex-1 min-w-0 overflow-hidden flex flex-col">{renderView()}</main>
 
       <SSEDebugPanel />
