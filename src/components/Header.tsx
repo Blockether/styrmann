@@ -15,7 +15,7 @@ import { format } from 'date-fns';
 import type { Workspace } from '@/lib/types';
 import { StyrmannLogo } from '@/components/StyrmannLogo';
 
-export type DashboardView = 'tasks' | 'backlog' | 'pareto' | 'issues' | 'discord';
+export type DashboardView = 'tasks' | 'issues' | 'discord';
 
 interface HeaderProps {
   workspace?: Workspace;

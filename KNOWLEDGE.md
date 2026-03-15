@@ -58,19 +58,17 @@ The homepage lists organizations and their workspaces. Clicking a workspace open
 /workspace/[slug]/page.tsx
   Header (logo, workspace, stats, online status, clock, settings -- NO view nav)
   Desktop: AgentsSidebar(views + agents, collapsed by default) | {view content} | LiveFeed(collapsed by default)
-    view='tasks'    -> ActiveSprint (workspace-wide List/Board toggle)
-    view='backlog'  -> BacklogView (tasks with no milestone_id)
-    view='pareto'   -> ParetoView (effort/impact matrix)
+    view='tasks'    -> WorkspaceTasks (workspace-wide List/Board toggle)
     view='issues'   -> GithubIssuesView
     view='discord'  -> DiscordMessagesView
   Mobile: hamburger in Header opens AgentsSidebar as slide-over overlay. Single content panel, no duplicate tabs.
 ```
 
-**Navigation lives in AgentsSidebar only** -- not in the Header. The sidebar has two sections: Views (Tasks/Backlog/Pareto/Issues/Discord) at top, Agents list below. On desktop it collapses to icons. On mobile it's a slide-over overlay triggered by hamburger menu.
+**Navigation lives in workspace tab bar and AgentsSidebar**. Workspace tabs expose Tasks/Issues/Discord and keep URL state in `?view=`. AgentsSidebar mirrors those same views; on desktop it collapses to icons, and on mobile it's a slide-over overlay triggered by hamburger menu.
 
-View state is React state + URL query param (`?view=backlog`). Default is `tasks`. Switching calls `window.history.replaceState()` -- no page reload.
+View state is React state + URL query param (`?view=issues` or `?view=discord`). Default is `tasks`. Switching calls `window.history.replaceState()` -- no page reload.
 
-Workspace view components use a consistent internal toolbar wrapper (`p-3 border-b border-mc-border bg-mc-bg-secondary shrink-0`) so the content origin stays stable when switching between views. Tasks and Backlog no longer render duplicate in-view headings because the workspace tab strip already indicates the active view.
+Workspace view components use a consistent internal toolbar wrapper (`p-3 border-b border-mc-border bg-mc-bg-secondary shrink-0`) so the content origin stays stable when switching between views.
 
 The Header workspace switcher supports org-scoped return navigation: when `orgSlug` is passed, the `All Workspaces` shortcut links to `/organization/{orgSlug}?tab=workspaces`; it falls back to `/` when org context is unavailable.
 
@@ -390,7 +388,7 @@ Auto-named `SPRINT-N` per workspace (auto-incremented `sprint_number`). Users ca
 - When a sprint is completed, all non-done tasks are unassigned from the sprint (via their milestones).
 - Cannot delete a sprint that has milestones.
 
-**Workspace tasks board** (ActiveSprint): Workspace-scoped read view with no sprint selector. It always shows all tasks for the workspace. Two view modes remain: List (flat task cards) and Board (status columns with drag-and-drop). Milestones are shown as task labels and summary chips when present, but sprint concepts are not exposed in this workspace surface.
+**Workspace tasks board** (WorkspaceTasks): Workspace-scoped read view with no sprint selector. It always shows all tasks for the workspace. Two view modes remain: List (flat task cards) and Board (status columns with drag-and-drop). Milestones are shown as task labels and summary chips when present, but sprint concepts are not exposed in this workspace surface.
 
 ---
 
@@ -408,7 +406,7 @@ Milestones are the primary grouping unit for tasks. Each milestone optionally be
 
 **Coordinator agent**: Optional. Informational only -- displayed in the UI alongside the milestone name and progress bar. No automated notifications or dispatch tied to the coordinator.
 
-**In ActiveSprint task surfaces**: Milestones remain available as optional resource assignments. ActiveSprint now displays milestone chips in stats and task metadata instead of milestone-grouped sprint lanes.
+**In WorkspaceTasks task surfaces**: Milestones remain available as optional resource assignments. WorkspaceTasks displays milestone chips in stats and task metadata instead of milestone-grouped sprint lanes.
 
 Cannot delete a milestone that has tasks.
 

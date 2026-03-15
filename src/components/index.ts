@@ -1,4 +1,4 @@
 export { Header } from './Header';
 export { AgentModal } from './AgentModal';
-export { ActiveSprint } from './ActiveSprint';
+export { WorkspaceTasks } from './WorkspaceTasks';
 export { TaskModal } from './TaskModal';

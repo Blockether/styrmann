@@ -23,7 +23,7 @@ import { TaskModal } from './TaskModal';
 import { AgentInitials } from './AgentInitials';
 import type { Milestone, Task, TaskStatus, TaskType } from '@/lib/types';
 
-interface ActiveSprintProps {
+interface WorkspaceTasksProps {
   workspaceId?: string;
   mobileMode?: boolean;
   isPortrait?: boolean;
@@ -83,7 +83,7 @@ function getTaskAssigneePresentation(task: Task): { badge: string; name: string 
   return null;
 }
 
-export function ActiveSprint({ workspaceId, mobileMode = false, isPortrait = true }: ActiveSprintProps) {
+export function WorkspaceTasks({ workspaceId, mobileMode = false, isPortrait = true }: WorkspaceTasksProps) {
   const { tasks: storeTasks, updateTaskStatus, addEvent } = useStyrmann();
   const [milestones, setMilestones] = useState<Milestone[]>([]);
   const [loading, setLoading] = useState(true);
@@ -193,7 +193,7 @@ export function ActiveSprint({ workspaceId, mobileMode = false, isPortrait = tru
   }
 
   return (
-    <div data-component="src/components/ActiveSprint" className="flex-1 flex flex-col overflow-hidden">
+    <div data-component="src/components/WorkspaceTasks" className="flex-1 flex flex-col overflow-hidden">
       <div className="p-3 border-b border-mc-border bg-mc-bg-secondary shrink-0">
         <div className="flex items-center justify-between gap-2 flex-wrap mb-2">
           <div className="flex items-center gap-3 text-xs flex-wrap">

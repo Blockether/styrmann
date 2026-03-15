@@ -7,9 +7,7 @@ import { ChevronLeft } from 'lucide-react';
 import { Header, type DashboardView } from '@/components/Header';
 import { StyrmannLogo } from '@/components/StyrmannLogo';
 
-import { ActiveSprint } from '@/components/ActiveSprint';
-import { BacklogView } from '@/components/BacklogView';
-import { ParetoView } from '@/components/ParetoView';
+import { WorkspaceTasks } from '@/components/WorkspaceTasks';
 import { SSEDebugPanel } from '@/components/SSEDebugPanel';
 import { GithubIssuesView } from '@/components/GithubIssuesView';
 import { DiscordMessagesView } from '@/components/DiscordMessagesView';
@@ -22,7 +20,7 @@ function getInitialView(): DashboardView {
   if (typeof window === 'undefined') return 'tasks';
   const params = new URLSearchParams(window.location.search);
   const urlView = params.get('view');
-  if (urlView && ['tasks', 'backlog', 'pareto', 'issues', 'discord'].includes(urlView)) {
+  if (urlView && ['tasks', 'issues', 'discord'].includes(urlView)) {
     return urlView as DashboardView;
   }
   return 'tasks';
@@ -44,7 +42,7 @@ export default function WorkspacePage() {
 
   useEffect(() => {
     const urlView = new URLSearchParams(window.location.search).get('view');
-    if (urlView && ['tasks', 'backlog', 'pareto', 'issues', 'discord'].includes(urlView)) {
+    if (urlView && ['tasks', 'issues', 'discord'].includes(urlView)) {
       return;
     }
     if (urlView) {
@@ -167,17 +165,13 @@ export default function WorkspacePage() {
     if (!workspace) return null;
     switch (view) {
       case 'tasks':
-        return <ActiveSprint workspaceId={workspace.id} />;
-      case 'backlog':
-        return <BacklogView workspaceId={workspace.id} />;
-      case 'pareto':
-        return <ParetoView workspaceId={workspace.id} />;
+        return <WorkspaceTasks workspaceId={workspace.id} />;
       case 'issues':
         return <GithubIssuesView workspaceId={workspace.id} workspace={workspace} />;
       case 'discord':
         return <DiscordMessagesView workspaceId={workspace.id} />;
       default:
-        return <ActiveSprint workspaceId={workspace.id} />;
+        return <WorkspaceTasks workspaceId={workspace.id} />;
     }
   };
 
@@ -226,8 +220,6 @@ export default function WorkspacePage() {
       <div className="border-b border-mc-border bg-mc-bg-secondary flex items-center px-3 gap-0 shrink-0 overflow-x-auto">
         {[
           { key: 'tasks', label: 'Tasks' },
-          { key: 'backlog', label: 'Backlog' },
-          { key: 'pareto', label: 'Pareto' },
           { key: 'issues', label: 'Issues' },
           { key: 'discord', label: 'Discord' },
         ].map((tab) => (
