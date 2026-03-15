@@ -475,7 +475,7 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
         </div>
 
         {activeTab === 'board' ? (
-        <div className="flex-1 min-w-0 overflow-y-auto p-2 sm:p-3 md:p-4">
+        <div className="min-w-0 overflow-y-auto p-2 sm:p-3 md:p-4">
           {activeTab === 'board' && (
             <div className="space-y-3">
             <div className="grid grid-cols-3 gap-2">
