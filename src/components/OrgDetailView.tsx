@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  Building2,
   BookOpen,
   ChevronDown,
   ChevronRight,
@@ -289,175 +290,27 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
   }
 
   const selectedSprint = selectedSprintId === 'backlog' ? null : sprints.find((sprint) => sprint.id === selectedSprintId) || null;
+  const hasSprints = sprints.length > 0;
+  const hasTicketsInSelection = filteredTickets.length > 0;
+  const unassignedTickets = milestoneTicketMap.get('no-milestone') || [];
+  const showUnassignedSection = unassignedTickets.length > 0;
+  const showNoSprintEmptyState = activeTab === 'board' && !hasSprints;
+  const showNoTicketEmptyState = activeTab === 'board' && hasSprints && !hasTicketsInSelection;
 
   return (
     <div data-component="src/components/OrgDetailView" className="min-h-screen bg-mc-bg">
       <Header />
+
+      <div className="px-6 py-2 border-b border-mc-border bg-mc-bg-secondary flex items-center gap-2">
+        <Building2 size={16} className="text-mc-accent" />
+        <span className="text-sm font-semibold text-mc-text">{org.name}</span>
+      </div>
 
       {org.description && (
         <div className="px-8 py-3 border-b border-mc-border text-sm text-mc-text-secondary">{org.description}</div>
       )}
 
       <div className="p-8 space-y-4">
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          <div className="flex items-center gap-2 flex-wrap">
-            <label className="text-sm text-mc-text-secondary">Sprint</label>
-            <select
-              value={selectedSprintId}
-              onChange={(event) => setSelectedSprintId(event.target.value)}
-              className="px-3 py-2 text-sm border border-mc-border rounded bg-mc-bg-secondary text-mc-text focus:outline-none focus:border-mc-accent"
-            >
-              <option value="backlog">Backlog</option>
-              {sprints.map((sprint) => (
-                <option key={sprint.id} value={sprint.id}>
-                  {sprint.name} ({sprint.status})
-                </option>
-              ))}
-            </select>
-            {selectedSprint ? (
-              <span className={`px-2 py-1 rounded text-sm font-mono ${SPRINT_STATUS_COLORS[selectedSprint.status] || 'bg-gray-100 text-gray-700'}`}>
-                {selectedSprint.status}
-              </span>
-            ) : (
-              <span className="px-2 py-1 rounded text-sm font-mono bg-gray-100 text-gray-700">backlog</span>
-            )}
-          </div>
-
-          <div className="flex items-center gap-2 flex-wrap">
-            <button
-              onClick={() => setShowSprintForm((prev) => !prev)}
-              className="px-3 py-1.5 text-sm font-mono border border-mc-border rounded hover:bg-mc-bg-secondary flex items-center gap-1"
-            >
-              <Plus size={14} />
-              <span className="hidden sm:inline">Sprint</span>
-            </button>
-            <button
-              onClick={() => setShowMilestoneForm((prev) => !prev)}
-              className="px-3 py-1.5 text-sm font-mono border border-mc-border rounded hover:bg-mc-bg-secondary flex items-center gap-1"
-            >
-              <Plus size={14} />
-              <span className="hidden sm:inline">Milestone</span>
-            </button>
-            <button
-              onClick={() => setShowCreateTicketModal(true)}
-              className="px-3 py-1.5 text-sm font-mono bg-mc-accent text-white rounded hover:opacity-90 flex items-center gap-1"
-            >
-              <Plus size={14} />
-              <span className="hidden sm:inline">Ticket</span>
-            </button>
-          </div>
-        </div>
-
-        {showSprintForm && (
-          <div className="p-4 rounded border border-mc-border bg-mc-bg-secondary mb-4">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <input
-                type="text"
-                value={newSprintName}
-                onChange={(event) => setNewSprintName(event.target.value)}
-                placeholder="Sprint name"
-                className="w-full px-3 py-2 text-sm border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
-              />
-              <input
-                type="date"
-                value={newSprintStartDate}
-                onChange={(event) => setNewSprintStartDate(event.target.value)}
-                placeholder="Start"
-                className="w-full px-3 py-2 text-sm border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
-              />
-              <input
-                type="date"
-                value={newSprintEndDate}
-                onChange={(event) => setNewSprintEndDate(event.target.value)}
-                placeholder="End"
-                className="w-full px-3 py-2 text-sm border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
-              />
-            </div>
-            <div className="mt-3 flex justify-end gap-2">
-              <button
-                onClick={() => {
-                  setShowSprintForm(false);
-                  setNewSprintName('');
-                  setNewSprintStartDate('');
-                  setNewSprintEndDate('');
-                }}
-                className="px-3 py-1.5 text-sm border border-mc-border rounded"
-              >
-                Cancel
-              </button>
-              <button
-                disabled={creatingSprint || !newSprintName.trim()}
-                onClick={createSprint}
-                className="px-3 py-1.5 text-sm bg-mc-accent text-white rounded disabled:opacity-50"
-              >
-                Create
-              </button>
-            </div>
-          </div>
-        )}
-
-        {showMilestoneForm && (
-          <div className="p-4 rounded border border-mc-border bg-mc-bg-secondary mb-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <input
-                type="text"
-                value={newMilestoneName}
-                onChange={(event) => setNewMilestoneName(event.target.value)}
-                placeholder="Milestone name"
-                className="w-full px-3 py-2 text-sm border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
-              />
-              <select
-                value={newMilestoneSprintId}
-                onChange={(event) => setNewMilestoneSprintId(event.target.value)}
-                className="w-full px-3 py-2 text-sm border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
-              >
-                <option value="">Backlog</option>
-                {sprints.map((sprint) => (
-                  <option key={sprint.id} value={sprint.id}>
-                    {sprint.name}
-                  </option>
-                ))}
-              </select>
-              <select
-                value={newMilestonePriority}
-                onChange={(event) => setNewMilestonePriority(event.target.value as 'low' | 'normal' | 'high' | 'urgent')}
-                className="w-full px-3 py-2 text-sm border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
-              >
-                <option value="low">Low</option>
-                <option value="normal">Normal</option>
-                <option value="high">High</option>
-                <option value="urgent">Urgent</option>
-              </select>
-              <input
-                type="date"
-                value={newMilestoneDueDate}
-                onChange={(event) => setNewMilestoneDueDate(event.target.value)}
-                className="w-full px-3 py-2 text-sm border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
-              />
-            </div>
-            <div className="mt-3 flex justify-end gap-2">
-              <button
-                onClick={() => {
-                  setShowMilestoneForm(false);
-                  setNewMilestoneName('');
-                  setNewMilestoneDueDate('');
-                  setNewMilestonePriority('normal');
-                }}
-                className="px-3 py-1.5 text-sm border border-mc-border rounded"
-              >
-                Cancel
-              </button>
-              <button
-                disabled={creatingMilestone || !newMilestoneName.trim()}
-                onClick={createMilestone}
-                className="px-3 py-1.5 text-sm bg-mc-accent text-white rounded disabled:opacity-50"
-              >
-                Create
-              </button>
-            </div>
-          </div>
-        )}
-
         <div className="flex gap-0 border-b border-mc-border bg-mc-bg-secondary">
           {(['board', 'knowledge', 'workspaces'] as const).map((tab) => (
             <Link
@@ -495,81 +348,294 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
         </div>
 
         {activeTab === 'board' && (
-          <div className="space-y-2">
-            {[...filteredMilestones, { id: 'no-milestone', name: 'No Milestone', status: 'open' } as OrgMilestone].map((milestone) => {
-              const milestoneKey = milestone.id;
-              const milestoneTickets = milestoneTicketMap.get(milestoneKey) || [];
-              const isOpen = expandedMilestones.has(milestoneKey);
-              const statusClass = STATUS_COLORS[milestone.status] || 'bg-gray-100 text-gray-700';
-
-              return (
-                <section key={milestoneKey} className="rounded border border-mc-border bg-mc-bg-secondary">
-                  <button
-                    type="button"
-                    onClick={() => toggleMilestone(milestoneKey)}
-                    className="w-full p-3 border-b border-mc-border/50 text-left"
+          <div className="space-y-4">
+            {hasSprints && (
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <select
+                    value={selectedSprintId}
+                    onChange={(event) => setSelectedSprintId(event.target.value)}
+                    className="px-3 py-2 text-sm border border-mc-border rounded bg-mc-bg-secondary text-mc-text focus:outline-none focus:border-mc-accent"
                   >
-                    <div className="flex items-center justify-between gap-3 flex-wrap">
-                      <div className="flex items-center gap-2 min-w-0">
-                        {isOpen ? <ChevronDown size={16} className="text-mc-text-secondary" /> : <ChevronRight size={16} className="text-mc-text-secondary" />}
-                        <span className="font-mono text-base text-mc-text truncate">{milestone.name}</span>
-                        {milestone.id !== 'no-milestone' && (
-                          <span className={`px-2 py-0.5 rounded text-sm font-mono ${statusClass}`}>{milestone.status}</span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2 text-sm text-mc-text-secondary">
-                        <span>{milestoneTickets.length} ticket{milestoneTickets.length === 1 ? '' : 's'}</span>
-                      </div>
-                    </div>
-                  </button>
-
-                  {isOpen && (
-                    <div className="p-3 space-y-2">
-                      {milestoneTickets.length === 0 ? (
-                        <div className="p-3 rounded border border-mc-border bg-mc-bg text-sm text-mc-text-secondary">
-                          No tickets in this milestone.
-                        </div>
-                      ) : (
-                        milestoneTickets.map((ticket) => {
-                          const typeConfig = TYPE_CONFIG[ticket.ticket_type] || TYPE_CONFIG.task;
-                          return (
-                            <button
-                              key={ticket.id}
-                              type="button"
-                              onClick={() => setSelectedTicketId(ticket.id)}
-                              className="w-full p-3 rounded border border-mc-border bg-mc-bg text-left hover:border-mc-accent transition-colors"
-                            >
-                              <div className="flex items-start justify-between gap-3">
-                                <div className="flex items-center gap-2 min-w-0">
-                                  <span className={`px-2 py-0.5 rounded text-sm font-mono ${typeConfig.color}`}>{typeConfig.label}</span>
-                                  <span className="text-sm text-mc-text truncate">{ticket.title}</span>
-                                </div>
-                                <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
-                                  <span className={`px-2 py-0.5 rounded text-sm font-mono ${STATUS_COLORS[ticket.status] || 'bg-gray-100 text-gray-700'}`}>
-                                    {ticket.status}
-                                  </span>
-                                  <span className={`px-2 py-0.5 rounded text-sm font-mono ${PRIORITY_COLORS[ticket.priority] || 'bg-slate-100 text-slate-700'}`}>
-                                    {ticket.priority}
-                                  </span>
-                                  {typeof ticket.story_points === 'number' && (
-                                    <span className="px-2 py-0.5 rounded text-sm font-mono bg-mc-bg-secondary border border-mc-border text-mc-text-secondary">
-                                      {ticket.story_points}sp
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                              {ticket.description && (
-                                <p className="mt-2 text-sm text-mc-text-secondary line-clamp-2">{ticket.description}</p>
-                              )}
-                            </button>
-                          );
-                        })
-                      )}
-                    </div>
+                    <option value="backlog">Backlog</option>
+                    {sprints.map((sprint) => (
+                      <option key={sprint.id} value={sprint.id}>
+                        {sprint.name} ({sprint.status})
+                      </option>
+                    ))}
+                  </select>
+                  {selectedSprint && (
+                    <span className={`px-2 py-1 rounded text-sm font-mono ${SPRINT_STATUS_COLORS[selectedSprint.status] || 'bg-gray-100 text-gray-700'}`}>
+                      {selectedSprint.status}
+                    </span>
                   )}
-                </section>
-              );
-            })}
+                </div>
+
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    onClick={() => setShowCreateTicketModal(true)}
+                    className="px-3 py-1.5 text-sm font-mono bg-mc-accent text-white rounded hover:opacity-90 flex items-center gap-1"
+                  >
+                    <Plus size={14} />
+                    <span className="hidden sm:inline">Ticket</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowSprintForm((prev) => !prev);
+                      setShowMilestoneForm(false);
+                    }}
+                    className="px-3 py-1.5 text-sm border border-mc-border rounded hover:bg-mc-bg-secondary"
+                  >
+                    Create Sprint
+                  </button>
+                  {selectedSprint && (
+                    <button
+                      onClick={() => {
+                        setShowMilestoneForm((prev) => !prev);
+                        setShowSprintForm(false);
+                      }}
+                      className="px-3 py-1.5 text-sm border border-mc-border rounded hover:bg-mc-bg-secondary"
+                    >
+                      Add Milestone
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {showSprintForm && (
+              <div className="p-4 rounded border border-mc-border bg-mc-bg-secondary">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <input
+                    type="text"
+                    value={newSprintName}
+                    onChange={(event) => setNewSprintName(event.target.value)}
+                    placeholder="Sprint name"
+                    className="w-full px-3 py-2 text-sm border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
+                  />
+                  <input
+                    type="date"
+                    value={newSprintStartDate}
+                    onChange={(event) => setNewSprintStartDate(event.target.value)}
+                    placeholder="Start"
+                    className="w-full px-3 py-2 text-sm border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
+                  />
+                  <input
+                    type="date"
+                    value={newSprintEndDate}
+                    onChange={(event) => setNewSprintEndDate(event.target.value)}
+                    placeholder="End"
+                    className="w-full px-3 py-2 text-sm border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
+                  />
+                </div>
+                <div className="mt-3 flex justify-end gap-2">
+                  <button
+                    onClick={() => {
+                      setShowSprintForm(false);
+                      setNewSprintName('');
+                      setNewSprintStartDate('');
+                      setNewSprintEndDate('');
+                    }}
+                    className="px-3 py-1.5 text-sm border border-mc-border rounded"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    disabled={creatingSprint || !newSprintName.trim()}
+                    onClick={createSprint}
+                    className="px-3 py-1.5 text-sm bg-mc-accent text-white rounded disabled:opacity-50"
+                  >
+                    Create
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {showMilestoneForm && (
+              <div className="p-4 rounded border border-mc-border bg-mc-bg-secondary">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <input
+                    type="text"
+                    value={newMilestoneName}
+                    onChange={(event) => setNewMilestoneName(event.target.value)}
+                    placeholder="Milestone name"
+                    className="w-full px-3 py-2 text-sm border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
+                  />
+                  <select
+                    value={newMilestoneSprintId}
+                    onChange={(event) => setNewMilestoneSprintId(event.target.value)}
+                    className="w-full px-3 py-2 text-sm border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
+                  >
+                    <option value="">Backlog</option>
+                    {sprints.map((sprint) => (
+                      <option key={sprint.id} value={sprint.id}>
+                        {sprint.name}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    value={newMilestonePriority}
+                    onChange={(event) => setNewMilestonePriority(event.target.value as 'low' | 'normal' | 'high' | 'urgent')}
+                    className="w-full px-3 py-2 text-sm border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
+                  >
+                    <option value="low">Low</option>
+                    <option value="normal">Normal</option>
+                    <option value="high">High</option>
+                    <option value="urgent">Urgent</option>
+                  </select>
+                  <input
+                    type="date"
+                    value={newMilestoneDueDate}
+                    onChange={(event) => setNewMilestoneDueDate(event.target.value)}
+                    className="w-full px-3 py-2 text-sm border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
+                  />
+                </div>
+                <div className="mt-3 flex justify-end gap-2">
+                  <button
+                    onClick={() => {
+                      setShowMilestoneForm(false);
+                      setNewMilestoneName('');
+                      setNewMilestoneDueDate('');
+                      setNewMilestonePriority('normal');
+                    }}
+                    className="px-3 py-1.5 text-sm border border-mc-border rounded"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    disabled={creatingMilestone || !newMilestoneName.trim()}
+                    onClick={createMilestone}
+                    className="px-3 py-1.5 text-sm bg-mc-accent text-white rounded disabled:opacity-50"
+                  >
+                    Create
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {showNoSprintEmptyState && (
+              <div className="rounded border border-mc-border bg-mc-bg-secondary min-h-[320px] flex items-center justify-center px-6">
+                <div className="max-w-md text-center space-y-4">
+                  <div className="mx-auto w-12 h-12 rounded-full bg-mc-bg flex items-center justify-center border border-mc-border">
+                    <Layers size={22} className="text-mc-accent" />
+                  </div>
+                  <div className="space-y-2">
+                    <h3 className="text-xl font-semibold text-mc-text">No sprints yet</h3>
+                    <p className="text-sm text-mc-text-secondary">Create your first sprint to start organizing work.</p>
+                  </div>
+                  <div className="flex items-center justify-center gap-3 flex-wrap">
+                    <button
+                      onClick={() => setShowSprintForm(true)}
+                      className="px-4 py-2 text-sm bg-mc-accent text-white rounded hover:opacity-90"
+                    >
+                      Create Sprint
+                    </button>
+                    <button
+                      onClick={() => setShowCreateTicketModal(true)}
+                      className="px-4 py-2 text-sm border border-mc-border rounded hover:bg-mc-bg"
+                    >
+                      Create Ticket
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {showNoTicketEmptyState && (
+              <div className="rounded border border-mc-border bg-mc-bg-secondary min-h-[220px] flex items-center justify-center px-6">
+                <div className="max-w-md text-center space-y-4">
+                  <div className="mx-auto w-12 h-12 rounded-full bg-mc-bg flex items-center justify-center border border-mc-border">
+                    <Ticket size={22} className="text-mc-accent" />
+                  </div>
+                  <div className="space-y-1">
+                    <h3 className="text-lg font-semibold text-mc-text">No tickets in this sprint yet.</h3>
+                    <p className="text-sm text-mc-text-secondary">Create a ticket to get started.</p>
+                  </div>
+                  <button
+                    onClick={() => setShowCreateTicketModal(true)}
+                    className="px-4 py-2 text-sm bg-mc-accent text-white rounded hover:opacity-90"
+                  >
+                    Create Ticket
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {hasTicketsInSelection && (
+              <div className="space-y-2">
+                {[
+                  ...filteredMilestones.filter((milestone) => (milestoneTicketMap.get(milestone.id) || []).length > 0),
+                  ...(showUnassignedSection ? [{ id: 'no-milestone', name: 'Unassigned', status: 'open' } as OrgMilestone] : []),
+                ].map((milestone) => {
+                  const milestoneKey = milestone.id;
+                  const milestoneTickets = milestoneTicketMap.get(milestoneKey) || [];
+                  const isOpen = expandedMilestones.has(milestoneKey);
+                  const statusClass = STATUS_COLORS[milestone.status] || 'bg-gray-100 text-gray-700';
+
+                  return (
+                    <section key={milestoneKey} className="rounded border border-mc-border bg-mc-bg-secondary">
+                      <button
+                        type="button"
+                        onClick={() => toggleMilestone(milestoneKey)}
+                        className="w-full p-3 border-b border-mc-border/50 text-left"
+                      >
+                        <div className="flex items-center justify-between gap-3 flex-wrap">
+                          <div className="flex items-center gap-2 min-w-0">
+                            {isOpen ? <ChevronDown size={16} className="text-mc-text-secondary" /> : <ChevronRight size={16} className="text-mc-text-secondary" />}
+                            <span className="font-mono text-base text-mc-text truncate">{milestone.name}</span>
+                            {milestone.id !== 'no-milestone' && (
+                              <span className={`px-2 py-0.5 rounded text-sm font-mono ${statusClass}`}>{milestone.status}</span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 text-sm text-mc-text-secondary">
+                            <span>{milestoneTickets.length} ticket{milestoneTickets.length === 1 ? '' : 's'}</span>
+                          </div>
+                        </div>
+                      </button>
+
+                      {isOpen && (
+                        <div className="p-3 space-y-2">
+                          {milestoneTickets.map((ticket) => {
+                            const typeConfig = TYPE_CONFIG[ticket.ticket_type] || TYPE_CONFIG.task;
+                            return (
+                              <button
+                                key={ticket.id}
+                                type="button"
+                                onClick={() => setSelectedTicketId(ticket.id)}
+                                className="w-full p-3 rounded border border-mc-border bg-mc-bg text-left hover:border-mc-accent transition-colors"
+                              >
+                                <div className="flex items-start justify-between gap-3">
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <span className={`px-2 py-0.5 rounded text-sm font-mono ${typeConfig.color}`}>{typeConfig.label}</span>
+                                    <span className="text-sm text-mc-text truncate">{ticket.title}</span>
+                                  </div>
+                                  <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+                                    <span className={`px-2 py-0.5 rounded text-sm font-mono ${STATUS_COLORS[ticket.status] || 'bg-gray-100 text-gray-700'}`}>
+                                      {ticket.status}
+                                    </span>
+                                    <span className={`px-2 py-0.5 rounded text-sm font-mono ${PRIORITY_COLORS[ticket.priority] || 'bg-slate-100 text-slate-700'}`}>
+                                      {ticket.priority}
+                                    </span>
+                                    {typeof ticket.story_points === 'number' && (
+                                      <span className="px-2 py-0.5 rounded text-sm font-mono bg-mc-bg-secondary border border-mc-border text-mc-text-secondary">
+                                        {ticket.story_points}sp
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                                {ticket.description && (
+                                  <p className="mt-2 text-sm text-mc-text-secondary line-clamp-2">{ticket.description}</p>
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </section>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
 
