@@ -1,7 +1,7 @@
 'use client';
-import { X, Ticket, Loader2, Check, Trash2, Plus, Zap, Folder } from 'lucide-react';
+import { X, Ticket, Loader2, Check, Trash2, Plus, Zap, Folder, Upload, Download, Paperclip } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
-import type { OrgTicket, OrgTicketAcceptanceCriteria, OrgTicketStatus, OrgTicketType, Task } from '@/lib/types';
+import type { OrgTicket, OrgTicketAcceptanceCriteria, OrgTicketAttachment, OrgTicketStatus, OrgTicketType, Task } from '@/lib/types';
 
 interface Workspace {
   id: string;
@@ -20,6 +20,7 @@ interface DelegatedTask {
 interface FullTicket extends OrgTicket {
   acceptance_criteria?: OrgTicketAcceptanceCriteria[];
   delegated_tasks?: DelegatedTask[];
+  attachments?: OrgTicketAttachment[];
 }
 
 interface Props {
@@ -29,7 +30,7 @@ interface Props {
   onUpdated?: () => void;
 }
 
-type TabType = 'overview' | 'criteria' | 'delegation';
+type TabType = 'overview' | 'criteria' | 'attachments' | 'delegation';
 
 const STATUS_TRANSITIONS: Record<OrgTicketStatus, OrgTicketStatus[]> = {
   open: ['triaged', 'closed'],
@@ -89,6 +90,12 @@ export function OrgTicketModal({ ticketId, organizationId, onClose, onUpdated }:
   const [editingCriterionDesc, setEditingCriterionDesc] = useState('');
   const [submittingCriteria, setSubmittingCriteria] = useState(false);
 
+  // Attachment state
+  const [attachments, setAttachments] = useState<OrgTicketAttachment[]>([]);
+  const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
+  const [uploadingFiles, setUploadingFiles] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   // Delegation state
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState('');
@@ -109,6 +116,7 @@ export function OrgTicketModal({ ticketId, organizationId, onClose, onUpdated }:
         const data: FullTicket = await res.json();
         setTicket(data);
         setCriteria(data.acceptance_criteria || []);
+        setAttachments(data.attachments || []);
         
         const formData = {
           title: data.title || '',
@@ -303,9 +311,47 @@ export function OrgTicketModal({ ticketId, organizationId, onClose, onUpdated }:
     }
   };
 
+  const handleUploadFiles = async () => {
+    if (attachedFiles.length === 0) return;
+    setUploadingFiles(true);
+    try {
+      for (const file of attachedFiles) {
+        const formData = new FormData();
+        formData.append('file', file);
+        const res = await fetch(`/api/org-tickets/${ticketId}/attachments`, {
+          method: 'POST',
+          body: formData,
+        });
+        if (res.ok) {
+          const newAttachment = await res.json();
+          setAttachments(prev => [newAttachment, ...prev]);
+        }
+      }
+      setAttachedFiles([]);
+    } catch (e) {
+      console.error('Failed to upload files:', e);
+    } finally {
+      setUploadingFiles(false);
+    }
+  };
+
+  const handleDeleteAttachment = async (attachmentId: string) => {
+    try {
+      const res = await fetch(`/api/org-tickets/${ticketId}/attachments/${attachmentId}`, {
+        method: 'DELETE',
+      });
+      if (res.ok) {
+        setAttachments(prev => prev.filter(a => a.id !== attachmentId));
+      }
+    } catch (e) {
+      console.error('Failed to delete attachment:', e);
+    }
+  };
+
   const tabs: { id: TabType; label: string }[] = [
     { id: 'overview', label: 'Overview' },
     { id: 'criteria', label: 'Acceptance Criteria' },
+    { id: 'attachments', label: 'Attachments' },
     { id: 'delegation', label: 'Delegation' },
   ];
 
@@ -590,6 +636,105 @@ export function OrgTicketModal({ ticketId, organizationId, onClose, onUpdated }:
                   <span className="hidden sm:inline">Add</span>
                 </button>
               </div>
+            </div>
+          )}
+
+          {/* Attachments Tab */}
+          {activeTab === 'attachments' && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-mono font-semibold text-mc-text">Attachments</h3>
+                {attachments.length > 0 && (
+                  <span className="text-xs text-mc-text-secondary">{attachments.length} file(s)</span>
+                )}
+              </div>
+
+              <div
+                className="border-2 border-dashed border-mc-border rounded p-4 text-center cursor-pointer hover:border-mc-accent transition-colors"
+                onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  const files = Array.from(e.dataTransfer.files || []);
+                  if (files.length > 0) setAttachedFiles(prev => [...prev, ...files]);
+                }}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <Upload size={20} className="mx-auto mb-1 text-mc-text-secondary" />
+                <div className="text-sm text-mc-text-secondary">Drop files here or click to upload</div>
+              </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                className="hidden"
+                onChange={(e) => {
+                  const files = Array.from(e.target.files || []);
+                  if (files.length > 0) setAttachedFiles(prev => [...prev, ...files]);
+                  if (e.target) e.target.value = '';
+                }}
+              />
+
+              {attachedFiles.length > 0 && (
+                <div className="space-y-1">
+                  {attachedFiles.map((file, i) => (
+                    <div key={i} className="flex items-center justify-between px-2 py-1 bg-mc-bg rounded text-sm">
+                      <span className="truncate text-mc-text">{file.name} ({(file.size / 1024).toFixed(0)} KB)</span>
+                      <button
+                        onClick={() => setAttachedFiles(prev => prev.filter((_, j) => j !== i))}
+                        className="text-mc-text-secondary hover:text-red-500"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    onClick={handleUploadFiles}
+                    disabled={uploadingFiles}
+                    className="px-3 py-1.5 text-xs font-mono bg-mc-accent text-white rounded hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                  >
+                    {uploadingFiles ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
+                    {uploadingFiles ? 'Uploading...' : 'Upload Files'}
+                  </button>
+                </div>
+              )}
+
+              {attachments.length > 0 ? (
+                <div className="space-y-2">
+                  {attachments.map(att => (
+                    <div key={att.id} className="flex items-center justify-between gap-2 p-2 bg-mc-bg border border-mc-border rounded">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Paperclip size={14} className="text-mc-text-secondary shrink-0" />
+                        <div className="min-w-0">
+                          <div className="text-sm text-mc-text truncate">{att.file_name}</div>
+                          <div className="text-xs text-mc-text-secondary">
+                            {att.file_size ? `${(att.file_size / 1024).toFixed(0)} KB` : 'Unknown size'}
+                            {att.mime_type ? ` - ${att.mime_type}` : ''}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <a
+                          href={`/api/org-tickets/${ticketId}/attachments/${att.id}`}
+                          download={att.file_name}
+                          className="p-1 text-mc-text-secondary hover:text-mc-accent hover:bg-mc-bg-tertiary rounded"
+                          title="Download"
+                        >
+                          <Download size={14} />
+                        </a>
+                        <button
+                          onClick={() => handleDeleteAttachment(att.id)}
+                          className="p-1 text-mc-text-secondary hover:text-red-500 hover:bg-red-50 rounded"
+                          title="Delete"
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-mc-text-secondary">No attachments yet.</p>
+              )}
             </div>
           )}
 

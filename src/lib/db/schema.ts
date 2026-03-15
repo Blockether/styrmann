@@ -175,6 +175,20 @@ CREATE TABLE IF NOT EXISTS org_ticket_acceptance_criteria (
 
 CREATE INDEX IF NOT EXISTS idx_org_ticket_ac ON org_ticket_acceptance_criteria(org_ticket_id);
 
+-- Org ticket attachments (file BLOB storage)
+CREATE TABLE IF NOT EXISTS org_ticket_attachments (
+  id TEXT PRIMARY KEY,
+  org_ticket_id TEXT NOT NULL REFERENCES org_tickets(id) ON DELETE CASCADE,
+  file_name TEXT NOT NULL,
+  file_size INTEGER,
+  mime_type TEXT,
+  content BLOB,
+  description TEXT,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_org_ticket_attachments ON org_ticket_attachments(org_ticket_id);
+
 -- Sprints table
 CREATE TABLE IF NOT EXISTS sprints (
   id TEXT PRIMARY KEY,

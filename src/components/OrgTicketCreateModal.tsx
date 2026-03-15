@@ -1,6 +1,6 @@
 'use client';
-import { X, Ticket, Plus, Loader2 } from 'lucide-react';
-import { useState } from 'react';
+import { X, Ticket, Plus, Loader2, Upload } from 'lucide-react';
+import { useState, useRef } from 'react';
 import type { OrgTicket } from '@/lib/types';
 
 interface Props {
@@ -25,6 +25,8 @@ export function OrgTicketCreateModal({ organizationId, onClose, onCreated }: Pro
   const [externalRef, setExternalRef] = useState('');
   const [criteria, setCriteria] = useState<AcceptanceCriterion[]>([]);
   const [newCriterion, setNewCriterion] = useState('');
+  const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -82,6 +84,16 @@ export function OrgTicketCreateModal({ organizationId, onClose, onCreated }: Pro
             description: criterion.description,
             sort_order: i,
           }),
+        });
+      }
+
+      // Upload attached files
+      for (const file of attachedFiles) {
+        const formData = new FormData();
+        formData.append('file', file);
+        await fetch(`/api/org-tickets/${ticket.id}/attachments`, {
+          method: 'POST',
+          body: formData,
         });
       }
 
@@ -255,6 +267,51 @@ export function OrgTicketCreateModal({ organizationId, onClose, onCreated }: Pro
                   </button>
                 </div>
               </div>
+            </div>
+
+            {/* Attachments */}
+            <div>
+              <label className="block text-xs font-mono text-mc-text-secondary mb-1">Attachments</label>
+              <div
+                className="border-2 border-dashed border-mc-border rounded p-4 text-center cursor-pointer hover:border-mc-accent transition-colors"
+                onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  const files = Array.from(e.dataTransfer.files || []);
+                  if (files.length > 0) setAttachedFiles(prev => [...prev, ...files]);
+                }}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <Upload size={20} className="mx-auto mb-1 text-mc-text-secondary" />
+                <div className="text-sm text-mc-text-secondary">Drop files here or click to upload</div>
+              </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                className="hidden"
+                onChange={(e) => {
+                  const files = Array.from(e.target.files || []);
+                  if (files.length > 0) setAttachedFiles(prev => [...prev, ...files]);
+                  if (e.target) e.target.value = '';
+                }}
+              />
+              {attachedFiles.length > 0 && (
+                <div className="mt-2 space-y-1">
+                  {attachedFiles.map((file, i) => (
+                    <div key={i} className="flex items-center justify-between px-2 py-1 bg-mc-bg rounded text-sm">
+                      <span className="truncate text-mc-text">{file.name} ({(file.size / 1024).toFixed(0)} KB)</span>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); setAttachedFiles(prev => prev.filter((_, j) => j !== i)); }}
+                        className="text-mc-text-secondary hover:text-red-500"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 

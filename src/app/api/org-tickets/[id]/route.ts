@@ -33,12 +33,16 @@ export async function GET(
     const acceptance_criteria = db.prepare(
       'SELECT * FROM org_ticket_acceptance_criteria WHERE org_ticket_id = ? ORDER BY sort_order ASC'
     ).all(id);
+    const attachments = db.prepare(
+      'SELECT id, org_ticket_id, file_name, file_size, mime_type, description, created_at FROM org_ticket_attachments WHERE org_ticket_id = ? ORDER BY created_at DESC'
+    ).all(id);
 
     const result = {
       ...ticket,
       tags: JSON.parse(ticket.tags || '[]'),
       delegated_tasks,
       acceptance_criteria,
+      attachments,
     };
 
     return NextResponse.json(result);

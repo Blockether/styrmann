@@ -207,6 +207,27 @@ const migrations: Migration[] = [
        console.log('[Migration 105] Added org_milestones table');
      }
    },
+   {
+     id: '106',
+     name: 'add_org_ticket_attachments',
+     up: (db) => {
+       db.exec(`
+         CREATE TABLE IF NOT EXISTS org_ticket_attachments (
+           id TEXT PRIMARY KEY,
+           org_ticket_id TEXT NOT NULL REFERENCES org_tickets(id) ON DELETE CASCADE,
+           file_name TEXT NOT NULL,
+           file_size INTEGER,
+           mime_type TEXT,
+           content BLOB,
+           description TEXT,
+           created_at TEXT DEFAULT (datetime('now'))
+         );
+
+         CREATE INDEX IF NOT EXISTS idx_org_ticket_attachments ON org_ticket_attachments(org_ticket_id);
+       `);
+       console.log('[Migration 106] Added org_ticket_attachments table');
+     }
+   },
  ];
 
 export function runMigrations(db: Database.Database): void {

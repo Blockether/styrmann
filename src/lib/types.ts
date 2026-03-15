@@ -879,6 +879,16 @@ export interface OrgTicketAcceptanceCriteria {
   created_at: string;
 }
 
+export interface OrgTicketAttachment {
+  id: string;
+  org_ticket_id: string;
+  file_name: string;
+  file_size?: number | null;
+  mime_type?: string | null;
+  description?: string | null;
+  created_at: string;
+}
+
 export type MemoryType = 'fact' | 'decision' | 'event' | 'tool_run' | 'error' | 'observation' | 'note' | 'patch';
 
 export interface Memory {
