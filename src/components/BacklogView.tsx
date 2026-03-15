@@ -10,7 +10,6 @@ import {
   Zap,
   Filter,
   Circle,
-  Plus,
   Flag,
   Calendar,
   Type,
@@ -20,7 +19,6 @@ import {
   Eye,
   EyeOff,
   Target,
-  ListTodo,
   FunnelX,
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
@@ -168,101 +166,95 @@ export function BacklogView({ workspaceId }: BacklogViewProps) {
 
   return (
     <div data-component="src/components/BacklogView" className="flex-1 flex flex-col overflow-hidden">
-      <div className="p-3 border-b border-mc-border bg-mc-bg-secondary flex items-center justify-between gap-2 flex-wrap">
-        <div>
-          <div className="flex items-center gap-2 text-sm font-medium text-mc-text">
-            <ListTodo className="w-4 h-4 text-mc-accent" />
-            <span>Backlog</span>
-          </div>
-          <p className="mt-1 text-xs text-mc-text-secondary">
+      <div className="p-3 border-b border-mc-border bg-mc-bg-secondary shrink-0 space-y-2">
+        <div className="flex items-start justify-between gap-2 flex-wrap">
+          <p className="text-xs text-mc-text-secondary">
             Unscheduled tasks waiting for milestone assignment and dispatch.
           </p>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap text-xs">
-          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full border border-mc-border bg-mc-bg text-mc-text-secondary">
-            Total unscheduled: {backlogTasks.length}
-          </span>
-          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full border border-red-200 bg-red-50 text-red-700">
-            Urgent: {urgentCount}
-          </span>
-          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full border border-cyan-200 bg-cyan-50 text-cyan-700">
-            Ready: {readyCount}
-          </span>
-          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full border border-green-200 bg-green-50 text-green-700">
-            Done in view: {doneCount}
-          </span>
-        </div>
-      </div>
-
-      <div className="p-3 border-b border-mc-border bg-mc-bg-secondary flex items-center justify-between gap-2 flex-wrap">
-        <div className="flex items-center gap-2 flex-wrap">
-          <button
-            onClick={() => setShowFilters(!showFilters)}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-medium transition-colors min-h-9 border ${
-              showFilters ? 'bg-mc-accent text-white border-mc-accent' : 'border-mc-border text-mc-text-secondary hover:bg-mc-bg-tertiary'
-            }`}
-          >
-            <Filter className="w-4 h-4" />
-            <span className="hidden sm:inline">Filters</span>
-            {activeFilterCount > 0 && (
-              <span className="w-2 h-2 rounded-full bg-mc-accent-green" />
-            )}
-          </button>
-          {activeFilterCount > 0 && (
-            <button
-              onClick={resetFilters}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-medium transition-colors min-h-9 border border-mc-border text-mc-text-secondary hover:bg-mc-bg-tertiary"
-            >
-              <FunnelX className="w-4 h-4" />
-              <span className="hidden sm:inline">Reset ({activeFilterCount})</span>
-            </button>
-          )}
-          <button
-            onClick={() => setHideDone(!hideDone)}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-medium transition-colors min-h-9 border ${
-              hideDone ? 'border-mc-border text-mc-text-secondary hover:bg-mc-bg-tertiary' : 'bg-mc-accent text-white border-mc-accent'
-            }`}
-          >
-            {hideDone ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-            <span className="hidden sm:inline">{hideDone ? 'Show Done' : 'Hide Done'}</span>
-          </button>
-          <div className="flex items-center bg-mc-bg-tertiary rounded-lg p-0.5">
-            <button
-              onClick={() => toggleSort('created')}
-              title={`Sort by created (${sortBy === 'created' ? sortDir : 'desc'})`}
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-medium transition-colors min-h-9 ${
-                sortBy === 'created' ? 'bg-mc-accent text-white' : 'text-mc-text-secondary hover:text-mc-text'
-              }`}
-            >
-              <Calendar className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Created</span>
-              {sortBy === 'created' && (sortDir === 'asc' ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />)}
-            </button>
-            <button
-              onClick={() => toggleSort('priority')}
-              title={`Sort by priority (${sortBy === 'priority' ? sortDir : 'desc'})`}
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-medium transition-colors min-h-9 ${
-                sortBy === 'priority' ? 'bg-mc-accent text-white' : 'text-mc-text-secondary hover:text-mc-text'
-              }`}
-            >
-              <Flag className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Priority</span>
-              {sortBy === 'priority' && (sortDir === 'asc' ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />)}
-            </button>
-            <button
-              onClick={() => toggleSort('title')}
-              title={`Sort by title (${sortBy === 'title' ? sortDir : 'desc'})`}
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-medium transition-colors min-h-9 ${
-                sortBy === 'title' ? 'bg-mc-accent text-white' : 'text-mc-text-secondary hover:text-mc-text'
-              }`}
-            >
-              <Type className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Title</span>
-              {sortBy === 'title' && (sortDir === 'asc' ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />)}
-            </button>
+          <div className="flex items-center gap-2 flex-wrap text-xs">
+            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full border border-mc-border bg-mc-bg text-mc-text-secondary">
+              Total unscheduled: {backlogTasks.length}
+            </span>
+            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full border border-red-200 bg-red-50 text-red-700">
+              Urgent: {urgentCount}
+            </span>
+            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full border border-cyan-200 bg-cyan-50 text-cyan-700">
+              Ready: {readyCount}
+            </span>
+            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full border border-green-200 bg-green-50 text-green-700">
+              Done in view: {doneCount}
+            </span>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-medium transition-colors min-h-9 border ${
+                showFilters ? 'bg-mc-accent text-white border-mc-accent' : 'border-mc-border text-mc-text-secondary hover:bg-mc-bg-tertiary'
+              }`}
+            >
+              <Filter className="w-4 h-4" />
+              <span className="hidden sm:inline">Filters</span>
+              {activeFilterCount > 0 && (
+                <span className="w-2 h-2 rounded-full bg-mc-accent-green" />
+              )}
+            </button>
+            {activeFilterCount > 0 && (
+              <button
+                onClick={resetFilters}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-medium transition-colors min-h-9 border border-mc-border text-mc-text-secondary hover:bg-mc-bg-tertiary"
+              >
+                <FunnelX className="w-4 h-4" />
+                <span className="hidden sm:inline">Reset ({activeFilterCount})</span>
+              </button>
+            )}
+            <button
+              onClick={() => setHideDone(!hideDone)}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-medium transition-colors min-h-9 border ${
+                hideDone ? 'border-mc-border text-mc-text-secondary hover:bg-mc-bg-tertiary' : 'bg-mc-accent text-white border-mc-accent'
+              }`}
+            >
+              {hideDone ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+              <span className="hidden sm:inline">{hideDone ? 'Show Done' : 'Hide Done'}</span>
+            </button>
+            <div className="flex items-center bg-mc-bg-tertiary rounded-lg p-0.5">
+              <button
+                onClick={() => toggleSort('created')}
+                title={`Sort by created (${sortBy === 'created' ? sortDir : 'desc'})`}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-medium transition-colors min-h-9 ${
+                  sortBy === 'created' ? 'bg-mc-accent text-white' : 'text-mc-text-secondary hover:text-mc-text'
+                }`}
+              >
+                <Calendar className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Created</span>
+                {sortBy === 'created' && (sortDir === 'asc' ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />)}
+              </button>
+              <button
+                onClick={() => toggleSort('priority')}
+                title={`Sort by priority (${sortBy === 'priority' ? sortDir : 'desc'})`}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-medium transition-colors min-h-9 ${
+                  sortBy === 'priority' ? 'bg-mc-accent text-white' : 'text-mc-text-secondary hover:text-mc-text'
+                }`}
+              >
+                <Flag className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Priority</span>
+                {sortBy === 'priority' && (sortDir === 'asc' ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />)}
+              </button>
+              <button
+                onClick={() => toggleSort('title')}
+                title={`Sort by title (${sortBy === 'title' ? sortDir : 'desc'})`}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-medium transition-colors min-h-9 ${
+                  sortBy === 'title' ? 'bg-mc-accent text-white' : 'text-mc-text-secondary hover:text-mc-text'
+                }`}
+              >
+                <Type className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Title</span>
+                {sortBy === 'title' && (sortDir === 'asc' ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />)}
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 

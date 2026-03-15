@@ -20,10 +20,11 @@ export type DashboardView = 'tasks' | 'backlog' | 'pareto' | 'issues' | 'discord
 interface HeaderProps {
   workspace?: Workspace;
   orgName?: string;
+  orgSlug?: string;
   isPortrait?: boolean;
 }
 
-export function Header({ workspace, orgName, isPortrait = true }: HeaderProps) {
+export function Header({ workspace, orgName, orgSlug, isPortrait = true }: HeaderProps) {
   const { isOnline } = useStyrmann();
   const [currentTime, setCurrentTime] = useState(new Date());
   const [showWorkspaceSwitcher, setShowWorkspaceSwitcher] = useState(false);
@@ -96,11 +97,12 @@ export function Header({ workspace, orgName, isPortrait = true }: HeaderProps) {
 
 
   const portraitContextHeader = isPortrait && (!!workspace || !!orgName);
+  const allWorkspacesHref = orgSlug ? `/organization/${orgSlug}?tab=workspaces` : '/';
 
   const workspaceSwitcherDropdown = showWorkspaceSwitcher && (
     <div className="absolute top-full left-0 mt-1 w-44 sm:w-64 bg-mc-bg-secondary border border-mc-border rounded-lg shadow-lg z-50 py-1 max-h-64 overflow-y-auto">
       <Link
-        href="/"
+        href={allWorkspacesHref}
         onClick={() => setShowWorkspaceSwitcher(false)}
         className="flex items-center gap-2 px-3 py-2 text-sm text-mc-text-secondary hover:bg-mc-bg-tertiary transition-colors"
       >

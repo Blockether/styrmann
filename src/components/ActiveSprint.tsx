@@ -194,12 +194,8 @@ export function ActiveSprint({ workspaceId, mobileMode = false, isPortrait = tru
 
   return (
     <div data-component="src/components/ActiveSprint" className="flex-1 flex flex-col overflow-hidden">
-      <div className={`p-3 border-b border-mc-border bg-mc-bg-secondary flex items-center justify-between gap-2 ${mobileMode && isPortrait ? 'flex-wrap' : ''}`}>
-        <div className="flex items-center gap-2">
-          <h2 className="text-sm font-semibold">Tasks</h2>
-        </div>
-
-        <div className="flex items-center gap-2">
+      <div className="p-3 border-b border-mc-border bg-mc-bg-secondary shrink-0 space-y-2">
+        <div className={`flex items-center justify-end gap-2 ${mobileMode && isPortrait ? 'flex-wrap' : ''}`}>
           <div className="flex items-center bg-mc-bg-tertiary rounded-lg p-0.5" role="tablist" aria-label="View mode">
             <button
               onClick={() => setViewMode('list')}
@@ -227,9 +223,7 @@ export function ActiveSprint({ workspaceId, mobileMode = false, isPortrait = tru
             </button>
           </div>
         </div>
-      </div>
 
-      <div className="p-3 border-b border-mc-border bg-mc-bg-secondary space-y-2">
         <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs">
           <div className="p-2.5 rounded-lg border border-mc-border bg-mc-bg">
             <div className="text-mc-text-secondary">Total Tasks</div>

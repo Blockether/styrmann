@@ -1,6 +1,6 @@
 # KNOWLEDGE.md -- Styrmann
 
-Last updated: 2026-03-14 (org-platform-fixes)
+Last updated: 2026-03-15 (workspace-toolbar-navigation-fix)
 
 ---
 
@@ -69,6 +69,10 @@ The homepage lists organizations and their workspaces. Clicking a workspace open
 **Navigation lives in AgentsSidebar only** -- not in the Header. The sidebar has two sections: Views (Tasks/Backlog/Pareto/Issues/Discord) at top, Agents list below. On desktop it collapses to icons. On mobile it's a slide-over overlay triggered by hamburger menu.
 
 View state is React state + URL query param (`?view=backlog`). Default is `tasks`. Switching calls `window.history.replaceState()` -- no page reload.
+
+Workspace view components use a consistent internal toolbar wrapper (`p-3 border-b border-mc-border bg-mc-bg-secondary shrink-0`) so the content origin stays stable when switching between views. Tasks and Backlog no longer render duplicate in-view headings because the workspace tab strip already indicates the active view.
+
+The Header workspace switcher supports org-scoped return navigation: when `orgSlug` is passed, the `All Workspaces` shortcut links to `/organization/{orgSlug}?tab=workspaces`; it falls back to `/` when org context is unavailable.
 
 ---
 

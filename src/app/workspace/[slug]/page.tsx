@@ -208,6 +208,10 @@ export default function WorkspacePage() {
     );
   }
 
+  const orgSlug = workspace.organization
+    ? workspace.organization.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '')
+    : undefined;
+
   return (
     <div data-component="src/app/workspace/[slug]/page" className="h-screen flex flex-col bg-mc-bg overflow-hidden">
       <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-[100] focus:px-4 focus:py-2 focus:bg-mc-accent focus:text-white focus:rounded focus:text-sm focus:font-medium">
@@ -215,6 +219,7 @@ export default function WorkspacePage() {
       </a>
       <Header 
         workspace={workspace} 
+        orgSlug={orgSlug}
         isPortrait={isPortrait} 
       />
 
