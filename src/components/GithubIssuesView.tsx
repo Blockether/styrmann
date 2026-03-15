@@ -220,7 +220,7 @@ export function GithubIssuesView({ workspaceId, workspace }: GithubIssuesViewPro
           <button
             onClick={handleSync}
             disabled={syncing}
-            className="flex items-center gap-1.5 px-2 py-1.5 border border-mc-border rounded text-sm hover:bg-mc-bg-tertiary disabled:opacity-50 transition-colors"
+            className="flex items-center gap-1.5 px-2 h-[34px] border border-mc-border rounded text-sm hover:bg-mc-bg-tertiary disabled:opacity-50 transition-colors"
           >
             <RefreshCw className={`w-3.5 h-3.5 shrink-0 ${syncing ? 'animate-spin' : ''}`} />
             <span className="hidden sm:inline">{syncing ? 'Syncing...' : 'Sync'}</span>
