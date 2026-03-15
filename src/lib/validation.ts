@@ -300,6 +300,8 @@ export const UpdateOrgMilestoneSchema = z.object({
 export type CreateOrgMilestoneInput = z.infer<typeof CreateOrgMilestoneSchema>;
 export type UpdateOrgMilestoneInput = z.infer<typeof UpdateOrgMilestoneSchema>;
 
+export const RESERVED_SPRINT_NAMES = ['backlog'];
+
 export const CreateOrgSprintSchema = z.object({
   organization_id: z.string().min(1),
   name: z.string().min(1).max(200),
@@ -307,7 +309,10 @@ export const CreateOrgSprintSchema = z.object({
   status: z.enum(['planned', 'active', 'completed']).default('planned'),
   start_date: z.string().optional(),
   end_date: z.string().optional(),
-});
+}).refine(
+  (data) => !RESERVED_SPRINT_NAMES.includes(data.name.trim().toLowerCase()),
+  { message: '"Backlog" is a reserved name and cannot be used as a sprint name', path: ['name'] }
+);
 
 export const UpdateOrgSprintSchema = z.object({
   name: z.string().min(1).max(200).optional(),
@@ -315,7 +320,10 @@ export const UpdateOrgSprintSchema = z.object({
   status: z.enum(['planned', 'active', 'completed']).optional(),
   start_date: z.string().optional().nullable(),
   end_date: z.string().optional().nullable(),
-});
+}).refine(
+  (data) => !data.name || !RESERVED_SPRINT_NAMES.includes(data.name.trim().toLowerCase()),
+  { message: '"Backlog" is a reserved name and cannot be used as a sprint name', path: ['name'] }
+);
 
 export type CreateOrgSprintInput = z.infer<typeof CreateOrgSprintSchema>;
 export type UpdateOrgSprintInput = z.infer<typeof UpdateOrgSprintSchema>;
