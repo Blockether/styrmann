@@ -5,13 +5,17 @@ import { useSearchParams } from 'next/navigation';
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import {
   BookOpen,
+  CircleDot,
   ChevronDown,
   ChevronRight,
   Folder,
   Layers,
+  MessageSquare,
   Plus,
   Ticket,
 } from 'lucide-react';
+import { DiscordMessagesView } from '@/components/DiscordMessagesView';
+import { GithubIssuesView } from '@/components/GithubIssuesView';
 import { Header } from '@/components/Header';
 import { OrgTicketCreateModal } from '@/components/OrgTicketCreateModal';
 import { OrgTicketModal } from '@/components/OrgTicketModal';
@@ -108,7 +112,7 @@ const TYPE_CONFIG: Record<string, { label: string; color: string }> = {
 
 function OrgDetailViewInner({ slug }: { slug: string }) {
   const searchParams = useSearchParams();
-  const activeTab = (searchParams.get('tab') || 'board') as 'board' | 'knowledge' | 'workspaces';
+  const activeTab = (searchParams.get('tab') || 'board') as 'board' | 'knowledge' | 'workspaces' | 'discord' | 'issues';
 
   const [org, setOrg] = useState<OrgDetail | null>(null);
   const [tickets, setTickets] = useState<OrgTicket[]>([]);
@@ -400,6 +404,7 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
   const showSprintActionBar = hasSprints;
   const showNoSprintEmptyState = activeTab === 'board' && !hasSprints && tickets.length === 0;
   const showNoTicketEmptyState = activeTab === 'board' && hasSprints && !hasTicketsInSelection;
+  const primaryWorkspaceId = org.workspaces?.[0]?.id || '';
 
   return (
     <div data-component="src/components/OrgDetailView" className="min-h-screen bg-mc-bg">
@@ -411,7 +416,7 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
 
       <div className="p-8 space-y-4">
         <div className="flex gap-0 border-b border-mc-border bg-mc-bg-secondary">
-          {(['board', 'knowledge', 'workspaces'] as const).map((tab) => (
+          {(['board', 'issues', 'discord', 'knowledge', 'workspaces'] as const).map((tab) => (
             <Link
               key={tab}
               href={`?tab=${tab}`}
@@ -431,6 +436,18 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
                 <>
                   <BookOpen size={14} className="shrink-0" />
                   <span>Knowledge</span>
+                </>
+              )}
+              {tab === 'issues' && (
+                <>
+                  <CircleDot size={14} className="shrink-0" />
+                  <span>Issues</span>
+                </>
+              )}
+              {tab === 'discord' && (
+                <>
+                  <MessageSquare size={14} className="shrink-0" />
+                  <span>Discord</span>
                 </>
               )}
               {tab === 'workspaces' && (
@@ -746,6 +763,14 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
               </div>
             )}
           </div>
+        )}
+
+        {activeTab === 'discord' && primaryWorkspaceId && (
+          <DiscordMessagesView workspaceId={primaryWorkspaceId} />
+        )}
+
+        {activeTab === 'issues' && primaryWorkspaceId && org.workspaces?.[0] && (
+          <GithubIssuesView workspaceId={primaryWorkspaceId} workspace={org.workspaces[0] as any} />
         )}
 
         {activeTab === 'knowledge' && (

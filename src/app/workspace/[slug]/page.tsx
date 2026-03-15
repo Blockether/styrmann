@@ -4,27 +4,15 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { ChevronLeft } from 'lucide-react';
-import { Header, type DashboardView } from '@/components/Header';
+import { Header } from '@/components/Header';
 import { StyrmannLogo } from '@/components/StyrmannLogo';
 
 import { WorkspaceTasks } from '@/components/WorkspaceTasks';
 import { SSEDebugPanel } from '@/components/SSEDebugPanel';
-import { GithubIssuesView } from '@/components/GithubIssuesView';
-import { DiscordMessagesView } from '@/components/DiscordMessagesView';
 import { useStyrmann } from '@/lib/store';
 import { useSSE } from '@/hooks/useSSE';
 import { debug } from '@/lib/debug';
 import type { Task, Workspace } from '@/lib/types';
-
-function getInitialView(): DashboardView {
-  if (typeof window === 'undefined') return 'tasks';
-  const params = new URLSearchParams(window.location.search);
-  const urlView = params.get('view');
-  if (urlView && ['tasks', 'issues', 'discord'].includes(urlView)) {
-    return urlView as DashboardView;
-  }
-  return 'tasks';
-}
 
 export default function WorkspacePage() {
   const params = useParams();
@@ -34,34 +22,10 @@ export default function WorkspacePage() {
 
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [notFound, setNotFound] = useState(false);
-  const [view, setView] = useState<DashboardView>(getInitialView);
 
   const [isPortrait, setIsPortrait] = useState(true);
 
   useSSE();
-
-  useEffect(() => {
-    const urlView = new URLSearchParams(window.location.search).get('view');
-    if (urlView && ['tasks', 'issues', 'discord'].includes(urlView)) {
-      return;
-    }
-    if (urlView) {
-      const url = new URL(window.location.href);
-      url.searchParams.delete('view');
-      window.history.replaceState({}, '', url.toString());
-    }
-  }, []);
-
-  const handleViewChange = (newView: DashboardView) => {
-    setView(newView);
-    const url = new URL(window.location.href);
-    if (newView === 'tasks') {
-      url.searchParams.delete('view');
-    } else {
-      url.searchParams.set('view', newView);
-    }
-    window.history.replaceState({}, '', url.toString());
-  };
 
   useEffect(() => {
     const media = window.matchMedia('(orientation: portrait)');
@@ -161,20 +125,6 @@ export default function WorkspacePage() {
     };
   }, [workspace, setAgents, setTasks, setIsOnline, setIsLoading]);
 
-  const renderView = () => {
-    if (!workspace) return null;
-    switch (view) {
-      case 'tasks':
-        return <WorkspaceTasks workspaceId={workspace.id} />;
-      case 'issues':
-        return <GithubIssuesView workspaceId={workspace.id} workspace={workspace} />;
-      case 'discord':
-        return <DiscordMessagesView workspaceId={workspace.id} />;
-      default:
-        return <WorkspaceTasks workspaceId={workspace.id} />;
-    }
-  };
-
   if (notFound) {
     return (
       <div className="min-h-screen bg-mc-bg flex items-center justify-center">
@@ -217,28 +167,9 @@ export default function WorkspacePage() {
         isPortrait={isPortrait} 
       />
 
-      <div className="border-b border-mc-border bg-mc-bg-secondary flex items-center px-3 gap-0 shrink-0 overflow-x-auto">
-        {[
-          { key: 'tasks', label: 'Tasks' },
-          { key: 'issues', label: 'Issues' },
-          { key: 'discord', label: 'Discord' },
-        ].map((tab) => (
-          <button
-            key={tab.key}
-            type="button"
-            onClick={() => handleViewChange(tab.key as DashboardView)}
-            className={`px-4 py-2.5 text-sm border-b-2 transition-colors whitespace-nowrap ${
-              view === tab.key
-                ? 'border-mc-accent text-mc-text font-medium'
-                : 'border-transparent text-mc-text-secondary hover:text-mc-text'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
-      <main id="main-content" className="flex-1 min-w-0 overflow-hidden flex flex-col">{renderView()}</main>
+      <main id="main-content" className="flex-1 min-w-0 overflow-hidden flex flex-col">
+        <WorkspaceTasks workspaceId={workspace.id} />
+      </main>
 
       <SSEDebugPanel />
     </div>

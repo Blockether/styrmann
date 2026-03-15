@@ -1,6 +1,6 @@
 # KNOWLEDGE.md -- Styrmann
 
-Last updated: 2026-03-15 (workspace-toolbar-navigation-fix)
+Last updated: 2026-03-15 (org-level-communications-tabs)
 
 ---
 
@@ -50,23 +50,29 @@ OpenClaw Gateway was removed because:
 
 ## Dashboard Architecture
 
-The homepage lists organizations and their workspaces. Clicking a workspace opens the single-page workspace dashboard. No route navigations between views within a workspace.
+The homepage lists organizations and their workspaces. Clicking a workspace opens the single-page workspace dashboard focused on task execution.
 
 **Org-first navigation**: The root `/` page groups workspaces by organization. Each organization card shows its name, slug, and workspace count. Workspaces without an `organization_id` appear under an "Ungrouped" section.
 
 ```
 /workspace/[slug]/page.tsx
   Header (logo, workspace, stats, online status, clock, settings -- NO view nav)
-  Desktop: AgentsSidebar(views + agents, collapsed by default) | {view content} | LiveFeed(collapsed by default)
-    view='tasks'    -> WorkspaceTasks (workspace-wide List/Board toggle)
-    view='issues'   -> GithubIssuesView
-    view='discord'  -> DiscordMessagesView
+  Desktop: AgentsSidebar(tasks + sprint history + agents, collapsed by default) | WorkspaceTasks | LiveFeed(collapsed by default)
   Mobile: hamburger in Header opens AgentsSidebar as slide-over overlay. Single content panel, no duplicate tabs.
+
+/organization/[slug]/page.tsx
+  Header (organization context)
+  OrgDetailView tabs: Board | Issues | Discord | Knowledge | Workspaces
+    tab='board'     -> Org ticket/sprint/milestone board
+    tab='issues'    -> GithubIssuesView (bound to org.workspaces[0])
+    tab='discord'   -> DiscordMessagesView (bound to org.workspaces[0])
+    tab='knowledge' -> knowledge articles
+    tab='workspaces'-> workspace cards
 ```
 
-**Navigation lives in workspace tab bar and AgentsSidebar**. Workspace tabs expose Tasks/Issues/Discord and keep URL state in `?view=`. AgentsSidebar mirrors those same views; on desktop it collapses to icons, and on mobile it's a slide-over overlay triggered by hamburger menu.
+**Navigation split by scope**: Workspace now exposes only Tasks (no workspace `?view=` tabs). Integration channels (Issues, Discord) live at organization scope in OrgDetailView tabs.
 
-View state is React state + URL query param (`?view=issues` or `?view=discord`). Default is `tasks`. Switching calls `window.history.replaceState()` -- no page reload.
+Org view state uses the `?tab=` query param (for example `?tab=issues` or `?tab=discord`). Workspace pages no longer keep a local `view` state.
 
 Workspace view components use a consistent internal toolbar wrapper (`p-3 border-b border-mc-border bg-mc-bg-secondary shrink-0`) so the content origin stays stable when switching between views.
 
@@ -218,7 +224,7 @@ open -> triaged -> delegated -> in_progress -> resolved -> closed
 
 SSE events: `org_sprint_created`, `org_sprint_updated`, `org_sprint_deleted`.
 
-**OrgDetailView unified board**: The organization detail page is now organized as `Board | Knowledge | Workspaces`. The Board tab is a sprint-scoped milestone board (`Sprint -> Milestone -> Ticket`) with a sprint selector (including `Backlog`), inline sprint/milestone creation, and ticket rows that open `OrgTicketModal`. Org-level updates refresh via `useOrgSSE` listening to `/api/events` for ticket/sprint/milestone/knowledge events.
+**OrgDetailView tabs**: The organization detail page is organized as `Board | Issues | Discord | Knowledge | Workspaces`. The Board tab is a sprint-scoped milestone board (`Sprint -> Milestone -> Ticket`) with a sprint selector (including `Backlog`), inline sprint/milestone creation, and ticket rows that open `OrgTicketModal`. Issues and Discord tabs reuse workspace-scoped integration views by binding to the first workspace in `org.workspaces` (single-workspace org mode). Org-level updates refresh via `useOrgSSE` listening to `/api/events` for ticket/sprint/milestone/knowledge events.
 
 ---
 
@@ -1111,7 +1117,7 @@ Discord integration runs as a daemon module (`src/daemon/discord.ts`). Condition
 
 **Reporter stats**: The daemon reporter includes Discord-specific counters in the stats payload: `discord_connected`, `discord_messages_processed`, `discord_tasks_created`, `discord_completions_sent`, `discord_voice_responses`. When connected, a `discord` module entry appears in the modules list.
 
-**UI**: `DiscordMessagesView` component (`src/components/DiscordMessagesView.tsx`) shows Discord message history with classification icons, author badges, task linkage, and thread indicators. Accessible via the `?view=discord` URL param or the sidebar Discord nav item. Filterable by classification type (all/task/conversation/clarification).
+**UI**: `DiscordMessagesView` component (`src/components/DiscordMessagesView.tsx`) shows Discord message history with classification icons, author badges, task linkage, and thread indicators. Accessible from organization detail via `?tab=discord` in `OrgDetailView` (workspace-level Discord nav removed). Filterable by classification type (all/task/conversation/clarification).
 
 **Channel filtering**: `DISCORD_CHANNEL_IDS` env var (comma-separated) limits which channels the bot monitors. If not set, bot only responds to @mentions.
 
