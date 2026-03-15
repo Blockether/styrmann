@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { ChevronDown, CheckCircle2, Loader2, Flag, Calendar, ChevronRight, ArrowRightLeft, LayoutList, Columns3, GripVertical, Target, AlertCircle, Crown, Bug, Lightbulb, Wrench, BookOpen, FlaskConical, Zap } from 'lucide-react';
+import { ChevronDown, ArrowRightLeft, CheckCircle2, Loader2, Flag, Calendar, ChevronRight, LayoutList, Columns3, GripVertical, Target, AlertCircle, Crown, Bug, Lightbulb, Wrench, BookOpen, FlaskConical, Zap } from 'lucide-react';
 import { useStyrmann } from '@/lib/store';
 import { triggerAutoDispatch, shouldTriggerAutoDispatch } from '@/lib/auto-dispatch';
 import type { Task, TaskStatus, TaskType, Sprint, Milestone, Agent } from '@/lib/types';
@@ -308,7 +308,10 @@ export function ActiveSprint({ workspaceId, mobileMode = false, isPortrait = tru
         <Calendar className="w-12 h-12 text-mc-border mb-4" />
         <h3 className="text-lg font-semibold mb-2">No Sprints Yet</h3>
         <p className="text-sm text-mc-text-secondary text-center mb-4">
-          Sprints are managed from the organization board.
+          Sprints are managed at the organization level.
+        </p>
+        <p className="text-sm text-mc-text-secondary text-center">
+          Tasks are created via org ticket delegation
         </p>
       </div>
     );
