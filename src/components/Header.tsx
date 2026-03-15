@@ -8,13 +8,14 @@ import {
   Folder,
   ChevronDown,
   Check,
+  Plus,
 } from 'lucide-react';
 import { useStyrmann } from '@/lib/store';
 import { format } from 'date-fns';
 import type { Workspace } from '@/lib/types';
 import { StyrmannLogo } from '@/components/StyrmannLogo';
 
-export type DashboardView = 'sprint' | 'backlog' | 'pareto' | 'issues' | 'discord';
+export type DashboardView = 'tasks' | 'backlog' | 'pareto' | 'issues' | 'discord';
 
 interface HeaderProps {
   workspace?: Workspace;
@@ -27,7 +28,10 @@ export function Header({ workspace, orgName, isPortrait = true }: HeaderProps) {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [showWorkspaceSwitcher, setShowWorkspaceSwitcher] = useState(false);
   const [allWorkspaces, setAllWorkspaces] = useState<Workspace[]>([]);
+  const [showOrgCreate, setShowOrgCreate] = useState(false);
+  const [newOrgName, setNewOrgName] = useState('');
   const switcherRef = useRef<HTMLDivElement>(null);
+  const orgCreateRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -54,12 +58,41 @@ export function Header({ workspace, orgName, isPortrait = true }: HeaderProps) {
       if (switcherRef.current && !switcherRef.current.contains(e.target as Node)) {
         setShowWorkspaceSwitcher(false);
       }
+      if (orgCreateRef.current && !orgCreateRef.current.contains(e.target as Node)) {
+        setShowOrgCreate(false);
+      }
     };
-    if (showWorkspaceSwitcher) {
+    if (showWorkspaceSwitcher || showOrgCreate) {
       document.addEventListener('mousedown', handleClickOutside);
       return () => document.removeEventListener('mousedown', handleClickOutside);
     }
-  }, [showWorkspaceSwitcher]);
+  }, [showWorkspaceSwitcher, showOrgCreate]);
+
+  const handleCreateOrganization = async () => {
+    const name = newOrgName.trim();
+    if (!name) return;
+
+    const slug = name.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+    if (!slug) return;
+
+    try {
+      const res = await fetch('/api/organizations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, slug }),
+      });
+
+      if (!res.ok) {
+        return;
+      }
+
+      setShowOrgCreate(false);
+      setNewOrgName('');
+      window.location.href = `/organization/${slug}`;
+    } catch {
+      return;
+    }
+  };
 
 
   const portraitContextHeader = isPortrait && (!!workspace || !!orgName);
@@ -131,9 +164,40 @@ export function Header({ workspace, orgName, isPortrait = true }: HeaderProps) {
                   {workspaceSwitcherDropdown}
                 </div>
               ) : orgName ? (
-                <div className="flex items-center gap-2 px-2.5 py-1.5 bg-mc-bg-tertiary rounded min-w-0 overflow-hidden">
-                  <Building2 className="w-4 h-4 text-mc-accent shrink-0" />
-                  <span className="font-medium truncate text-sm">{orgName}</span>
+                <div ref={orgCreateRef} className="relative">
+                  <div className="flex items-center gap-2 px-2.5 py-1.5 bg-mc-bg-tertiary rounded min-w-0 overflow-hidden">
+                    <Building2 className="w-4 h-4 text-mc-accent shrink-0" />
+                    <span className="font-medium truncate text-sm">{orgName}</span>
+                    <button
+                      onClick={() => setShowOrgCreate((prev) => !prev)}
+                      className="p-1 rounded hover:bg-mc-bg transition-colors"
+                      title="Create organization"
+                      aria-label="Create organization"
+                    >
+                      <Plus className="w-4 h-4 text-mc-text-secondary" />
+                    </button>
+                  </div>
+                  {showOrgCreate && (
+                    <div className="absolute top-full left-0 mt-1 w-72 bg-mc-bg-secondary border border-mc-border rounded-lg shadow-lg z-50 p-3">
+                      <div className="text-sm font-semibold mb-2">New Organization</div>
+                      <input
+                        placeholder="Organization name"
+                        value={newOrgName}
+                        onChange={(e) => setNewOrgName(e.target.value)}
+                        className="w-full px-3 py-2 text-sm border border-mc-border rounded bg-mc-bg text-mc-text mb-2"
+                        autoFocus
+                      />
+                      <div className="flex justify-end gap-2">
+                        <button onClick={() => setShowOrgCreate(false)} className="px-3 py-1.5 text-sm text-mc-text-secondary">Cancel</button>
+                        <button
+                          onClick={handleCreateOrganization}
+                          className="px-3 py-1.5 text-sm bg-mc-accent text-white rounded hover:opacity-90"
+                        >
+                          Create
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <Link href="/" className="flex items-center gap-2 px-2.5 py-1.5 bg-mc-bg-tertiary rounded hover:bg-mc-bg transition-colors">
@@ -181,9 +245,40 @@ export function Header({ workspace, orgName, isPortrait = true }: HeaderProps) {
                 {workspaceSwitcherDropdown}
               </div>
             ) : orgName ? (
-              <div className="flex items-center gap-2 px-3 py-1 bg-mc-bg-tertiary rounded">
-                <Building2 className="w-4 h-4 text-mc-accent" />
-                <span className="font-medium text-sm md:text-base">{orgName}</span>
+              <div ref={orgCreateRef} className="relative">
+                <div className="flex items-center gap-2 px-3 py-1 bg-mc-bg-tertiary rounded">
+                  <Building2 className="w-4 h-4 text-mc-accent" />
+                  <span className="font-medium text-sm md:text-base">{orgName}</span>
+                  <button
+                    onClick={() => setShowOrgCreate((prev) => !prev)}
+                    className="p-1 rounded hover:bg-mc-bg transition-colors"
+                    title="Create organization"
+                    aria-label="Create organization"
+                  >
+                    <Plus className="w-4 h-4 text-mc-text-secondary" />
+                  </button>
+                </div>
+                {showOrgCreate && (
+                  <div className="absolute top-full left-0 mt-1 w-72 bg-mc-bg-secondary border border-mc-border rounded-lg shadow-lg z-50 p-3">
+                    <div className="text-sm font-semibold mb-2">New Organization</div>
+                    <input
+                      placeholder="Organization name"
+                      value={newOrgName}
+                      onChange={(e) => setNewOrgName(e.target.value)}
+                      className="w-full px-3 py-2 text-sm border border-mc-border rounded bg-mc-bg text-mc-text mb-2"
+                      autoFocus
+                    />
+                    <div className="flex justify-end gap-2">
+                      <button onClick={() => setShowOrgCreate(false)} className="px-3 py-1.5 text-sm text-mc-text-secondary">Cancel</button>
+                      <button
+                        onClick={handleCreateOrganization}
+                        className="px-3 py-1.5 text-sm bg-mc-accent text-white rounded hover:opacity-90"
+                      >
+                        Create
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             ) : (
               <Link href="/" className="flex items-center gap-2 px-3 py-1 bg-mc-bg-tertiary rounded hover:bg-mc-bg transition-colors">

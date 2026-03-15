@@ -58,16 +58,17 @@ The homepage lists organizations and their workspaces. Clicking a workspace open
 /workspace/[slug]/page.tsx
   Header (logo, workspace, stats, online status, clock, settings -- NO view nav)
   Desktop: AgentsSidebar(views + agents, collapsed by default) | {view content} | LiveFeed(collapsed by default)
-    view='sprint'   -> ActiveSprint (List/Board toggle)
+    view='tasks'    -> ActiveSprint (workspace-wide List/Board toggle)
     view='backlog'  -> BacklogView (tasks with no milestone_id)
     view='pareto'   -> ParetoView (effort/impact matrix)
-    view='activity' -> AgentActivityDashboard (embedded)
+    view='issues'   -> GithubIssuesView
+    view='discord'  -> DiscordMessagesView
   Mobile: hamburger in Header opens AgentsSidebar as slide-over overlay. Single content panel, no duplicate tabs.
 ```
 
-**Navigation lives in AgentsSidebar only** -- not in the Header. The sidebar has two sections: Views (Sprint/Backlog/Pareto/Activity) at top, Agents list below. On desktop it collapses to icons. On mobile it's a slide-over overlay triggered by hamburger menu.
+**Navigation lives in AgentsSidebar only** -- not in the Header. The sidebar has two sections: Views (Tasks/Backlog/Pareto/Issues/Discord) at top, Agents list below. On desktop it collapses to icons. On mobile it's a slide-over overlay triggered by hamburger menu.
 
-View state is React state + URL query param (`?view=backlog`). Default is `sprint`. Switching calls `window.history.replaceState()` -- no page reload.
+View state is React state + URL query param (`?view=backlog`). Default is `tasks`. Switching calls `window.history.replaceState()` -- no page reload.
 
 ---
 
@@ -385,7 +386,7 @@ Auto-named `SPRINT-N` per workspace (auto-incremented `sprint_number`). Users ca
 - When a sprint is completed, all non-done tasks are unassigned from the sprint (via their milestones).
 - Cannot delete a sprint that has milestones.
 
-**Kanban board** (ActiveSprint): Sprint-scoped read view. Shows tasks grouped by milestone, where the milestone belongs to the selected sprint. Two view modes: List (milestone-grouped) and Board (drag-and-drop columns for all 8 statuses, with milestone swimlanes). Sprint/milestone creation actions were removed from this workspace surface and are managed from the organization board.
+**Workspace tasks board** (ActiveSprint): Workspace-scoped read view with no sprint selector. It always shows all tasks for the workspace. Two view modes remain: List (flat task cards) and Board (status columns with drag-and-drop). Milestones are shown as task labels and summary chips when present, but sprint concepts are not exposed in this workspace surface.
 
 ---
 
@@ -403,11 +404,7 @@ Milestones are the primary grouping unit for tasks. Each milestone optionally be
 
 **Coordinator agent**: Optional. Informational only -- displayed in the UI alongside the milestone name and progress bar. No automated notifications or dispatch tied to the coordinator.
 
-**In ActiveSprint list view**: Tasks are grouped by milestone. Each group shows milestone name, coordinator initials, and a progress bar (done/total). Ungrouped tasks appear at the bottom.
-
-**Empty milestone visibility**: Sprint milestones remain visible even when they have zero tasks. Empty groups show a "No tasks yet in this milestone." placeholder with an inline Create Task action.
-
-**Milestone-scoped task creation**: ActiveSprint milestone groups include a New Task button that opens TaskModal with that milestone pre-selected.
+**In ActiveSprint task surfaces**: Milestones remain available as optional resource assignments. ActiveSprint now displays milestone chips in stats and task metadata instead of milestone-grouped sprint lanes.
 
 Cannot delete a milestone that has tasks.
 
@@ -924,7 +921,7 @@ Agents without direct filesystem access use upload/download endpoints:
 
 1. **SSE over WebSocket**: Simpler, works with Next.js App Router natively, sufficient for server-to-client updates.
 2. **SQLite over Postgres**: Single-file DB, zero config, WAL mode for concurrent reads. Sufficient for single-server deployment.
-3. **Single-page dashboard**: All views render in same page via state switching. No route navigations between views -- prevents layout jumps. Workspace-level dashboard views are now `sprint`, `backlog`, `pareto`, and `issues`; removed views like `activity` and `knowledge` fall back to the main panel.
+3. **Single-page dashboard**: All views render in same page via state switching. No route navigations between views -- prevents layout jumps. Workspace-level dashboard views are `tasks`, `backlog`, `pareto`, `issues`, and `discord`; removed views like `activity` and `knowledge` fall back to the main panel.
 4. **Milestone-first hierarchy**: Tasks belong to milestones; milestones belong to sprints. The hierarchy is `Workspace -> Sprint -> Milestone -> Task`. Tasks do not have a direct sprint relationship. Backlog is defined as `milestone_id IS NULL`.
 5. **Agent sync from gateway config**: Agents defined in OpenClaw config files, auto-synced on startup. Prompts stored in files (not DB). Synced agents appear in all workspaces.
 6. **Migrations auto-run on DB connection**: Schema creation only for fresh databases. `legacy_alter_table = ON` during migrations to prevent FK rewriting bug.

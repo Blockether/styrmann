@@ -16,7 +16,7 @@ interface AgentsSidebarProps {
 }
 
 const NAV_ITEMS = [
-  { label: 'Active Sprint', view: 'sprint' as DashboardView, icon: <ListTodo className="w-4 h-4" /> },
+  { label: 'Tasks', view: 'tasks' as DashboardView, icon: <ListTodo className="w-4 h-4" /> },
   { label: 'Backlog', view: 'backlog' as DashboardView, icon: <Inbox className="w-4 h-4" /> },
   { label: 'Pareto', view: 'pareto' as DashboardView, icon: <BarChart3 className="w-4 h-4" /> },
   { label: 'Issues', view: 'issues' as DashboardView, icon: <CircleDot className="w-4 h-4" /> },
@@ -30,7 +30,7 @@ interface AgentSummary {
 
 export function AgentsSidebar({
   workspaceId,
-  activeView = 'sprint',
+  activeView = 'tasks',
   onViewChange,
   open = false,
   onClose
@@ -127,7 +127,7 @@ export function AgentsSidebar({
                   key={sprint.id}
                   onClick={() => {
                     setSelectedSprintId(sprint.id);
-                    handleNavClick('sprint');
+                    handleNavClick('tasks');
                   }}
                   className="w-full text-left px-3 py-1.5 rounded text-xs hover:bg-mc-bg-tertiary transition-colors"
                 >

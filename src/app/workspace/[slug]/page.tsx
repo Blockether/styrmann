@@ -19,13 +19,13 @@ import { debug } from '@/lib/debug';
 import type { Task, Workspace } from '@/lib/types';
 
 function getInitialView(): DashboardView {
-  if (typeof window === 'undefined') return 'sprint';
+  if (typeof window === 'undefined') return 'tasks';
   const params = new URLSearchParams(window.location.search);
   const urlView = params.get('view');
-  if (urlView && ['sprint', 'backlog', 'pareto', 'issues', 'discord'].includes(urlView)) {
+  if (urlView && ['tasks', 'backlog', 'pareto', 'issues', 'discord'].includes(urlView)) {
     return urlView as DashboardView;
   }
-  return 'sprint';
+  return 'tasks';
 }
 
 export default function WorkspacePage() {
@@ -44,7 +44,7 @@ export default function WorkspacePage() {
 
   useEffect(() => {
     const urlView = new URLSearchParams(window.location.search).get('view');
-    if (urlView && ['sprint', 'backlog', 'pareto', 'issues', 'discord'].includes(urlView)) {
+    if (urlView && ['tasks', 'backlog', 'pareto', 'issues', 'discord'].includes(urlView)) {
       return;
     }
     if (urlView) {
@@ -57,7 +57,7 @@ export default function WorkspacePage() {
   const handleViewChange = (newView: DashboardView) => {
     setView(newView);
     const url = new URL(window.location.href);
-    if (newView === 'sprint') {
+    if (newView === 'tasks') {
       url.searchParams.delete('view');
     } else {
       url.searchParams.set('view', newView);
@@ -166,7 +166,7 @@ export default function WorkspacePage() {
   const renderView = () => {
     if (!workspace) return null;
     switch (view) {
-      case 'sprint':
+      case 'tasks':
         return <ActiveSprint workspaceId={workspace.id} />;
       case 'backlog':
         return <BacklogView workspaceId={workspace.id} />;
