@@ -144,7 +144,7 @@ export function Header({ workspace, orgName, orgSlug, isPortrait = true }: Heade
           <div className="flex items-center justify-between gap-2 min-w-0">
             <div className="flex items-center gap-2 min-w-0 flex-1">
               <Link href="/" className="flex items-center gap-2 rounded px-1 py-1 transition-colors hover:bg-mc-bg-tertiary shrink-0">
-                <StyrmannLogo size={28} />
+                <StyrmannLogo size={34} />
                 <h1 className="font-semibold text-mc-text uppercase tracking-wider text-xs sm:text-sm">Styrmann</h1>
               </Link>
 
@@ -226,7 +226,7 @@ export function Header({ workspace, orgName, orgSlug, isPortrait = true }: Heade
         <>
           <div className="flex items-center gap-2 md:gap-4 min-w-0">
             <Link href="/" className="flex items-center gap-2 rounded px-1 py-1 transition-colors hover:bg-mc-bg-tertiary">
-              <StyrmannLogo size={32} />
+              <StyrmannLogo size={38} />
               <h1 className="font-semibold text-mc-text uppercase tracking-wider text-sm">Styrmann</h1>
             </Link>
 
