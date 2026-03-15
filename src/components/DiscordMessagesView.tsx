@@ -50,18 +50,12 @@ export function DiscordMessagesView({ workspaceId }: DiscordMessagesViewProps) {
         setMessages(Array.isArray(data) ? data : []);
         setIsConfigured(true);
       } else {
-        const errData = await res.json().catch(() => ({ error: 'Failed to fetch messages' }));
-        const message = errData.error || 'Failed to fetch messages';
-        const discordNotConfigured =
-          message.toLowerCase().includes('not configured') ||
-          message.includes('DISCORD_BOT_TOKEN') ||
-          message.includes('DISCORD_CHANNEL_ID');
-
-        setIsConfigured(!discordNotConfigured);
-        setError(discordNotConfigured ? null : message);
+        setIsConfigured(false);
+        setError(null);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch messages');
+      setIsConfigured(false);
+      setError(null);
     } finally {
       setLoading(false);
     }
