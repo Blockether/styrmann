@@ -559,35 +559,15 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
                   <h4 className="text-sm font-semibold text-mc-text">Create New Sprint</h4>
                 </div>
                 <div className="p-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 min-w-0">
-                    <div className="min-w-0">
-                      <label className="block text-xs uppercase tracking-wide text-mc-text-secondary font-medium mb-1.5">Name</label>
-                      <input
-                        type="text"
-                        value={newSprintName}
-                        onChange={(event) => setNewSprintName(event.target.value)}
-                        placeholder="Sprint name"
-                        className="w-full min-w-0 px-3 py-1.5 text-sm border border-mc-border rounded bg-mc-bg text-mc-text placeholder:text-mc-text-secondary/50 focus:outline-none focus:border-mc-accent"
-                      />
-                    </div>
-                    <div className="min-w-0">
-                      <label className="block text-xs uppercase tracking-wide text-mc-text-secondary font-medium mb-1.5">Start Date</label>
-                      <input
-                        type="date"
-                        value={newSprintStartDate}
-                        onChange={(event) => setNewSprintStartDate(event.target.value)}
-                        className="w-full min-w-0 max-w-full px-3 py-1.5 text-sm border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
-                      />
-                    </div>
-                    <div className="min-w-0">
-                      <label className="block text-xs uppercase tracking-wide text-mc-text-secondary font-medium mb-1.5">End Date</label>
-                      <input
-                        type="date"
-                        value={newSprintEndDate}
-                        onChange={(event) => setNewSprintEndDate(event.target.value)}
-                        className="w-full min-w-0 max-w-full px-3 py-1.5 text-sm border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
-                      />
-                    </div>
+                  <div>
+                    <label className="block text-xs uppercase tracking-wide text-mc-text-secondary font-medium mb-1.5">Name</label>
+                    <input
+                      type="text"
+                      value={newSprintName}
+                      onChange={(event) => setNewSprintName(event.target.value)}
+                      placeholder="Sprint name"
+                      className="w-full px-3 py-1.5 text-sm border border-mc-border rounded bg-mc-bg text-mc-text placeholder:text-mc-text-secondary/50 focus:outline-none focus:border-mc-accent"
+                    />
                   </div>
                 </div>
                 <div className="px-4 py-3 border-t border-mc-border flex justify-end gap-2">
@@ -658,15 +638,7 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
                         <option value="urgent">Urgent</option>
                       </select>
                     </div>
-                    <div className="min-w-0">
-                      <label className="block text-xs uppercase tracking-wide text-mc-text-secondary font-medium mb-1.5">Due Date</label>
-                      <input
-                        type="date"
-                        value={newMilestoneDueDate}
-                        onChange={(event) => setNewMilestoneDueDate(event.target.value)}
-                        className="w-full min-w-0 max-w-full px-3 py-1.5 text-sm border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
-                      />
-                    </div>
+
                   </div>
                 </div>
                 <div className="px-4 py-3 border-t border-mc-border flex justify-end gap-2">
