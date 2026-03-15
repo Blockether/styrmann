@@ -371,11 +371,19 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
   };
 
   if (loading) {
-    return <div className="p-8 text-sm text-mc-text-secondary">Loading...</div>;
+    return (
+      <div data-component="src/components/OrgDetailView" className="h-screen bg-mc-bg flex items-center justify-center">
+        <div className="text-sm text-mc-text-secondary">Loading organization...</div>
+      </div>
+    );
   }
 
   if (!org) {
-    return <div className="p-8 text-sm text-mc-text-secondary">Organization not found.</div>;
+    return (
+      <div data-component="src/components/OrgDetailView" className="h-screen bg-mc-bg flex items-center justify-center">
+        <div className="text-sm text-mc-text-secondary">Organization not found.</div>
+      </div>
+    );
   }
 
   const selectedSprint = selectedSprintId === 'backlog' ? null : sprints.find((sprint) => sprint.id === selectedSprintId) || null;
@@ -391,63 +399,65 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
   const primaryWorkspaceId = org.workspaces?.[0]?.id || '';
 
   return (
-    <div data-component="src/components/OrgDetailView" className="min-h-screen bg-mc-bg">
+    <div data-component="src/components/OrgDetailView" className="h-screen flex flex-col bg-mc-bg overflow-hidden">
       <Header orgName={org.name} />
 
       {org.description && (
-        <div className="px-8 py-3 border-b border-mc-border text-sm text-mc-text-secondary">{org.description}</div>
+        <div className="px-3 md:px-4 py-3 border-b border-mc-border text-sm text-mc-text-secondary shrink-0">{org.description}</div>
       )}
 
-      <div className="p-8">
-        <div className="flex gap-0 border-b border-mc-border bg-mc-bg-secondary overflow-x-auto">
-          {(['board', 'issues', 'discord', 'knowledge', 'workspaces'] as const).map((tab) => (
-            <Link
-              key={tab}
-              href={`?tab=${tab}`}
-               className={`px-4 py-2 text-sm border-b-2 transition-colors flex items-center gap-1 whitespace-nowrap shrink-0 ${
-                activeTab === tab
-                  ? 'border-mc-accent text-mc-text'
-                  : 'border-transparent text-mc-text-secondary hover:text-mc-text'
-              }`}
-            >
-              {tab === 'board' && (
-                <>
-                  <Layers size={14} className="shrink-0" />
-                  <span>Board</span>
-                </>
-              )}
-              {tab === 'knowledge' && (
-                <>
-                  <BookOpen size={14} className="shrink-0" />
-                  <span>Knowledge</span>
-                </>
-              )}
-              {tab === 'issues' && (
-                <>
-                  <CircleDot size={14} className="shrink-0" />
-                  <span>Issues</span>
-                </>
-              )}
-              {tab === 'discord' && (
-                <>
-                  <MessageSquare size={14} className="shrink-0" />
-                  <span>Discord</span>
-                </>
-              )}
-              {tab === 'workspaces' && (
-                <>
-                  <Folder size={14} className="shrink-0" />
-                  <span>Workspaces</span>
-                </>
-              )}
-            </Link>
-          ))}
+      <main className="flex-1 min-w-0 overflow-hidden flex flex-col">
+        <div className="px-3 md:px-4 border-b border-mc-border bg-mc-bg-secondary shrink-0">
+          <div className="flex gap-0 overflow-x-auto">
+            {(['board', 'issues', 'discord', 'knowledge', 'workspaces'] as const).map((tab) => (
+              <Link
+                key={tab}
+                href={`?tab=${tab}`}
+                className={`px-4 py-3 text-sm border-b-2 transition-colors flex items-center gap-1 whitespace-nowrap shrink-0 ${
+                  activeTab === tab
+                    ? 'border-mc-accent text-mc-text'
+                    : 'border-transparent text-mc-text-secondary hover:text-mc-text'
+                }`}
+              >
+                {tab === 'board' && (
+                  <>
+                    <Layers size={14} className="shrink-0" />
+                    <span>Board</span>
+                  </>
+                )}
+                {tab === 'knowledge' && (
+                  <>
+                    <BookOpen size={14} className="shrink-0" />
+                    <span>Knowledge</span>
+                  </>
+                )}
+                {tab === 'issues' && (
+                  <>
+                    <CircleDot size={14} className="shrink-0" />
+                    <span>Issues</span>
+                  </>
+                )}
+                {tab === 'discord' && (
+                  <>
+                    <MessageSquare size={14} className="shrink-0" />
+                    <span>Discord</span>
+                  </>
+                )}
+                {tab === 'workspaces' && (
+                  <>
+                    <Folder size={14} className="shrink-0" />
+                    <span>Workspaces</span>
+                  </>
+                )}
+              </Link>
+            ))}
+          </div>
         </div>
 
-        <div className="pt-6">
+        <div className="flex-1 min-w-0 overflow-y-auto p-3 md:p-4">
           {activeTab === 'board' && (
             <div className="space-y-4">
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="p-4 rounded-lg border border-mc-border bg-mc-bg-secondary">
                 <div className="text-sm text-mc-text-secondary">Open Tickets</div>
                 <div className="text-2xl font-semibold mt-1 text-mc-text">{openTickets}</div>
@@ -847,7 +857,7 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
             </div>
           )}
         </div>
-      </div>
+      </main>
 
       {showCreateTicketModal && (
         <OrgTicketCreateModal
@@ -876,7 +886,7 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
 
 export function OrgDetailView({ slug }: { slug: string }) {
   return (
-    <Suspense fallback={<div className="p-8 text-sm text-mc-text-secondary">Loading...</div>}>
+    <Suspense fallback={<div data-component="src/components/OrgDetailView" className="h-screen bg-mc-bg flex items-center justify-center text-sm text-mc-text-secondary">Loading organization...</div>}>
       <OrgDetailViewInner slug={slug} />
     </Suspense>
   );

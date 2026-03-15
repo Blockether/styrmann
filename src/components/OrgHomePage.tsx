@@ -26,10 +26,10 @@ export function OrgHomePage() {
   }, []);
 
   return (
-    <div data-component="src/components/OrgHomePage" className="min-h-screen bg-mc-bg">
+    <div data-component="src/components/OrgHomePage" className="h-screen flex flex-col bg-mc-bg overflow-hidden">
       <Header />
 
-      <div className="p-6 max-w-5xl mx-auto">
+      <main className="flex-1 min-w-0 overflow-y-auto p-3 md:p-4">
         <h1 className="text-lg font-semibold text-mc-text mb-6">Organizations</h1>
 
         {loading && (
@@ -81,7 +81,7 @@ export function OrgHomePage() {
             ))}
           </div>
         )}
-      </div>
+      </main>
     </div>
   );
 }
