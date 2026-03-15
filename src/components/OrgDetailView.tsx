@@ -466,7 +466,7 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
           </div>
         </div>
 
-        {(activeTab === 'board' || activeTab === 'knowledge' || activeTab === 'workspaces') ? (
+        {activeTab === 'board' ? (
         <div className="flex-1 min-w-0 overflow-y-auto p-3 md:p-4">
           {activeTab === 'board' && (
             <div className="space-y-4">
@@ -828,17 +828,20 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
             </div>
           )}
 
-          {activeTab === 'knowledge' && (
+
+        </div>
+        ) : activeTab === 'knowledge' ? (
+          <div className="flex-1 min-w-0 overflow-y-auto p-3 md:p-4">
             <div className="space-y-2">
             {knowledge.length === 0 ? (
-              <div className="rounded-lg border border-mc-border bg-mc-bg-secondary min-h-[320px] flex items-center justify-center px-6">
+              <div className="flex-1 flex items-center justify-center p-6 min-h-[320px]">
                 <div className="flex flex-col items-center justify-center py-16 text-center">
                   <BookOpen size={32} className="text-mc-text-secondary mb-4" />
                   <h3 className="text-lg font-semibold mb-2 text-mc-text">No knowledge articles yet</h3>
                   <p className="text-sm text-mc-text-secondary max-w-md mb-4">
                     Knowledge articles are automatically synthesized from your team&apos;s memories and decisions. Start by recording memories through the API.
                   </p>
-                  <pre className="text-xs font-mono text-left rounded-lg border border-mc-border bg-mc-bg p-3 mb-4 overflow-x-auto">
+                  <pre className="text-xs font-mono text-left rounded-lg border border-mc-border bg-mc-bg-secondary p-3 mb-4 overflow-x-auto">
 {`POST /api/memories
 {
   "memory_type": "decision",
@@ -873,9 +876,9 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
               ))
             )}
             </div>
-          )}
-
-          {activeTab === 'workspaces' && (
+          </div>
+        ) : activeTab === 'workspaces' ? (
+          <div className="flex-1 min-w-0 overflow-y-auto p-3 md:p-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {(org.workspaces || []).map((workspace) => (
               <Link
@@ -893,15 +896,12 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
                       <p className="text-xs text-mc-text-secondary mt-0.5">Tasks managed by AI agents</p>
                     )}
                   </div>
-                </div>
-                <div className="mt-2.5 flex flex-wrap gap-4 text-xs text-mc-text-secondary font-mono">
-                  <span>{workspaceSummaries[workspace.id]?.taskCount ?? 0} tasks</span>
-                  <span>{workspaceSummaries[workspace.id]?.lastActivity ?? 'No recent activity'}</span>
+                  <span className="text-xs font-mono text-mc-text-secondary shrink-0">{workspaceSummaries[workspace.id]?.taskCount ?? 0} tasks</span>
                 </div>
               </Link>
             ))}
             {(org.workspaces || []).length === 0 && (
-              <div className="sm:col-span-2 rounded-lg border border-mc-border bg-mc-bg-secondary min-h-[260px] flex items-center justify-center px-6">
+              <div className="sm:col-span-2 flex items-center justify-center p-6 min-h-[260px]">
                 <div className="flex flex-col items-center justify-center py-16 text-center">
                   <Folder size={32} className="text-mc-text-secondary mb-4" />
                   <h3 className="text-lg font-semibold mb-2 text-mc-text">No workspaces in this organization</h3>
@@ -915,8 +915,7 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
               </div>
             )}
             </div>
-          )}
-        </div>
+          </div>
         ) : activeTab === 'discord' ? (
           primaryWorkspaceId ? (
             <DiscordMessagesView workspaceId={primaryWorkspaceId} />
