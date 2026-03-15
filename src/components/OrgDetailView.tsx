@@ -474,36 +474,36 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
              </div>
 
             {showSprintActionBar && (
-              <div className="flex items-center justify-between gap-3 flex-wrap">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <select
-                    value={selectedSprintId}
-                    onChange={(event) => setSelectedSprintId(event.target.value)}
-                    className="px-3 py-1.5 text-sm border border-mc-border rounded bg-mc-bg-secondary text-mc-text focus:outline-none focus:border-mc-accent"
-                  >
-                    <option value="backlog">Backlog</option>
-                    {sprints.map((sprint) => (
-                      <option key={sprint.id} value={sprint.id}>
-                        {sprint.name} ({sprint.status})
-                      </option>
-                    ))}
-                  </select>
-                  {selectedSprint && (
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-mono ${SPRINT_STATUS_COLORS[selectedSprint.status] || 'bg-mc-bg-tertiary text-mc-text-secondary'}`}>
-                      {selectedSprint.status}
-                    </span>
-                  )}
-                </div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <button
-                    onClick={() => setShowCreateTicketModal(true)}
-                    className="px-3 py-1.5 text-sm bg-mc-accent text-white rounded hover:opacity-90 flex items-center gap-1.5"
-                  >
-                    <Plus size={14} />
-                    <span className="hidden sm:inline">Create Ticket</span>
-                    <span className="sm:hidden">Ticket</span>
-                  </button>
-                  {selectedSprint && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <select
+                      value={selectedSprintId}
+                      onChange={(event) => setSelectedSprintId(event.target.value)}
+                      className="px-3 py-1.5 text-sm border border-mc-border rounded bg-mc-bg-secondary text-mc-text focus:outline-none focus:border-mc-accent"
+                    >
+                      <option value="backlog">Backlog</option>
+                      {sprints.map((sprint) => (
+                        <option key={sprint.id} value={sprint.id}>
+                          {sprint.name} ({sprint.status})
+                        </option>
+                      ))}
+                    </select>
+                    {selectedSprint && (
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-mono ${SPRINT_STATUS_COLORS[selectedSprint.status] || 'bg-mc-bg-tertiary text-mc-text-secondary'}`}>
+                        {selectedSprint.status}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <button
+                      onClick={() => setShowCreateTicketModal(true)}
+                      className="px-3 py-1.5 text-sm bg-mc-accent text-white rounded hover:opacity-90 flex items-center gap-1.5"
+                    >
+                      <Plus size={14} />
+                      <span className="hidden sm:inline">Create Ticket</span>
+                      <span className="sm:hidden">Ticket</span>
+                    </button>
                     <button
                       onClick={() => {
                         setShowMilestoneForm((prev) => !prev);
@@ -513,17 +513,43 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
                     >
                       Add Milestone
                     </button>
-                  )}
-                  <button
-                    onClick={() => {
-                      setShowSprintForm((prev) => !prev);
-                      setShowMilestoneForm(false);
-                    }}
-                    className="px-3 py-1.5 text-sm border border-mc-border rounded hover:bg-mc-bg-tertiary"
-                  >
-                    Create Sprint
-                  </button>
+                    <button
+                      onClick={() => {
+                        setShowSprintForm((prev) => !prev);
+                        setShowMilestoneForm(false);
+                      }}
+                      className="px-3 py-1.5 text-sm border border-mc-border rounded hover:bg-mc-bg-tertiary"
+                    >
+                      Create Sprint
+                    </button>
+                  </div>
                 </div>
+
+                {selectedSprint && (
+                  <div className="rounded-lg border border-mc-border bg-mc-bg-secondary px-4 py-3">
+                    <div className="flex items-center justify-between gap-3 flex-wrap">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span className="text-sm font-semibold text-mc-text truncate">{selectedSprint.name}</span>
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-mono shrink-0 ${SPRINT_STATUS_COLORS[selectedSprint.status] || 'bg-mc-bg-tertiary text-mc-text-secondary'}`}>
+                          {selectedSprint.status}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-4 text-xs text-mc-text-secondary font-mono flex-wrap">
+                        {selectedSprint.start_date && (
+                          <span>Start: {selectedSprint.start_date}</span>
+                        )}
+                        {selectedSprint.end_date && (
+                          <span>End: {selectedSprint.end_date}</span>
+                        )}
+                        <span>{filteredTickets.length} ticket{filteredTickets.length === 1 ? '' : 's'}</span>
+                        <span>{filteredMilestones.length} milestone{filteredMilestones.length === 1 ? '' : 's'}</span>
+                      </div>
+                    </div>
+                    {selectedSprint.description && (
+                      <p className="mt-1.5 text-xs text-mc-text-secondary">{selectedSprint.description}</p>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
@@ -533,33 +559,33 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
                   <h4 className="text-sm font-semibold text-mc-text">Create New Sprint</h4>
                 </div>
                 <div className="p-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 min-w-0">
+                    <div className="min-w-0">
                       <label className="block text-xs uppercase tracking-wide text-mc-text-secondary font-medium mb-1.5">Name</label>
                       <input
                         type="text"
                         value={newSprintName}
                         onChange={(event) => setNewSprintName(event.target.value)}
                         placeholder="Sprint name"
-                        className="w-full px-3 py-1.5 text-sm border border-mc-border rounded bg-mc-bg text-mc-text placeholder:text-mc-text-secondary/50 focus:outline-none focus:border-mc-accent"
+                        className="w-full min-w-0 px-3 py-1.5 text-sm border border-mc-border rounded bg-mc-bg text-mc-text placeholder:text-mc-text-secondary/50 focus:outline-none focus:border-mc-accent"
                       />
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <label className="block text-xs uppercase tracking-wide text-mc-text-secondary font-medium mb-1.5">Start Date</label>
                       <input
                         type="date"
                         value={newSprintStartDate}
                         onChange={(event) => setNewSprintStartDate(event.target.value)}
-                        className="w-full px-3 py-1.5 text-sm border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
+                        className="w-full min-w-0 max-w-full px-3 py-1.5 text-sm border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
                       />
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <label className="block text-xs uppercase tracking-wide text-mc-text-secondary font-medium mb-1.5">End Date</label>
                       <input
                         type="date"
                         value={newSprintEndDate}
                         onChange={(event) => setNewSprintEndDate(event.target.value)}
-                        className="w-full px-3 py-1.5 text-sm border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
+                        className="w-full min-w-0 max-w-full px-3 py-1.5 text-sm border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
                       />
                     </div>
                   </div>
@@ -593,23 +619,23 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
                   <h4 className="text-sm font-semibold text-mc-text">Add New Milestone</h4>
                 </div>
                 <div className="p-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 min-w-0">
+                    <div className="min-w-0">
                       <label className="block text-xs uppercase tracking-wide text-mc-text-secondary font-medium mb-1.5">Name</label>
                       <input
                         type="text"
                         value={newMilestoneName}
                         onChange={(event) => setNewMilestoneName(event.target.value)}
                         placeholder="Milestone name"
-                        className="w-full px-3 py-1.5 text-sm border border-mc-border rounded bg-mc-bg text-mc-text placeholder:text-mc-text-secondary/50 focus:outline-none focus:border-mc-accent"
+                        className="w-full min-w-0 px-3 py-1.5 text-sm border border-mc-border rounded bg-mc-bg text-mc-text placeholder:text-mc-text-secondary/50 focus:outline-none focus:border-mc-accent"
                       />
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <label className="block text-xs uppercase tracking-wide text-mc-text-secondary font-medium mb-1.5">Sprint</label>
                       <select
                         value={newMilestoneSprintId}
                         onChange={(event) => setNewMilestoneSprintId(event.target.value)}
-                        className="w-full px-3 py-1.5 text-sm border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
+                        className="w-full min-w-0 px-3 py-1.5 text-sm border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
                       >
                         <option value="">Backlog</option>
                         {sprints.map((sprint) => (
@@ -619,12 +645,12 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
                         ))}
                       </select>
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <label className="block text-xs uppercase tracking-wide text-mc-text-secondary font-medium mb-1.5">Priority</label>
                       <select
                         value={newMilestonePriority}
                         onChange={(event) => setNewMilestonePriority(event.target.value as 'low' | 'normal' | 'high' | 'urgent')}
-                        className="w-full px-3 py-1.5 text-sm border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
+                        className="w-full min-w-0 px-3 py-1.5 text-sm border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
                       >
                         <option value="low">Low</option>
                         <option value="normal">Normal</option>
@@ -632,13 +658,13 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
                         <option value="urgent">Urgent</option>
                       </select>
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <label className="block text-xs uppercase tracking-wide text-mc-text-secondary font-medium mb-1.5">Due Date</label>
                       <input
                         type="date"
                         value={newMilestoneDueDate}
                         onChange={(event) => setNewMilestoneDueDate(event.target.value)}
-                        className="w-full px-3 py-1.5 text-sm border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
+                        className="w-full min-w-0 max-w-full px-3 py-1.5 text-sm border border-mc-border rounded bg-mc-bg text-mc-text focus:outline-none focus:border-mc-accent"
                       />
                     </div>
                   </div>
@@ -667,12 +693,12 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
             )}
 
             {showNoSprintEmptyState && (
-              <div className="rounded border border-mc-border bg-mc-bg-secondary min-h-[320px] flex items-center justify-center px-6">
+              <div className="rounded-lg border border-mc-border bg-mc-bg-secondary min-h-[320px] flex items-center justify-center px-6">
                 <div className="flex flex-col items-center justify-center py-16 text-center">
                   <Layers size={32} className="text-mc-text-secondary mb-4" />
                   <h3 className="text-lg font-semibold mb-2 text-mc-text">Get started with your first sprint</h3>
                   <p className="text-sm text-mc-text-secondary max-w-md mb-6">
-                    Sprints help you organize work into time-boxed iterations. Create a sprint, add tickets, and delegate them to your engineering team.
+                    Sprints help you organize work into time-boxed iterations. Create a sprint, add milestones and tickets, then delegate them to your engineering team.
                   </p>
                   <div className="flex items-center justify-center gap-3 flex-wrap">
                     <button
@@ -682,10 +708,19 @@ function OrgDetailViewInner({ slug }: { slug: string }) {
                       Create Sprint
                     </button>
                     <button
-                      onClick={() => setShowCreateTicketModal(true)}
-                      className="px-4 py-2 text-sm text-mc-text-secondary hover:text-mc-text border border-mc-border rounded hover:bg-mc-bg"
+                      onClick={() => {
+                        setShowMilestoneForm(true);
+                        setShowSprintForm(false);
+                      }}
+                      className="px-4 py-2 text-sm border border-mc-border rounded hover:bg-mc-bg-tertiary"
                     >
-                      or create a ticket
+                      Add Milestone
+                    </button>
+                    <button
+                      onClick={() => setShowCreateTicketModal(true)}
+                      className="px-4 py-2 text-sm text-mc-text-secondary hover:text-mc-text border border-mc-border rounded hover:bg-mc-bg-tertiary"
+                    >
+                      Create Ticket
                     </button>
                   </div>
                 </div>
