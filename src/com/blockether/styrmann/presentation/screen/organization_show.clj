@@ -7,30 +7,8 @@
    [com.blockether.styrmann.presentation.component.ticket-card :as ticket-card]
    [com.blockether.styrmann.presentation.component.ui :as ui]))
 
-(defn- count-label [n singular plural]
-  (str n " " (if (= 1 n) singular plural)))
-
-(defn- lane-ticket-count [sprint]
-  (+ (count (:sprint/direct-tickets sprint))
-     (reduce + 0 (map #(count (:milestone/tickets %)) (:sprint/milestones sprint)))))
-
 (defn- org-topbar-context [organizations org]
   (ui/org-topbar-dropdown organizations org))
-
-;; -- Compact stats bar -------------------------------------------------------
-
-(defn- stats-bar [org]
-  [:div {:class "flex flex-wrap items-center gap-x-5 gap-y-1 text-[12px] text-[var(--muted)]"}
-   [:span [:strong {:class "text-[var(--ink)] font-semibold"} (count (:organization/sprints org))] " sprints"]
-   [:span [:strong {:class "text-[var(--ink)] font-semibold"} (count (:organization/backlog org))] " backlog"]
-   [:span [:strong {:class "text-[var(--ink)] font-semibold"} (count (:organization/workspaces org))] " workspaces"]
-   [:span [:strong {:class "text-[var(--ink)] font-semibold"}
-           (reduce + 0 (map #(count (:sprint/milestones %)) (:organization/sprints org)))] " milestones"]
-   (for [ws (:organization/workspaces org)]
-     [:a {:href (str "/organizations/" (get-in ws [:workspace/organization :organization/id]) "/workspaces/" (:workspace/id ws))
-          :class "inline-flex items-center gap-1 text-[var(--accent)] no-underline hover:underline"}
-      [:i {:data-lucide "git-branch" :class "size-3"}]
-      (:workspace/name ws)])])
 
 ;; -- Toolbar -----------------------------------------------------------------
 
@@ -63,6 +41,41 @@
    [:input {:type "checkbox"}]
    [:span label]])
 
+(defn- status-column
+  "Render a status column (Todo / In Progress / Done) with its tickets."
+  [title tickets]
+  [:div {:class "flex-1 min-w-0"}
+   [:div {:class "flex items-center justify-between px-2 py-2"}
+    [:span {:class "text-[12px] font-semibold uppercase tracking-wider text-[var(--muted)]"} title]
+    [:span {:class "rounded-full bg-[var(--surface)] px-2 py-0.5 text-[11px] font-bold text-[var(--ink-secondary)] shadow-sm"}
+     (count tickets)]]
+   (if (seq tickets)
+     (into [:div {:class "space-y-2 pt-1"}]
+           (map ticket-card/board-card tickets))
+     [:div {:class "px-2 py-4 text-[12px] text-[var(--muted)] italic text-center"} "No items"])])
+
+(defn- tickets-by-status
+  "Group tickets into [todo in-progress done] vectors."
+  [tickets]
+  (let [grouped (group-by #(or (:ticket/status %) :ticket.status/open) tickets)]
+    [(get grouped :ticket.status/open [])
+     (get grouped :ticket.status/in-progress [])
+     (get grouped :ticket.status/closed [])]))
+
+(defn- milestone-row
+  "Render a milestone as a row: label on left, 3 status columns on right."
+  [label tickets]
+  (let [[todo in-progress done] (tickets-by-status tickets)]
+    [:div {:class "flex gap-4"}
+     ;; Row label
+     [:div {:class "w-28 sm:w-36 flex-shrink-0 pt-2"}
+      [:span {:class "text-[13px] font-semibold text-[var(--ink)]"} label]]
+     ;; 3 status columns
+     [:div {:class "flex-1 grid grid-cols-3 gap-2.5"}
+      (status-column "Todo" todo)
+      (status-column "In Progress" in-progress)
+      (status-column "Done" done)]]))
+
 (defn- board-section [org]
   (let [sprints (:organization/sprints org)]
     [:section {:id "board-view" :class "view-panel" :data-view-panel "board"}
@@ -70,23 +83,26 @@
       [:span {:class "text-[13px] font-semibold text-[var(--muted)] uppercase tracking-wider"} "Board"]
       (closed-toggle "show-closed" "Show closed")]
      (if (seq sprints)
-       (into [:div {:class "space-y-5"}]
+       (into [:div {:class "space-y-6"}]
              (for [sprint sprints]
                [:div
-                [:div {:class "flex items-center gap-2 mb-2"}
+                [:div {:class "flex items-center gap-2 mb-3"}
                  [:i {:data-lucide "zap" :class "size-3.5 text-[var(--accent)]"}]
-                 [:span {:class "text-[14px] font-semibold text-[var(--ink)]"} (:sprint/name sprint)]
-                 (ui/pill (count-label (lane-ticket-count sprint) "ticket" "tickets"))]
-                [:div {:class "board-scroll flex gap-2.5 overflow-x-auto pb-2"}
-                 (ui/board-column
-                  "Direct"
-                  (count (:sprint/direct-tickets sprint))
-                  (map ticket-card/board-card (:sprint/direct-tickets sprint)))
-                 (for [milestone (:sprint/milestones sprint)]
-                   (ui/board-column
-                    (:milestone/name milestone)
-                    (count (:milestone/tickets milestone))
-                    (map ticket-card/board-card (:milestone/tickets milestone))))]]))
+                 [:span {:class "text-[14px] font-semibold text-[var(--ink)]"} (:sprint/name sprint)]]
+                ;; Column headers
+                [:div {:class "flex gap-4 mb-2"}
+                 [:div {:class "w-28 sm:w-36 flex-shrink-0"}]
+                 [:div {:class "flex-1 grid grid-cols-3 gap-2.5"}
+                  [:span {:class "text-[11px] font-semibold uppercase tracking-wider text-[var(--muted)] px-2"} "Todo"]
+                  [:span {:class "text-[11px] font-semibold uppercase tracking-wider text-[var(--muted)] px-2"} "In Progress"]
+                  [:span {:class "text-[11px] font-semibold uppercase tracking-wider text-[var(--muted)] px-2"} "Done"]]]
+                ;; Direct tickets row
+                (when (seq (:sprint/direct-tickets sprint))
+                  (milestone-row "Direct" (:sprint/direct-tickets sprint)))
+                ;; Milestone rows
+                (into [:div {:class "space-y-3"}]
+                      (for [milestone (:sprint/milestones sprint)]
+                        (milestone-row (:milestone/name milestone) (:milestone/tickets milestone))))]))
        (ui/empty-state "No sprints yet." "mt-2"))]))
 
 ;; -- Backlog -----------------------------------------------------------------
@@ -194,22 +210,21 @@
        [:button {:type "button" :class "btn-primary !px-3 !py-2.5" :id "ac-add-btn"}
         [:i {:data-lucide "plus" :class "size-4"}]]]
       [:input {:type "hidden" :name "acceptance-criteria-text" :id "ac-hidden-field"}]]
-     [:div {:class "grid grid-cols-2 sm:grid-cols-4 gap-4"}
-      (number-field "Story points" "story-points" 3 0 nil)
-      (number-field "Effort (0-10)" "effort" 3 0 10)
-      (number-field "Impact (0-10)" "impact" 7 0 10)
+      [:div {:class "grid grid-cols-3 gap-4"}
+       (number-field "Story points" "story-points" 3 0 nil)
+       (number-field "Effort (0-10)" "effort" 3 0 10)
+       (number-field "Impact (0-10)" "impact" 7 0 10)]
       [:label {:class "block"}
        [:span {:class "field-label"} "Attachments"]
-       [:input {:class "input !py-2" :type "file" :name "attachments" :multiple true}]]]
-     [:div {:class "flex justify-end"}
+       [:input {:class "input" :type "file" :name "attachments" :multiple true}]]
+      [:div {:class "flex justify-end"}
       [:button {:class "btn-primary" :type "submit"} "Create ticket"]]])])
 
 ;; -- Page assembly -----------------------------------------------------------
 
 (defn- body-content [_organizations org organization-id]
   [:div {:data-view-root true :data-view-default "board"}
-   (stats-bar org)
-   [:div {:class "mt-3"} (toolbar)]
+    (toolbar)
    (board-section org)
    (backlog-section org)
    (activity-section org)

@@ -52,7 +52,14 @@
 .btn-secondary:hover { background: var(--cream-dark); border-color: var(--charcoal); color: var(--ink); }
 .input { border: 1.5px solid var(--line-strong); background: var(--surface); color: var(--ink); border-radius: var(--radius-sm); padding: 10px 14px; font-size: 14px; transition: border-color .2s, box-shadow .2s; width: 100%; font-family: inherit; }
 .input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
-textarea.input { min-height: 100px; resize: vertical; }
+ textarea.input { min-height: 100px; resize: vertical; }
+ select.input { appearance: none; -webkit-appearance: none; background-image: url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238b8b95' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E\"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 36px; cursor: pointer; }
+ input[type=number].input { appearance: textfield; -moz-appearance: textfield; }
+ input[type=number].input::-webkit-inner-spin-button, input[type=number].input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+ input[type=file].input { padding: 8px 14px; font-size: 13px; color: var(--ink); cursor: pointer; position: relative; }
+ input[type=file].input::file-selector-button { display: none; }
+ input[type=file].input::before { content: \"Choose files...\"; color: var(--muted); }
+ input[type=file].input::after { content: \"\"; position: absolute; right: 12px; top: 50%; transform: translateY(-50%); width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 5px solid var(--muted); pointer-events: none; }
 a { color: var(--accent); text-decoration: none; transition: color .15s; }
 a:hover { color: var(--accent-hover); }
 .badge { display: inline-flex; align-items: center; border-radius: 6px; padding: 3px 10px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
@@ -80,9 +87,9 @@ a:hover { color: var(--accent-hover); }
  .topbar-menu.is-open .topbar-menu-panel { display: block; }
  .topbar-menu-link { display: flex; align-items: center; gap: 10px; border-radius: 14px; padding: 10px 12px; color: var(--ink); text-decoration: none; font-size: 13px; font-weight: 500; }
  .topbar-menu-link:hover { background: var(--cream-dark); }
- .modal-backdrop { position: fixed; inset: 0; background: rgba(26,26,31,0.48); display: none; align-items: flex-end; justify-content: center; padding: 16px; z-index: 80; }
- .modal-backdrop.is-open { display: flex; }
- .modal-shell { width: 100%; max-width: 680px; max-height: 88vh; overflow: auto; background: var(--surface); border-radius: 28px; border: 1px solid var(--line); box-shadow: 0 24px 80px rgba(26,26,31,0.18); }
+  .modal-backdrop { position: fixed; inset: 0; background: rgba(26,26,31,0.48); display: none; align-items: center; justify-content: center; padding: 16px; z-index: 80; }
+  .modal-backdrop.is-open { display: flex; }
+  .modal-shell { width: 100%; max-width: 520px; max-height: 88vh; overflow: auto; background: var(--surface); border-radius: 28px; border: 1px solid var(--line); box-shadow: 0 24px 80px rgba(26,26,31,0.18); }
  .view-panel[hidden] { display: none !important; }
  [data-closed] { display: none; }
  [data-done] { display: none; }
@@ -323,9 +330,9 @@ lucide.createIcons();
           '<span class=\"w-1.5 h-1.5 rounded-full bg-[var(--accent)] flex-shrink-0\"></span>' +
           '<span class=\"ac-text flex-1 text-[13px] text-[var(--ink)]\">' + escapeHtml(text) + '</span>' +
           (depth < MAX_DEPTH - 1
-            ? '<button type=\"button\" class=\"ac-sub-btn btn-secondary !px-2 !py-1 !text-[11px] !rounded-md\" title=\"Add sub-criterion\">+ sub</button>'
+            ? '<button type=\"button\" class=\"ac-sub-btn inline-flex items-center justify-center size-6 text-[11px] text-[var(--muted)] hover:text-[var(--ink)] hover:bg-[var(--cream-dark)] rounded-md\" title=\"Add sub-criterion\"><i data-lucide=\"plus\" class=\"size-3\"></i></button>'
             : '') +
-          '<button type=\"button\" class=\"ac-rm-btn btn-secondary !px-2 !py-1 !text-[11px] !rounded-md text-[var(--danger)]\" title=\"Remove\">&times;</button>' +
+          '<button type=\"button\" class=\"ac-rm-btn inline-flex items-center justify-center size-6 text-[11px] text-[var(--muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-soft)] rounded-md\" title=\"Remove\"><i data-lucide=\"x\" class=\"size-3\"></i></button>' +
         '</div>';
       item.querySelector('.ac-rm-btn').addEventListener('click', function() {
         removeWithChildren(item);
@@ -358,8 +365,8 @@ lucide.createIcons();
       row.style.marginLeft = (depth * 24) + 'px';
       row.innerHTML =
         '<input class=\"input flex-1 !py-1.5 !text-[13px]\" type=\"text\" placeholder=\"Sub-criterion...\" autocomplete=\"off\">' +
-        '<button type=\"button\" class=\"btn-primary !px-2.5 !py-1.5 !text-[12px]\">Add</button>' +
-        '<button type=\"button\" class=\"btn-secondary !px-2 !py-1.5 !text-[12px]\">&times;</button>';
+        '<button type=\"button\" class=\"inline-flex items-center justify-center size-6 text-[var(--good)] hover:bg-[var(--good-soft)] rounded-md\" title=\"Add\"><i data-lucide=\"check\" class=\"size-3\"></i></button>' +
+        '<button type=\"button\" class=\"inline-flex items-center justify-center size-6 text-[var(--muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-soft)] rounded-md\" title=\"Cancel\"><i data-lucide=\"x\" class=\"size-3\"></i></button>';
       var subInput = row.querySelector('input');
       var subAdd = row.querySelectorAll('button')[0];
       var subCancel = row.querySelectorAll('button')[1];
@@ -369,6 +376,7 @@ lucide.createIcons();
         var newItem = createItem(val, depth);
         var insertBefore = findInsertPoint(afterItem, depth);
         builder.insertBefore(newItem, insertBefore);
+        if (typeof lucide !== 'undefined') lucide.createIcons({nameAttr: 'data-lucide'});
         subInput.value = '';
         subInput.focus();
       }
@@ -376,6 +384,7 @@ lucide.createIcons();
       subInput.addEventListener('keydown', function(e) { if (e.key === 'Enter') { e.preventDefault(); addSub(); } });
       subCancel.addEventListener('click', function() { row.remove(); });
       afterItem.after(row);
+      if (typeof lucide !== 'undefined') lucide.createIcons({nameAttr: 'data-lucide'});
       subInput.focus();
     }
 
@@ -392,6 +401,7 @@ lucide.createIcons();
       if (!val) return;
       var item = createItem(val, 0);
       builder.appendChild(item);
+      if (typeof lucide !== 'undefined') lucide.createIcons({nameAttr: 'data-lucide'});
       input.value = '';
       input.focus();
     }

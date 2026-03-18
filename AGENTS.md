@@ -138,16 +138,40 @@ Run `./pre-commit.sh` to automate steps 1-6. Remaining steps are manual.
 
 **Every deploy to control.blockether.com MUST pass this gate. No exceptions.**
 
+`./deploy.sh` is always at the project root. Do NOT look for it, read it, or verify its existence — just run it.
+
 ```
 1. SECRETS      Scan for leaked secrets (.env, credentials, API keys)
                 NEVER commit secrets. NEVER deploy secrets. ABORT if found.
 2. LINT         clojure-lsp diagnostics — ZERO errors, ZERO warnings
 3. TESTS        clj -M:test — ALL tests MUST pass
 4. BUILD        clojure -T:build uberjar — must produce target/styrmann.jar
-5. DEPLOY       Copy jar, restart service
+5. DEPLOY       Copy jar to /opt/styrmann, restart systemd service
 ```
 
-Run via `./deploy.sh`. Failures at any stage abort the entire pipeline.
+Run `./deploy.sh`. Failures at any stage abort the entire pipeline.
+
+### Systemd Service
+
+The production service runs as `/etc/systemd/system/styrmann.service`:
+
+```ini
+[Unit]
+Description=Styrmann
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/styrmann
+ExecStart=/usr/bin/java -jar /opt/styrmann/styrmann.jar
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Secrets and env overrides go in `/etc/systemd/system/styrmann.service.d/override.conf`.
 
 ### Secret Prevention
 
