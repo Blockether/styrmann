@@ -36,9 +36,13 @@
 
 (defn- toolbar []
   [:div {:class "card p-2.5 sm:p-3 mb-4"}
-   [:div {:class "flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-2"}
-    ;; Actions — right on mobile, right on desktop
-    [:div {:class "flex flex-wrap gap-1.5"}
+   [:div {:class "flex items-center justify-between gap-2"}
+    ;; Tabs
+    [:div {:class "flex gap-1.5"}
+     [:button {:type "button" :class "toolbar-tab is-active" :data-view-tab "board"} "Sprint board"]
+     [:button {:type "button" :class "toolbar-tab" :data-view-tab "backlog"} "Backlog"]]
+    ;; Actions — on the right
+    [:div {:class "flex gap-1.5"}
      [:button {:type "button" :class "toolbar-action !py-2 !px-3 !text-[12px]" :data-modal-open "modal-ticket"}
       [:i {:data-lucide "ticket" :class "size-3.5 text-[var(--accent)]"}]
       [:span {:class "hidden sm:inline"} "Ticket"]]
@@ -50,11 +54,7 @@
       [:span {:class "hidden sm:inline"} "Milestone"]]
      [:button {:type "button" :class "toolbar-action !py-2 !px-3 !text-[12px]" :data-modal-open "modal-workspace"}
       [:i {:data-lucide "git-branch" :class "size-3.5 text-[var(--accent)]"}]
-      [:span {:class "hidden sm:inline"} "Workspace"]]]
-    ;; Tabs
-    [:div {:class "flex gap-1.5"}
-     [:button {:type "button" :class "toolbar-tab is-active" :data-view-tab "board"} "Sprint board"]
-     [:button {:type "button" :class "toolbar-tab" :data-view-tab "backlog"} "Backlog"]]]])
+      [:span {:class "hidden sm:inline"} "Workspace"]]]]])
 
 ;; -- Kanban board ------------------------------------------------------------
 
