@@ -2,11 +2,11 @@
   "Loaded automatically when the REPL starts with the :dev alias.
    Boots nREPL + Ring/Jetty + Datalevin.
    Provides test runners, docstring validation, and test scaffolding."
-  (:require [clojure.string :as str]
-            [nrepl.server :as nrepl]
-            [ring.adapter.jetty :as jetty]
-            [com.blockether.styrmann.db.core :as db])
-  (:import [java.util UUID]))
+  (:require
+   [clojure.string :as str]
+   [com.blockether.styrmann.db.core :as db]
+   [nrepl.server :as nrepl]
+   [ring.adapter.jetty :as jetty]))
 
 ;; -- state -------------------------------------------------------------------
 
@@ -75,12 +75,12 @@
 
 (defn- find-section-start-indices [lines]
   (reduce-kv
-    (fn [acc idx line]
-      (reduce-kv
-        (fn [acc' section pattern]
-          (if (re-matches pattern line) (assoc acc' section idx) acc'))
-        acc SECTION_MARKERS))
-    {} (vec lines)))
+   (fn [acc idx line]
+     (reduce-kv
+      (fn [acc' section pattern]
+        (if (re-matches pattern line) (assoc acc' section idx) acc'))
+      acc SECTION_MARKERS))
+   {} (vec lines)))
 
 (defn- extract-summary-text [lines section-indices]
   (let [first-idx (when (seq section-indices) (apply min (vals section-indices)))
@@ -183,7 +183,7 @@
                         (let [fn-name (:name (meta v))]
                           {:fn-name fn-name
                            :has-test? (and test-ns-exists (some? (find-test-var test-ns-sym fn-name)))}))
-                  fn-vars)
+                      fn-vars)
         covered (count (filter :has-test? results))
         missing (- (count results) covered)]
     (println)
@@ -223,10 +223,10 @@
 
 (defn- styrmann-source-namespaces []
   (->> (all-ns)
-    (map ns-name)
-    (filter #(str/starts-with? (name %) "com.blockether.styrmann."))
-    (remove #(str/ends-with? (name %) "-test"))
-    (sort)))
+       (map ns-name)
+       (filter #(str/starts-with? (name %) "com.blockether.styrmann."))
+       (remove #(str/ends-with? (name %) "-test"))
+       (sort)))
 
 (defn run-tests
   "Run tests for a specific test namespace.
@@ -240,7 +240,7 @@
   ([ns-sym]
    (ensure-lazytest!)
    (when-let [source-ns (when (and ns-sym (str/ends-with? (name ns-sym) "-test"))
-                           (symbol (subs (name ns-sym) 0 (- (count (name ns-sym)) 5))))]
+                          (symbol (subs (name ns-sym) 0 (- (count (name ns-sym)) 5))))]
      (try (require source-ns :reload) (catch java.io.FileNotFoundException _)))
    (when ns-sym (try (require ns-sym :reload) (catch java.io.FileNotFoundException _)))
    (if ns-sym
@@ -269,11 +269,11 @@
                           (catch java.io.FileNotFoundException _ nil))))]
     (when-not test-var
       (throw (ex-info (str "Test not found for: " fn-name)
-               {:fn-name fn-name :source-ns var-ns
-                :expected (str (source-ns->test-ns var-ns) "/" (fn-name->test-name fn-name))})))
+                      {:fn-name fn-name :source-ns var-ns
+                       :expected (str (source-ns->test-ns var-ns) "/" (fn-name->test-name fn-name))})))
     (when test-var?
       (when-let [source-ns (when (str/ends-with? (name var-ns) "-test")
-                              (symbol (subs (name var-ns) 0 (- (count (name var-ns)) 5))))]
+                             (symbol (subs (name var-ns) 0 (- (count (name var-ns)) 5))))]
         (try (require source-ns :reload) (catch java.io.FileNotFoundException _))))
     (let [test-ns (ns-name (:ns (meta test-var)))]
       (require test-ns :reload)
@@ -294,7 +294,7 @@
                              (let [tns (source-ns->test-ns ns-sym)]
                                (try (require tns :reload) (conj acc tns)
                                     (catch java.io.FileNotFoundException _ acc))))
-                     [] source-nss)]
+                           [] source-nss)]
       (if (seq test-nss)
         (do (println (str "  Running: " (count test-nss) " test namespaces"))
             ((resolve 'lazytest.repl/run-tests) test-nss))
@@ -324,8 +324,8 @@
         test-path (ns-sym->test-path source-ns)
         test-name (fn-name->test-name fn-name)
         scaffold (str "(defdescribe " test-name "\n"
-                   "  (it \"does something\"\n"
-                   "    (expect (= :expected :expected))))\n")
+                      "  (it \"does something\"\n"
+                      "    (expect (= :expected :expected))))\n")
         file-exists? (.exists (java.io.File. test-path))]
     (when file-exists?
       (when (str/includes? (slurp test-path) (str "(defdescribe " test-name))
@@ -337,10 +337,10 @@
           (println (str "Appended " test-name " to " test-path))
           {:test-file test-path :test-name test-name :created? false :appended? true})
       (let [header (str "(ns " test-ns "\n"
-                     "  (:require\n"
-                     "   [lazytest.core :refer [defdescribe describe it expect expect-it\n"
-                     "                          before after around before-each after-each]]\n"
-                     "   [" source-ns " :as sut]))\n")]
+                        "  (:require\n"
+                        "   [lazytest.core :refer [defdescribe describe it expect expect-it\n"
+                        "                          before after around before-each after-each]]\n"
+                        "   [" source-ns " :as sut]))\n")]
         (spit test-path (str header "\n" scaffold))
         (println (str "Created " test-path " with " test-name))
         {:test-file test-path :test-name test-name :created? true :appended? false}))))
@@ -364,10 +364,10 @@
         categorized (mapv (fn [v]
                             (let [fn-name (:name (meta v))
                                   exists? (or (and file-exists?
-                                                (str/includes? (slurp test-path) (str "(defdescribe " (fn-name->test-name fn-name))))
-                                            (and test-loaded? (some? (find-test-var test-ns-sym fn-name))))]
+                                                   (str/includes? (slurp test-path) (str "(defdescribe " (fn-name->test-name fn-name))))
+                                              (and test-loaded? (some? (find-test-var test-ns-sym fn-name))))]
                               {:fn-name fn-name :exists? exists?}))
-                    fn-vars)
+                          fn-vars)
         to-create (filterv (complement :exists?) categorized)]
     (println (str "\n=== Scaffolding: " ns-sym " ==="))
     (println (str "Total: " (count fn-vars) " | To create: " (count to-create) " | Exist: " (count (filter :exists? categorized))))
@@ -375,15 +375,15 @@
       (.mkdirs (.getParentFile (java.io.File. test-path)))
       (when-not file-exists?
         (spit test-path (str "(ns " test-ns-sym "\n"
-                          "  (:require\n"
-                          "   [lazytest.core :refer [defdescribe describe it expect expect-it\n"
-                          "                          before after around before-each after-each]]\n"
-                          "   [" ns-sym " :as sut]))\n")))
+                             "  (:require\n"
+                             "   [lazytest.core :refer [defdescribe describe it expect expect-it\n"
+                             "                          before after around before-each after-each]]\n"
+                             "   [" ns-sym " :as sut]))\n")))
       (doseq [{:keys [fn-name]} to-create]
         (spit test-path (str "\n(defdescribe " (fn-name->test-name fn-name) "\n"
-                          "  (it \"does something\"\n"
-                          "    (expect (= :expected :expected))))\n")
-          :append true)
+                             "  (it \"does something\"\n"
+                             "    (expect (= :expected :expected))))\n")
+              :append true)
         (println (str "  Created: " (fn-name->test-name fn-name)))))
     {:test-file test-path :created (count to-create) :skipped (- (count fn-vars) (count to-create))}))
 

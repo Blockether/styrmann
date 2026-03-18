@@ -1,7 +1,8 @@
 (ns com.blockether.styrmann.db.core
   "Datalevin connection management."
-  (:require [datalevin.core :as d]
-            [com.blockether.styrmann.db.schema :as schema]))
+  (:require
+   [com.blockether.styrmann.db.schema :as schema]
+   [datalevin.core :as d]))
 
 (defonce ^:private !conn (atom nil))
 

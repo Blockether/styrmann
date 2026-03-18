@@ -1,8 +1,9 @@
 (ns com.blockether.styrmann.main
   "Production entry point for the uberjar."
-  (:require [nrepl.server :as nrepl]
-            [ring.adapter.jetty :as jetty]
-            [com.blockether.styrmann.db.core :as db])
+  (:require
+   [com.blockether.styrmann.db.core :as db]
+   [nrepl.server :as nrepl]
+   [ring.adapter.jetty :as jetty])
   (:gen-class))
 
 (defn- default-handler [_req]

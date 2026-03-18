@@ -1,8 +1,10 @@
 (ns com.blockether.styrmann.test-helpers
   "Test utilities. Provides temp Datalevin connections for isolated tests."
-  (:require [datalevin.core :as d]
-            [com.blockether.styrmann.db.schema :as schema])
-  (:import [java.util UUID]))
+  (:require
+   [com.blockether.styrmann.db.schema :as schema]
+   [datalevin.core :as d])
+  (:import
+   [java.util UUID]))
 
 (defmacro with-temp-conn
   "Execute body with a fresh Datalevin conn bound to `sym`.
