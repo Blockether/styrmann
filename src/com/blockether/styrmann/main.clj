@@ -3,8 +3,22 @@
   (:require
    [com.blockether.styrmann.db.core :as db]
    [nrepl.server :as nrepl]
-   [ring.adapter.jetty :as jetty])
+   [ring.adapter.jetty :as jetty]
+   [taoensso.telemere :as t])
   (:gen-class))
+
+(defn- setup-logging!
+  "Configure Telemere with file output for production.
+   Logs to LOG_PATH env (default: log/styrmann.log)."
+  []
+  (let [log-path (or (System/getenv "LOG_PATH") "log/styrmann.log")]
+    (.mkdirs (.getParentFile (java.io.File. log-path)))
+    (t/add-handler! :file/log
+                    (t/handler:file {:path log-path
+                                     :max-file-size (* 10 1024 1024)  ;; 10 MB
+                                     :max-num-files 5}))
+    (t/set-min-level! :info)
+    (t/log! :info ["Logging initialized" {:path log-path}])))
 
 (defn- default-handler [_req]
   {:status  200
@@ -17,9 +31,11 @@
   (let [nrepl-port (parse-long (or (System/getenv "NREPL_PORT") "7888"))
         http-port  (parse-long (or (System/getenv "HTTP_PORT")  "3000"))
         db-path    (or (System/getenv "DB_PATH") "data/styrmann")]
+    (setup-logging!)
     (db/start! db-path)
     (nrepl/start-server :port nrepl-port)
     (spit ".nrepl-port" (str nrepl-port))
-    (println (str "[styrmann] nREPL listening on port " nrepl-port))
-    (println (str "[styrmann] HTTP  listening on port " http-port))
+    (t/log! :info ["Styrmann started" {:nrepl-port nrepl-port
+                                       :http-port  http-port
+                                       :db-path    db-path}])
     (jetty/run-jetty handler {:port http-port :join? true})))

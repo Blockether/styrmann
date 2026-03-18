@@ -6,7 +6,13 @@
    [clojure.string :as str]
    [com.blockether.styrmann.db.core :as db]
    [nrepl.server :as nrepl]
-   [ring.adapter.jetty :as jetty]))
+   [ring.adapter.jetty :as jetty]
+   [taoensso.telemere :as t]))
+
+;; -- logging -----------------------------------------------------------------
+
+;; Dev: console only (default handler), debug level
+(t/set-min-level! :debug)
 
 ;; -- state -------------------------------------------------------------------
 
@@ -36,11 +42,11 @@
      (let [srv (nrepl/start-server :port nrepl-port)]
        (reset! !nrepl srv)
        (spit ".nrepl-port" (str nrepl-port))
-       (println (str "[user] nREPL listening on port " nrepl-port))))
+       (t/log! :info ["nREPL listening" {:port nrepl-port}])))
    (when-not @!jetty
      (let [srv (jetty/run-jetty handler {:port http-port :join? false})]
        (reset! !jetty srv)
-       (println (str "[user] HTTP  listening on port " http-port))))))
+       (t/log! :info ["HTTP listening" {:port http-port}])))))
 
 (defn stop
   "Stop nREPL + Jetty + Datalevin."
@@ -48,11 +54,11 @@
   (when-let [srv @!jetty]
     (.stop srv)
     (reset! !jetty nil)
-    (println "[user] HTTP  stopped"))
+    (t/log! :info "HTTP stopped"))
   (when-let [srv @!nrepl]
     (nrepl/stop-server srv)
     (reset! !nrepl nil)
-    (println "[user] nREPL stopped"))
+    (t/log! :info "nREPL stopped"))
   (db/stop!))
 
 (defn restart

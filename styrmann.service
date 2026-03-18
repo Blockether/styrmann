@@ -1,0 +1,45 @@
+[Unit]
+Description=Styrmann — AI workflow orchestration
+After=network.target
+Documentation=https://github.com/Blockether/styrmann
+
+[Service]
+Type=simple
+User=styrmann
+Group=styrmann
+WorkingDirectory=/opt/styrmann
+
+# -- Entry point --------------------------------------------------------------
+ExecStart=/usr/bin/java \
+  -XX:+UseZGC \
+  -Xms256m -Xmx1g \
+  --enable-native-access=ALL-UNNAMED \
+  -jar styrmann.jar
+
+# -- Secrets (override in /etc/systemd/system/styrmann.service.d/override.conf)
+# Environment=DB_PATH=/opt/styrmann/data/styrmann
+# Environment=NREPL_PORT=7888
+# Environment=HTTP_PORT=3000
+# Environment=LOG_PATH=/opt/styrmann/log/styrmann.log
+
+# -- Logging -------------------------------------------------------------------
+# Application logs via Telemere to LOG_PATH (default: log/styrmann.log)
+# Stdout/stderr also captured by journald for debug
+StandardOutput=append:/opt/styrmann/log/debug.log
+StandardError=append:/opt/styrmann/log/debug.log
+SyslogIdentifier=styrmann
+
+# -- Lifecycle -----------------------------------------------------------------
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+
+# -- Hardening -----------------------------------------------------------------
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/styrmann/data /opt/styrmann/log /opt/styrmann/.nrepl-port
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

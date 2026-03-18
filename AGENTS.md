@@ -120,15 +120,18 @@ When you discover a bug or unexpected behavior via REPL, IMMEDIATELY create a re
 
 ### Pre-Commit Checklist
 
+Run `./pre-commit.sh` to automate steps 1-6. Remaining steps are manual.
+
 ```
-1. ATOMIC?      Single, complete unit of work?
-2. DIAGNOSTICS  LSP diagnostics on all changed files
-3. CLEAN-NS     clean-ns on all changed files
-4. CLJFMT       cljfmt fix on all changed files
-5. TESTS        All tests pass
-6. KNOWLEDGE    Update KNOWLEDGE.md if domain concepts changed
-7. COMMIT       Semantic: feat|fix|refactor|test|docs|chore(scope): description
-8. PUSH         One change = commit + push. If tests pass, ship it.
+1. SECRETS      Scan for leaked secrets — ABORT if found
+2. DIAGNOSTICS  clojure-lsp diagnostics — ZERO errors/warnings
+3. CLEAN-NS     clojure-lsp clean-ns on all files
+4. CLJFMT       clojure-lsp format on all files (uses .cljfmt.edn)
+5. REPL CHECKS  check-docstrings + check-test-coverage on domain namespaces
+6. TESTS        All tests pass (via REPL or clj -M:test)
+7. KNOWLEDGE    Update KNOWLEDGE.md if domain concepts changed
+8. COMMIT       Semantic: feat|fix|refactor|test|docs|chore(scope): description
+9. PUSH         One change = commit + push. If tests pass, ship it.
 ```
 
 ### Deploy Stage (MANDATORY)

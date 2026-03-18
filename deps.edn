@@ -13,7 +13,11 @@
    ;; nREPL — embedded in dev + prod
    nrepl/nrepl                      {:mvn/version "1.5.2"}
    ;; Datalevin — embedded Datalog database
-   datalevin/datalevin              {:mvn/version "0.10.7"}}
+   datalevin/datalevin              {:mvn/version "0.10.7"}
+   ;; Structured logging
+   com.taoensso/telemere            {:mvn/version "1.2.1"}
+   ;; SLF4J -> Telemere bridge (Jetty, Datalevin use SLF4J)
+   com.taoensso/telemere-slf4j      {:mvn/version "1.2.1"}}
 
  :aliases
  {:dev  {:extra-paths ["dev"]

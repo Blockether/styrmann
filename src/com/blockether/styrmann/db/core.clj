@@ -2,7 +2,8 @@
   "Datalevin connection management."
   (:require
    [com.blockether.styrmann.db.schema :as schema]
-   [datalevin.core :as d]))
+   [datalevin.core :as d]
+   [taoensso.telemere :as t]))
 
 (defonce ^:private !conn (atom nil))
 
@@ -18,7 +19,7 @@
   (when-not @!conn
     (let [c (d/get-conn dir schema/schema)]
       (reset! !conn c)
-      (println (str "[db] Datalevin opened at " dir))))
+      (t/log! :info ["Datalevin opened" {:path dir}])))
   @!conn)
 
 (defn stop!
@@ -27,7 +28,7 @@
   (when-let [c @!conn]
     (d/close c)
     (reset! !conn nil)
-    (println "[db] Datalevin closed")))
+    (t/log! :info "Datalevin closed")))
 
 (defn db
   "Return the current database value."
