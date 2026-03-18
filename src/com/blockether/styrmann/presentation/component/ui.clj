@@ -44,9 +44,10 @@
    (some-> status name (str/replace "-" " "))])
 
 (def ^:private ticket-status-badge-class
-  {:ticket.status/open        "badge-inbox"
-   :ticket.status/in-progress "badge-implementing"
-   :ticket.status/closed      "badge-done"})
+  {:ticket.status/open         "badge-inbox"
+   :ticket.status/in-progress  "badge-implementing"
+   :ticket.status/verification "badge-reviewing"
+   :ticket.status/closed       "badge-done"})
 
 (defn ticket-status-badge
   "Render a ticket status badge.

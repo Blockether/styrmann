@@ -80,6 +80,7 @@
 (def ^:private allowed-ticket-statuses
   #{:ticket.status/open
     :ticket.status/in-progress
+    :ticket.status/verification
     :ticket.status/closed})
 
 (defn update-status!
@@ -88,7 +89,7 @@
    Params:
    `conn` - Datalevin connection.
    `ticket-id` - UUID. Ticket identifier.
-   `status` - Keyword. New status (:ticket.status/open, :ticket.status/in-progress, :ticket.status/closed).
+    `status` - Keyword. New status (:ticket.status/open, :ticket.status/in-progress, :ticket.status/verification, :ticket.status/closed).
 
    Returns:
    Updated ticket read model."

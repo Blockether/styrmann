@@ -43,14 +43,10 @@
 
 (defn- status-column
   "Render a status column (Todo / In Progress / Done) with its tickets."
-  [title tickets]
+  [tickets]
   [:div {:class "flex-1 min-w-0"}
-   [:div {:class "flex items-center justify-between px-2 py-2"}
-    [:span {:class "text-[12px] font-semibold uppercase tracking-wider text-[var(--muted)]"} title]
-    [:span {:class "rounded-full bg-[var(--surface)] px-2 py-0.5 text-[11px] font-bold text-[var(--ink-secondary)] shadow-sm"}
-     (count tickets)]]
    (if (seq tickets)
-     (into [:div {:class "space-y-2 pt-1"}]
+     (into [:div {:class "space-y-2"}]
            (map ticket-card/board-card tickets))
      [:div {:class "px-2 py-4 text-[12px] text-[var(--muted)] italic text-center"} "No items"])])
 
@@ -72,9 +68,9 @@
       [:span {:class "text-[13px] font-semibold text-[var(--ink)]"} label]]
      ;; 3 status columns
      [:div {:class "flex-1 grid grid-cols-3 gap-2.5"}
-      (status-column "Todo" todo)
-      (status-column "In Progress" in-progress)
-      (status-column "Done" done)]]))
+      (status-column todo)
+      (status-column in-progress)
+      (status-column done)]]))
 
 (defn- board-section [org]
   (let [sprints (:organization/sprints org)]
