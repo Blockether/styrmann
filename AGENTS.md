@@ -328,6 +328,27 @@ spel init-agents --force --ns com.blockether.styrmann
 
 This regenerates Spel's agent context from the current codebase.
 
+### Spel Always Uses Localhost
+
+**Production (control.blockether.com) requires authentication and returns 401 for unauthenticated requests.**
+
+When using Spel for visual verification, ALWAYS use `http://localhost:3000` instead of production URLs:
+
+```bash
+# CORRECT - use localhost
+spel open "http://localhost:3000/organizations/..."
+
+# WRONG - production requires auth
+spel open "https://control.blockether.com/organizations/..."
+```
+
+Start the local server before Spel checks:
+```bash
+clojure -M:dev &>/dev/null &
+# OR run from deployed JAR:
+cd /opt/styrmann && java -jar styrmann.jar &
+```
+
 ### Visual Verification Protocol
 
 After any UI/presentation change:
