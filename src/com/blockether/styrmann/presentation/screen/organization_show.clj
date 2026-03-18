@@ -36,13 +36,13 @@
 
 (defn- toolbar []
   [:div {:class "card p-2.5 sm:p-3 mb-4"}
-   [:div {:class "flex items-center justify-between gap-2"}
+   [:div {:class "flex flex-wrap items-center justify-between gap-2"}
     ;; Tabs
     [:div {:class "flex gap-1.5"}
      [:button {:type "button" :class "toolbar-tab is-active" :data-view-tab "board"} "Sprint board"]
      [:button {:type "button" :class "toolbar-tab" :data-view-tab "backlog"} "Backlog"]]
     ;; Actions — on the right
-    [:div {:class "flex gap-1.5"}
+    [:div {:class "flex flex-wrap justify-end gap-1.5 ml-auto"}
      [:button {:type "button" :class "toolbar-action !py-2 !px-3 !text-[12px]" :data-modal-open "modal-ticket"}
       [:i {:data-lucide "ticket" :class "size-3.5 text-[var(--accent)]"}]
       [:span {:class "hidden sm:inline"} "Ticket"]]
