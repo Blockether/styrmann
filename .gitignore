@@ -1,0 +1,40 @@
+# Build artifacts
+target/
+classes/
+
+# Datalevin data
+data/
+
+# Tooling caches — auto-generated, never commit
+.cpcache/
+.clj-kondo/
+.lsp/
+
+# nREPL
+.nrepl-port
+
+# Logs
+log/
+
+# Secrets — NEVER commit
+.env
+.env.*
+*.pem
+*.key
+credentials.json
+*secret*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Spel (Playwright) artifacts
+.spel/
+screenshots/
+test-results/
+playwright-report/
+
+# Editor
+*.swp
+*.swo
+*~
