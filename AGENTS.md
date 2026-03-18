@@ -214,6 +214,17 @@ clj-nrepl-eval -p 7888 "(scaffold-test-namespace 'com.blockether.styrmann.domain
 
 One require per line, alphabetize within groups. Use `:as` aliases, avoid `:refer :all`.
 
+### Namespace Boundaries
+
+Keep persistence, business rules, and SSR rendering in separate namespace families.
+
+- `com.blockether.styrmann.db.*` - Datalevin schema, queries, transactions, and persistence-only code
+- `com.blockether.styrmann.domain.*` - domain rules and orchestration functions
+- `com.blockether.styrmann.presentation.screen.*` - screen-scoped SSR rendering
+- `com.blockether.styrmann.presentation.component.*` - reusable SSR components
+
+Do not put Datalevin queries in presentation namespaces. Do not put HTML rendering in db namespaces. Domain namespaces coordinate rules and call db namespaces.
+
 ### Naming & Data Rules
 
 | Rule | Correct | Wrong |

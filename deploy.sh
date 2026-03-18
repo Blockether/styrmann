@@ -17,6 +17,15 @@ step() { echo -e "\n${BOLD}==> $1${NC}"; }
 pass() { echo -e "${GREEN}OK${NC}"; }
 fail() { echo -e "${RED}FAIL${NC}"; exit 1; }
 
+matching_pids() {
+  for pid in $(pgrep -f 'java -jar styrmann.jar' || true); do
+    cwd="$(readlink -f "/proc/${pid}/cwd" 2>/dev/null || true)"
+    if [ "$cwd" = "$DEPLOY_DIR" ]; then
+      echo "$pid"
+    fi
+  done
+}
+
 # -- 1. Secret scan ----------------------------------------------------------
 step "Scanning for leaked secrets"
 if git diff --cached --name-only 2>/dev/null | grep -qiE '\.env|credential|secret|\.pem|\.key'; then
@@ -63,9 +72,33 @@ if systemctl is-active --quiet "$SERVICE_NAME" 2>/dev/null; then
 else
   echo "systemd service not configured — starting directly"
   sudo mkdir -p "$DEPLOY_DIR/log"
+  EXISTING_PIDS="$(matching_pids)"
+  if [ -n "$EXISTING_PIDS" ]; then
+    echo "Stopping existing process(es): ${EXISTING_PIDS//$'\n'/ }"
+    # shellcheck disable=SC2086
+    kill $EXISTING_PIDS
+
+    for _ in $(seq 1 20); do
+      sleep 1
+      if [ -z "$(matching_pids)" ]; then
+        break
+      fi
+    done
+
+    if [ -n "$(matching_pids)" ]; then
+      echo "Existing processes did not stop cleanly"
+      fail
+    fi
+  fi
   cd "$DEPLOY_DIR"
   nohup java -jar styrmann.jar > log/styrmann.log 2>&1 &
-  echo "PID=$!"
+  PID=$!
+  echo "PID=$PID"
+  sleep 3
+  if ! kill -0 "$PID" 2>/dev/null; then
+    echo "New process exited immediately. Check $DEPLOY_DIR/log/styrmann.log"
+    fail
+  fi
   pass
 fi
 
