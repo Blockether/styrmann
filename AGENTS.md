@@ -377,11 +377,14 @@ clj-nrepl-eval -p 7888 "(require '[my.ns :as ns] :reload) (ns/my-fn {:param \"va
 
 ## KNOWLEDGE.md — Domain Knowledge
 
-**KNOWLEDGE.md is the canonical place for domain concepts, business rules, and terminology.** It must be updated whenever domain understanding changes.
+**KNOWLEDGE.md is the canonical place for domain concepts, business rules, and terminology.** All domain knowledge goes here — nowhere else.
+
+**PROACTIVELY update KNOWLEDGE.md whenever domain understanding changes.** Do not wait to be asked. If you add a new entity, rename a concept, discover a business rule, or change a workflow — update KNOWLEDGE.md immediately as part of the same change. This is pre-commit step 6 and is NOT optional.
 
 Rules:
-- Update KNOWLEDGE.md when new domain concepts are introduced (pre-commit step 6)
-- Only document **domain knowledge** — business entities, workflows, terminology
+- **ALL domain knowledge goes in KNOWLEDGE.md** — entities, workflows, terminology, business rules
+- **PROACTIVELY update** — every domain change triggers a KNOWLEDGE.md update in the same commit
+- NEVER put domain knowledge in AGENTS.md — AGENTS.md is for development conventions only
 - NEVER put project structure in KNOWLEDGE.md — the code is the structure
 - NEVER put project structure in AGENTS.md — only mention the main namespace (`com.blockether.styrmann.main`)
 
