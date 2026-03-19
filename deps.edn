@@ -15,6 +15,21 @@
    nrepl/nrepl                      {:mvn/version "1.5.2"}
    ;; Datalevin — embedded Datalog database
    datalevin/datalevin              {:mvn/version "0.10.7"}
+   ;; Structural code editing — clojure-mcp (form editing core only)
+   io.github.bhauman/clojure-mcp   {:git/tag "v0.3.1" :git/sha "81005ce"
+                                     :exclusions [;; LLM / MCP / agent ecosystem — not needed
+                                                  io.modelcontextprotocol.sdk/mcp
+                                                  dev.langchain4j/langchain4j
+                                                  dev.langchain4j/langchain4j-open-ai
+                                                  dev.langchain4j/langchain4j-anthropic
+                                                  dev.langchain4j/langchain4j-google-ai-gemini
+                                                  org.apache.tika/tika-core
+                                                  pogonos/pogonos
+                                                  org.clojure/tools.cli
+                                                  org.clj-commons/pretty
+                                                  ;; Logging conflicts with Telemere
+                                                  com.taoensso/timbre
+                                                  org.slf4j/slf4j-nop]}
    ;; Structured logging
    com.taoensso/telemere            {:mvn/version "1.2.1"}
    ;; SLF4J -> Telemere bridge (Jetty, Datalevin use SLF4J)
@@ -24,9 +39,10 @@
  {:dev  {:extra-paths ["dev"]
          :extra-deps  {cider/cider-nrepl {:mvn/version "0.58.0"}}}
 
-  :test {:extra-paths ["test"]
-         :extra-deps  {io.github.noahtheduke/lazytest {:mvn/version "1.9.1"}}
-         :main-opts   ["-m" "lazytest.main"]}
+   :test {:extra-paths ["test"]
+          :extra-deps  {io.github.noahtheduke/lazytest {:mvn/version "1.9.1"}
+                        nubank/matcher-combinators     {:mvn/version "3.10.0"}}
+          :main-opts   ["-m" "lazytest.main"]}
 
   :build {:deps       {io.github.clojure/tools.build {:mvn/version "0.10.12"}}
           :ns-default build}}}

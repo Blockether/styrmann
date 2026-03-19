@@ -143,7 +143,10 @@
 (defn- handle-ticket-status [organization-id ticket-id request]
   (let [status (keyword-from-param (get-in request [:params :status]))]
     (ticket/update-status! (db/conn) ticket-id status)
-    (redirect-to (str "/organizations/" organization-id "/tickets/" ticket-id))))
+    (if (= "fetch" (get-in request [:headers "x-requested-with"]))
+      (-> (response/response "")
+          (response/status 204))
+      (redirect-to (str "/organizations/" organization-id "/tickets/" ticket-id)))))
 
 (defn- handle-ticket-assign-sprint [ticket-id request]
   (if-let [ticket-record (ticket/find-by-id (db/conn) ticket-id)]
@@ -228,7 +231,7 @@
                                                    (layout/render-breadcrumb-fragment breadcrumbs))
                                (d*/patch-elements! sse
                                                    (layout/render-topbar-context-fragment topbar-context))
-                               (d*/execute-script! sse "lucide.createIcons()")))}))
+                               (d*/execute-script! sse "lucide.createIcons();window.styrmannInitInteractive&&window.styrmannInitInteractive();")))}))
 
 (defn- handle-fragment-home [request]
   (if-let [organization (organization/default-organization (db/conn))]

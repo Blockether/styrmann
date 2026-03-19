@@ -55,6 +55,27 @@ A delegated unit of implementation work derived from a ticket.
 - Task statuses are `:task.status/inbox`, `:task.status/implementing`, `:task.status/testing`, `:task.status/reviewing`, and `:task.status/done`
 - The initial task status is `:task.status/inbox`
 - `:task.status/done` means the delegated work is accepted
+- A task optionally carries scoped acceptance criteria (EDN string) narrowed from the parent ticket's acceptance criteria
+- A task optionally carries CoVe (Chain-of-Verification) questions (EDN string) used to validate the task's output
+- A task can declare dependencies on other tasks via `:task/depends-on` (a set of task refs); dependent tasks must complete before this task can start
+
+### Task Dependency Graph
+A directed acyclic graph (DAG) of tasks derived from a single ticket.
+
+- Tasks within a ticket can depend on other tasks in the same ticket
+- Dependencies are expressed as `:task/depends-on` refs on the task entity
+- Circular dependencies are rejected at creation time
+- `domain.task/create-graph!` creates an entire DAG in a single transaction; callers pass `depends-on-indices` (0-based indices into the same spec vector) to wire up edges
+- `domain.task/dependency-graph` returns all tasks for a ticket with `:task/depends-on` refs resolved to full task maps
+
+### Ticket Analysis
+The process of decomposing a ticket into a DAG of scoped AI tasks.
+
+- Analysis is orchestrated in `domain.analysis`
+- Each resulting task gets a subset of the ticket's acceptance criteria and a set of CoVe questions
+- CoVe questions are generated via Svar RLM to verify the task output before marking it done
+- The analysis pipeline is: parse ticket → generate CoVe questions → decompose into tasks → build dependency graph
+- Svar RLM integration is implemented in a separate step; `domain.analysis/decompose-ticket` is currently scaffolded
 
 ### Notification
 An organization-level signal about task progress.
@@ -111,6 +132,9 @@ Ticket
 | **Sprint** | Planning container that can hold tickets and milestones |
 | **Milestone** | Named grouping of tickets inside a sprint |
 | **AI Task** | Delegated implementation unit for a ticket in a workspace |
+| **Task Graph** | DAG of tasks within a ticket expressing execution order via dependency edges |
+| **CoVe Questions** | Chain-of-Verification questions generated per task to validate output |
+| **Ticket Analysis** | Process of decomposing a ticket into a scoped task DAG via Svar RLM |
 | **OpenCode Run** | External process execution observed by PID |
 
 ## Naming Conventions (UI)

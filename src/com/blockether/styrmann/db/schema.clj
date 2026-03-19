@@ -112,8 +112,15 @@
                             :db/doc       "Delegated task description"}
    :task/status            {:db/valueType :db.type/keyword
                             :db/doc       "Task lifecycle status"}
-   :task/created-at        {:db/valueType :db.type/instant
-                            :db/doc       "Creation timestamp"}
+   :task/created-at                {:db/valueType :db.type/instant
+                                    :db/doc       "Creation timestamp"}
+   :task/acceptance-criteria-edn  {:db/valueType :db.type/string
+                                    :db/doc       "EDN-encoded scoped acceptance criteria for this task"}
+   :task/cove-questions-edn       {:db/valueType :db.type/string
+                                    :db/doc       "EDN-encoded CoVe verification questions"}
+   :task/depends-on               {:db/valueType   :db.type/ref
+                                    :db/cardinality :db.cardinality/many
+                                    :db/doc         "Tasks that must complete before this task can start"}
 
    ;; -- Notification ----------------------------------------------------------
    :notification/id          {:db/valueType :db.type/uuid

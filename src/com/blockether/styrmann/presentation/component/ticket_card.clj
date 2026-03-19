@@ -21,13 +21,20 @@
    Returns:
    Hiccup node."
   [ticket]
-  (let [closed? (= :ticket.status/closed (:ticket/status ticket))]
+  (let [closed?         (= :ticket.status/closed (:ticket/status ticket))
+        organization-id (get-in ticket [:ticket/organization :organization/id])
+        ticket-id       (:ticket/id ticket)
+        status          (or (:ticket/status ticket) :ticket.status/open)
+        drag-attrs      {:draggable         "true"
+                         :data-ticket-id    (str ticket-id)
+                         :data-ticket-org   (str organization-id)
+                         :data-ticket-status (name status)}]
     (ui/board-card-node
-     (cond-> {:href (str "/organizations/" (get-in ticket [:ticket/organization :organization/id]) "/tickets/" (:ticket/id ticket))
+     (cond-> {:href (str "/organizations/" organization-id "/tickets/" ticket-id)
               :title-class (when closed? "ticket-title")
               :title (or (:ticket/title ticket) (:ticket/description ticket))
               :badges [(ui/type-badge (:ticket/type ticket))
-                       (ui/ticket-status-badge (:ticket/status ticket))
+                       (ui/ticket-status-badge status)
                        (when-let [m (:ticket/milestone ticket)]
                          (ui/pill (:milestone/name m)))]
               :assignee (:ticket/assignee ticket)
@@ -37,7 +44,8 @@
                        [:span (str "E" (:ticket/effort ticket))]
                        [:span {:class "w-1 h-1 rounded-full bg-[var(--line-strong)]"}]
                        [:span (str "I" (:ticket/impact ticket))]]}
-       closed? (assoc :wrapper-attrs {:data-closed "1"})))))
+       true    (assoc :wrapper-attrs (cond-> drag-attrs
+                                       closed? (assoc :data-closed "1")))))))
 
 (defn view
   "Render a full ticket row.

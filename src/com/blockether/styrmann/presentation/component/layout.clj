@@ -103,6 +103,10 @@ a:hover { color: var(--accent-hover); }
  .done-toggle input { accent-color: var(--accent); }
  .org-chip { display: inline-flex; align-items: center; gap: 10px; border-radius: 999px; background: var(--cream-dark); padding: 6px 12px 6px 8px; color: var(--ink); }
  .org-chip-mark { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 999px; background: var(--accent); color: white; font-family: 'DM Serif Display', Georgia, serif; font-size: 16px; }
+ .board-card[draggable=true] { cursor: grab; }
+ .board-card.is-dragging { opacity: 0.35; transform: scale(0.96); }
+ .drop-zone.drag-over { background: var(--accent-soft); outline: 2px dashed var(--accent); outline-offset: -2px; border-radius: 8px; }
+ .drop-zone { transition: background .15s, outline .15s; }
  @media (max-width: 768px) {
    .board-scroll { flex-direction: column !important; }
    .board-scroll > * { min-width: 100% !important; max-width: 100% !important; }
@@ -440,6 +444,177 @@ lucide.createIcons();
     initACBuilder();
   };
   initACBuilder();
+})();
+/* Board drag-and-drop */
+(function(){
+  var dragCard = null;
+  var dragTicketId = null;
+  var dragTicketOrg = null;
+  var touchClone = null;
+  var touchDropZone = null;
+
+  function findDropZone(el) {
+    while (el) {
+      if (el.classList && el.classList.contains('drop-zone')) return el;
+      el = el.parentElement;
+    }
+    return null;
+  }
+
+  function findBoardCard(el) {
+    while (el) {
+      if (el.classList && el.classList.contains('board-card') && el.getAttribute('draggable') === 'true') return el;
+      el = el.parentElement;
+    }
+    return null;
+  }
+
+  function clearAllHighlights() {
+    document.querySelectorAll('.drop-zone.drag-over').forEach(function(z) {
+      z.classList.remove('drag-over');
+    });
+  }
+
+  function submitStatusChange(orgId, ticketId, newStatus) {
+    var url = '/organizations/' + orgId + '/tickets/' + ticketId + '/status';
+    fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'fetch' },
+      body: 'status=ticket.status/' + newStatus,
+      redirect: 'manual'
+    }).then(function() {
+      var orgLink = document.querySelector('[data-on-click*=\"/fragments/organizations/' + orgId + '\"]');
+      if (orgLink) { orgLink.click(); } else { window.location.reload(); }
+    }).catch(function() { window.location.reload(); });
+  }
+
+  /* --- Desktop: HTML5 Drag and Drop --- */
+  document.addEventListener('dragstart', function(evt) {
+    var card = findBoardCard(evt.target);
+    if (!card) return;
+    dragCard = card;
+    dragTicketId = card.getAttribute('data-ticket-id');
+    dragTicketOrg = card.getAttribute('data-ticket-org');
+    evt.dataTransfer.effectAllowed = 'move';
+    evt.dataTransfer.setData('text/plain', dragTicketId);
+    requestAnimationFrame(function() { card.classList.add('is-dragging'); });
+  });
+
+  document.addEventListener('dragend', function() {
+    if (dragCard) dragCard.classList.remove('is-dragging');
+    dragCard = null;
+    dragTicketId = null;
+    dragTicketOrg = null;
+    clearAllHighlights();
+  });
+
+  document.addEventListener('dragover', function(evt) {
+    if (!dragTicketId) return;
+    var zone = findDropZone(evt.target);
+    if (!zone) return;
+    evt.preventDefault();
+    evt.dataTransfer.dropEffect = 'move';
+    clearAllHighlights();
+    zone.classList.add('drag-over');
+  });
+
+  document.addEventListener('dragleave', function(evt) {
+    var zone = findDropZone(evt.target);
+    if (zone && !zone.contains(evt.relatedTarget)) {
+      zone.classList.remove('drag-over');
+    }
+  });
+
+  document.addEventListener('drop', function(evt) {
+    if (!dragTicketId) return;
+    evt.preventDefault();
+    var zone = findDropZone(evt.target);
+    if (!zone) return;
+    clearAllHighlights();
+    var newStatus = zone.getAttribute('data-drop-status');
+    var currentStatus = dragCard ? dragCard.getAttribute('data-ticket-status') : null;
+    if (newStatus && newStatus !== currentStatus) {
+      submitStatusChange(dragTicketOrg, dragTicketId, newStatus);
+    }
+    if (dragCard) dragCard.classList.remove('is-dragging');
+    dragCard = null;
+    dragTicketId = null;
+    dragTicketOrg = null;
+  });
+
+  /* --- Mobile: Touch-based drag --- */
+  var longPressTimer = null;
+  var touchStartX = 0;
+  var touchStartY = 0;
+  var isDragging = false;
+
+  document.addEventListener('touchstart', function(evt) {
+    var card = findBoardCard(evt.target);
+    if (!card) return;
+    touchStartX = evt.touches[0].clientX;
+    touchStartY = evt.touches[0].clientY;
+    longPressTimer = setTimeout(function() {
+      isDragging = true;
+      dragCard = card;
+      dragTicketId = card.getAttribute('data-ticket-id');
+      dragTicketOrg = card.getAttribute('data-ticket-org');
+      card.classList.add('is-dragging');
+      touchClone = card.cloneNode(true);
+      touchClone.classList.remove('is-dragging');
+      touchClone.style.cssText = 'position:fixed;z-index:9999;pointer-events:none;width:' + card.offsetWidth + 'px;opacity:0.85;transform:rotate(2deg);box-shadow:0 12px 32px rgba(0,0,0,0.18);';
+      touchClone.style.left = (touchStartX - card.offsetWidth / 2) + 'px';
+      touchClone.style.top = (touchStartY - 20) + 'px';
+      document.body.appendChild(touchClone);
+    }, 400);
+  }, { passive: true });
+
+  document.addEventListener('touchmove', function(evt) {
+    if (longPressTimer && !isDragging) {
+      var dx = evt.touches[0].clientX - touchStartX;
+      var dy = evt.touches[0].clientY - touchStartY;
+      if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
+        clearTimeout(longPressTimer);
+        longPressTimer = null;
+      }
+    }
+    if (!isDragging) return;
+    evt.preventDefault();
+    var tx = evt.touches[0].clientX;
+    var ty = evt.touches[0].clientY;
+    if (touchClone) {
+      touchClone.style.left = (tx - touchClone.offsetWidth / 2) + 'px';
+      touchClone.style.top = (ty - 20) + 'px';
+    }
+    clearAllHighlights();
+    var el = document.elementFromPoint(tx, ty);
+    var zone = el ? findDropZone(el) : null;
+    if (zone) {
+      zone.classList.add('drag-over');
+      touchDropZone = zone;
+    } else {
+      touchDropZone = null;
+    }
+  }, { passive: false });
+
+  document.addEventListener('touchend', function() {
+    if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+    if (!isDragging) return;
+    isDragging = false;
+    clearAllHighlights();
+    if (touchClone) { touchClone.remove(); touchClone = null; }
+    if (touchDropZone && dragCard) {
+      var newStatus = touchDropZone.getAttribute('data-drop-status');
+      var currentStatus = dragCard.getAttribute('data-ticket-status');
+      if (newStatus && newStatus !== currentStatus) {
+        submitStatusChange(dragTicketOrg, dragTicketId, newStatus);
+      }
+    }
+    if (dragCard) dragCard.classList.remove('is-dragging');
+    dragCard = null;
+    dragTicketId = null;
+    dragTicketOrg = null;
+    touchDropZone = null;
+  }, { passive: true });
 })();
 (function(){
   var cv=null;

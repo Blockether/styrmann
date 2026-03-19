@@ -10,6 +10,10 @@
 (defn- org-topbar-context [organizations org]
   (ui/org-topbar-dropdown organizations org))
 
+(defn- sprint-ticket-count [sprint]
+  (+ (count (:sprint/direct-tickets sprint))
+     (reduce + 0 (map #(count (:milestone/tickets %)) (:sprint/milestones sprint)))))
+
 ;; -- Toolbar -----------------------------------------------------------------
 
 (defn- toolbar []
@@ -41,36 +45,118 @@
    [:input {:type "checkbox"}]
    [:span label]])
 
-(defn- status-column
-  "Render a status column (Todo / In Progress / Done) with its tickets."
+(def ^:private status-columns
+  "Status column definitions: [keyword label icon]."
+  [[:ticket.status/open        "Inbox"        "inbox"]
+   [:ticket.status/in-progress "In Progress"  "loader"]
+   [:ticket.status/verification "Verification" "eye"]
+   [:ticket.status/closed      "Done"         "check-circle"]])
+
+(defn- tickets-by-status
+  "Group tickets into [inbox in-progress verification done] vectors."
   [tickets]
-  [:div {:class "flex-1 min-w-0"}
+  (let [grouped (group-by #(or (:ticket/status %) :ticket.status/open) tickets)]
+    (mapv (fn [[k _ _]] (get grouped k [])) status-columns)))
+
+(defn- status-col-header
+  "Render a status column header with icon, label, and count."
+  [label icon cnt]
+  [:div {:class "flex items-center gap-1.5 px-1 pb-1"}
+   [:i {:data-lucide icon :class "size-3 text-[var(--muted)]"}]
+   [:span {:class "text-[11px] font-semibold uppercase tracking-wider text-[var(--muted)]"} label]
+   (when (pos? cnt)
+     [:span {:class "ml-auto rounded-full bg-[var(--cream-dark)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--muted)] leading-none"} cnt])])
+
+(defn- status-column-cards
+  "Render a list of ticket cards for a status column."
+  [status-kw tickets]
+  [:div {:class "drop-zone min-h-[48px] rounded-lg p-1 transition-colors"
+         :data-drop-status (name status-kw)}
    (if (seq tickets)
      (into [:div {:class "space-y-2"}]
            (map ticket-card/board-card tickets))
-     [:div {:class "px-2 py-4 text-[12px] text-[var(--muted)] italic text-center"} "No items"])])
+     [:div {:class "py-3 text-[12px] text-[var(--muted)] italic text-center"} "—"])])
 
-(defn- tickets-by-status
-  "Group tickets into [todo in-progress done] vectors."
-  [tickets]
-  (let [grouped (group-by #(or (:ticket/status %) :ticket.status/open) tickets)]
-    [(get grouped :ticket.status/open [])
-     (get grouped :ticket.status/in-progress [])
-     (get grouped :ticket.status/closed [])]))
+;; -- Desktop: milestone rows (hidden on mobile) ----------------------------
 
-(defn- milestone-row
-  "Render a milestone as a row: label on left, 3 status columns on right."
+(defn- desktop-milestone-row
+  "Render a milestone row for desktop: label + 4 status columns."
   [label tickets]
-  (let [[todo in-progress done] (tickets-by-status tickets)]
-    [:div {:class "flex gap-4"}
-     ;; Row label
-     [:div {:class "w-28 sm:w-36 flex-shrink-0 pt-2"}
-      [:span {:class "text-[13px] font-semibold text-[var(--ink)]"} label]]
-     ;; 3 status columns
-     [:div {:class "flex-1 grid grid-cols-3 gap-2.5"}
-      (status-column todo)
-      (status-column in-progress)
-      (status-column done)]]))
+  (let [buckets (tickets-by-status tickets)]
+    [:div {:class "flex gap-3 py-2 border-b border-[var(--line)] last:border-b-0"}
+     [:div {:class "w-36 flex-shrink-0 pt-1"}
+      [:span {:class "text-[13px] font-semibold text-[var(--ink)] leading-tight"} label]
+      [:div {:class "text-[11px] text-[var(--muted)] mt-0.5"} (str (count tickets) " tickets")]]
+     [:div {:class "flex-1 grid grid-cols-4 gap-3"}
+      (for [[bucket [status-kw _ _]] (map vector buckets status-columns)]
+        (status-column-cards status-kw bucket))]]))
+
+(defn- desktop-board
+  "Render the desktop board for a sprint: column headers + milestone rows."
+  [sprint]
+  (let [milestones (:sprint/milestones sprint)
+        direct     (:sprint/direct-tickets sprint)
+        all-rows   (cond-> []
+                     (seq direct)     (conj {:label "Direct" :tickets direct})
+                     true             (into (for [m milestones]
+                                              {:label (:milestone/name m) :tickets (:milestone/tickets m)})))]
+    [:div {:class "hidden sm:block"}
+     ;; Column headers
+     [:div {:class "flex gap-3 mb-2"}
+      [:div {:class "w-36 flex-shrink-0"}]
+      [:div {:class "flex-1 grid grid-cols-4 gap-3"}
+       (for [[idx [_ label icon]] (map-indexed vector status-columns)]
+         (let [cnt (reduce + 0 (map (fn [{:keys [tickets]}]
+                                      (count (nth (tickets-by-status tickets) idx)))
+                                    all-rows))]
+           (status-col-header label icon cnt)))]]
+     ;; Milestone rows
+     (if (seq all-rows)
+       (into [:div {:class "card-sm divide-y divide-[var(--line)] px-3"}]
+             (for [{:keys [label tickets]} all-rows]
+               (desktop-milestone-row label tickets)))
+       [:div {:class "py-4 text-[12px] text-[var(--muted)] italic text-center"} "No tickets assigned"])]))
+
+;; -- Mobile: milestone sections (hidden on desktop) -------------------------
+
+(defn- mobile-milestone-section
+  "Render a milestone as a collapsible mobile section with stacked status groups."
+  [label tickets]
+  (let [buckets (tickets-by-status tickets)]
+    [:details {:class "card-sm overflow-hidden" :open true}
+     [:summary {:class "flex items-center justify-between gap-2 px-4 py-3 cursor-pointer select-none bg-[var(--cream-dark)]"}
+      [:div {:class "flex items-center gap-2 min-w-0"}
+       [:i {:data-lucide "flag" :class "size-3.5 text-[var(--accent)] flex-shrink-0"}]
+       [:span {:class "text-[13px] font-semibold text-[var(--ink)] truncate"} label]]
+      [:div {:class "flex items-center gap-2 flex-shrink-0"}
+       [:span {:class "text-[11px] text-[var(--muted)]"} (str (count tickets))]
+       [:i {:data-lucide "chevron-down" :class "size-3.5 text-[var(--muted)] transition-transform [[open]>&]:rotate-180"}]]]
+     [:div {:class "divide-y divide-[var(--line)]"}
+      (for [[bucket [status-kw label icon]] (map vector buckets status-columns)]
+        [:div {:class "px-3 py-3 drop-zone" :data-drop-status (name status-kw)}
+         [:div {:class "flex items-center gap-1.5 mb-2"}
+          [:i {:data-lucide icon :class "size-3 text-[var(--muted)]"}]
+          [:span {:class "text-[11px] font-semibold uppercase tracking-wider text-[var(--muted)]"} label]
+          [:span {:class "ml-1 text-[10px] text-[var(--muted)]"} (str "(" (count bucket) ")")]]
+         (if (seq bucket)
+           (into [:div {:class "space-y-2"}]
+                 (map ticket-card/board-card bucket))
+           [:div {:class "py-2 text-[12px] text-[var(--muted)] italic text-center"} "—"])])]]))
+
+(defn- mobile-board
+  "Render the mobile board for a sprint: stacked milestone sections."
+  [sprint]
+  (let [milestones (:sprint/milestones sprint)
+        direct     (:sprint/direct-tickets sprint)]
+    [:div {:class "sm:hidden space-y-3"}
+     (when (seq direct)
+       (mobile-milestone-section "Direct" direct))
+     (for [m milestones]
+       (mobile-milestone-section (:milestone/name m) (:milestone/tickets m)))
+     (when (and (empty? direct) (empty? milestones))
+       [:div {:class "py-4 text-[12px] text-[var(--muted)] italic text-center"} "No tickets assigned"])]))
+
+;; -- Board section ----------------------------------------------------------
 
 (defn- board-section [org]
   (let [sprints (:organization/sprints org)]
@@ -84,21 +170,10 @@
                [:div
                 [:div {:class "flex items-center gap-2 mb-3"}
                  [:i {:data-lucide "zap" :class "size-3.5 text-[var(--accent)]"}]
-                 [:span {:class "text-[14px] font-semibold text-[var(--ink)]"} (:sprint/name sprint)]]
-                ;; Column headers
-                [:div {:class "flex gap-4 mb-2"}
-                 [:div {:class "w-28 sm:w-36 flex-shrink-0"}]
-                 [:div {:class "flex-1 grid grid-cols-3 gap-2.5"}
-                  [:span {:class "text-[11px] font-semibold uppercase tracking-wider text-[var(--muted)] px-2"} "Todo"]
-                  [:span {:class "text-[11px] font-semibold uppercase tracking-wider text-[var(--muted)] px-2"} "In Progress"]
-                  [:span {:class "text-[11px] font-semibold uppercase tracking-wider text-[var(--muted)] px-2"} "Done"]]]
-                ;; Direct tickets row
-                (when (seq (:sprint/direct-tickets sprint))
-                  (milestone-row "Direct" (:sprint/direct-tickets sprint)))
-                ;; Milestone rows
-                (into [:div {:class "space-y-3"}]
-                      (for [milestone (:sprint/milestones sprint)]
-                        (milestone-row (:milestone/name milestone) (:milestone/tickets milestone))))]))
+                 [:span {:class "text-[14px] font-semibold text-[var(--ink)]"} (:sprint/name sprint)]
+                 (ui/pill (str (sprint-ticket-count sprint) " tickets"))]
+                (desktop-board sprint)
+                (mobile-board sprint)]))
        (ui/empty-state "No sprints yet." "mt-2"))]))
 
 ;; -- Backlog -----------------------------------------------------------------

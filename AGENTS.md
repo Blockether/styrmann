@@ -69,18 +69,26 @@ clj-nrepl-eval -p 7888 "(your-expression-here)"
 
 **DO NOT** speculate. **DO NOT** propose fixes based on reading code alone.
 
-### REPL Discovery -> Test
+### EVERY REPL Verification → Test
 
-When you discover a bug or unexpected behavior via REPL, IMMEDIATELY create a regression test before fixing.
+**If you verified it in the REPL, it MUST become a test. No exceptions.**
+
+This applies to ALL `clj-nrepl-eval` calls that confirm behavior: bug reproductions, feature smoke tests, integration checks, data round-trips, API calls — everything. If the REPL call was worth running, the behavior is worth protecting.
 
 ```clojure
-;; REPL exploration:
-(my-fn bad-input) ;; => unexpected result
+;; You ran this in the REPL:
+(analysis/decompose-ticket! conn ticket-id {:model "gpt-4o-mini"})
+;; => 5 tasks with ACs and CoVe questions
 
-;; IMMEDIATELY convert to test:
-(it "handles bad-input correctly"
-  (expect (= expected-result (sut/my-fn bad-input))))
+;; IMMEDIATELY create a test:
+(it "decomposes a ticket into a valid task DAG"
+  (with-temp-conn [conn (temp-conn)]
+    (let [tasks (sut/decompose-ticket! conn ticket-id opts)]
+      (expect (>= (count tasks) 2))
+      (expect (every? #(seq (:task/acceptance-criteria-edn %)) tasks)))))
 ```
+
+**The REPL is for discovery. Tests are for keeping it.**
 
 ### Bug Fixing Protocol
 
@@ -105,7 +113,7 @@ When you discover a bug or unexpected behavior via REPL, IMMEDIATELY create a re
 
 ### Test Rules
 
-**Tests are about values, not types.**
+**Tests are about values, not types. NEVER accept weak tests.**
 
 ```
 1. NO MOCKS         Real temp Datalevin instances, real data
@@ -116,6 +124,45 @@ When you discover a bug or unexpected behavior via REPL, IMMEDIATELY create a re
                     No HTTP layer, no presentation in tests
 5. TEMP DB          Every test gets a fresh Datalevin instance
                     Clean up after — no test pollution
+6. USE MATCHERS     Use matcher-combinators for structural matching
+                    NOT (every? some? xs) or (>= (count xs) 1)
+```
+
+### No Weak Tests (MANDATORY)
+
+**Weak tests give false confidence. They pass even when things are broken.**
+
+A weak test checks shape instead of substance. A strong test checks the actual data.
+
+| WEAK (PROHIBITED)                              | STRONG (REQUIRED)                                    |
+|-------------------------------------------------|------------------------------------------------------|
+| `(expect (string? title))`                      | `(expect (= "Add JWT auth" title))`                  |
+| `(expect (>= (count tasks) 2))`                 | `(expect (= 3 (count tasks)))`                       |
+| `(expect (every? some? xs))`                    | `(expect (match? [map? map?] xs))` with field checks  |
+| `(expect (seq (:task/ac task)))`                 | `(expect (match? (m/embeds {:task/ac [string?]}) t))` |
+| `(expect (vector? (edn/read-string edn-str)))`  | `(expect (= ["AC one" "AC two"] (edn/read-string s)))`|
+
+**Use `nubank/matcher-combinators`** for structural assertions on maps, vectors, and nested data.
+When testing LLM output or other non-deterministic results, use `m/embeds` to check structure
+and required fields without brittle exact-match on generated text.
+
+```clojure
+(require '[matcher-combinators.matchers :as m])
+
+;; Structural match — checks shape AND presence of keys
+(expect (match? (m/embeds {:task/status :task.status/inbox
+                           :task/workspace {:workspace/name "styrmann"}
+                           :task/acceptance-criteria-edn string?})
+                task))
+
+;; Collection with specific count and per-element structure
+(expect (match? (m/equals [m/any m/any m/any])  ;; exactly 3
+                tasks))
+
+;; Nested structure in any order
+(expect (match? (m/in-any-order [{:task/description "Schema migration"}
+                                  {:task/description "API handler"}])
+                (map #(select-keys % [:task/description]) tasks)))
 ```
 
 ### Pre-Commit Checklist

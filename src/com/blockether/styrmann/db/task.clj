@@ -9,9 +9,12 @@
   [:task/id
    :task/description
    :task/status
+   :task/acceptance-criteria-edn
+   :task/cove-questions-edn
    :task/created-at
    {:task/ticket [:ticket/id :ticket/title :ticket/description {:ticket/organization [:organization/id :organization/name]}]}
-   {:task/workspace [:workspace/id :workspace/name :workspace/repository {:workspace/organization [:organization/id :organization/name]}]}])
+   {:task/workspace [:workspace/id :workspace/name :workspace/repository {:workspace/organization [:organization/id :organization/name]}]}
+   {:task/depends-on [:task/id :task/description :task/status]}])
 
 (def ^:private notification-pull
   [:notification/id
@@ -83,19 +86,50 @@
 
    Params:
    `conn` - Datalevin connection.
-   `attrs` - Map with `:ticket-id`, `:workspace-id`, and `:description`.
+   `attrs` - Map with `:ticket-id`, `:workspace-id`, `:description`, and optional
+             `:acceptance-criteria-edn`, `:cove-questions-edn`, `:depends-on` (vector of lookup refs).
 
    Returns:
    Persisted task map."
-  [conn {:keys [ticket-id workspace-id description]}]
-  (let [task-id (UUID/randomUUID)]
-    (d/transact! conn [{:task/id          task-id
-                        :task/ticket      [:ticket/id ticket-id]
-                        :task/workspace   [:workspace/id workspace-id]
-                        :task/description description
-                        :task/status      :task.status/inbox
-                        :task/created-at  (java.util.Date.)}])
+  [conn {:keys [ticket-id workspace-id description acceptance-criteria-edn cove-questions-edn depends-on]}]
+  (let [task-id (UUID/randomUUID)
+        tx-map  (cond-> {:task/id          task-id
+                         :task/ticket      [:ticket/id ticket-id]
+                         :task/workspace   [:workspace/id workspace-id]
+                         :task/description description
+                         :task/status      :task.status/inbox
+                         :task/created-at  (java.util.Date.)}
+                  acceptance-criteria-edn (assoc :task/acceptance-criteria-edn acceptance-criteria-edn)
+                  cove-questions-edn      (assoc :task/cove-questions-edn cove-questions-edn)
+                  (seq depends-on)        (assoc :task/depends-on (vec depends-on)))]
+    (d/transact! conn [tx-map])
     (find-task conn task-id)))
+
+(defn create-tasks-batch!
+  "Persist multiple tasks in a single transaction.
+
+   Params:
+   `conn`     - Datalevin connection.
+   `tx-data`  - Vector of task attribute maps with pre-resolved refs.
+   `task-ids` - Vector of UUIDs corresponding to each entry in `tx-data`.
+
+   Returns:
+   Vector of persisted task maps."
+  [conn tx-data task-ids]
+  (d/transact! conn tx-data)
+  (mapv #(find-task conn %) task-ids))
+
+(defn task-dependency-graph
+  "Return all tasks for a ticket including resolved dependency refs.
+
+   Params:
+   `conn`      - Datalevin connection.
+   `ticket-id` - UUID. Ticket identifier.
+
+   Returns:
+   Vector of task maps; each task's `:task/depends-on` is a vector of referenced task maps."
+  [conn ticket-id]
+  (list-tasks-by-ticket conn ticket-id))
 
 (defn update-task-status!
   "Replace the status of a task.

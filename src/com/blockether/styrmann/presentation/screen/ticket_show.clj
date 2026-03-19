@@ -94,38 +94,50 @@
                  action-url (str "/organizations/" org-id "/tickets/" (:ticket/id t) "/status")]
              [:aside {:class "space-y-4"}
               ;; Status actions
-              [:div {:class "card p-4"}
-               (cond
-                 closed?
-                 [:form {:method "post" :action action-url}
-                  [:input {:type "hidden" :name "status" :value "ticket.status/open"}]
-                  [:button {:class "btn-secondary w-full" :type "submit"}
-                   [:i {:data-lucide "rotate-ccw" :class "size-4"}]
-                   "Reopen ticket"]]
-
-                 (= status :ticket.status/in-progress)
-                 [:div {:class "flex gap-2"}
-                  [:form {:method "post" :action action-url :class "flex-1"}
-                   [:input {:type "hidden" :name "status" :value "ticket.status/closed"}]
-                   [:button {:class "btn-primary w-full" :type "submit"}
-                    [:i {:data-lucide "check-circle" :class "size-4"}]
-                    "Close ticket"]]
+               [:div {:class "card p-4"}
+                (cond
+                  closed?
                   [:form {:method "post" :action action-url}
                    [:input {:type "hidden" :name "status" :value "ticket.status/open"}]
-                   [:button {:class "btn-secondary !px-3" :type "submit" :title "Back to open"}
-                    [:i {:data-lucide "rotate-ccw" :class "size-4"}]]]]
+                   [:button {:class "btn-secondary w-full" :type "submit"}
+                    [:i {:data-lucide "rotate-ccw" :class "size-4"}]
+                    "Reopen ticket"]]
 
-                 :else
-                 [:div {:class "flex gap-2"}
-                  [:form {:method "post" :action action-url :class "flex-1"}
-                   [:input {:type "hidden" :name "status" :value "ticket.status/in-progress"}]
-                   [:button {:class "btn-primary w-full" :type "submit"}
-                    [:i {:data-lucide "play" :class "size-4"}]
-                    "Start progress"]]
-                  [:form {:method "post" :action action-url}
-                   [:input {:type "hidden" :name "status" :value "ticket.status/closed"}]
-                   [:button {:class "btn-secondary !px-3" :type "submit" :title "Close directly"}
-                    [:i {:data-lucide "check-circle" :class "size-4"}]]]])]
+                  (= status :ticket.status/verification)
+                  [:div {:class "flex gap-2"}
+                   [:form {:method "post" :action action-url :class "flex-1"}
+                    [:input {:type "hidden" :name "status" :value "ticket.status/closed"}]
+                    [:button {:class "btn-primary w-full" :type "submit"}
+                     [:i {:data-lucide "check-circle" :class "size-4"}]
+                     "Close ticket"]]
+                   [:form {:method "post" :action action-url}
+                    [:input {:type "hidden" :name "status" :value "ticket.status/in-progress"}]
+                    [:button {:class "btn-secondary !px-3" :type "submit" :title "Back to in progress"}
+                     [:i {:data-lucide "rotate-ccw" :class "size-4"}]]]]
+
+                  (= status :ticket.status/in-progress)
+                  [:div {:class "flex gap-2"}
+                   [:form {:method "post" :action action-url :class "flex-1"}
+                    [:input {:type "hidden" :name "status" :value "ticket.status/verification"}]
+                    [:button {:class "btn-primary w-full" :type "submit"}
+                     [:i {:data-lucide "search-check" :class "size-4"}]
+                     "Send to verification"]]
+                   [:form {:method "post" :action action-url}
+                    [:input {:type "hidden" :name "status" :value "ticket.status/open"}]
+                    [:button {:class "btn-secondary !px-3" :type "submit" :title "Back to todo"}
+                     [:i {:data-lucide "rotate-ccw" :class "size-4"}]]]]
+
+                  :else
+                  [:div {:class "flex gap-2"}
+                   [:form {:method "post" :action action-url :class "flex-1"}
+                    [:input {:type "hidden" :name "status" :value "ticket.status/in-progress"}]
+                    [:button {:class "btn-primary w-full" :type "submit"}
+                     [:i {:data-lucide "play" :class "size-4"}]
+                     "Start progress"]]
+                   [:form {:method "post" :action action-url}
+                    [:input {:type "hidden" :name "status" :value "ticket.status/closed"}]
+                    [:button {:class "btn-secondary !px-3" :type "submit" :title "Close directly"}
+                     [:i {:data-lucide "check-circle" :class "size-4"}]]]])]
               ;; Details
               [:div {:class "card p-5"}
                [:div {:class "field-label mb-3"} "Details"]
