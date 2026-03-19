@@ -72,10 +72,8 @@
                [:form {:method "post" :action (str "/organizations/" org-id "/tasks/" task-id "/status")
                        :class "flex gap-2"}
                 (for [s available]
-                  [:button {:class "btn-primary" :type "submit" :name "status" :value (name s)}
+                  [:button {:class "btn-primary" :type "submit" :name "status" :value (subs (str s) 1)}
                    (status-label s)])]])
-            [:form {:method "post" :action (str "/organizations/" org-id "/tasks/" task-id "/runs")}
-             [:button {:class "btn-secondary"} "Start observed run"]]
             [:div
              (ui/section-heading {:title "Run history" :count (count runs)})
              (if (seq runs)
