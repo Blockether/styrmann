@@ -152,4 +152,50 @@
    :opencode-run/working-directory {:db/valueType :db.type/string
                                     :db/doc       "Process working directory"}
    :opencode-run/created-at  {:db/valueType :db.type/instant
-                              :db/doc       "Creation timestamp"}})
+                              :db/doc       "Creation timestamp"}
+
+   ;; -- Git Author -------------------------------------------------------------
+   :git.author/id            {:db/valueType :db.type/uuid
+                              :db/unique    :db.unique/identity
+                              :db/doc       "Unique git author identifier"}
+   :git.author/name          {:db/valueType :db.type/string
+                              :db/doc       "Author display name from git config"}
+   :git.author/email         {:db/valueType :db.type/string
+                              :db/unique    :db.unique/identity
+                              :db/doc       "Author email — identity key for deduplication across commits"}
+
+   ;; -- Git Worktree -----------------------------------------------------------
+   :git.worktree/id          {:db/valueType :db.type/uuid
+                              :db/unique    :db.unique/identity
+                              :db/doc       "Unique git worktree identifier"}
+   :git.worktree/workspace   {:db/valueType :db.type/ref
+                              :db/doc       "Parent workspace this worktree belongs to"}
+   :git.worktree/path        {:db/valueType :db.type/string
+                              :db/doc       "Absolute filesystem path of the worktree checkout"}
+   :git.worktree/branch      {:db/valueType :db.type/string
+                              :db/doc       "Branch currently checked out in this worktree"}
+   :git.worktree/main?       {:db/valueType :db.type/boolean
+                              :db/doc       "Whether this is the main worktree (vs a linked worktree)"}
+   :git.worktree/created-at  {:db/valueType :db.type/instant
+                              :db/doc       "Creation timestamp"}
+
+   ;; -- Git Commit --------------------------------------------------------------
+   :git.commit/id            {:db/valueType :db.type/uuid
+                              :db/unique    :db.unique/identity
+                              :db/doc       "Unique git commit identifier"}
+   :git.commit/worktree      {:db/valueType :db.type/ref
+                              :db/doc       "Worktree where this commit was observed"}
+   :git.commit/sha           {:db/valueType :db.type/string
+                              :db/unique    :db.unique/identity
+                              :db/doc       "Full 40-char hex SHA — unique across all repos"}
+   :git.commit/message       {:db/valueType :db.type/string
+                              :db/doc       "Commit message (first line + body)"}
+   :git.commit/author        {:db/valueType :db.type/ref
+                              :db/doc       "Ref to git.author entity"}
+   :git.commit/authored-at   {:db/valueType :db.type/instant
+                              :db/doc       "Author timestamp from git log"}
+   :git.commit/parent        {:db/valueType   :db.type/ref
+                              :db/cardinality :db.cardinality/many
+                              :db/doc         "Parent commit(s) — cardinality/many for merge commits"}
+   :git.commit/branch        {:db/valueType :db.type/string
+                              :db/doc       "Branch name at time of observation"}})
