@@ -189,11 +189,26 @@
                               :db/doc       "Parent git.repo this worktree belongs to"}
    :git.worktree/path        {:db/valueType :db.type/string
                               :db/doc       "Absolute filesystem path of the worktree checkout"}
-   :git.worktree/branch      {:db/valueType :db.type/string
-                              :db/doc       "Branch currently checked out in this worktree"}
+   :git.worktree/branch      {:db/valueType :db.type/ref
+                              :db/doc       "git.branch currently checked out in this worktree"}
    :git.worktree/main?       {:db/valueType :db.type/boolean
                               :db/doc       "Whether this is the main worktree (vs a linked worktree)"}
    :git.worktree/created-at  {:db/valueType :db.type/instant
+                              :db/doc       "Creation timestamp"}
+
+   ;; -- Git Branch --------------------------------------------------------------
+   :git.branch/id            {:db/valueType :db.type/uuid
+                              :db/unique    :db.unique/identity
+                              :db/doc       "Unique git branch identifier"}
+   :git.branch/repo          {:db/valueType :db.type/ref
+                              :db/doc       "Parent git.repo this branch belongs to"}
+   :git.branch/name          {:db/valueType :db.type/string
+                              :db/doc       "Branch name (e.g. main, feature/foo)"}
+   :git.branch/head          {:db/valueType :db.type/ref
+                              :db/doc       "Ref to git.commit at the tip of this branch"}
+   :git.branch/remote?       {:db/valueType :db.type/boolean
+                              :db/doc       "Whether this is a remote-tracking branch (origin/main) vs local"}
+   :git.branch/created-at    {:db/valueType :db.type/instant
                               :db/doc       "Creation timestamp"}
 
    ;; -- Git Commit --------------------------------------------------------------
@@ -213,6 +228,4 @@
                               :db/doc       "Author timestamp from git log"}
    :git.commit/parent        {:db/valueType   :db.type/ref
                               :db/cardinality :db.cardinality/many
-                              :db/doc         "Parent commit(s) — cardinality/many for merge commits"}
-   :git.commit/branch        {:db/valueType :db.type/string
-                              :db/doc       "Branch name at time of observation"}})
+                              :db/doc         "Parent commit(s) — cardinality/many for merge commits"}})
