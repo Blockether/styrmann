@@ -154,6 +154,23 @@
    :opencode-run/created-at  {:db/valueType :db.type/instant
                               :db/doc       "Creation timestamp"}
 
+   ;; -- Git Repo ----------------------------------------------------------------
+   :git.repo/id              {:db/valueType :db.type/uuid
+                              :db/unique    :db.unique/identity
+                              :db/doc       "Unique git repository identifier"}
+   :git.repo/workspace       {:db/valueType :db.type/ref
+                              :db/doc       "Parent workspace that owns this repository"}
+   :git.repo/origin-url      {:db/valueType :db.type/string
+                              :db/doc       "Remote origin URL (HTTPS or SSH)"}
+   :git.repo/default-branch  {:db/valueType :db.type/string
+                              :db/doc       "Default branch name (e.g. main, master)"}
+   :git.repo/stats-edn       {:db/valueType :db.type/string
+                              :db/doc       "EDN-encoded aggregate statistics snapshot (commit count, contributor count, etc.)"}
+   :git.repo/knowledge-edn   {:db/valueType :db.type/string
+                              :db/doc       "EDN-encoded AI-generated knowledge summarizations about the repository"}
+   :git.repo/created-at      {:db/valueType :db.type/instant
+                              :db/doc       "Creation timestamp"}
+
    ;; -- Git Author -------------------------------------------------------------
    :git.author/id            {:db/valueType :db.type/uuid
                               :db/unique    :db.unique/identity
@@ -168,8 +185,8 @@
    :git.worktree/id          {:db/valueType :db.type/uuid
                               :db/unique    :db.unique/identity
                               :db/doc       "Unique git worktree identifier"}
-   :git.worktree/workspace   {:db/valueType :db.type/ref
-                              :db/doc       "Parent workspace this worktree belongs to"}
+   :git.worktree/repo        {:db/valueType :db.type/ref
+                              :db/doc       "Parent git.repo this worktree belongs to"}
    :git.worktree/path        {:db/valueType :db.type/string
                               :db/doc       "Absolute filesystem path of the worktree checkout"}
    :git.worktree/branch      {:db/valueType :db.type/string
@@ -183,8 +200,8 @@
    :git.commit/id            {:db/valueType :db.type/uuid
                               :db/unique    :db.unique/identity
                               :db/doc       "Unique git commit identifier"}
-   :git.commit/worktree      {:db/valueType :db.type/ref
-                              :db/doc       "Worktree where this commit was observed"}
+   :git.commit/repo          {:db/valueType :db.type/ref
+                              :db/doc       "Parent git.repo this commit belongs to"}
    :git.commit/sha           {:db/valueType :db.type/string
                               :db/unique    :db.unique/identity
                               :db/doc       "Full 40-char hex SHA — unique across all repos"}
