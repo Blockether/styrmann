@@ -27,7 +27,7 @@
                      :repository (:workspace/repository workspace)}
          :repo (when repo
                  {:id (str (:git.repo/id repo))
-                  :origin (:git.repo/origin repo)})
+                  :origin (:git.repo/origin-url repo)})
          :branch-count (count branches)
          :branches (mapv (fn [b]
                            {:name (:git.branch/name b)

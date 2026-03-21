@@ -392,7 +392,7 @@
         :else
         (not-found-page "Page not found."))
       (catch clojure.lang.ExceptionInfo ex
-        (-> (html-response (layout/page "Error" (layout/panel (str "<p>" (ex-message ex) "</p>"))))
+        (-> (html-response (layout/page "Error" (layout/panel [:p (ex-message ex)])))
             (response/status 400))))))
 
 (def app

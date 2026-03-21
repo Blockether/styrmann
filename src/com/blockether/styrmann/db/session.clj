@@ -12,7 +12,7 @@
    :execution-environment/status
    :execution-environment/created-at
    {:execution-environment/workspace [:workspace/id :workspace/name :workspace/repository {:workspace/organization [:organization/id :organization/name]}]}
-   {:execution-environment/provider [:provider/id :provider/name :provider/base-url :provider/api-key :provider/default?]}])
+   {:execution-environment/provider [:provider/id :provider/name :provider/base-url :provider/default?]}])
 
 (def ^:private agent-pull
   [:agent/id :agent/key :agent/name :agent/type :agent/model :agent/version :agent/role :agent/instructions-edn :agent/created-at

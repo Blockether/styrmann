@@ -169,9 +169,9 @@
                         [:i {:data-lucide "circle" :class "w-4 h-4 flex-shrink-0 text-[var(--muted)]"}])
                       [:span {:class "text-[14px]"} title]
                       [:span {:class "text-[12px] text-[var(--muted)] ml-auto"} _task]]))]))
-            (let [workspace-ids (->> (:ticket/tasks t
-                                                    (map #(get-in % [:task/workspace :workspace/id]))
-                                                    distinct))
+            (let [workspace-ids (->> (:ticket/tasks t)
+                                    (map #(get-in % [:task/workspace :workspace/id]))
+                                    distinct)
                   git-commits (->> workspace-ids
                                 (mapcat (fn [ws-id]
                                           (when-let [repo (db.git/find-repo-by-workspace conn ws-id)]
