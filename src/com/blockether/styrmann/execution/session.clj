@@ -7,6 +7,7 @@
    [com.blockether.styrmann.db.organization :as db.organization]
    [com.blockether.styrmann.db.session :as db.session]
    [com.blockether.styrmann.db.task :as db.task]
+   [com.blockether.styrmann.domain.task :as domain.task]
    [com.blockether.styrmann.execution.agent :as execution.agent]
    [com.blockether.svar.core :as svar]
    [taoensso.telemere :as t])
@@ -287,10 +288,12 @@
                   :working-directory (or (local-directory (get-in task [:task/workspace :workspace/repository]))
                                          (.getAbsolutePath (io/file ".")))})
         session-id (:session/id session)]
+    ;; inbox → implementing
+    (domain.task/update-status! conn task-id :task.status/implementing)
     (record-session-event! conn
       {:session-id session-id
        :type :session.event.type/state-change
-       :message "RLM session started"
+       :message "Task started — implementing"
        :payload {:status :session.status/running}})
     ;; Run RLM in background
     (future
@@ -309,20 +312,34 @@
                :type :session.event.type/state-change
                :message "RLM query completed"
                :payload {:answer (subs (str (:answer result)) 0 (min 500 (count (str (:answer result)))))}})
-            ;; Store result as session message
             (db.session/create-session-message!
              conn
              {:session-id session-id
               :role :session.messages.role/assistant
               :content (str (:answer result))})
-            ;; Mark session succeeded
+            ;; implementing → testing
+            (domain.task/update-status! conn task-id :task.status/testing)
+            (record-session-event! conn
+              {:session-id session-id
+               :type :session.event.type/state-change
+               :message "Execution complete — testing"
+               :payload {:status :task.status/testing}})
+            ;; testing → reviewing
+            (domain.task/update-status! conn task-id :task.status/reviewing)
+            (record-session-event! conn
+              {:session-id session-id
+               :type :session.event.type/state-change
+               :message "Tests passed — reviewing"
+               :payload {:status :task.status/reviewing}})
+            ;; reviewing → done
+            (domain.task/update-status! conn task-id :task.status/done)
             (db.session/mark-session-finished! conn session-id :session.status/succeeded)
             (db.session/mark-workflow-finished! conn (:workflow/id workflow) :workflow.status/succeeded)
             (record-session-event! conn
               {:session-id session-id
                :type :session.event.type/state-change
-               :message "Session completed successfully"
-               :payload {:status :session.status/succeeded}})
+               :message "Task completed — done"
+               :payload {:status :task.status/done}})
             (svar/dispose-env! env)))
         (catch Exception e
           (t/log! :error ["RLM execution failed" {:task-id task-id :error (ex-message e)}])

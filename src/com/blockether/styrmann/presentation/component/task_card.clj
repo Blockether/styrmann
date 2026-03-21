@@ -38,33 +38,17 @@
    Returns:
    Hiccup node."
   [task]
-  (let [available (get next-statuses (:task/status task) [])
-        done? (= :task.status/done (:task/status task))]
-    [:div (cond-> {:class "flex flex-col gap-2 card-sm px-4 py-3 hover:shadow-md transition-shadow"}
+  (let [done? (= :task.status/done (:task/status task))]
+    [:div (cond-> {:class "card-sm px-4 py-3 hover:shadow-md transition-shadow"}
             done? (assoc :data-done "1"))
-     ;; First row: status + description (wraps on mobile, truncated on desktop)
      [:div {:class "flex items-start gap-2 sm:items-center min-w-0"}
       (ui/status-badge (:task/status task))
       [:div {:class "flex-1 min-w-0"}
        [:a {:href (str "/organizations/" (get-in task [:task/ticket :ticket/organization :organization/id]) "/tasks/" (:task/id task))
             :class "text-[13px] font-medium text-[var(--ink)] no-underline hover:text-[var(--accent)] sm:truncate task-title"}
         (:task/description task)]
-       ;; Workspace name: shown below on mobile, inline on desktop
-       [:span {:class "block sm:hidden text-[11px] text-[var(--muted)] mt-0.5"}
-        (get-in task [:task/workspace :workspace/name])]
        [:span {:class "hidden sm:inline text-[11px] text-[var(--muted)] ml-2 flex-shrink-0"}
-        (get-in task [:task/workspace :workspace/name])]]]
-     ;; Second row: action buttons (aligned right on mobile, inline on desktop)
-     (if (seq available)
-       [:form {:method "post" :action (str "/organizations/" (get-in task [:task/ticket :ticket/organization :organization/id]) "/tasks/" (:task/id task) "/status")
-               :class "flex gap-1.5 flex-shrink-0 sm:items-center self-end sm:self-auto"}
-        (for [status available]
-          [:button {:class "btn-secondary !px-2.5 !py-1 !text-[11px] !rounded-md"
-                    :type "submit"
-                    :name "status"
-                    :value (subs (str status) 1)}
-           (str/replace (name status) "-" " ")])]
-       [:span {:class "badge badge-done self-end sm:self-auto"} (i18n/t :task-card/done)])]))
+        (get-in task [:task/workspace :workspace/name])]]]]))
 
 (defn render
   "Render a task card.

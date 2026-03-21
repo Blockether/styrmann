@@ -94,14 +94,12 @@
                               [:div {:class "flex-shrink-0 mt-0.5 w-5 h-5 rounded border-2 border-[var(--line-strong)] flex items-center justify-center bg-[var(--surface)]"}]
                               [:span {:class "text-[14px] text-[var(--ink-secondary)] leading-relaxed"} (str c)]])
                            criteria))])))
-            (when (seq available)
-              [:div {:class "flex flex-wrap items-center gap-2"}
-               [:span {:class "text-[13px] text-[var(--muted)]"} (str (i18n/t :task/transition) ":")]
-               [:form {:method "post" :action (str "/organizations/" org-id "/tasks/" task-id "/status")
-                       :class "flex gap-2"}
-                (for [s available]
-                  [:button {:class "btn-primary" :type "submit" :name "status" :value (subs (str s) 1)}
-                   (status-label s)])]])
+            (when (= :task.status/inbox (:task/status task))
+              [:form {:method "post" :action (str "/organizations/" org-id "/tasks/" task-id "/runs")
+                      :class "flex"}
+               [:button {:class "btn-primary" :type "submit"}
+                [:i {:data-lucide "play" :class "size-4"}]
+                "Execute task"]])
             (let [deliverables (when-let [edn-str (:task/deliverables-edn task)]
                                 (try (edn/read-string edn-str) (catch Exception _ nil)))]
               (when (seq deliverables)
