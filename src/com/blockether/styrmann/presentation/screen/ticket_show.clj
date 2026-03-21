@@ -137,7 +137,7 @@
             [:div {:class "card p-5"}
              [:div {:class "flex items-center justify-between mb-4"}
               [:div {:class "flex items-center gap-3"}
-               [:div {:class "field-label !mb-0"} "Task DAG"]
+               [:div {:class "field-label !mb-0"} "Workflow"]
                [:span {:class "text-[12px] text-[var(--muted)]"} (str (count (:ticket/tasks t)) " tasks")]
                (let [done (count (filter #(= :task.status/done (:task/status %)) (:ticket/tasks t)))]
                  (when (pos? (count (:ticket/tasks t)))
@@ -147,20 +147,63 @@
                [:input {:type "checkbox"}]
                [:span "Show done"]]]
              (if (seq (:ticket/tasks t))
-               (into [:div {:class "space-y-2"}]
-                 (map
-                   (fn [task]
-                     (let [deps (:task/depends-on task)]
-                       [:div
-                        (when (seq deps)
-                          [:div {:class "flex items-center gap-1.5 ml-4 mb-1 text-[11px] text-[var(--muted)]"}
-                           [:i {:data-lucide "arrow-up-left" :class "size-3"}]
-                           (if (= 1 (count deps))
-                             [:span (let [d (or (:task/description (first deps)) "?")]
-                                      (subs d 0 (min 50 (count d))))]
-                             [:span (str (count deps) " dependencies")])])
-                        (task-card/view task)]))
-                   (:ticket/tasks t)))
+               (let [tasks (:ticket/tasks t)
+                     task-id-set (set (map :task/id tasks))
+                     roots (filter #(empty? (filter (fn [d] (contains? task-id-set (:task/id d)))
+                                                    (:task/depends-on %))) tasks)
+                     dep-count (fn [task] (count (:task/depends-on task)))
+                     ;; Group by depth level (0 = root, 1 = depends on root, etc.)
+                     task-by-id (into {} (map (juxt :task/id identity) tasks))
+                     depth-of (fn depth-of [task seen]
+                                (if (contains? seen (:task/id task)) 0
+                                    (let [deps (:task/depends-on task)]
+                                      (if (empty? deps) 0
+                                          (inc (apply max (map #(depth-of (get task-by-id (:task/id %) %) (conj seen (:task/id task))) deps)))))))
+                     tasks-with-depth (map (fn [task] (assoc task ::depth (depth-of task #{}))) tasks)
+                     sorted-tasks (sort-by (juxt ::depth :task/created-at) tasks-with-depth)
+                     max-depth (apply max 0 (map ::depth sorted-tasks))]
+                 [:div {:class "relative"}
+                  ;; Legend
+                  (when (> max-depth 0)
+                    [:div {:class "flex items-center gap-4 mb-4 text-[11px] text-[var(--muted)]"}
+                     [:div {:class "flex items-center gap-1.5"}
+                      [:div {:class "w-3 h-3 rounded-full bg-[var(--cream-dark)] border-2 border-[var(--line-strong)]"}]
+                      "Root task"]
+                     [:div {:class "flex items-center gap-1.5"}
+                      [:div {:class "w-6 h-0.5 bg-[var(--line-strong)]"}]
+                      "Dependency"]])
+                  ;; Task flow
+                  (into [:div {:class "space-y-1"}]
+                    (map-indexed
+                      (fn [idx task]
+                        (let [depth (::depth task)
+                              deps (:task/depends-on task)
+                              has-deps? (seq deps)
+                              is-root? (zero? depth)]
+                          [:div {:class "relative"}
+                           ;; Connector line from parent
+                           (when has-deps?
+                             [:div {:class "flex items-center gap-1 mb-1"
+                                    :style (str "margin-left:" (* depth 16) "px")}
+                              [:div {:class "w-4 h-0.5 bg-[var(--line-strong)]"}]
+                              [:i {:data-lucide "chevron-down" :class "size-3 text-[var(--muted)] -rotate-90"}]
+                              [:span {:class "text-[10px] text-[var(--muted)] italic"}
+                               (if (= 1 (count deps))
+                                 (let [d (or (:task/description (first deps)) "?")]
+                                   (str "from: " (subs d 0 (min 35 (count d)))))
+                                 (str (count deps) " deps"))]])
+                           ;; Task card with depth indent
+                           [:div {:style (str "margin-left:" (* depth 16) "px")}
+                            [:div {:class (str "flex items-start gap-2 "
+                                               (when is-root? ""))}
+                             ;; Depth indicator dot
+                             [:div {:class (str "flex-shrink-0 mt-3 w-3 h-3 rounded-full border-2 "
+                                                (if is-root?
+                                                  "border-[var(--accent)] bg-[var(--accent-soft)]"
+                                                  "border-[var(--line-strong)] bg-[var(--cream-dark)]"))}]
+                             [:div {:class "flex-1 min-w-0"}
+                              (task-card/view task)]]]]))
+                      sorted-tasks))])
                [:div {:class "text-[13px] text-[var(--muted)] text-center py-4"}
                 "No tasks yet."])]
             (let [all-deliverables (->> (:ticket/tasks t)
