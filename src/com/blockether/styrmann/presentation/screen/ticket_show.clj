@@ -2,6 +2,7 @@
   "SSR ticket detail — warm editorial issue view."
   (:require
    [clojure.edn :as edn]
+   [clojure.string :as str]
    [com.blockether.styrmann.db.git :as db.git]
    [com.blockether.styrmann.domain.organization :as organization]
    [com.blockether.styrmann.domain.ticket :as ticket]
@@ -142,22 +143,21 @@
                [:input {:type "checkbox"}]
                [:span "Show done"]]]
              (if (seq (:ticket/tasks t))
-               (let [task-id->idx (into {} (map-indexed (fn [i t] [(:task/id t) i]) (:ticket/tasks t)))]
-                 (into [:div {:class "space-y-2"}]
-                   (map-indexed
-                     (fn [idx task]
-                       (let [deps (:task/depends-on task)
-                             dep-descriptions (when (seq deps)
-                                                (->> deps
-                                                     (map #(or (:task/description %) (str "Task " (get task-id->idx (:task/id %) "?"))))
-                                                     vec))]
-                         [:div
-                          (when (seq dep-descriptions)
-                            [:div {:class "flex items-center gap-1.5 ml-4 mb-1 text-[11px] text-[var(--muted)]"}
-                             [:i {:data-lucide "git-branch" :class "size-3 rotate-180"}]
-                             [:span (str "depends on: " (clojure.string/join ", " (map #(subs % 0 (min 40 (count %))) dep-descriptions)))]])
-                          (task-card/view task)]))
-                     (:ticket/tasks t))))
+               (into [:div {:class "space-y-2"}]
+                 (map
+                   (fn [task]
+                     (let [deps (:task/depends-on task)
+                           dep-descriptions (when (seq deps)
+                                              (->> deps
+                                                   (map #(or (:task/description %) "Task ?"))
+                                                   vec))]
+                       [:div
+                        (when (seq dep-descriptions)
+                          [:div {:class "flex items-center gap-1.5 ml-4 mb-1 text-[11px] text-[var(--muted)]"}
+                           [:i {:data-lucide "git-branch" :class "size-3 rotate-180"}]
+                           [:span (str "depends on: " (str/join ", " (map #(subs % 0 (min 40 (count %))) dep-descriptions)))]])
+                        (task-card/view task)]))
+                   (:ticket/tasks t)))
                [:div {:class "text-[13px] text-[var(--muted)] text-center py-4"}
                 "No tasks yet."])]
             (let [all-deliverables (->> (:ticket/tasks t)

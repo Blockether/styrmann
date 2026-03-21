@@ -7,7 +7,6 @@
    [com.blockether.styrmann.db.organization :as db.organization]
    [com.blockether.styrmann.db.session :as db.session]
    [com.blockether.styrmann.db.task :as db.task]
-   [com.blockether.styrmann.db.ticket :as db.ticket]
    [com.blockether.styrmann.execution.agent :as execution.agent]
    [com.blockether.svar.core :as svar]
    [taoensso.telemere :as t])
