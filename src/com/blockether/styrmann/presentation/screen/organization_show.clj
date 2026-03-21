@@ -222,7 +222,7 @@
      [:div
       [:div {:class "field-label mb-1"} subtitle]
       [:h2 {:class "text-[24px] leading-none"} title]]
-     [:button {:type "button" :class "toolbar-action !px-3 !py-2" :data-modal-close true}
+     [:button {:type "button" :class "modal-close" :data-modal-close true}
       [:i {:data-lucide "x" :class "size-4"}]]]
     [:div {:class "px-5 py-5"} body]]])
 

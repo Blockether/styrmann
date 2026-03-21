@@ -343,3 +343,13 @@
        (map #(d/pull (d/db conn) session-event-pull [:session.event/id %]))
        (sort-by :session.event/created-at #(compare %1 %2))
        vec))
+
+(defn create-session-message!
+  "Persist a message exchanged during a session."
+  [conn {:keys [session-id role content]}]
+  (let [msg-id (UUID/randomUUID)]
+    (d/transact! conn [{:session.messages/id      msg-id
+                        :session.messages/session [:session/id session-id]
+                        :session.messages/role    role
+                        :session.messages/content content}])
+    msg-id))

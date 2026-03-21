@@ -132,14 +132,32 @@
             [:div {:class "card p-5"}
              [:div {:class "flex items-center justify-between mb-4"}
               [:div {:class "flex items-center gap-3"}
-               [:div {:class "field-label !mb-0"} "Child tasks"]
-               [:span {:class "text-[12px] text-[var(--muted)]"} (str (count (:ticket/tasks t)) " tasks")]]
+               [:div {:class "field-label !mb-0"} "Task DAG"]
+               [:span {:class "text-[12px] text-[var(--muted)]"} (str (count (:ticket/tasks t)) " tasks")]
+               (let [done (count (filter #(= :task.status/done (:task/status %)) (:ticket/tasks t)))]
+                 (when (pos? (count (:ticket/tasks t)))
+                   [:span {:class "text-[11px] font-medium text-[var(--good)]"}
+                    (str done "/" (count (:ticket/tasks t)) " done")]))]
               [:label {:class "done-toggle" :data-done-toggle "show-done"}
                [:input {:type "checkbox"}]
                [:span "Show done"]]]
              (if (seq (:ticket/tasks t))
-               (into [:div {:class "space-y-2"}]
-                 (map task-card/view (:ticket/tasks t)))
+               (let [task-id->idx (into {} (map-indexed (fn [i t] [(:task/id t) i]) (:ticket/tasks t)))]
+                 (into [:div {:class "space-y-2"}]
+                   (map-indexed
+                     (fn [idx task]
+                       (let [deps (:task/depends-on task)
+                             dep-descriptions (when (seq deps)
+                                                (->> deps
+                                                     (map #(or (:task/description %) (str "Task " (get task-id->idx (:task/id %) "?"))))
+                                                     vec))]
+                         [:div
+                          (when (seq dep-descriptions)
+                            [:div {:class "flex items-center gap-1.5 ml-4 mb-1 text-[11px] text-[var(--muted)]"}
+                             [:i {:data-lucide "git-branch" :class "size-3 rotate-180"}]
+                             [:span (str "depends on: " (clojure.string/join ", " (map #(subs % 0 (min 40 (count %))) dep-descriptions)))]])
+                          (task-card/view task)]))
+                     (:ticket/tasks t))))
                [:div {:class "text-[13px] text-[var(--muted)] text-center py-4"}
                 "No tasks yet."])]
             (let [all-deliverables (->> (:ticket/tasks t)
@@ -244,13 +262,20 @@
                               :selected? (= (:milestone/id m) current-milestone-id)})
                            "None"))
                        [:span {:class "text-[13px] text-[var(--muted)]"} "No milestones"]))))]
-              ;; Add task — modal popup (hidden when closed)
+              ;; Decompose + Add task (hidden when closed)
               (when (and (not closed?) (seq (:organization/workspaces org-overview)))
-                [:button {:type "button"
-                          :class "btn-primary w-full"
-                          :data-modal-open (str "modal-add-task-" ticket-id)}
-                 [:i {:data-lucide "plus" :class "size-4"}]
-                 "Add task"])])
+                [:div {:class "flex flex-col gap-2"}
+                 (when (empty? (:ticket/tasks t))
+                   [:form {:method "post"
+                           :action (str "/organizations/" org-id "/tickets/" ticket-id "/decompose")}
+                    [:button {:class "btn-primary w-full" :type "submit"}
+                     [:i {:data-lucide "sparkles" :class "size-4"}]
+                     "Decompose into tasks"]])
+                 [:button {:type "button"
+                           :class "btn-secondary w-full"
+                           :data-modal-open (str "modal-add-task-" ticket-id)}
+                  [:i {:data-lucide "plus" :class "size-4"}]
+                  "Add task manually"]])])
            ;; Add task modal
            (when (and (not (= :ticket.status/closed (or (:ticket/status t) :ticket.status/open)))
                    (seq (:organization/workspaces org-overview)))
@@ -260,7 +285,7 @@
                 [:div
                  [:div {:class "field-label mb-1"} "Task"]
                  [:h2 {:class "text-[24px] leading-none"} "Add task"]]
-                [:button {:type "button" :class "toolbar-action !px-3 !py-2" :data-modal-close true}
+                [:button {:type "button" :class "modal-close" :data-modal-close true}
                  [:i {:data-lucide "x" :class "size-4"}]]]
                [:div {:class "px-5 py-5"}
                 [:form {:class "space-y-4" :method "post"

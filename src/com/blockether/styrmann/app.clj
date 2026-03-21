@@ -5,6 +5,7 @@
    [com.blockether.styrmann.db.core :as db]
    [com.blockether.styrmann.db.organization :as db.organization]
    [com.blockether.styrmann.db.task :as db.task]
+   [com.blockether.styrmann.domain.analysis :as analysis]
    [com.blockether.styrmann.domain.organization :as organization]
    [com.blockether.styrmann.domain.planning :as planning]
    [com.blockether.styrmann.domain.provider :as provider]
@@ -239,9 +240,16 @@
 (defn- handle-task-run [task-id]
   (if-let [task-record (db.task/find-task (db/conn) task-id)]
     (let [organization-id (get-in task-record [:task/ticket :ticket/organization :organization/id])]
-      (session/execute! (db/conn) {:task-id task-id})
+      (session/execute-with-rlm! (db/conn) task-id)
       (redirect-to (str "/organizations/" organization-id "/tasks/" task-id)))
     (not-found-page "Task not found.")))
+
+(defn- handle-ticket-decompose [ticket-id]
+  (if-let [t (ticket/find-by-id (db/conn) ticket-id)]
+    (let [org-id (get-in t [:ticket/organization :organization/id])]
+      (future (analysis/decompose-ticket! (db/conn) ticket-id))
+      (redirect-to (str "/organizations/" org-id "/tickets/" ticket-id)))
+    (not-found-page "Ticket not found.")))
 
 (defn- sse-fragment-response
   "Create an SSE response that patches #main-content, #breadcrumbs, and #topbar-context."
@@ -349,6 +357,9 @@
 
         (and (= method :post) (= 5 (count segments)) (= "organizations" (first segments)) (= "tickets" (nth segments 2)) (= "tasks" (nth segments 4)))
         (handle-create-task (uuid (nth segments 3)) request)
+
+        (and (= method :post) (= 5 (count segments)) (= "organizations" (first segments)) (= "tickets" (nth segments 2)) (= "decompose" (nth segments 4)))
+        (handle-ticket-decompose (uuid (nth segments 3)))
 
         (and (= method :get) (= 4 (count segments)) (= "organizations" (first segments)) (= "workspaces" (nth segments 2)))
         (handle-workspace-show-in-organization (uuid (second segments)) (uuid (nth segments 3)))

@@ -3,8 +3,10 @@
    Boots nREPL + Ring/Jetty + Datalevin.
    Provides test runners, docstring validation, and test scaffolding."
   (:require
+   [clj-reload.core :as reload]
    [clojure.string :as str]
    [com.blockether.styrmann.app :as app]
+   [com.blockether.styrmann.bootstrap :as bootstrap]
    [com.blockether.styrmann.db.core :as db]
    [nrepl.server :as nrepl]
    [ring.adapter.jetty :as jetty]
@@ -30,6 +32,7 @@
             http-port  3000
             db-path    "data/styrmann"}}]
    (db/start! db-path)
+   (bootstrap/ensure-from-git! (db/conn))
    (when-not @!nrepl
      (let [srv (nrepl/start-server :port nrepl-port)]
        (reset! !nrepl srv)
@@ -53,12 +56,10 @@
     (t/log! :info "nREPL stopped"))
   (db/stop!))
 
-(defn restart
-  "Restart all services."
-  ([] (restart {}))
-  ([opts]
-   (stop)
-   (start opts)))
+(defn reset
+  "Reload changed namespaces via clj-reload. No server restart needed."
+  []
+  (reload/reload))
 
 ;; =============================================================================
 ;; Docstring Validation (from unbound)
@@ -384,6 +385,12 @@
               :append true)
         (println (str "  Created: " (fn-name->test-name fn-name)))))
     {:test-file test-path :created (count to-create) :skipped (- (count fn-vars) (count to-create))}))
+
+;; -- clj-reload + clojure+ ---------------------------------------------------
+
+(reload/init {:dirs ["src" "dev"]})
+((requiring-resolve 'clojure+.hashp/install!))
+((requiring-resolve 'clojure+.error/install!))
 
 ;; -- auto-start on load ------------------------------------------------------
 

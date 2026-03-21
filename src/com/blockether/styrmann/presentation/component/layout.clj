@@ -89,7 +89,10 @@ a:hover { color: var(--accent-hover); }
  .topbar-menu-link:hover { background: var(--cream-dark); }
   .modal-backdrop { position: fixed; inset: 0; background: rgba(26,26,31,0.48); display: none; align-items: center; justify-content: center; padding: 16px; z-index: 80; }
   .modal-backdrop.is-open { display: flex; }
-  .modal-shell { width: 100%; max-width: 520px; max-height: 88vh; overflow: auto; background: var(--surface); border-radius: 28px; border: 1px solid var(--line); box-shadow: 0 24px 80px rgba(26,26,31,0.18); }
+  .modal-shell { width: 100%; max-width: 520px; min-height: 40vh; max-height: 88vh; display: flex; flex-direction: column; background: var(--surface); border-radius: 28px; border: 1px solid var(--line); box-shadow: 0 24px 80px rgba(26,26,31,0.18); }
+  .modal-shell > :last-child { flex: 1; overflow-y: auto; }
+  .modal-close { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 50%; background: var(--cream-dark); border: 1px solid var(--line); color: var(--ink-secondary); cursor: pointer; transition: background .2s, color .2s; flex-shrink: 0; padding: 0; }
+  .modal-close:hover { background: var(--cream); color: var(--ink); border-color: var(--line-strong); }
  .view-panel[hidden] { display: none !important; }
  [data-closed] { display: none; }
  [data-done] { display: none; }
@@ -111,7 +114,7 @@ a:hover { color: var(--accent-hover); }
    .board-scroll { flex-direction: column !important; }
    .board-scroll > * { min-width: 100% !important; max-width: 100% !important; }
    .modal-backdrop { align-items: flex-end; padding: 0; }
-   .modal-shell { max-width: 100%; max-height: 92vh; border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+   .modal-shell { max-width: 100%; min-height: 50vh; max-height: 92vh; border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
  }")
 
 (defn raw-html
@@ -173,7 +176,7 @@ a:hover { color: var(--accent-hover); }
         [:div
          [:div {:class "field-label mb-1"} "Organization"]
          [:h2 {:class "text-[24px] leading-none"} "Create organization"]]
-        [:button {:type "button" :class "toolbar-action !px-3 !py-2" :data-modal-close true}
+        [:button {:type "button" :class "modal-close" :data-modal-close true}
          [:i {:data-lucide "x" :class "size-4"}]]]
        [:div {:class "px-5 py-5"}
         [:form {:class "space-y-4" :method "post" :action "/organizations"}
@@ -426,8 +429,16 @@ lucide.createIcons();
     }
 
     if (form) {
-      form.addEventListener('submit', function() {
+      form.addEventListener('submit', function(e) {
         if (hiddenField) hiddenField.value = serializeToText();
+        var items = builder.querySelectorAll('.ac-item');
+        if (items.length === 0) {
+          e.preventDefault();
+          input.classList.add('!border-[var(--danger)]');
+          input.setAttribute('placeholder', 'At least one acceptance criterion is required');
+          input.focus();
+          setTimeout(function(){ input.classList.remove('!border-[var(--danger)]'); input.setAttribute('placeholder', 'Add acceptance criterion...'); }, 3000);
+        }
       });
     }
   }

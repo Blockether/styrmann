@@ -6,7 +6,11 @@
    [clojure.string :as str]
    [com.blockether.styrmann.db.organization :as db.organization]
    [com.blockether.styrmann.db.session :as db.session]
-   [com.blockether.styrmann.db.task :as db.task])
+   [com.blockether.styrmann.db.task :as db.task]
+   [com.blockether.styrmann.db.ticket :as db.ticket]
+   [com.blockether.styrmann.execution.agent :as execution.agent]
+   [com.blockether.svar.core :as svar]
+   [taoensso.telemere :as t])
   (:import
    [java.lang ProcessHandle]))
 
@@ -239,6 +243,98 @@
     :model model
     :working-directory working-directory
     :status status}))
+
+(defn- build-rlm-prompt [task]
+  (let [ticket-desc (get-in task [:task/ticket :ticket/description] "")
+        ticket-title (get-in task [:task/ticket :ticket/title] "")
+        ac (or (:task/acceptance-criteria-edn task) "[]")
+        cove (or (:task/cove-questions-edn task) "[]")]
+    (str "## Context\n"
+         "Ticket: " ticket-title "\n"
+         "Description: " ticket-desc "\n\n"
+         "## Your Task\n"
+         (:task/description task) "\n\n"
+         "## Acceptance Criteria\n"
+         ac "\n\n"
+         "## Verification Questions\n"
+         cove)))
+
+(defn execute-with-rlm!
+  "Execute a task using in-process Svar RLM instead of subprocess.
+
+   Creates workflow + session, runs RLM query, emits events throughout.
+   Runs asynchronously in a future.
+
+   Params:
+   `conn` - Datalevin connection.
+   `task-id` - UUID. Task to execute.
+
+   Returns:
+   Session map (execution runs in background)."
+  [conn task-id]
+  (let [task (require-task! conn task-id)
+        environment (ensure-environment! conn task)
+        agent (ensure-agent! conn)
+        workflow (db.session/create-workflow! conn {:task-id task-id})
+        session (db.session/create-session!
+                 conn
+                 {:workflow-id       (:workflow/id workflow)
+                  :environment-id    (:execution-environment/id environment)
+                  :agent-id          (:agent/id agent)
+                  :pid               0
+                  :command-edn       (pr-str ["rlm" "query"])
+                  :log-path          ""
+                  :exit-path         ""
+                  :working-directory (or (local-directory (get-in task [:task/workspace :workspace/repository]))
+                                         (.getAbsolutePath (io/file ".")))})
+        session-id (:session/id session)]
+    (record-session-event! conn
+      {:session-id session-id
+       :type :session.event.type/state-change
+       :message "RLM session started"
+       :payload {:status :session.status/running}})
+    ;; Run RLM in background
+    (future
+      (try
+        (let [config (execution.agent/default-config)
+              env (svar/create-env {:config config})
+              prompt (build-rlm-prompt task)]
+          (record-session-event! conn
+            {:session-id session-id
+             :type :session.event.type/state-change
+             :message "RLM environment created, querying..."
+             :payload {:model (:default-model config)}})
+          (let [result (svar/query-env! env prompt)]
+            (record-session-event! conn
+              {:session-id session-id
+               :type :session.event.type/state-change
+               :message "RLM query completed"
+               :payload {:answer (subs (str (:answer result)) 0 (min 500 (count (str (:answer result)))))}})
+            ;; Store result as session message
+            (db.session/create-session-message!
+             conn
+             {:session-id session-id
+              :role :session.messages.role/assistant
+              :content (str (:answer result))})
+            ;; Mark session succeeded
+            (db.session/mark-session-finished! conn session-id :session.status/succeeded)
+            (db.session/mark-workflow-finished! conn (:workflow/id workflow) :workflow.status/succeeded)
+            (record-session-event! conn
+              {:session-id session-id
+               :type :session.event.type/state-change
+               :message "Session completed successfully"
+               :payload {:status :session.status/succeeded}})
+            (svar/dispose-env! env)))
+        (catch Exception e
+          (t/log! :error ["RLM execution failed" {:task-id task-id :error (ex-message e)}])
+          (record-session-event! conn
+            {:session-id session-id
+             :type :session.event.type/state-change
+             :message (str "Session failed: " (ex-message e))
+             :payload {:status :session.status/failed :error (ex-message e)}})
+          (db.session/mark-session-finished! conn session-id :session.status/failed)
+          (db.session/mark-workflow-finished! conn (:workflow/id workflow) :workflow.status/failed))))
+    session))
 
 (defn execute!
   "Start a workflow with one running agent session for a task."
