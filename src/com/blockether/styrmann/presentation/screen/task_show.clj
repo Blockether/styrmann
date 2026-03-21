@@ -1,11 +1,14 @@
 (ns com.blockether.styrmann.presentation.screen.task-show
   "SSR task detail — warm editorial view."
   (:require
+   [clojure.edn :as edn]
    [clojure.string :as str]
+   [com.blockether.styrmann.db.git :as db.git]
    [com.blockether.styrmann.db.organization :as db.organization]
    [com.blockether.styrmann.db.task :as db.task]
    [com.blockether.styrmann.domain.organization :as organization]
    [com.blockether.styrmann.execution.session :as session]
+   [com.blockether.styrmann.presentation.component.git-progress :as git-progress]
    [com.blockether.styrmann.presentation.component.layout :as layout]
    [com.blockether.styrmann.presentation.component.ui :as ui]))
 
@@ -87,6 +90,33 @@
                 (for [s available]
                   [:button {:class "btn-primary" :type "submit" :name "status" :value (subs (str s) 1)}
                    (status-label s)])]])
+            (let [deliverables (when-let [edn-str (:task/deliverables-edn task)]
+                                (try (edn/read-string edn-str) (catch Exception _ nil)))]
+              (when (seq deliverables)
+                [:div
+                 (ui/section-heading {:title "Deliverables" :count (count deliverables)})
+                 [:div {:class "mt-3 space-y-2"}
+                  (for [{:keys [title description status]} deliverables]
+                    [:div {:class "card p-4 flex items-start gap-3"}
+                     [:div {:class "mt-0.5"}
+                      (if (= status "done")
+                        [:i {:data-lucide "check-circle" :class "w-4 h-4 text-[var(--good)]"}]
+                        [:i {:data-lucide "circle" :class "w-4 h-4 text-[var(--muted)]"}])]
+                     [:div
+                      [:div {:class "text-[14px] font-medium"} title]
+                      (when (and description (not (str/blank? description)))
+                        [:div {:class "text-[13px] text-[var(--ink-secondary)] mt-0.5"} description])]])]]))
+            (let [ws-id (get-in task [:task/workspace :workspace/id])
+                  git-commits (when ws-id
+                                (when-let [repo (db.git/find-repo-by-workspace conn ws-id)]
+                                  (->> (db.git/list-commits-by-repo conn (:git.repo/id repo))
+                                       (map (fn [c]
+                                              {:sha (:git.commit/sha c)
+                                               :message (:git.commit/message c)
+                                               :author (some-> c :git.commit/author :git.author/name)
+                                               :date (some-> c :git.commit/authored-at str)}))
+                                       vec)))]
+              (git-progress/commits-section git-commits {:title "Git Activity"}))
             [:div
              (ui/section-heading {:title "Run history" :count (count runs)})
              (if (seq runs)

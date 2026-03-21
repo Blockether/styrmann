@@ -118,6 +118,8 @@
                                    :db/doc       "EDN-encoded scoped acceptance criteria for this task"}
    :task/cove-questions-edn       {:db/valueType :db.type/string
                                    :db/doc       "EDN-encoded CoVe verification questions"}
+   :task/deliverables-edn         {:db/valueType :db.type/string
+                                   :db/doc       "EDN-encoded deliverables list for this task"}
    :task/depends-on               {:db/valueType   :db.type/ref
                                    :db/cardinality :db.cardinality/many
                                    :db/doc         "Tasks that must complete before this task can start"}
@@ -176,10 +178,14 @@
                              :db/doc       "Stable unique key for the agent"}
    :agent/name              {:db/valueType :db.type/string
                              :db/doc       "Human-friendly agent name"}
+   :agent/type              {:db/valueType :db.type/keyword
+                             :db/doc       "Agent type: planner, implementer, reviewer, explorer, verifier"}
    :agent/version           {:db/valueType :db.type/string
                              :db/doc       "Agent prompt or implementation version"}
    :agent/role              {:db/valueType :db.type/string
                              :db/doc       "Role description for the agent"}
+   :agent/model             {:db/valueType :db.type/string
+                             :db/doc       "Default LLM model for this agent type"}
    :agent/instructions-edn  {:db/valueType :db.type/string
                              :db/doc       "EDN-encoded instruction list"}
    :agent/tools             {:db/valueType   :db.type/ref

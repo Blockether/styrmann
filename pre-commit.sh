@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # pre-commit.sh — run all pre-commit checks
-# Mirrors the Pre-Commit Checklist in AGENTS.md
+# Mirrors the Pre-Commit Checklist in CLAUDE.md
 set -euo pipefail
 
 RED='\033[0;31m'

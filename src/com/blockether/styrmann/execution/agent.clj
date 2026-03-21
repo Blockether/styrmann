@@ -2,10 +2,21 @@
   "Svar-backed agent utilities for execution namespaces.
 
    This namespace centralizes RLM wiring so execution code does not depend on
-   Svar details directly."
+   Svar details directly.
+
+   Provider resolution order:
+   1. Explicit :provider map passed in opts
+   2. Default provider from Datalevin (via :conn in opts)
+   3. Environment variables (BLOCKETHER_OPENAI_API_KEY, etc.)
+
+   Default model: glm-5-turbo (Blockether LLM)."
   (:require
    [clojure.string :as str]
    [com.blockether.svar.core :as svar]))
+
+(def default-model
+  "Default LLM model for all execution."
+  "glm-5-turbo")
 
 (defn- env
   "Read environment variable by key, returning nil when blank."
@@ -14,37 +25,71 @@
     (when (and value (not (str/blank? value)))
       value)))
 
+(defn provider->config
+  "Convert a DB provider map to a Svar config map.
+
+   Params:
+   `provider` - Map with :provider/api-key, :provider/base-url.
+   `model`    - Optional model override. Defaults to `default-model`.
+
+   Returns:
+   Svar config map with :api-key, :base-url, :model."
+  [provider model]
+  (let [opts {:api-key  (:provider/api-key provider)
+              :base-url (:provider/base-url provider)
+              :model    (or model default-model)}]
+    (svar/make-config opts)))
+
 (defn default-config
   "Build default Svar config for OpenAI-compatible APIs from environment.
 
-   Reads:
-   - BLOCKETHER_LLM_API_KEY or OPENAI_API_KEY
-   - BLOCKETHER_LLM_API_BASE_URL or OPENAI_BASE_URL
-   - BLOCKETHER_LLM_DEFAULT_MODEL (optional)
+   Reads (in priority order):
+   - BLOCKETHER_OPENAI_API_KEY or BLOCKETHER_LLM_API_KEY or OPENAI_API_KEY
+   - BLOCKETHER_OPENAI_BASE_URL or BLOCKETHER_LLM_API_BASE_URL or OPENAI_BASE_URL
+   - BLOCKETHER_LLM_DEFAULT_MODEL (optional, defaults to glm-5-turbo)
 
    Returns nil when no API key is configured."
   []
-  (let [api-key  (or (env "BLOCKETHER_LLM_API_KEY")
+  (let [api-key  (or (env "BLOCKETHER_OPENAI_API_KEY")
+                     (env "BLOCKETHER_LLM_API_KEY")
                      (env "OPENAI_API_KEY"))
-        base-url (or (env "BLOCKETHER_LLM_API_BASE_URL")
+        base-url (or (env "BLOCKETHER_OPENAI_BASE_URL")
+                     (env "BLOCKETHER_LLM_API_BASE_URL")
                      (env "OPENAI_BASE_URL"))
-        model    (env "BLOCKETHER_LLM_DEFAULT_MODEL")]
+        model    (or (env "BLOCKETHER_LLM_DEFAULT_MODEL") default-model)]
     (when api-key
-      (let [opts (cond-> {:api-key api-key}
-                   base-url (assoc :base-url base-url)
-                   model    (assoc :model model))]
-        (if-let [make-config (requiring-resolve 'com.blockether.svar.core/make-config)]
-          (make-config opts)
-          nil)))))
+      (svar/make-config (cond-> {:api-key api-key :model model}
+                          base-url (assoc :base-url base-url))))))
+
+(defn resolve-config
+  "Resolve Svar config from provider map, conn, or env vars.
+
+   Params:
+   `opts` - Map with optional keys:
+     :provider - DB provider map (highest priority)
+     :conn     - Datalevin connection (looks up default provider)
+     :model    - Model override
+     :config   - Pre-built Svar config (bypasses resolution)
+
+   Returns:
+   Svar config map or nil."
+  [{:keys [provider conn model config]}]
+  (or config
+      (when provider
+        (provider->config provider model))
+      (when conn
+        (when-let [db-provider ((requiring-resolve 'com.blockether.styrmann.db.provider/find-default-provider) conn)]
+          (provider->config db-provider model)))
+      (default-config)))
 
 (defn ask!
-  "Call Svar ask! with optional default config fallback."
+  "Call Svar ask! with config resolution.
+
+   Config is resolved in order: explicit :config > :provider > :conn default > env vars."
   [opts]
-  (let [opts (if (:config opts)
-               opts
-               (if-let [cfg (default-config)]
-                 (assoc opts :config cfg)
-                 opts))]
+  (let [cfg (resolve-config opts)
+        opts (cond-> opts
+               cfg (assoc :config cfg))]
     (svar/ask! opts)))
 
 (def system svar/system)

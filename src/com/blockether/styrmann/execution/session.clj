@@ -69,7 +69,7 @@
         (db.session/create-environment!
          conn
          {:workspace-id workspace-id
-          :model "gpt-4o-mini"
+          :model "glm-5-turbo"
           :working-directory (or (local-directory (get-in task [:task/workspace :workspace/repository]))
                                  (.getAbsolutePath (io/file ".")))
           :status :execution-environment.status/ready}))))
@@ -139,7 +139,7 @@
                         (db.session/create-environment!
                          conn
                          {:workspace-id workspace-id
-                          :model "gpt-4o-mini"
+                          :model "glm-5-turbo"
                           :working-directory (:workspace/repository workspace)
                           :status :execution-environment.status/ready}))
         agent (ensure-explorer-agent! conn)

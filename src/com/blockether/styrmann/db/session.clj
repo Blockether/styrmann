@@ -15,7 +15,7 @@
    {:execution-environment/provider [:provider/id :provider/name :provider/base-url :provider/api-key :provider/default?]}])
 
 (def ^:private agent-pull
-  [:agent/id :agent/key :agent/name :agent/version :agent/role :agent/instructions-edn :agent/created-at
+  [:agent/id :agent/key :agent/name :agent/type :agent/model :agent/version :agent/role :agent/instructions-edn :agent/created-at
    {:agent/tools [:tool-definition/id :tool-definition/key :tool-definition/name :tool-definition/fn-symbol :tool-definition/enabled?]}])
 
 (def ^:private workflow-pull
@@ -190,7 +190,7 @@
 
 (defn create-agent!
   "Create an agent definition."
-  [conn {:keys [key name version role instructions-edn tool-ids]}]
+  [conn {:keys [key name type model version role instructions-edn tool-ids]}]
   (let [agent-id (UUID/randomUUID)]
     (d/transact! conn [(cond-> {:agent/id               agent-id
                                 :agent/key              key
@@ -199,6 +199,8 @@
                                 :agent/role             role
                                 :agent/instructions-edn instructions-edn
                                 :agent/created-at       (java.util.Date.)}
+                         type (assoc :agent/type type)
+                         model (assoc :agent/model model)
                          (seq tool-ids) (assoc :agent/tools (mapv (fn [tool-id] [:tool-definition/id tool-id]) tool-ids)))])
     (find-agent-by-key conn key)))
 

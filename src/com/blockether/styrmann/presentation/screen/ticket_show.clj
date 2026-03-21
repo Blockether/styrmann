@@ -1,8 +1,11 @@
 (ns com.blockether.styrmann.presentation.screen.ticket-show
   "SSR ticket detail — warm editorial issue view."
   (:require
+   [clojure.edn :as edn]
+   [com.blockether.styrmann.db.git :as db.git]
    [com.blockether.styrmann.domain.organization :as organization]
    [com.blockether.styrmann.domain.ticket :as ticket]
+   [com.blockether.styrmann.presentation.component.git-progress :as git-progress]
    [com.blockether.styrmann.presentation.component.layout :as layout]
    [com.blockether.styrmann.presentation.component.task-card :as task-card]
    [com.blockether.styrmann.presentation.component.ui :as ui]))
@@ -121,11 +124,11 @@
               [:div {:class "card p-5"}
                [:div {:class "field-label mb-3"} "Attachments"]
                (into [:div {:class "flex flex-wrap gap-2"}]
-                     (for [att (:ticket/attachments t)]
-                       [:a {:href (str "/attachments/" (:attachment/id att))
-                            :class "inline-flex items-center gap-1.5 rounded-xl bg-[var(--cream-dark)] px-3 py-2 text-[13px] text-[var(--ink)] no-underline hover:bg-[var(--line-strong)] transition-colors"}
-                        [:i {:data-lucide "paperclip" :class "size-3.5 text-[var(--muted)]"}]
-                        (:attachment/name att)]))])
+                 (for [att (:ticket/attachments t)]
+                   [:a {:href (str "/attachments/" (:attachment/id att))
+                        :class "inline-flex items-center gap-1.5 rounded-xl bg-[var(--cream-dark)] px-3 py-2 text-[13px] text-[var(--ink)] no-underline hover:bg-[var(--line-strong)] transition-colors"}
+                    [:i {:data-lucide "paperclip" :class "size-3.5 text-[var(--muted)]"}]
+                    (:attachment/name att)]))])
             [:div {:class "card p-5"}
              [:div {:class "flex items-center justify-between mb-4"}
               [:div {:class "flex items-center gap-3"}
@@ -136,69 +139,111 @@
                [:span "Show done"]]]
              (if (seq (:ticket/tasks t))
                (into [:div {:class "space-y-2"}]
-                     (map task-card/view (:ticket/tasks t)))
+                 (map task-card/view (:ticket/tasks t)))
                [:div {:class "text-[13px] text-[var(--muted)] text-center py-4"}
-                "No tasks yet."])]]
+                "No tasks yet."])]
+            (let [all-deliverables (->> (:ticket/tasks t)
+                                     (mapcat (fn [task]
+                                               (when-let [edn-str (:task/deliverables-edn task)]
+                                                 (try
+                                                   (map #(assoc % :_task (:task/description task))
+                                                     (edn/read-string edn-str))
+                                                   (catch Exception _ nil)))))
+                                     vec)
+                  done-count (count (filter #(= "done" (:status %)) all-deliverables))
+                  total (count all-deliverables)]
+              (when (seq all-deliverables)
+                [:div {:class "card p-5"}
+                 [:div {:class "flex items-center gap-3 mb-4"}
+                  [:div {:class "field-label !mb-0"} "Deliverables summary"]
+                  [:span {:class "text-[12px] text-[var(--muted)]"}
+                   (str done-count "/" total " complete")]]
+                 [:div {:class "w-full h-2 rounded-full bg-[var(--cream-dark)] overflow-hidden mb-4"}
+                  [:div {:class "h-full rounded-full bg-[var(--good)] transition-all"
+                         :style (str "width:" (if (pos? total) (* 100 (/ done-count total)) 0) "%")}]]
+                 (into [:div {:class "space-y-2"}]
+                   (for [{:keys [title status _task]} all-deliverables]
+                     [:div {:class "flex items-center gap-3 py-1.5"}
+                      (if (= status "done")
+                        [:i {:data-lucide "check-circle" :class "w-4 h-4 flex-shrink-0 text-[var(--good)]"}]
+                        [:i {:data-lucide "circle" :class "w-4 h-4 flex-shrink-0 text-[var(--muted)]"}])
+                      [:span {:class "text-[14px]"} title]
+                      [:span {:class "text-[12px] text-[var(--muted)] ml-auto"} _task]]))]))
+            (let [workspace-ids (->> (:ticket/tasks t
+                                                    (map #(get-in % [:task/workspace :workspace/id]))
+                                                    distinct))
+                  git-commits (->> workspace-ids
+                                (mapcat (fn [ws-id]
+                                          (when-let [repo (db.git/find-repo-by-workspace conn ws-id)]
+                                            (db.git/list-commits-by-repo conn (:git.repo/id repo)))))
+                                (sort-by :git.commit/authored-at #(compare %2 %1))
+                                (map (fn [c]
+                                       {:sha (:git.commit/sha c)
+                                        :message (:git.commit/message c)
+                                        :author (some-> c :git.commit/author :git.author/name)
+                                        :date (some-> c :git.commit/authored-at str)}))
+                                vec)]
+              (git-progress/commits-section git-commits {:title "Git Activity"}))]
            (let [closed? (= (or (:ticket/status t) :ticket.status/open) :ticket.status/closed)]
              [:aside {:class "flex flex-col gap-4 lg:col-start-2 lg:row-start-2"}
               ;; Details
               [:div {:class "card p-5"}
                [:div {:class "field-label mb-3"} "Details"]
                (detail-row "Assignee"
-                           [:div {:class "flex items-center gap-2"}
-                            (ui/avatar (:ticket/assignee t))
-                            [:span {:class "text-[14px] font-medium"} (:ticket/assignee t)]])
+                 [:div {:class "flex items-center gap-2"}
+                  (ui/avatar (:ticket/assignee t))
+                  [:span {:class "text-[14px] font-medium"} (:ticket/assignee t)]])
                (detail-row "Story Points"
-                           [:span {:class "text-[16px] font-bold"} (:ticket/story-points t)])
+                 [:span {:class "text-[16px] font-bold"} (:ticket/story-points t)])
                (detail-row "Effort"
-                           [:div {:class "flex items-center gap-3"}
-                            [:div {:class "w-24 h-2 rounded-full bg-[var(--cream-dark)] overflow-hidden"}
-                             [:div {:class "h-full rounded-full bg-[var(--accent)]"
-                                    :style (str "width:" (* 10 (:ticket/effort t)) "%")}]]
-                            [:span {:class "text-[12px] text-[var(--muted)]"} (str (:ticket/effort t) "/10")]])
+                 [:div {:class "flex items-center gap-3"}
+                  [:div {:class "w-24 h-2 rounded-full bg-[var(--cream-dark)] overflow-hidden"}
+                   [:div {:class "h-full rounded-full bg-[var(--accent)]"
+                          :style (str "width:" (* 10 (:ticket/effort t)) "%")}]]
+                  [:span {:class "text-[12px] text-[var(--muted)]"} (str (:ticket/effort t) "/10")]])
                (detail-row "Impact"
-                           [:div {:class "flex items-center gap-3"}
-                            [:div {:class "w-24 h-2 rounded-full bg-[var(--cream-dark)] overflow-hidden"}
-                             [:div {:class "h-full rounded-full bg-[var(--good)]"
-                                    :style (str "width:" (* 10 (:ticket/impact t)) "%")}]]
-                            [:span {:class "text-[12px] text-[var(--muted)]"} (str (:ticket/impact t) "/10")]])
+                 [:div {:class "flex items-center gap-3"}
+                  [:div {:class "w-24 h-2 rounded-full bg-[var(--cream-dark)] overflow-hidden"}
+                   [:div {:class "h-full rounded-full bg-[var(--good)]"
+                          :style (str "width:" (* 10 (:ticket/impact t)) "%")}]]
+                  [:span {:class "text-[12px] text-[var(--muted)]"} (str (:ticket/impact t) "/10")]])
                (detail-row "Organization"
-                           [:a {:href (str "/organizations/" org-id)} org-name])
+                 [:a {:href (str "/organizations/" org-id)} org-name])
                ;; Sprint — inline editable (disabled when closed)
                (detail-row "Sprint"
-                           (if closed?
-                             [:span {:class "text-[14px]"} (or (get-in t [:ticket/sprint :sprint/name]) "None")]
-                             (if (seq (:organization/sprints org-overview))
-                               (let [current-sprint-id (get-in t [:ticket/sprint :sprint/id])]
-                                 (inline-select-form
-                                  (str "/organizations/" org-id "/tickets/" ticket-id "/assign-sprint")
-                                  "sprint-id"
-                                  current-sprint-id
-                                  (for [s (:organization/sprints org-overview)]
-                                    {:value (str (:sprint/id s))
-                                     :label (:sprint/name s)
-                                     :selected? (= (:sprint/id s) current-sprint-id)})
-                                  "None"))
-                               [:span {:class "text-[13px] text-[var(--muted)]"} "No sprints"])))
+                 (if closed?
+                   [:span {:class "text-[14px]"} (or (get-in t [:ticket/sprint :sprint/name]) "None")]
+                   (if (seq (:organization/sprints org-overview))
+                     (let [current-sprint-id (get-in t [:ticket/sprint :sprint/id])]
+                       (inline-select-form
+                         (str "/organizations/" org-id "/tickets/" ticket-id "/assign-sprint")
+                         "sprint-id"
+                         current-sprint-id
+                         (for [s (:organization/sprints org-overview)]
+                           {:value (str (:sprint/id s))
+                            :label (:sprint/name s)
+                            :selected? (= (:sprint/id s) current-sprint-id)})
+                         "None"))
+                     [:span {:class "text-[13px] text-[var(--muted)]"} "No sprints"])))
                ;; Milestone — inline editable (disabled when closed)
                (let [milestones (mapcat (fn [s] (map #(assoc % :_sprint-name (:sprint/name s))
-                                                     (:sprint/milestones s)))
-                                        (:organization/sprints org-overview))]
+                                                  (:sprint/milestones s)))
+                                  (:organization/sprints org-overview))]
                  (detail-row "Milestone"
-                             (if closed?
-                               [:span {:class "text-[14px]"} (or (get-in t [:ticket/milestone :milestone/name]) "None")]
-                               (if (seq milestones)
-                                 (let [current-milestone-id (get-in t [:ticket/milestone :milestone/id])]
-                                   (inline-select-form
-                                    (str "/organizations/" org-id "/tickets/" ticket-id "/assign-milestone")
-                                    "milestone-id"
-                                    current-milestone-id
-                                    (for [m milestones]
-                                      {:value (str (:milestone/id m))
-                                       :label (str (:_sprint-name m) " / " (:milestone/name m))
-                                       :selected? (= (:milestone/id m) current-milestone-id)})
-                                    "None"))
-                                 [:span {:class "text-[13px] text-[var(--muted)]"} "No milestones"]))))]
+                   (if closed?
+                     [:span {:class "text-[14px]"} (or (get-in t [:ticket/milestone :milestone/name]) "None")]
+                     (if (seq milestones)
+                       (let [current-milestone-id (get-in t [:ticket/milestone :milestone/id])]
+                         (inline-select-form
+                           (str "/organizations/" org-id "/tickets/" ticket-id "/assign-milestone")
+                           "milestone-id"
+                           current-milestone-id
+                           (for [m milestones]
+                             {:value (str (:milestone/id m))
+                              :label (str (:_sprint-name m) " / " (:milestone/name m))
+                              :selected? (= (:milestone/id m) current-milestone-id)})
+                           "None"))
+                       [:span {:class "text-[13px] text-[var(--muted)]"} "No milestones"]))))]
               ;; Add task — modal popup (hidden when closed)
               (when (and (not closed?) (seq (:organization/workspaces org-overview)))
                 [:button {:type "button"
@@ -208,7 +253,7 @@
                  "Add task"])])
            ;; Add task modal
            (when (and (not (= :ticket.status/closed (or (:ticket/status t) :ticket.status/open)))
-                      (seq (:organization/workspaces org-overview)))
+                   (seq (:organization/workspaces org-overview)))
              [:div {:id (str "modal-add-task-" ticket-id) :class "modal-backdrop" :role "dialog" :aria-modal "true"}
               [:div {:class "modal-shell"}
                [:div {:class "flex items-start justify-between gap-4 border-b border-[var(--line)] px-5 py-4"}
@@ -235,9 +280,9 @@
                    [:i {:data-lucide "plus" :class "size-4"}]
                    "Create task"]]]]]])]]
       (layout/page "Ticket" body
-                   {:breadcrumbs [{:href "/" :label "Organizations"}
-                                  {:href (str "/organizations/" org-id) :label org-name}
-                                  {:label (let [title (or (:ticket/title t) (:ticket/description t))]
-                                            (subs title 0 (min 40 (count title))))}]
-                    :topbar-context (layout/render-fragment (ui/org-topbar-dropdown organizations org-overview))}))
+        {:breadcrumbs [{:href "/" :label "Organizations"}
+                       {:href (str "/organizations/" org-id) :label org-name}
+                       {:label (let [title (or (:ticket/title t) (:ticket/description t))]
+                                 (subs title 0 (min 40 (count title))))}]
+         :topbar-context (layout/render-fragment (ui/org-topbar-dropdown organizations org-overview))}))
     (layout/page "Not found" [:p "Ticket not found."])))

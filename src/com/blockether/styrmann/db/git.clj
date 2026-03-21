@@ -247,6 +247,49 @@
     (d/transact! conn [tx-data])
     (find-commit conn commit-id)))
 
+(defn find-repo-by-workspace
+  "Fetch a git repo by workspace UUID.
+
+   Params:
+   `conn` - Datalevin connection.
+   `workspace-id` - UUID.
+
+   Returns:
+   Repo map or nil."
+  [conn workspace-id]
+  (let [result (d/q '[:find ?repo-id
+                       :in $ ?ws-id
+                       :where
+                       [?repo :git.repo/workspace [:workspace/id ?ws-id]]
+                       [?repo :git.repo/id ?repo-id]]
+                     (d/db conn)
+                     workspace-id)]
+    (when (seq result)
+      (find-repo conn (ffirst result)))))
+
+(defn list-branches-by-repo
+  "List branches for a repo.
+
+   Params:
+   `conn` - Datalevin connection.
+   `repo-id` - UUID.
+
+   Returns:
+   Vector of branch maps."
+  [conn repo-id]
+  (->> (d/q '[:find ?branch-id
+              :in $ ?repo-id
+              :where
+              [?repo :git.repo/id ?repo-id]
+              [?branch :git.branch/repo ?repo]
+              [?branch :git.branch/id ?branch-id]]
+            (d/db conn)
+            repo-id)
+       (map first)
+       (map #(find-branch conn %))
+       (sort-by :git.branch/name)
+       vec))
+
 (defn list-commits-by-repo
   "List commits for a repo, most recent first.
 

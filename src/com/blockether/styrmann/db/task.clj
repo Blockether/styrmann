@@ -11,6 +11,7 @@
    :task/status
    :task/acceptance-criteria-edn
    :task/cove-questions-edn
+   :task/deliverables-edn
    :task/created-at
    {:task/ticket [:ticket/id :ticket/title :ticket/description {:ticket/organization [:organization/id :organization/name]}]}
    {:task/workspace [:workspace/id :workspace/name :workspace/repository {:workspace/organization [:organization/id :organization/name]}]}

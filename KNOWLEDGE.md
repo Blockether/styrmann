@@ -57,6 +57,8 @@ A delegated unit of implementation work derived from a ticket.
 - `:task.status/done` means the delegated work is accepted
 - A task optionally carries scoped acceptance criteria (EDN string) narrowed from the parent ticket's acceptance criteria
 - A task optionally carries CoVe (Chain-of-Verification) questions (EDN string) used to validate the task's output
+- A task optionally carries deliverables (EDN string) — a list of maps with `:title`, `:description`, and `:status` ("done" or "pending")
+- Deliverables are rolled up on the ticket detail view as a summary with a progress bar
 - A task can declare dependencies on other tasks via `:task/depends-on` (a set of task refs); dependent tasks must complete before this task can start
 
 ### Task Dependency Graph
@@ -75,7 +77,7 @@ The process of decomposing a ticket into a DAG of scoped AI tasks.
 - Each resulting task gets a subset of the ticket's acceptance criteria and a set of CoVe questions
 - CoVe questions are generated via Svar RLM to verify the task output before marking it done
 - The analysis pipeline is: parse ticket → generate CoVe questions → decompose into tasks → build dependency graph
-- Svar RLM integration is implemented in a separate step; `domain.analysis/decompose-ticket` is currently scaffolded
+- Svar RLM integration is implemented with retry loop; `domain.analysis/decompose-ticket!` generates structured output with validation feedback
 
 ### Notification
 An organization-level signal about task progress.
@@ -93,11 +95,18 @@ The runtime context used by agents to execute delegated task work.
 - Environment status tracks readiness (`ready`, `busy`, `offline`, `error`)
 
 ### Agent
-An execution identity with instructions and role metadata.
+An execution identity with instructions, role metadata, and type classification.
 
-- An agent has a stable key, name, version, role description, and instruction set
+- An agent has a stable key, name, type, model, version, role description, and instruction set
+- Agent type is one of: `:agent.type/planner`, `:agent.type/implementer`, `:agent.type/reviewer`, `:agent.type/explorer`, `:agent.type/verifier`
+- **Planner**: decomposes tickets into task DAGs (uses glm-5)
+- **Implementer**: writes code using structured editing (uses glm-5-turbo)
+- **Reviewer**: reviews code changes, runs diagnostics (uses glm-5)
+- **Explorer**: indexes codebases, maps namespaces (uses glm-5-turbo)
+- **Verifier**: runs tests, validates acceptance criteria (uses glm-5-turbo)
 - Agent records are reusable across many runs
 - Agents are bound to tool capabilities through explicit bindings
+- All 5 agents are registered via `execution.agent-types/ensure-all-agents!`
 
 ### Workflow
 A workflow coordinates execution of one task through one or more agent sessions.
