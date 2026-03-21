@@ -5,11 +5,12 @@
    [com.blockether.styrmann.db.core :as db]
    [com.blockether.styrmann.db.organization :as db.organization]
    [com.blockether.styrmann.db.task :as db.task]
-   [com.blockether.styrmann.domain.opencode-run :as opencode-run]
    [com.blockether.styrmann.domain.organization :as organization]
    [com.blockether.styrmann.domain.planning :as planning]
+   [com.blockether.styrmann.domain.provider :as provider]
    [com.blockether.styrmann.domain.task :as task]
    [com.blockether.styrmann.domain.ticket :as ticket]
+   [com.blockether.styrmann.execution.session :as session]
    [com.blockether.styrmann.presentation.component.layout :as layout]
    [com.blockether.styrmann.presentation.screen.home :as home-screen]
    [com.blockether.styrmann.presentation.screen.organization-settings :as organization-settings-screen]
@@ -84,10 +85,35 @@
     (html-response (organization-screen/render (db/conn) organization-id))
     (not-found-page "Organization not found.")))
 
-(defn- handle-organization-settings [organization-id]
+(defn- handle-organization-settings [organization-id request]
   (if (organization/overview (db/conn) organization-id)
-    (html-response (organization-settings-screen/render (db/conn) organization-id))
+    (let [tab (case (get-in request [:query-params "tab"])
+                "runner" :runner
+                :providers)]
+      (html-response (organization-settings-screen/render (db/conn) organization-id tab)))
     (not-found-page "Organization not found.")))
+
+(defn- handle-update-runner-settings [organization-id request]
+  (let [params (request-params request)
+        workspace-id (uuid (:workspace-id params))]
+    (session/configure-workspace-environment!
+     (db/conn)
+     {:workspace-id workspace-id
+      :provider-id (some-> (:provider-id params) uuid)
+      :model (:model params)
+      :working-directory (:working-directory params)
+      :status (keyword-from-param (:status params))})
+    (redirect-to (str "/organizations/" organization-id "/settings?tab=runner"))))
+
+(defn- handle-add-provider [organization-id request]
+  (let [params (request-params request)]
+    (provider/add-provider!
+     (db/conn)
+     {:name (:name params)
+      :base-url (:base-url params)
+      :api-key (:api-key params)
+      :default? (= (:default? params) "true")})
+    (redirect-to (str "/organizations/" organization-id "/settings?tab=providers"))))
 
 (defn- handle-create-workspace [organization-id request]
   (organization/create-workspace!
@@ -213,7 +239,7 @@
 (defn- handle-task-run [task-id]
   (if-let [task-record (db.task/find-task (db/conn) task-id)]
     (let [organization-id (get-in task-record [:task/ticket :ticket/organization :organization/id])]
-      (opencode-run/execute! (db/conn) {:task-id task-id})
+      (session/execute! (db/conn) {:task-id task-id})
       (redirect-to (str "/organizations/" organization-id "/tasks/" task-id)))
     (not-found-page "Task not found.")))
 
@@ -289,10 +315,16 @@
         (handle-organization-show (uuid (second segments)))
 
         (and (= method :get) (= 3 (count segments)) (= "organizations" (first segments)) (= "settings" (nth segments 2)))
-        (handle-organization-settings (uuid (second segments)))
+        (handle-organization-settings (uuid (second segments)) request)
 
         (and (= method :post) (= 3 (count segments)) (= "organizations" (first segments)) (= "workspaces" (nth segments 2)))
         (handle-create-workspace (uuid (second segments)) request)
+
+        (and (= method :post) (= 4 (count segments)) (= "organizations" (first segments)) (= "settings" (nth segments 2)) (= "runner" (nth segments 3)))
+        (handle-update-runner-settings (uuid (second segments)) request)
+
+        (and (= method :post) (= 4 (count segments)) (= "organizations" (first segments)) (= "settings" (nth segments 2)) (= "provider" (nth segments 3)))
+        (handle-add-provider (uuid (second segments)) request)
 
         (and (= method :post) (= 3 (count segments)) (= "organizations" (first segments)) (= "sprints" (nth segments 2)))
         (handle-create-sprint (uuid (second segments)) request)

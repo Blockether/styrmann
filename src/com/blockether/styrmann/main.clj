@@ -3,6 +3,8 @@
   (:require
    [com.blockether.styrmann.app :as app]
    [com.blockether.styrmann.db.core :as db]
+   [com.blockether.styrmann.execution.session :as session]
+   [com.blockether.styrmann.runner.tool-registry :as tool-registry]
    [nrepl.server :as nrepl]
    [ring.adapter.jetty :as jetty]
    [taoensso.telemere :as t])
@@ -53,6 +55,9 @@
          db-path "data/styrmann"}}]
   (setup-logging!)
   (db/start! db-path)
+  (tool-registry/register-default-tools!)
+  (session/sync-tool-definitions! (db/conn) (tool-registry/list-tools))
+  (session/ensure-explorer-agent! (db/conn))
   (when-not @!nrepl
     (let [server (nrepl/start-server :port nrepl-port)]
       (reset! !nrepl server)

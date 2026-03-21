@@ -200,7 +200,7 @@ a:hover { color: var(--accent-hover); }
         [:div {:id "topbar-context"}
          (raw-html topbar-context)]]]]
       ;; Breadcrumbs
-     [:div {:id "breadcrumbs" :class "mx-auto max-w-6xl px-5 pt-4 pb-1"}
+     [:div {:id "breadcrumbs" :class "mx-auto max-w-6xl px-5 pt-5 pb-2"}
       (when (seq breadcrumbs)
         (into [:div {:class "flex items-center gap-1.5 text-[12px] text-[var(--muted)] overflow-hidden"}]
               (interpose
@@ -693,16 +693,16 @@ lucide.createIcons();
    Returns:
    HTML string wrapped in a div with id=breadcrumbs."
   [breadcrumbs]
-   (render-fragment
-    [:div {:id "breadcrumbs" :class "mx-auto max-w-6xl px-5 pt-4 pb-1"}
-     (when (seq breadcrumbs)
-       (into [:div {:class "flex items-center gap-1.5 text-[12px] text-[var(--muted)] overflow-hidden"}]
-             (interpose
-              [:span {:class "flex-shrink-0"} "/"]
-              (for [{:keys [href label]} breadcrumbs]
-                (if href
-                  [:a {:href href :class "text-[var(--muted)] hover:text-[var(--accent)] no-underline truncate max-w-[120px] sm:max-w-none"} label]
-                  [:span {:class "font-medium text-[var(--ink-secondary)] truncate max-w-[140px] sm:max-w-none"} label])))))]))
+  (render-fragment
+   [:div {:id "breadcrumbs" :class "mx-auto max-w-6xl px-5 pt-5 pb-2"}
+    (when (seq breadcrumbs)
+      (into [:div {:class "flex items-center gap-1.5 text-[12px] text-[var(--muted)] overflow-hidden"}]
+            (interpose
+             [:span {:class "flex-shrink-0"} "/"]
+             (for [{:keys [href label]} breadcrumbs]
+               (if href
+                 [:a {:href href :class "text-[var(--muted)] hover:text-[var(--accent)] no-underline truncate max-w-[120px] sm:max-w-none"} label]
+                 [:span {:class "font-medium text-[var(--ink-secondary)] truncate max-w-[140px] sm:max-w-none"} label])))))]))
 
 (defn render-topbar-context-fragment
   "Render the topbar organization context fragment for SSE patching.

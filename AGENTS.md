@@ -55,6 +55,15 @@ Backend-only Clojure application with Ring/Jetty, Datastar SSE, and Tailwind CSS
 
 When success criteria are clear, loop independently. When criteria are weak or ambiguous, stop and ask.
 
+### 5. Pre-1.0 Compatibility
+
+**Before version 1.0.0, backward compatibility is not required.**
+
+- Prefer clean, correct domain models over compatibility shims.
+- It is acceptable to rename entities/attributes and remove obsolete paths.
+- When making breaking changes, update tests and docs in the same change.
+- Do not spend effort on migration layers unless explicitly requested.
+
 ---
 
 ## Non-Negotiable Rules

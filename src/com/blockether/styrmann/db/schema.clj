@@ -115,12 +115,12 @@
    :task/created-at                {:db/valueType :db.type/instant
                                     :db/doc       "Creation timestamp"}
    :task/acceptance-criteria-edn  {:db/valueType :db.type/string
-                                    :db/doc       "EDN-encoded scoped acceptance criteria for this task"}
+                                   :db/doc       "EDN-encoded scoped acceptance criteria for this task"}
    :task/cove-questions-edn       {:db/valueType :db.type/string
-                                    :db/doc       "EDN-encoded CoVe verification questions"}
+                                   :db/doc       "EDN-encoded CoVe verification questions"}
    :task/depends-on               {:db/valueType   :db.type/ref
-                                    :db/cardinality :db.cardinality/many
-                                    :db/doc         "Tasks that must complete before this task can start"}
+                                   :db/cardinality :db.cardinality/many
+                                   :db/doc         "Tasks that must complete before this task can start"}
 
    ;; -- Notification ----------------------------------------------------------
    :notification/id          {:db/valueType :db.type/uuid
@@ -135,24 +135,173 @@
    :notification/created-at  {:db/valueType :db.type/instant
                               :db/doc       "Creation timestamp"}
 
-   ;; -- OpenCode Run ----------------------------------------------------------
-   :opencode-run/id          {:db/valueType :db.type/uuid
-                              :db/unique    :db.unique/identity
-                              :db/doc       "Unique run identifier"}
-   :opencode-run/task        {:db/valueType :db.type/ref
-                              :db/doc       "Parent task"}
-   :opencode-run/pid         {:db/valueType :db.type/long
-                              :db/doc       "Observed external process id"}
-   :opencode-run/command-edn {:db/valueType :db.type/string
-                              :db/doc       "EDN-encoded command vector"}
-   :opencode-run/log-path    {:db/valueType :db.type/string
-                              :db/doc       "Path to captured logs"}
-   :opencode-run/exit-path   {:db/valueType :db.type/string
-                              :db/doc       "Path to captured exit code"}
-   :opencode-run/working-directory {:db/valueType :db.type/string
-                                    :db/doc       "Process working directory"}
-   :opencode-run/created-at  {:db/valueType :db.type/instant
-                              :db/doc       "Creation timestamp"}
+   ;; -- LLM Provider -----------------------------------------------------------
+   :provider/id         {:db/valueType :db.type/uuid
+                         :db/unique    :db.unique/identity
+                         :db/doc       "Unique provider identifier"}
+   :provider/name       {:db/valueType :db.type/string
+                         :db/doc       "Display name for the provider"}
+   :provider/base-url   {:db/valueType :db.type/string
+                         :db/doc       "Provider base URL (e.g. https://api.openai.com/v1)"}
+   :provider/api-key    {:db/valueType :db.type/string
+                         :db/doc       "Provider API key"}
+   :provider/default?   {:db/valueType :db.type/boolean
+                         :db/doc       "Whether this is the default provider"}
+   :provider/created-at {:db/valueType :db.type/instant
+                         :db/doc       "Creation timestamp"}
+
+   ;; -- Execution Environment -------------------------------------------------
+   :execution-environment/id                 {:db/valueType :db.type/uuid
+                                              :db/unique    :db.unique/identity
+                                              :db/doc       "Unique execution environment identifier"}
+   :execution-environment/workspace          {:db/valueType :db.type/ref
+                                              :db/doc       "Workspace that owns this execution environment"}
+   :execution-environment/provider           {:db/valueType :db.type/ref
+                                              :db/doc       "LLM provider used by this environment"}
+   :execution-environment/model              {:db/valueType :db.type/string
+                                              :db/doc       "Default model identifier used by this environment"}
+   :execution-environment/working-directory  {:db/valueType :db.type/string
+                                              :db/doc       "Default working directory for runs in this environment"}
+   :execution-environment/status             {:db/valueType :db.type/keyword
+                                              :db/doc       "Environment status: ready, busy, offline, error"}
+   :execution-environment/created-at         {:db/valueType :db.type/instant
+                                              :db/doc       "Creation timestamp"}
+
+   ;; -- Agent -----------------------------------------------------------------
+   :agent/id                {:db/valueType :db.type/uuid
+                             :db/unique    :db.unique/identity
+                             :db/doc       "Unique agent identifier"}
+   :agent/key               {:db/valueType :db.type/string
+                             :db/unique    :db.unique/identity
+                             :db/doc       "Stable unique key for the agent"}
+   :agent/name              {:db/valueType :db.type/string
+                             :db/doc       "Human-friendly agent name"}
+   :agent/version           {:db/valueType :db.type/string
+                             :db/doc       "Agent prompt or implementation version"}
+   :agent/role              {:db/valueType :db.type/string
+                             :db/doc       "Role description for the agent"}
+   :agent/instructions-edn  {:db/valueType :db.type/string
+                             :db/doc       "EDN-encoded instruction list"}
+   :agent/tools             {:db/valueType   :db.type/ref
+                             :db/cardinality :db.cardinality/many
+                             :db/doc         "Tools available to this agent"}
+   :agent/created-at        {:db/valueType :db.type/instant
+                             :db/doc       "Creation timestamp"}
+
+   ;; -- Workflow --------------------------------------------------------------
+   :workflow/id               {:db/valueType :db.type/uuid
+                               :db/unique    :db.unique/identity
+                               :db/doc       "Unique workflow identifier"}
+   :workflow/task             {:db/valueType :db.type/ref
+                               :db/doc       "Task this workflow executes"}
+   :workflow/status           {:db/valueType :db.type/keyword
+                               :db/doc       "Workflow status: queued, running, succeeded, failed, cancelled, timed-out"}
+   :workflow/created-at       {:db/valueType :db.type/instant
+                               :db/doc       "Creation timestamp"}
+   :workflow/started-at       {:db/valueType :db.type/instant
+                               :db/doc       "Workflow start timestamp"}
+   :workflow/finished-at      {:db/valueType :db.type/instant
+                               :db/doc       "Workflow finish timestamp"}
+
+   ;; -- Session ---------------------------------------------------------------
+   :session/id                {:db/valueType :db.type/uuid
+                               :db/unique    :db.unique/identity
+                               :db/doc       "Unique session identifier"}
+   :session/workflow          {:db/valueType :db.type/ref
+                               :db/doc       "Workflow that owns this session"}
+   :session/environment       {:db/valueType :db.type/ref
+                               :db/doc       "Execution environment used by this session"}
+   :session/agent             {:db/valueType :db.type/ref
+                               :db/doc       "Agent definition used in this session"}
+   :session/status            {:db/valueType :db.type/keyword
+                               :db/doc       "Session status: queued, running, succeeded, failed, cancelled, timed-out"}
+   :session/pid               {:db/valueType :db.type/long
+                               :db/doc       "Observed external process id when applicable"}
+   :session/command-edn       {:db/valueType :db.type/string
+                               :db/doc       "EDN-encoded command vector"}
+   :session/log-path          {:db/valueType :db.type/string
+                               :db/doc       "Path to captured logs"}
+   :session/exit-path         {:db/valueType :db.type/string
+                               :db/doc       "Path to captured exit code"}
+   :session/working-directory {:db/valueType :db.type/string
+                               :db/doc       "Resolved working directory for this session"}
+   :session/created-at        {:db/valueType :db.type/instant
+                               :db/doc       "Creation timestamp"}
+   :session/started-at        {:db/valueType :db.type/instant
+                               :db/doc       "Session start timestamp"}
+   :session/finished-at       {:db/valueType :db.type/instant
+                               :db/doc       "Session finish timestamp"}
+
+   ;; -- Tool Definition -------------------------------------------------------
+   :tool-definition/id               {:db/valueType :db.type/uuid
+                                      :db/unique    :db.unique/identity
+                                      :db/doc       "Unique tool definition identifier"}
+   :tool-definition/key              {:db/valueType :db.type/string
+                                      :db/unique    :db.unique/identity
+                                      :db/doc       "Stable unique key for the tool"}
+   :tool-definition/name             {:db/valueType :db.type/string
+                                      :db/doc       "Display name for the tool"}
+   :tool-definition/description      {:db/valueType :db.type/string
+                                      :db/doc       "Tool description"}
+   :tool-definition/input-schema-edn {:db/valueType :db.type/string
+                                      :db/doc       "EDN-encoded input schema"}
+   :tool-definition/fn-symbol        {:db/valueType :db.type/string
+                                      :db/doc       "Classpath-resolved var symbol used to execute tool"}
+   :tool-definition/enabled?         {:db/valueType :db.type/boolean
+                                      :db/doc       "Whether the tool is enabled"}
+   :tool-definition/created-at       {:db/valueType :db.type/instant
+                                      :db/doc       "Creation timestamp"}
+
+   ;; -- Session Calls ---------------------------------------------------------
+   :session.calls/id           {:db/valueType :db.type/uuid
+                                :db/unique    :db.unique/identity
+                                :db/doc       "Unique session call identifier"}
+   :session.calls/session      {:db/valueType :db.type/ref
+                                :db/doc       "Session that initiated the call"}
+   :session.calls/tool         {:db/valueType :db.type/ref
+                                :db/doc       "Tool definition that was invoked"}
+   :session.calls/status       {:db/valueType :db.type/keyword
+                                :db/doc       "Session call status: running, succeeded, failed, cancelled"}
+   :session.calls/input-edn    {:db/valueType :db.type/string
+                                :db/doc       "EDN-encoded input payload"}
+   :session.calls/output-edn   {:db/valueType :db.type/string
+                                :db/doc       "EDN-encoded output payload"}
+   :session.calls/error-message {:db/valueType :db.type/string
+                                 :db/doc       "Optional error text"}
+   :session.calls/started-at   {:db/valueType :db.type/instant
+                                :db/doc       "Session call start timestamp"}
+   :session.calls/finished-at  {:db/valueType :db.type/instant
+                                :db/doc       "Session call finish timestamp"}
+   :session.calls/created-at   {:db/valueType :db.type/instant
+                                :db/doc       "Creation timestamp"}
+
+   ;; -- Session Event ---------------------------------------------------------
+   :session.event/id           {:db/valueType :db.type/uuid
+                                :db/unique    :db.unique/identity
+                                :db/doc       "Unique session event identifier"}
+   :session.event/session      {:db/valueType :db.type/ref
+                                :db/doc       "Session associated with this event"}
+   :session.event/type         {:db/valueType :db.type/keyword
+                                :db/doc       "Event type, e.g. state-change, log, call-start, call-end"}
+   :session.event/message      {:db/valueType :db.type/string
+                                :db/doc       "Human-readable event message"}
+   :session.event/payload-edn  {:db/valueType :db.type/string
+                                :db/doc       "EDN-encoded event payload"}
+   :session.event/created-at   {:db/valueType :db.type/instant
+                                :db/doc       "Creation timestamp"}
+
+   ;; -- Session Messages ------------------------------------------------------
+   :session.messages/id        {:db/valueType :db.type/uuid
+                                :db/unique    :db.unique/identity
+                                :db/doc       "Unique session message identifier"}
+   :session.messages/session   {:db/valueType :db.type/ref
+                                :db/doc       "Session associated with this message"}
+   :session.messages/role      {:db/valueType :db.type/keyword
+                                :db/doc       "Message role: system, user, assistant, tool"}
+   :session.messages/content   {:db/valueType :db.type/string
+                                :db/doc       "Message content"}
+   :session.messages/created-at {:db/valueType :db.type/instant
+                                 :db/doc       "Creation timestamp"}
 
    ;; -- Git Repo ----------------------------------------------------------------
    :git.repo/id              {:db/valueType :db.type/uuid

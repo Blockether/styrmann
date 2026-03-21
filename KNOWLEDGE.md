@@ -84,13 +84,55 @@ An organization-level signal about task progress.
 - Notifications are created when a task enters review or is completed
 - A notification includes at least the task reference and status
 
-### OpenCode Run
-An observed execution of a delegated AI task.
+### Execution Environment
+The runtime context used by agents to execute delegated task work.
 
-- A run links a task to an external process identifier (PID)
-- Styrmann observes process state and logs through the PID
-- Styrmann does not own the process lifecycle
-- Redeployments must allow the system to reconnect to already-running processes
+- An execution environment belongs to a workspace
+- It defines runtime type (local/container/remote), model provider, model, optional base URL, and working directory
+- It references a credential profile key; secrets are resolved from runtime environment variables, never from database values
+- Environment status tracks readiness (`ready`, `busy`, `offline`, `error`)
+
+### Agent
+An execution identity with instructions and role metadata.
+
+- An agent has a stable key, name, version, role description, and instruction set
+- Agent records are reusable across many runs
+- Agents are bound to tool capabilities through explicit bindings
+
+### Workflow
+A workflow coordinates execution of one task through one or more agent sessions.
+
+- A workflow belongs to one task
+- A workflow aggregates many sessions
+- A workflow has explicit lifecycle status (`running`, `succeeded`, `failed`, etc.)
+
+### Session
+An observed execution attempt of an agent inside a workflow.
+
+- A session links workflow, execution environment, and agent
+- A session stores command metadata, process identifier (PID), logs, and exit code artifacts
+- A session has explicit lifecycle status (`running`, `succeeded`, `failed`, etc.)
+- Redeployments must allow the system to reconnect to already-running sessions
+
+### Tool Definition and Session Calls (`session.calls/*`)
+Function-like capabilities used by agents during execution.
+
+- Tools are first-class definitions with schema and classpath function symbol metadata
+- Tools are registered from classpath through the runtime tool registry and synced into Datalevin on startup
+- Agent-tool bindings control which tools an agent can call
+- Session calls are persisted with input/output payloads, status, timestamps, and optional error text
+
+### Session Event (`session.event/*`)
+Append-only timeline entries for session visibility.
+
+- Events capture state changes, logs, tool call boundaries, and other execution signals
+- Events are tied to a specific session and can carry structured EDN payloads
+
+### Session Messages (`session.messages/*`)
+Conversation and textual exchange timeline for a session.
+
+- Messages belong to a session
+- Messages include role (`system`, `user`, `assistant`, `tool`) and content
 
 ## Assignment Rules
 
@@ -112,7 +154,8 @@ Organization
 
 Ticket
   -> AI Task
-       -> OpenCode Run
+       -> Workflow
+            -> Session
 ```
 
 1. User creates an organization
@@ -120,7 +163,7 @@ Ticket
 3. User creates tickets in the organization backlog
 4. User assigns tickets directly to a sprint or indirectly through a milestone
 5. User delegates ticket work into AI tasks for a workspace
-6. Styrmann observes OpenCode runs and surfaces task progress through organization notifications
+6. Styrmann observes workflow/session execution and surfaces task progress through organization notifications
 
 ## Terminology
 
@@ -135,7 +178,14 @@ Ticket
 | **Task Graph** | DAG of tasks within a ticket expressing execution order via dependency edges |
 | **CoVe Questions** | Chain-of-Verification questions generated per task to validate output |
 | **Ticket Analysis** | Process of decomposing a ticket into a scoped task DAG via Svar RLM |
-| **OpenCode Run** | External process execution observed by PID |
+| **Execution Environment** | Workspace-scoped runtime context used for agent execution |
+| **Agent** | Versioned execution identity with role and instructions |
+| **Workflow** | Multi-session execution container for a single task |
+| **Session** | External process execution attempt observed by PID |
+| **Tool Definition** | Callable function capability available to agents |
+| **Session Calls** | Persisted invocation of a tool during a session (`session.calls/*`) |
+| **Session Event** | Timeline event emitted during a session (`session.event/*`) |
+| **Session Messages** | Conversation/message record inside a session (`session.messages/*`) |
 
 ## Naming Conventions (UI)
 

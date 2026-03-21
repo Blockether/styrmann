@@ -162,7 +162,7 @@
    Updated branch map."
   [conn branch-id commit-id]
   (d/transact! conn [{:db/id             [:git.branch/id branch-id]
-                       :git.branch/head   [:git.commit/id commit-id]}])
+                      :git.branch/head   [:git.commit/id commit-id]}])
   (find-branch conn branch-id))
 
 ;; -- Worktree ----------------------------------------------------------------

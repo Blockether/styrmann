@@ -140,7 +140,7 @@
                [:div {:class "text-[13px] text-[var(--muted)] text-center py-4"}
                 "No tasks yet."])]]
            (let [closed? (= (or (:ticket/status t) :ticket.status/open) :ticket.status/closed)]
-[:aside {:class "flex flex-col gap-4 lg:col-start-2 lg:row-start-2"}
+             [:aside {:class "flex flex-col gap-4 lg:col-start-2 lg:row-start-2"}
               ;; Details
               [:div {:class "card p-5"}
                [:div {:class "field-label mb-3"} "Details"]

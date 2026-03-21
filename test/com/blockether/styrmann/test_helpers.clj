@@ -29,6 +29,16 @@
   (let [dir (str "/tmp/styrmann-test-" (UUID/randomUUID))]
     [(d/get-conn dir schema/schema) dir]))
 
+(defn temp-dir
+  "Create a fresh temporary directory path.
+
+   Returns:
+   Directory path string."
+  []
+  (let [dir (str "/tmp/styrmann-test-dir-" (UUID/randomUUID))]
+    (.mkdirs (java.io.File. dir))
+    dir))
+
 (defmacro with-temp-conn
   "Execute body with a fresh Datalevin conn bound to `sym`.
    DB is created in a temp dir and cleaned up after."
@@ -40,3 +50,14 @@
        (finally
          (d/close ~sym)
          (delete-tree! dir#)))))
+
+(defmacro with-temp-dir
+  "Execute body with a temporary directory bound to `sym`.
+   Directory is removed after execution."
+  {:clj-kondo/lint-as 'clojure.core/let}
+  [[sym init] & body]
+  `(let [~sym ~init]
+     (try
+       ~@body
+       (finally
+         (delete-tree! ~sym)))))

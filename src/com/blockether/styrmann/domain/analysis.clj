@@ -13,52 +13,53 @@
   (:require
    [clojure.edn :as edn]
    [clojure.string :as str]
-   [com.blockether.svar.core :as svar]
    [com.blockether.styrmann.db.organization :as db.organization]
    [com.blockether.styrmann.db.ticket :as db.ticket]
-   [com.blockether.styrmann.domain.task :as task]))
+   [com.blockether.styrmann.domain.task :as task]
+   [com.blockether.styrmann.execution.agent :as execution.agent]
+   [com.blockether.svar.core :as svar]))
 
 ;; -- Svar spec for task graph ------------------------------------------------
 
 (def ^:private task-spec
   "Svar spec for a single task node in the dependency graph."
   (svar/spec :Task
-    (svar/field {svar/NAME        :workspace-id
-                 svar/TYPE        svar/TYPE_STRING
-                 svar/CARDINALITY svar/CARDINALITY_ONE
-                 svar/DESCRIPTION "UUID string of the target workspace for this task"
-                 svar/REQUIRED    true})
-    (svar/field {svar/NAME        :description
-                 svar/TYPE        svar/TYPE_STRING
-                 svar/CARDINALITY svar/CARDINALITY_ONE
-                 svar/DESCRIPTION "Concise description of the task's goal (1-2 sentences)"
-                 svar/REQUIRED    true})
-    (svar/field {svar/NAME        :acceptance-criteria
-                 svar/TYPE        svar/TYPE_STRING
-                 svar/CARDINALITY svar/CARDINALITY_MANY
-                 svar/DESCRIPTION "Scoped acceptance criteria for this task only"
-                 svar/REQUIRED    true})
-    (svar/field {svar/NAME        :cove-questions
-                 svar/TYPE        svar/TYPE_STRING
-                 svar/CARDINALITY svar/CARDINALITY_MANY
-                 svar/DESCRIPTION "CoVe verification questions to confirm this task is done"
-                 svar/REQUIRED    true})
-    (svar/field {svar/NAME        :depends-on-indices
-                 svar/TYPE        svar/TYPE_INT
-                 svar/CARDINALITY svar/CARDINALITY_MANY
-                 svar/DESCRIPTION "0-based indices of tasks in the array that must complete before this task. Empty array for root tasks."
-                 svar/REQUIRED    true})))
+             (svar/field {svar/NAME        :workspace-id
+                          svar/TYPE        svar/TYPE_STRING
+                          svar/CARDINALITY svar/CARDINALITY_ONE
+                          svar/DESCRIPTION "UUID string of the target workspace for this task"
+                          svar/REQUIRED    true})
+             (svar/field {svar/NAME        :description
+                          svar/TYPE        svar/TYPE_STRING
+                          svar/CARDINALITY svar/CARDINALITY_ONE
+                          svar/DESCRIPTION "Concise description of the task's goal (1-2 sentences)"
+                          svar/REQUIRED    true})
+             (svar/field {svar/NAME        :acceptance-criteria
+                          svar/TYPE        svar/TYPE_STRING
+                          svar/CARDINALITY svar/CARDINALITY_MANY
+                          svar/DESCRIPTION "Scoped acceptance criteria for this task only"
+                          svar/REQUIRED    true})
+             (svar/field {svar/NAME        :cove-questions
+                          svar/TYPE        svar/TYPE_STRING
+                          svar/CARDINALITY svar/CARDINALITY_MANY
+                          svar/DESCRIPTION "CoVe verification questions to confirm this task is done"
+                          svar/REQUIRED    true})
+             (svar/field {svar/NAME        :depends-on-indices
+                          svar/TYPE        svar/TYPE_INT
+                          svar/CARDINALITY svar/CARDINALITY_MANY
+                          svar/DESCRIPTION "0-based indices of tasks in the array that must complete before this task. Empty array for root tasks."
+                          svar/REQUIRED    true})))
 
 (def ^:private graph-spec
   "Svar spec for the full task dependency graph (array of Task nodes)."
   (svar/spec :TaskGraph
-    {:refs [task-spec]}
-    (svar/field {svar/NAME        :tasks
-                 svar/TYPE        svar/TYPE_REF
-                 svar/TARGET      :Task
-                 svar/CARDINALITY svar/CARDINALITY_MANY
-                 svar/DESCRIPTION "Ordered array of task nodes forming a DAG. Reference other tasks by 0-based index in depends-on-indices."
-                 svar/REQUIRED    true})))
+             {:refs [task-spec]}
+             (svar/field {svar/NAME        :tasks
+                          svar/TYPE        svar/TYPE_REF
+                          svar/TARGET      :Task
+                          svar/CARDINALITY svar/CARDINALITY_MANY
+                          svar/DESCRIPTION "Ordered array of task nodes forming a DAG. Reference other tasks by 0-based index in depends-on-indices."
+                          svar/REQUIRED    true})))
 
 ;; -- System prompt -----------------------------------------------------------
 
@@ -142,8 +143,8 @@
          _          (when (empty? workspaces)
                       (throw (ex-info "Organization has no workspaces" {:organization-id org-id})))
          sys-prompt (build-system-prompt ticket workspaces)
-         base-msgs  [(svar/system sys-prompt)
-                     (svar/user "Decompose this ticket into tasks.")]
+         base-msgs  [(execution.agent/system sys-prompt)
+                     (execution.agent/user "Decompose this ticket into tasks.")]
          ask-opts   (cond-> {:spec     graph-spec
                              :messages base-msgs}
                       model  (assoc :model model)
@@ -151,7 +152,7 @@
 
      (loop [attempt 0
             messages base-msgs]
-       (let [result    (svar/ask! (assoc ask-opts :messages messages))
+       (let [result    (execution.agent/ask! (assoc ask-opts :messages messages))
              raw-specs (get-in result [:result :tasks] [])
              specs     (parse-workspace-ids raw-specs)
              validation (task/validate-graph specs)]
@@ -168,5 +169,5 @@
                               :ticket-id ticket-id}))
              (recur (inc attempt)
                     (conj messages
-                          (svar/assistant (pr-str raw-specs))
-                          (svar/user (format-errors-for-retry (:errors validation))))))))))))
+                          (execution.agent/assistant (pr-str raw-specs))
+                          (execution.agent/user (format-errors-for-retry (:errors validation))))))))))))

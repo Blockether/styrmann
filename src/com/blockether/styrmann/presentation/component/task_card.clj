@@ -57,12 +57,12 @@
      (if (seq available)
        [:form {:method "post" :action (str "/organizations/" (get-in task [:task/ticket :ticket/organization :organization/id]) "/tasks/" (:task/id task) "/status")
                :class "flex gap-1.5 flex-shrink-0 sm:items-center self-end sm:self-auto"}
-         (for [status available]
-           [:button {:class "btn-secondary !px-2.5 !py-1 !text-[11px] !rounded-md"
-                     :type "submit"
-                     :name "status"
-                     :value (subs (str status) 1)}
-            (str/replace (name status) "-" " ")])]
+        (for [status available]
+          [:button {:class "btn-secondary !px-2.5 !py-1 !text-[11px] !rounded-md"
+                    :type "submit"
+                    :name "status"
+                    :value (subs (str status) 1)}
+           (str/replace (name status) "-" " ")])]
        [:span {:class "badge badge-done self-end sm:self-auto"} "Done"])]))
 
 (defn render

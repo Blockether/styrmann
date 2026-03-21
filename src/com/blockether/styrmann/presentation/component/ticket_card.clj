@@ -1,6 +1,7 @@
 (ns com.blockether.styrmann.presentation.component.ticket-card
   "Reusable SSR ticket card — warm editorial style."
   (:require
+   [clojure.string :as str]
    [com.blockether.styrmann.presentation.component.layout :as layout]
    [com.blockether.styrmann.presentation.component.ui :as ui]))
 
@@ -25,6 +26,11 @@
         organization-id (get-in ticket [:ticket/organization :organization/id])
         ticket-id       (:ticket/id ticket)
         status          (or (:ticket/status ticket) :ticket.status/open)
+        description     (some-> (:ticket/description ticket) str/trim)
+        summary         (when (seq description)
+                          (if (> (count description) 100)
+                            (str (subs description 0 100) "...")
+                            description))
         drag-attrs      {:draggable         "true"
                          :data-ticket-id    (str ticket-id)
                          :data-ticket-org   (str organization-id)
@@ -33,6 +39,7 @@
      (cond-> {:href (str "/organizations/" organization-id "/tickets/" ticket-id)
               :title-class (when closed? "ticket-title")
               :title (or (:ticket/title ticket) (:ticket/description ticket))
+              :description summary
               :badges [(ui/type-badge (:ticket/type ticket))
                        (ui/ticket-status-badge status)
                        (when-let [m (:ticket/milestone ticket)]

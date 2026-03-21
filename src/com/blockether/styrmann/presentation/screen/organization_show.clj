@@ -11,8 +11,7 @@
   (ui/org-topbar-dropdown organizations org))
 
 (defn- sprint-ticket-count [sprint]
-  (+ (count (:sprint/direct-tickets sprint))
-     (reduce + 0 (map #(count (:milestone/tickets %)) (:sprint/milestones sprint)))))
+  (reduce + 0 (map #(count (:milestone/tickets %)) (:sprint/milestones sprint))))
 
 ;; -- Toolbar -----------------------------------------------------------------
 
@@ -95,11 +94,9 @@
   "Render the desktop board for a sprint: column headers + milestone rows."
   [sprint]
   (let [milestones (:sprint/milestones sprint)
-        direct     (:sprint/direct-tickets sprint)
-        all-rows   (cond-> []
-                     (seq direct)     (conj {:label "Direct" :tickets direct})
-                     true             (into (for [m milestones]
-                                              {:label (:milestone/name m) :tickets (:milestone/tickets m)})))]
+        all-rows   (into []
+                         (for [m milestones]
+                           {:label (:milestone/name m) :tickets (:milestone/tickets m)}))]
     [:div {:class "hidden sm:block"}
      ;; Column headers
      [:div {:class "flex gap-3 mb-2"}
@@ -146,14 +143,11 @@
 (defn- mobile-board
   "Render the mobile board for a sprint: stacked milestone sections."
   [sprint]
-  (let [milestones (:sprint/milestones sprint)
-        direct     (:sprint/direct-tickets sprint)]
+  (let [milestones (:sprint/milestones sprint)]
     [:div {:class "sm:hidden space-y-3"}
-     (when (seq direct)
-       (mobile-milestone-section "Direct" direct))
      (for [m milestones]
        (mobile-milestone-section (:milestone/name m) (:milestone/tickets m)))
-     (when (and (empty? direct) (empty? milestones))
+     (when (empty? milestones)
        [:div {:class "py-4 text-[12px] text-[var(--muted)] italic text-center"} "No tickets assigned"])]))
 
 ;; -- Board section ----------------------------------------------------------
@@ -186,7 +180,7 @@
     (closed-toggle "show-closed" "Show closed")]
    (if (seq (:organization/backlog org))
      (into [:div {:class "space-y-2"}]
-           (map ticket-card/view (:organization/backlog org)))
+           (map ticket-card/board-card (:organization/backlog org)))
      (ui/empty-state "Backlog is empty."))])
 
 ;; -- Activity (collapsible) --------------------------------------------------
@@ -281,21 +275,21 @@
        [:button {:type "button" :class "btn-primary !px-3 !py-2.5" :id "ac-add-btn"}
         [:i {:data-lucide "plus" :class "size-4"}]]]
       [:input {:type "hidden" :name "acceptance-criteria-text" :id "ac-hidden-field"}]]
-      [:div {:class "grid grid-cols-3 gap-4"}
-       (number-field "Story points" "story-points" 3 0 nil)
-       (number-field "Effort (0-10)" "effort" 3 0 10)
-       (number-field "Impact (0-10)" "impact" 7 0 10)]
-      [:label {:class "block"}
-       [:span {:class "field-label"} "Attachments"]
-       [:input {:class "input" :type "file" :name "attachments" :multiple true}]]
-      [:div {:class "flex justify-end"}
+     [:div {:class "grid grid-cols-3 gap-4"}
+      (number-field "Story points" "story-points" 3 0 nil)
+      (number-field "Effort (0-10)" "effort" 3 0 10)
+      (number-field "Impact (0-10)" "impact" 7 0 10)]
+     [:label {:class "block"}
+      [:span {:class "field-label"} "Attachments"]
+      [:input {:class "input" :type "file" :name "attachments" :multiple true}]]
+     [:div {:class "flex justify-end"}
       [:button {:class "btn-primary" :type "submit"} "Create ticket"]]])])
 
 ;; -- Page assembly -----------------------------------------------------------
 
 (defn- body-content [_organizations org organization-id]
   [:div {:data-view-root true :data-view-default "board"}
-    (toolbar)
+   (toolbar)
    (board-section org)
    (backlog-section org)
    (activity-section org)

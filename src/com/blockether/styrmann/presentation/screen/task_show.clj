@@ -4,8 +4,8 @@
    [clojure.string :as str]
    [com.blockether.styrmann.db.organization :as db.organization]
    [com.blockether.styrmann.db.task :as db.task]
-   [com.blockether.styrmann.domain.opencode-run :as opencode-run]
    [com.blockether.styrmann.domain.organization :as organization]
+   [com.blockether.styrmann.execution.session :as session]
    [com.blockether.styrmann.presentation.component.layout :as layout]
    [com.blockether.styrmann.presentation.component.ui :as ui]))
 
@@ -29,12 +29,20 @@
    [:div {:class "flex items-center justify-between px-4 py-3 bg-[var(--cream-dark)] border-b border-[var(--line)]"}
     [:div {:class "flex items-center gap-2"}
      (ui/status-badge (:run/status run))
-     [:span {:class "text-[12px] text-[var(--muted)]"} (str "PID " (:opencode-run/pid run))]]
+     [:span {:class "text-[12px] text-[var(--muted)]"} (str "PID " (:session/pid run))]]
     (when-let [exit-code (:run/exit-code run)]
       (ui/pill (str "Exit " exit-code)))]
    [:div {:class "bg-[#1a1a1f] p-4 rounded-b-3xl"}
     [:pre {:class "text-[12px] leading-relaxed text-[#e8e6e3] overflow-x-auto whitespace-pre-wrap font-mono"}
-     (or (some-> (:run/logs run) str) "No logs captured yet.")]]])
+     (or (some-> (:run/logs run) str) "No logs captured yet.")]
+    (when (seq (:session/events run))
+      [:div {:class "mt-3 rounded-xl bg-[#242429] border border-[#33333a] p-3"}
+       [:div {:class "text-[11px] uppercase tracking-[0.08em] text-[#b7b6c2] mb-2"} "Events"]
+       (into [:div {:class "space-y-1.5"}]
+             (for [event (:session/events run)]
+               [:div {:class "text-[11px] text-[#d8d7de]"}
+                [:span {:class "text-[#9e9daa] mr-2"} (name (:session.event/type event))]
+                (:session.event/message event)]))])]])
 
 (defn render
   "Render a task detail screen.
@@ -47,7 +55,12 @@
    HTML page string."
   [conn task-id]
   (if-let [task (db.task/find-task conn task-id)]
-    (let [runs (opencode-run/list-by-task conn task-id)
+    (let [runs (mapv (fn [run]
+                       (assoc run :run/status (:session/runtime-status run)
+                              :run/logs (:session/logs run)
+                              :run/exit-code (:session/exit-code run)
+                              :session/events (session/list-session-events conn (:session/id run))))
+                     (session/list-by-task conn task-id))
           available (get next-statuses (:task/status task) [])
           ticket-desc (or (get-in task [:task/ticket :ticket/title])
                           (get-in task [:task/ticket :ticket/description]))

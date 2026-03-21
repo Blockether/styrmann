@@ -167,17 +167,20 @@
   "Render a board card for columns.
 
    Params:
-   `opts` - Map with `:href`, `:title`, `:badges`, optional `:assignee`, optional `:footer`.
+   `opts` - Map with `:href`, `:title`, `:badges`, optional `:description`,
+            optional `:assignee`, optional `:footer`.
 
    Returns:
    Hiccup node."
-  [{:keys [href title title-class badges assignee footer wrapper-attrs]}]
+  [{:keys [href title title-class badges description assignee footer wrapper-attrs]}]
   [:a (merge {:href href :class "board-card block no-underline text-[var(--ink)]"}
              wrapper-attrs)
    (when (seq badges)
      (into [:div {:class "flex flex-wrap gap-1 mb-2"}]
            (remove nil? badges)))
    [:div {:class (str "text-[13px] font-medium leading-snug " (or title-class "ticket-title"))} title]
+   (when (seq description)
+     [:p {:class "mt-2 text-[12px] leading-relaxed text-[var(--muted)]"} description])
    (when (or assignee footer)
      [:div {:class "mt-2.5 flex items-center justify-between"}
       (or footer [:span])
@@ -269,7 +272,7 @@
     [:div {:class "topbar-menu"}
      [:button {:type "button" :class "org-chip" :data-topbar-toggle true}
       [:span {:class "org-chip-mark"} (subs (:organization/name org) 0 1)]
-      [:div {:class "flex flex-col items-start leading-none"}
+      [:div {:class "flex flex-col items-start gap-0.5 leading-tight"}
        [:span {:class "text-[10px] uppercase tracking-[0.12em] text-[var(--muted)] font-semibold"} "Organization"]
        [:span {:class "text-[13px] font-semibold text-[var(--ink)]"} (:organization/name org)]]
       [:i {:data-lucide "chevron-down" :class "size-4 text-[var(--muted)]"}]]
