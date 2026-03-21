@@ -294,6 +294,20 @@ clj-nrepl-eval -p 7888 "(scaffold-test-namespace 'com.blockether.styrmann.domain
 
 One require per line, alphabetize within groups. Use `:as` aliases, avoid `:refer :all`.
 
+### Component Decomposition (MANDATORY)
+
+**Presentation code MUST be decomposed into small, focused units.**
+
+- **Screens** (`presentation/screen/*.clj`) — one per page/route, orchestrate components
+- **Components** (`presentation/component/*.clj`) — reusable UI building blocks
+- **Large screen sections** — extract into `presentation/component/` when a section exceeds ~50 lines
+
+**Rules:**
+1. If a screen file exceeds 150 lines, extract sections into components
+2. Every reusable UI pattern (cards, badges, forms, modals) belongs in `component/`
+3. Screen files should read like a high-level layout — delegate rendering details to components
+4. Never put business logic in presentation namespaces — call domain functions instead
+
 ### Namespace Boundaries
 
 Keep persistence, business rules, and SSR rendering in separate namespace families.
