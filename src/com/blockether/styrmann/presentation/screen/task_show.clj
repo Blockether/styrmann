@@ -138,7 +138,7 @@
       (layout/page "Task" body
                    {:breadcrumbs [{:href "/" :label "Organizations"}
                                   {:href (str "/organizations/" org-id) :label org-name}
-                                  {:href (str "/organizations/" org-id "/tickets/" ticket-id) :label (subs ticket-desc 0 (min 30 (count ticket-desc)))}
-                                  {:label (subs (:task/description task) 0 (min 30 (count (:task/description task))))}]
+                                  {:href (str "/organizations/" org-id "/tickets/" ticket-id) :label ticket-desc}
+                                  {:label (:task/description task)}]
                     :topbar-context (layout/render-fragment (ui/org-topbar-dropdown organizations org))}))
     (layout/page "Not found" [:p "Task not found."])))

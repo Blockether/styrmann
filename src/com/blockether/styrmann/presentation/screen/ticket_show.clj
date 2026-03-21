@@ -307,7 +307,6 @@
       (layout/page "Ticket" body
         {:breadcrumbs [{:href "/" :label "Organizations"}
                        {:href (str "/organizations/" org-id) :label org-name}
-                       {:label (let [title (or (:ticket/title t) (:ticket/description t))]
-                                 (subs title 0 (min 40 (count title))))}]
+                       {:label (or (:ticket/title t) (:ticket/description t))}]
          :topbar-context (layout/render-fragment (ui/org-topbar-dropdown organizations org-overview))}))
     (layout/page "Not found" [:p "Ticket not found."])))
