@@ -11,7 +11,8 @@
   (ui/org-topbar-dropdown organizations org))
 
 (defn- sprint-ticket-count [sprint]
-  (reduce + 0 (map #(count (:milestone/tickets %)) (:sprint/milestones sprint))))
+  (+ (count (:sprint/direct-tickets sprint))
+     (reduce + 0 (map #(count (:milestone/tickets %)) (:sprint/milestones sprint)))))
 
 ;; -- Toolbar -----------------------------------------------------------------
 
@@ -94,9 +95,12 @@
   "Render the desktop board for a sprint: column headers + milestone rows."
   [sprint]
   (let [milestones (:sprint/milestones sprint)
-        all-rows   (into []
-                         (for [m milestones]
-                           {:label (:milestone/name m) :tickets (:milestone/tickets m)}))]
+        direct-tickets (:sprint/direct-tickets sprint)
+        all-rows   (cond-> (into []
+                                 (for [m milestones]
+                                   {:label (:milestone/name m) :tickets (:milestone/tickets m)}))
+                     (seq direct-tickets)
+                     (conj {:label "Unassigned" :tickets direct-tickets}))]
     [:div {:class "hidden sm:block"}
      ;; Column headers
      [:div {:class "flex gap-3 mb-2"}
@@ -143,11 +147,14 @@
 (defn- mobile-board
   "Render the mobile board for a sprint: stacked milestone sections."
   [sprint]
-  (let [milestones (:sprint/milestones sprint)]
+  (let [milestones (:sprint/milestones sprint)
+        direct-tickets (:sprint/direct-tickets sprint)]
     [:div {:class "sm:hidden space-y-3"}
      (for [m milestones]
        (mobile-milestone-section (:milestone/name m) (:milestone/tickets m)))
-     (when (empty? milestones)
+     (when (seq direct-tickets)
+       (mobile-milestone-section "Unassigned" direct-tickets))
+     (when (and (empty? milestones) (empty? direct-tickets))
        [:div {:class "py-4 text-[12px] text-[var(--muted)] italic text-center"} "No tickets assigned"])]))
 
 ;; -- Board section ----------------------------------------------------------
