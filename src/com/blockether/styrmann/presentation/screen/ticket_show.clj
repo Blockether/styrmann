@@ -13,11 +13,15 @@
 
 (defn- criteria-tree [items]
   (when (seq items)
-    [:ul {:class "space-y-1.5 pl-5 text-[14px] text-[var(--ink-secondary)] leading-relaxed"}
-     (for [{:keys [text children]} items]
-       [:li {:class "list-disc marker:text-[var(--line-strong)]"}
-        text
-        (criteria-tree children)])]))
+    (into [:div {:class "space-y-2"}]
+      (for [{:keys [text children]} items]
+        (let [display-text (str/replace (or text "") #"^\[[ x]?\]\s*" "")]
+          [:div
+           [:div {:class "flex items-start gap-2.5"}
+            [:div {:class "flex-shrink-0 mt-0.5 w-5 h-5 rounded border-2 border-[var(--line-strong)] flex items-center justify-center bg-[var(--surface)]"}]
+            [:span {:class "text-[14px] text-[var(--ink-secondary)] leading-relaxed"} display-text]]
+           (when (seq children)
+             [:div {:class "ml-7"} (criteria-tree children)])])))))
 
 (defn- detail-row [label content]
   [:div {:class "flex items-start gap-3 py-2.5"}
@@ -146,16 +150,15 @@
                (into [:div {:class "space-y-2"}]
                  (map
                    (fn [task]
-                     (let [deps (:task/depends-on task)
-                           dep-descriptions (when (seq deps)
-                                              (->> deps
-                                                   (map #(or (:task/description %) "Task ?"))
-                                                   vec))]
+                     (let [deps (:task/depends-on task)]
                        [:div
-                        (when (seq dep-descriptions)
+                        (when (seq deps)
                           [:div {:class "flex items-center gap-1.5 ml-4 mb-1 text-[11px] text-[var(--muted)]"}
-                           [:i {:data-lucide "git-branch" :class "size-3 rotate-180"}]
-                           [:span (str "depends on: " (str/join ", " (map #(subs % 0 (min 40 (count %))) dep-descriptions)))]])
+                           [:i {:data-lucide "arrow-up-left" :class "size-3"}]
+                           (if (= 1 (count deps))
+                             [:span (let [d (or (:task/description (first deps)) "?")]
+                                      (subs d 0 (min 50 (count d))))]
+                             [:span (str (count deps) " dependencies")])])
                         (task-card/view task)]))
                    (:ticket/tasks t)))
                [:div {:class "text-[13px] text-[var(--muted)] text-center py-4"}
@@ -272,9 +275,9 @@
                      [:i {:data-lucide "sparkles" :class "size-4"}]
                      "Decompose into tasks"]])
                  [:button {:type "button"
-                           :class "btn-secondary w-full"
+                           :class "flex items-center justify-center gap-1.5 w-full py-2 text-[12px] font-medium text-[var(--muted)] hover:text-[var(--accent)] transition-colors cursor-pointer"
                            :data-modal-open (str "modal-add-task-" ticket-id)}
-                  [:i {:data-lucide "plus" :class "size-4"}]
+                  [:i {:data-lucide "plus" :class "size-3"}]
                   "Add task manually"]])])
            ;; Add task modal
            (when (and (not (= :ticket.status/closed (or (:ticket/status t) :ticket.status/open)))
