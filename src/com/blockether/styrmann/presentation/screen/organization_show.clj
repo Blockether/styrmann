@@ -2,6 +2,7 @@
   "SSR organization screen — clean board-first layout."
   (:require
    [com.blockether.styrmann.domain.organization :as organization]
+   [com.blockether.styrmann.i18n :as i18n]
    [com.blockether.styrmann.presentation.component.layout :as layout]
    [com.blockether.styrmann.presentation.component.notification-list :as notification-list]
    [com.blockether.styrmann.presentation.component.ticket-card :as ticket-card]
@@ -86,7 +87,7 @@
     [:div {:class "flex gap-3 py-2 border-b border-[var(--line)] last:border-b-0"}
      [:div {:class "w-36 flex-shrink-0 pt-1"}
       [:span {:class "text-[13px] font-semibold text-[var(--ink)] leading-tight"} label]
-      [:div {:class "text-[11px] text-[var(--muted)] mt-0.5"} (str (count tickets) (if (= 1 (count tickets)) " ticket" " tickets"))]]
+      [:div {:class "text-[11px] text-[var(--muted)] mt-0.5"} (i18n/t :n/ticket (count tickets))]]
      [:div {:class "flex-1 grid grid-cols-4 gap-3"}
       (for [[bucket [status-kw _ _]] (map vector buckets status-columns)]
         (status-column-cards status-kw bucket))]]))
@@ -172,7 +173,7 @@
                 [:div {:class "flex items-center gap-2 mb-3"}
                  [:i {:data-lucide "zap" :class "size-3.5 text-[var(--accent)]"}]
                  [:span {:class "text-[14px] font-semibold text-[var(--ink)]"} (:sprint/name sprint)]
-                 (let [c (sprint-ticket-count sprint)] (ui/pill (str c (if (= 1 c) " ticket" " tickets"))))]
+                 (ui/pill (i18n/t :n/ticket (sprint-ticket-count sprint)))]
                 (desktop-board sprint)
                 (mobile-board sprint)]))
        (ui/empty-state "No sprints yet." "mt-2"))]))

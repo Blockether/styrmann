@@ -2,6 +2,7 @@
   "SSR ticket detail — warm editorial issue view."
   (:require
    [clojure.edn :as edn]
+   [com.blockether.styrmann.i18n :as i18n]
    [clojure.string :as str]
    [com.blockether.styrmann.db.git :as db.git]
    [com.blockether.styrmann.domain.organization :as organization]
@@ -121,7 +122,7 @@
                [:p {:class "mt-3 text-[15px] leading-relaxed text-[var(--ink-secondary)]"}
                 (:ticket/description t)])]
             [:div {:class "card p-5"}
-             [:div {:class "field-label mb-3"} "Acceptance Criteria"]
+             [:div {:class "field-label mb-3"} (i18n/t :ticket/acceptance-criteria)]
              (if (seq (:ticket/acceptance-criteria t))
                (criteria-tree (:ticket/acceptance-criteria t))
                [:span {:class "text-[13px] text-[var(--muted)]"} "None defined."])]
@@ -141,18 +142,16 @@
                [:div
                 [:div {:class "flex items-center justify-between mb-4"}
                  [:div {:class "flex items-center gap-3"}
-                  [:div {:class "field-label !mb-0"} "Workflow"]
+                  [:div {:class "field-label !mb-0"} (i18n/t :ticket/workflow)]
                   (when (pos? total)
                     [:span {:class "rounded-full bg-[var(--cream-dark)] px-2.5 py-0.5 text-[11px] font-bold text-[var(--muted)]"} total])]
                  (when (pos? total)
-                   [:div {:class "flex items-center gap-3"}
-                    [:div {:class "flex items-center gap-1.5 text-[11px] text-[var(--muted)]"}
-                     [:div {:class "w-16 h-1.5 rounded-full bg-[var(--cream-dark)] overflow-hidden"}
-                      [:div {:class "h-full rounded-full bg-[var(--good)] transition-all"
-                             :style (str "width:" (if (pos? total) (* 100 (/ done total)) 0) "%")}]]
-                     (str done "/" total)]])]
+                   [:div {:class "flex items-center gap-1.5 text-[11px] text-[var(--muted)]"}
+                    [:div {:class "w-16 h-1.5 rounded-full bg-[var(--cream-dark)] overflow-hidden"}
+                     [:div {:class "h-full rounded-full bg-[var(--good)] transition-all"
+                            :style (str "width:" (if (pos? total) (* 100 (/ done total)) 0) "%")}]]
+                    (str done "/" total)])]
                 (if (seq tasks)
-                  ;; Topological sort by depth
                   (let [task-by-id (into {} (map (juxt :task/id identity) tasks))
                         depth-of (fn depth-of [task seen]
                                    (if (contains? seen (:task/id task)) 0
@@ -168,23 +167,16 @@
                                         :task.status/reviewing     [:i {:data-lucide "eye" :class "size-4 text-[var(--purple)]"}]
                                         [:i {:data-lucide "circle" :class "size-4 text-[var(--muted)]"}]))]
                     [:div {:class "relative"}
-                     ;; Vertical connector line
                      [:div {:class "absolute left-[9px] top-4 bottom-4 w-0.5 bg-[var(--line)]"}]
-                     ;; Tasks
                      (into [:div {:class "space-y-0"}]
-                       (map-indexed
-                         (fn [idx task]
-                           (let [status (:task/status task)
-                                 href (str "/organizations/" org-id "/tasks/" (:task/id task))
-                                 deps (:task/depends-on task)
-                                 is-last? (= idx (dec (count sorted)))]
+                       (mapv
+                         (fn [task]
+                           (let [deps (:task/depends-on task)]
                              [:div {:class "relative flex items-start gap-3 py-2.5 group"}
-                              ;; Status dot on the vertical line
                               [:div {:class "relative z-10 flex-shrink-0 mt-0.5 w-5 h-5 rounded-full bg-[var(--surface)] flex items-center justify-center"}
-                               (status-icon status)]
-                              ;; Content
+                               (status-icon (:task/status task))]
                               [:div {:class "flex-1 min-w-0 pb-1"}
-                               [:a {:href href
+                               [:a {:href (str "/organizations/" org-id "/tasks/" (:task/id task))
                                     :class "text-[13px] font-medium text-[var(--ink)] no-underline hover:text-[var(--accent)] leading-snug block"}
                                 (:task/description task)]
                                [:div {:class "flex flex-wrap items-center gap-2 mt-1"}
@@ -192,10 +184,10 @@
                                  (get-in task [:task/workspace :workspace/name])]
                                 (when (seq deps)
                                   [:span {:class "text-[10px] text-[var(--muted)] italic"}
-                                   (str (count deps) (if (= 1 (count deps)) " dep" " deps"))])]]]))
+                                   (i18n/t :n/dep (count deps))])]]]))
                          sorted))])
                   [:div {:class "text-[13px] text-[var(--muted)] text-center py-4"}
-                   "No tasks yet."])])]
+                   (i18n/t :ticket/no-tasks)])])]
             (let [all-deliverables (->> (:ticket/tasks t)
                                      (mapcat (fn [task]
                                                (when-let [edn-str (:task/deliverables-edn task)]
@@ -306,12 +298,12 @@
                            :action (str "/organizations/" org-id "/tickets/" ticket-id "/decompose")}
                     [:button {:class "btn-primary w-full" :type "submit"}
                      [:i {:data-lucide "sparkles" :class "size-4"}]
-                     "Decompose into tasks"]])
+                     (i18n/t :ticket/decompose)]])
                  [:button {:type "button"
                            :class "flex items-center justify-center gap-1.5 w-full py-2 text-[12px] font-medium text-[var(--muted)] hover:text-[var(--accent)] transition-colors cursor-pointer"
                            :data-modal-open (str "modal-add-task-" ticket-id)}
                   [:i {:data-lucide "plus" :class "size-3"}]
-                  "Add task manually"]])])
+                  (i18n/t :ticket/add-manually)]])])
            ;; Add task modal
            (when (and (not (= :ticket.status/closed (or (:ticket/status t) :ticket.status/open)))
                    (seq (:organization/workspaces org-overview)))
