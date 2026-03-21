@@ -434,19 +434,21 @@ cd /opt/styrmann && java -jar styrmann.jar &
 After any UI/presentation change:
 
 1. **Start the local server** — `clj -M:dev`
-2. **Take screenshot via Spel** — navigate to the changed page
-3. **Analyze screenshot** — ask specific questions about the UI
+2. **Use `spel snapshot` (NOT screenshot)** — snapshots include styles, positions, and element structure. Screenshots are images that lose detail at small sizes.
+3. **Analyze the snapshot** — check element positions, text content, link URLs, and computed styles
 4. **Assert expectations** — verify new elements AND absence of regressions
 5. **Create E2E test** — convert the verification into a Spel test
 
-**NEVER** take a screenshot without analyzing it. **ALWAYS** verify both new elements AND absence of regressions.
+**ALWAYS use `spel snapshot` over `spel screenshot`.** Snapshots provide structured DOM data with styles, positions, and accessibility info — far more useful than pixel images. Only use screenshots when explicitly asked by the user.
+
+**NEVER** take a snapshot without analyzing it. **ALWAYS** verify both new elements AND absence of regressions.
 
 ### Frontend Bug / Visual Check → Spel Test
 
 **When the user reports a frontend bug or asks to check something visually, ALWAYS create a Spel E2E test.** The test captures the expected behavior so it can never regress.
 
 ```
-1. Reproduce via Spel (navigate, screenshot, verify)
+1. Reproduce via Spel (navigate, snapshot, verify)
 2. Fix the issue
 3. Write a Spel test that asserts the fix
 4. Run the test — MUST PASS

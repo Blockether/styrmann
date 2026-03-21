@@ -20,7 +20,7 @@
                   (ui/status-badge (:notification/status n))
                   [:div {:class "min-w-0 flex-1"}
                    [:a {:href (str "/organizations/"
-                                   (get-in n [:notification/task :task/ticket :ticket/organization :organization/id])
+                                   (get-in n [:notification/organization :organization/id])
                                    "/tasks/"
                                    (get-in n [:notification/task :task/id]))
                         :class "text-[13px] font-medium text-[var(--ink)] no-underline hover:text-[var(--accent)] truncate block"}
