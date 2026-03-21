@@ -9,6 +9,7 @@
    [com.blockether.styrmann.domain.organization :as organization]
    [com.blockether.styrmann.execution.session :as session]
    [com.blockether.styrmann.presentation.component.git-progress :as git-progress]
+   [com.blockether.styrmann.i18n :as i18n]
    [com.blockether.styrmann.presentation.component.layout :as layout]
    [com.blockether.styrmann.presentation.component.ui :as ui]))
 
@@ -17,7 +18,7 @@
    :task.status/implementing [:task.status/testing]
    :task.status/testing      [:task.status/reviewing]
    :task.status/reviewing    [:task.status/done]
-   :task.status/done         []})
+   :task.status/done         [:task.status/inbox]})
 
 (defn- status-label [status]
   (-> status name (str/replace "-" " ") str/capitalize))
@@ -37,10 +38,10 @@
       (ui/pill (str "Exit " exit-code)))]
    [:div {:class "bg-[#1a1a1f] p-4 rounded-b-3xl"}
     [:pre {:class "text-[12px] leading-relaxed text-[#e8e6e3] overflow-x-auto whitespace-pre-wrap font-mono"}
-     (or (some-> (:run/logs run) str) "No logs captured yet.")]
+     (or (some-> (:run/logs run) str) (i18n/t :task/no-logs))]
     (when (seq (:session/events run))
       [:div {:class "mt-3 rounded-xl bg-[#242429] border border-[#33333a] p-3"}
-       [:div {:class "text-[11px] uppercase tracking-[0.08em] text-[#b7b6c2] mb-2"} "Events"]
+       [:div {:class "text-[11px] uppercase tracking-[0.08em] text-[#b7b6c2] mb-2"} (i18n/t :task/events)]
        (into [:div {:class "space-y-1.5"}]
              (for [event (:session/events run)]
                [:div {:class "text-[11px] text-[#d8d7de]"}
@@ -84,7 +85,7 @@
               (:task/description task)]]
             (when (seq available)
               [:div {:class "flex flex-wrap items-center gap-2"}
-               [:span {:class "text-[13px] text-[var(--muted)]"} "Transition:"]
+               [:span {:class "text-[13px] text-[var(--muted)]"} (str (i18n/t :task/transition) ":")]
                [:form {:method "post" :action (str "/organizations/" org-id "/tasks/" task-id "/status")
                        :class "flex gap-2"}
                 (for [s available]
@@ -94,7 +95,7 @@
                                 (try (edn/read-string edn-str) (catch Exception _ nil)))]
               (when (seq deliverables)
                 [:div
-                 (ui/section-heading {:title "Deliverables" :count (count deliverables)})
+                 (ui/section-heading {:title (i18n/t :task/deliverables) :count (count deliverables)})
                  [:div {:class "mt-3 space-y-2"}
                   (for [{:keys [title description status]} deliverables]
                     [:div {:class "card p-4 flex items-start gap-3"}
@@ -118,21 +119,21 @@
                                        vec)))]
               (git-progress/commits-section git-commits {:title "Git Activity"}))
             [:div
-             (ui/section-heading {:title "Run history" :count (count runs)})
+             (ui/section-heading {:title (i18n/t :task/run-history) :count (count runs)})
              (if (seq runs)
                (into [:div {:class "mt-4 space-y-3"}]
                      (map run-card runs))
-               (ui/empty-state "No process runs recorded." "mt-4"))]]
+               (ui/empty-state (i18n/t :task/no-runs) "mt-4"))]]
            [:aside {:class "space-y-4"}
             [:div {:class "card p-5"}
-             [:div {:class "field-label mb-3"} "Details"]
-             (detail-row "Status" (ui/status-badge (:task/status task)))
-             (detail-row "Runs" [:span {:class "text-[14px] font-bold"} (count runs)])
-             (detail-row "Ticket"
+             [:div {:class "field-label mb-3"} (i18n/t :details/title)]
+             (detail-row (i18n/t :details/status) (ui/status-badge (:task/status task)))
+             (detail-row (i18n/t :details/runs) [:span {:class "text-[14px] font-bold"} (count runs)])
+             (detail-row (i18n/t :details/ticket)
                          [:a {:href (str "/organizations/" org-id "/tickets/" ticket-id)} ticket-desc])
-             (detail-row "Workspace"
+             (detail-row (i18n/t :details/workspace)
                          [:a {:href (str "/organizations/" org-id "/workspaces/" ws-id)} ws-name])
-             (detail-row "Organization"
+             (detail-row (i18n/t :details/organization)
                          [:a {:href (str "/organizations/" org-id)} org-name])]]]]
       (layout/page "Task" body
                    {:breadcrumbs [{:href "/" :label "Organizations"}

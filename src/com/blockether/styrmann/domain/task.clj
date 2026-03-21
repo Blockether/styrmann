@@ -20,7 +20,7 @@
    :task.status/implementing #{:task.status/testing}
    :task.status/testing      #{:task.status/reviewing}
    :task.status/reviewing    #{:task.status/done}
-   :task.status/done         #{}})
+   :task.status/done         #{:task.status/inbox}})
 
 (defn- require-text! [value message]
   (let [trimmed (some-> value str/trim)]

@@ -161,11 +161,14 @@
                         sorted (sort-by (juxt #(depth-of % #{}) :task/created-at) tasks)
                         status-icon (fn [status]
                                       (case status
-                                        :task.status/done         [:i {:data-lucide "check-circle" :class "size-4 text-[var(--good)]"}]
-                                        :task.status/implementing [:i {:data-lucide "loader" :class "size-4 text-[var(--accent)]"}]
-                                        :task.status/testing       [:i {:data-lucide "test-tube" :class "size-4 text-[var(--warn)]"}]
-                                        :task.status/reviewing     [:i {:data-lucide "eye" :class "size-4 text-[var(--purple)]"}]
-                                        [:i {:data-lucide "circle" :class "size-4 text-[var(--muted)]"}]))]
+                                        :task.status/done         [:i {:data-lucide "check-circle-2" :class "size-4 text-[var(--good)]"}]
+                                        :task.status/implementing [:i {:data-lucide "hammer" :class "size-4 text-[var(--accent)]"}]
+                                        :task.status/testing      [:i {:data-lucide "flask-conical" :class "size-4 text-[var(--warn)]"}]
+                                        :task.status/reviewing    [:i {:data-lucide "scan-eye" :class "size-4 text-[var(--purple)]"}]
+                                        [:i {:data-lucide "circle-dashed" :class "size-4 text-[var(--muted)]"}]))
+                        ac-count (fn [task]
+                                   (when-let [edn-str (:task/acceptance-criteria-edn task)]
+                                     (try (count (edn/read-string edn-str)) (catch Exception _ 0))))]
                     [:div {:class "relative"}
                      [:div {:class "absolute left-[9px] top-4 bottom-4 w-0.5 bg-[var(--line)]"}]
                      (into [:div {:class "space-y-0"}]
@@ -182,6 +185,10 @@
                                [:div {:class "flex flex-wrap items-center gap-2 mt-1"}
                                 [:span {:class "text-[11px] text-[var(--muted)]"}
                                  (get-in task [:task/workspace :workspace/name])]
+                                (when-let [n (ac-count task)]
+                                  (when (pos? n)
+                                    [:span {:class "text-[10px] text-[var(--muted)]"}
+                                     (str n " AC")]))
                                 (when (seq deps)
                                   [:span {:class "text-[10px] text-[var(--muted)] italic"}
                                    (i18n/t :n/dep (count deps))])]]]))
@@ -254,42 +261,7 @@
                           :style (str "width:" (* 10 (:ticket/impact t)) "%")}]]
                   [:span {:class "text-[12px] text-[var(--muted)]"} (str (:ticket/impact t) "/10")]])
                (detail-row "Organization"
-                 [:a {:href (str "/organizations/" org-id)} org-name])
-               ;; Sprint — inline editable (disabled when closed)
-               (detail-row "Sprint"
-                 (if closed?
-                   [:span {:class "text-[14px]"} (or (get-in t [:ticket/sprint :sprint/name]) "None")]
-                   (if (seq (:organization/sprints org-overview))
-                     (let [current-sprint-id (get-in t [:ticket/sprint :sprint/id])]
-                       (inline-select-form
-                         (str "/organizations/" org-id "/tickets/" ticket-id "/assign-sprint")
-                         "sprint-id"
-                         current-sprint-id
-                         (for [s (:organization/sprints org-overview)]
-                           {:value (str (:sprint/id s))
-                            :label (:sprint/name s)
-                            :selected? (= (:sprint/id s) current-sprint-id)})
-                         "None"))
-                     [:span {:class "text-[13px] text-[var(--muted)]"} "No sprints"])))
-               ;; Milestone — inline editable (disabled when closed)
-               (let [milestones (mapcat (fn [s] (map #(assoc % :_sprint-name (:sprint/name s))
-                                                  (:sprint/milestones s)))
-                                  (:organization/sprints org-overview))]
-                 (detail-row "Milestone"
-                   (if closed?
-                     [:span {:class "text-[14px]"} (or (get-in t [:ticket/milestone :milestone/name]) "None")]
-                     (if (seq milestones)
-                       (let [current-milestone-id (get-in t [:ticket/milestone :milestone/id])]
-                         (inline-select-form
-                           (str "/organizations/" org-id "/tickets/" ticket-id "/assign-milestone")
-                           "milestone-id"
-                           current-milestone-id
-                           (for [m milestones]
-                             {:value (str (:milestone/id m))
-                              :label (str (:_sprint-name m) " / " (:milestone/name m))
-                              :selected? (= (:milestone/id m) current-milestone-id)})
-                           "None"))
-                       [:span {:class "text-[13px] text-[var(--muted)]"} "No milestones"]))))]
+                 [:a {:href (str "/organizations/" org-id)} org-name])]
               ;; Decompose + Add task (hidden when closed)
               (when (and (not closed?) (seq (:organization/workspaces org-overview)))
                 [:div {:class "flex flex-col gap-2"}

@@ -50,6 +50,10 @@
                         nubank/matcher-combinators     {:mvn/version "3.10.0"}}
           :main-opts   ["-m" "lazytest.main"]}
 
+  :e2e  {:extra-paths ["test-e2e"]
+         :extra-deps  {com.blockether/spel {:mvn/version "0.7.7"}}
+         :main-opts   ["-m" "lazytest.main" "--dir" "test-e2e"]}
+
   :outdated {:deps       {com.github.liquidz/antq {:mvn/version "RELEASE"}}
              :main-opts  ["-m" "antq.core"]}
 

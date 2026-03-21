@@ -2,6 +2,7 @@
   "Reusable AI task card — warm editorial style."
   (:require
    [clojure.string :as str]
+   [com.blockether.styrmann.i18n :as i18n]
    [com.blockether.styrmann.presentation.component.layout :as layout]
    [com.blockether.styrmann.presentation.component.ui :as ui]))
 
@@ -10,7 +11,7 @@
    :task.status/implementing [:task.status/testing]
    :task.status/testing      [:task.status/reviewing]
    :task.status/reviewing    [:task.status/done]
-   :task.status/done         []})
+   :task.status/done         [:task.status/inbox]})
 
 (defn board-card
   "Render a task as a board card.
@@ -63,7 +64,7 @@
                     :name "status"
                     :value (subs (str status) 1)}
            (str/replace (name status) "-" " ")])]
-       [:span {:class "badge badge-done self-end sm:self-auto"} "Done"])]))
+       [:span {:class "badge badge-done self-end sm:self-auto"} (i18n/t :task-card/done)])]))
 
 (defn render
   "Render a task card.
