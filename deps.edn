@@ -37,7 +37,9 @@
    ;; Fast EDN parsing
    io.github.tonsky/fast-edn        {:mvn/version "1.1.3"}
    ;; i18n — pluralization and translations
-   tongue/tongue                     {:mvn/version "0.4.4"}}
+   tongue/tongue                     {:mvn/version "0.4.4"}
+   ;; Dependency injection
+   org.clojars.darkleaf/di           {:mvn/version "3.6.0"}}
 
  :aliases
  {:dev  {:extra-paths ["dev"]
