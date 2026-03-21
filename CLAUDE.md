@@ -443,6 +443,36 @@ After any UI/presentation change:
 
 **NEVER** take a snapshot without analyzing it. **ALWAYS** verify both new elements AND absence of regressions.
 
+### Spel Command Reference
+
+```bash
+# Navigation
+spel open <url>                    # Navigate to URL
+spel navigate <url>                # Same as open
+
+# Snapshots (PREFERRED over screenshots)
+spel snapshot                      # Full DOM tree with refs and positions
+spel snapshot -i                   # Interactive elements only
+spel snapshot -S                   # Include computed CSS styles
+spel snapshot -S --minimal         # Styles: 16 essential properties
+spel snapshot -s "#main-content"   # Scoped to a CSS selector
+
+# Screenshots (only when user explicitly asks)
+spel screenshot                    # Viewport screenshot
+spel screenshot --full-page        # Full page screenshot
+
+# Interaction
+spel click <selector>              # Click element (use @ref or text=...)
+spel fill <selector> "text"        # Clear and fill input
+spel type <selector> "text"        # Type without clearing
+spel press <key>                   # Press key (Enter, Tab, etc.)
+spel select <selector> <value>     # Select dropdown option
+
+# Annotation (visual debugging)
+spel annotate                      # Show element overlays with refs
+spel unannotate                    # Remove overlays
+```
+
 ### Frontend Bug / Visual Check → Spel Test
 
 **When the user reports a frontend bug or asks to check something visually, ALWAYS create a Spel E2E test.** The test captures the expected behavior so it can never regress.

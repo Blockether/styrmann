@@ -26,7 +26,7 @@
                         :class "text-[13px] font-medium text-[var(--ink)] no-underline hover:text-[var(--accent)] truncate block"}
                     (get-in n [:notification/task :task/description])]
                    [:span {:class "text-[11px] text-[var(--muted)]"}
-                    (get-in n [:notification/task :task/ticket :ticket/description])]]]))
+                    (get-in n [:notification/task :task/ticket :ticket/title])]]]))
           notifications)
     [:div {:class "text-[13px] text-[var(--muted)] py-4 text-center"}
      "No activity yet."]))
