@@ -1,103 +1,112 @@
 (ns com.blockether.styrmann.main
-  "Production entry point for the uberjar."
+  "Production entry point for the uberjar.
+   Uses darkleaf/di for dependency injection and lifecycle management."
   (:require
    [com.blockether.styrmann.app :as app]
+   [com.blockether.styrmann.bootstrap :as bootstrap]
    [com.blockether.styrmann.db.core :as db]
    [com.blockether.styrmann.execution.session :as session]
    [com.blockether.styrmann.runner.tool-registry :as tool-registry]
+   [darkleaf.di.core :as di]
    [nrepl.server :as nrepl]
    [ring.adapter.jetty :as jetty]
    [taoensso.telemere :as t])
-  (:import
-   [java.lang Runtime Thread])
   (:gen-class))
 
-(defonce ^:private !nrepl (atom nil))
-(defonce ^:private !jetty (atom nil))
-(defonce ^:private !shutdown-hook (atom nil))
+;; -- Configuration -----------------------------------------------------------
 
-(defn- setup-logging!
-  "Configure Telemere with file output for production.
-   Logs to LOG_PATH env (default: log/styrmann.log)."
-  []
+(defn cfg:db-path
+  {::di/kind :component}
+  [_deps]
+  (or (System/getenv "DB_PATH") "data/styrmann"))
+
+(defn cfg:http-port
+  {::di/kind :component}
+  [_deps]
+  (parse-long (or (System/getenv "HTTP_PORT") "3000")))
+
+(defn cfg:nrepl-port
+  {::di/kind :component}
+  [_deps]
+  (parse-long (or (System/getenv "NREPL_PORT") "7888")))
+
+;; -- Components --------------------------------------------------------------
+
+(defn datalevin
+  "Datalevin connection component."
+  {::di/kind :component}
+  [{db-path `cfg:db-path}]
   (let [log-path (or (System/getenv "LOG_PATH") "log/styrmann.log")]
     (.mkdirs (.getParentFile (java.io.File. log-path)))
     (t/add-handler! :file/log
                     (t/handler:file {:path log-path
-                                     :max-file-size (* 10 1024 1024)  ;; 10 MB
+                                     :max-file-size (* 10 1024 1024)
                                      :max-num-files 5}))
-    (t/set-min-level! :info)
-    (t/log! :info ["Logging initialized" {:path log-path}])))
+    (t/set-min-level! :info))
+  (let [conn (db/start! db-path)]
+    (t/log! :info ["Datalevin started" {:path db-path}])
+    (reify
+      clojure.lang.IDeref (deref [_] conn)
+      java.lang.AutoCloseable
+      (close [_]
+        (db/stop!)
+        (t/log! :info "Datalevin stopped")))))
 
-(declare stop!)
+(defn tool-registry
+  "Register default tools and sync to DB."
+  {::di/kind :component}
+  [{datalevin `datalevin}]
+  (let [conn @datalevin]
+    (tool-registry/register-default-tools!)
+    (session/sync-tool-definitions! conn (tool-registry/list-tools))
+    (session/ensure-explorer-agent! conn)
+    (bootstrap/ensure-from-git! conn)
+    (t/log! :info "Tools registered and bootstrap complete")
+    (reify java.lang.AutoCloseable (close [_]))))
 
-(defn- install-shutdown-hook!
-  []
-  (when-not @!shutdown-hook
-    (let [hook (Thread. (reify Runnable
-                          (run [_]
-                            (stop!)))
-                        "styrmann-shutdown")]
-      (.addShutdownHook (Runtime/getRuntime) hook)
-      (reset! !shutdown-hook hook))))
+(defn nrepl-server
+  "nREPL server component."
+  {::di/kind :component}
+  [{port `cfg:nrepl-port
+    _datalevin `datalevin}]
+  (let [server (nrepl/start-server :port port)]
+    (spit ".nrepl-port" (str port))
+    (t/log! :info ["nREPL listening" {:port port}])
+    (reify java.lang.AutoCloseable
+      (close [_]
+        (nrepl/stop-server server)
+        (t/log! :info "nREPL stopped")))))
 
-(defn start!
-  "Start Datalevin, nREPL, and Jetty. Idempotent.
+(defn http-server
+  "Jetty HTTP server component."
+  {::di/kind :component}
+  [{port `cfg:http-port
+    _tools `tool-registry}]
+  (let [server (jetty/run-jetty #'app/app {:port port :join? false})]
+    (t/log! :info ["HTTP listening" {:port port}])
+    (reify
+      clojure.lang.IDeref (deref [_] server)
+      java.lang.AutoCloseable
+      (close [_]
+        (.stop server)
+        (t/log! :info "HTTP stopped")))))
 
-   Params:
-   `opts` - Map with optional `:nrepl-port`, `:http-port`, and `:db-path`.
+(defn app
+  "Root component that starts all services."
+  {::di/kind :component}
+  [{http `http-server
+    _nrepl `nrepl-server}]
+  (t/log! :info "Styrmann started")
+  (reify
+    clojure.lang.IDeref (deref [_] @http)
+    java.lang.AutoCloseable
+    (close [_]
+      (t/log! :info "Styrmann stopping"))))
 
-   Returns:
-   Map with running service handles."
-  [{:keys [nrepl-port http-port db-path]
-    :or {nrepl-port 7888
-         http-port 3000
-         db-path "data/styrmann"}}]
-  (setup-logging!)
-  (db/start! db-path)
-  (tool-registry/register-default-tools!)
-  (session/sync-tool-definitions! (db/conn) (tool-registry/list-tools))
-  (session/ensure-explorer-agent! (db/conn))
-  (when-not @!nrepl
-    (let [server (nrepl/start-server :port nrepl-port)]
-      (reset! !nrepl server)
-      (when (pos? nrepl-port)
-        (spit ".nrepl-port" (str nrepl-port)))))
-  (when-not @!jetty
-    (reset! !jetty (jetty/run-jetty #'app/app {:port http-port :join? false})))
-  (install-shutdown-hook!)
-  (t/log! :info ["Styrmann started" {:nrepl-port nrepl-port
-                                     :http-port http-port
-                                     :db-path db-path}])
-  {:nrepl @!nrepl
-   :jetty @!jetty})
-
-(defn stop!
-  "Stop Jetty, nREPL, and Datalevin. Safe to call multiple times.
-
-   Returns:
-   nil."
-  []
-  (when-let [server @!jetty]
-    (.stop server)
-    (reset! !jetty nil)
-    (t/log! :info "HTTP stopped"))
-  (when-let [server @!nrepl]
-    (nrepl/stop-server server)
-    (reset! !nrepl nil)
-    (t/log! :info "nREPL stopped"))
-  (db/stop!)
-  (when-let [hook @!shutdown-hook]
-    (when (not= (Thread/currentThread) hook)
-      (try
-        (.removeShutdownHook (Runtime/getRuntime) hook)
-        (catch IllegalStateException _)))
-    (reset! !shutdown-hook nil))
-  nil)
+;; -- Entry point -------------------------------------------------------------
 
 (defn -main [& _args]
-  (let [{:keys [jetty]}
-        (start! {:nrepl-port (parse-long (or (System/getenv "NREPL_PORT") "7888"))
-                 :http-port (parse-long (or (System/getenv "HTTP_PORT") "3000"))
-                 :db-path (or (System/getenv "DB_PATH") "data/styrmann")})]
-    (.join jetty)))
+  (let [system (di/start `app)]
+    (.addShutdownHook (Runtime/getRuntime)
+                      (Thread. #(di/stop system) "styrmann-shutdown"))
+    (.join @(di/ref `http-server))))

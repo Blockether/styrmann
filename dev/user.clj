@@ -1,15 +1,12 @@
 (ns user
   "Loaded automatically when the REPL starts with the :dev alias.
-   Boots nREPL + Ring/Jetty + Datalevin.
+   Uses darkleaf/di for system lifecycle.
    Provides test runners, docstring validation, and test scaffolding."
   (:require
    [clj-reload.core :as reload]
    [clojure.string :as str]
-   [com.blockether.styrmann.app :as app]
-   [com.blockether.styrmann.bootstrap :as bootstrap]
-   [com.blockether.styrmann.db.core :as db]
-   [nrepl.server :as nrepl]
-   [ring.adapter.jetty :as jetty]
+   [com.blockether.styrmann.main :as main]
+   [darkleaf.di.core :as di]
    [taoensso.telemere :as t]))
 
 ;; -- logging -----------------------------------------------------------------
@@ -19,42 +16,24 @@
 
 ;; -- state -------------------------------------------------------------------
 
-(defonce ^:private !nrepl (atom nil))
-(defonce ^:private !jetty (atom nil))
+(defonce ^:private !system (atom nil))
 
 ;; -- lifecycle ---------------------------------------------------------------
 
 (defn start
-  "Start nREPL + Jetty + Datalevin. Idempotent."
-  ([] (start {}))
-  ([{:keys [nrepl-port http-port db-path]
-     :or   {nrepl-port 7888
-            http-port  3000
-            db-path    "data/styrmann"}}]
-   (db/start! db-path)
-   (bootstrap/ensure-from-git! (db/conn))
-   (when-not @!nrepl
-     (let [srv (nrepl/start-server :port nrepl-port)]
-       (reset! !nrepl srv)
-       (spit ".nrepl-port" (str nrepl-port))
-       (t/log! :info ["nREPL listening" {:port nrepl-port}])))
-   (when-not @!jetty
-     (let [srv (jetty/run-jetty #'app/app {:port http-port :join? false})]
-       (reset! !jetty srv)
-       (t/log! :info ["HTTP listening" {:port http-port}])))))
+  "Start the system via darkleaf/di. Idempotent."
+  []
+  (when-not @!system
+    (reset! !system (di/start `main/app))
+    (t/log! :info "System started via di/start")))
 
 (defn stop
-  "Stop nREPL + Jetty + Datalevin."
+  "Stop the system via darkleaf/di."
   []
-  (when-let [srv @!jetty]
-    (.stop srv)
-    (reset! !jetty nil)
-    (t/log! :info "HTTP stopped"))
-  (when-let [srv @!nrepl]
-    (nrepl/stop-server srv)
-    (reset! !nrepl nil)
-    (t/log! :info "nREPL stopped"))
-  (db/stop!))
+  (when-let [sys @!system]
+    (di/stop sys)
+    (reset! !system nil)
+    (t/log! :info "System stopped via di/stop")))
 
 (defn reset
   "Reload changed namespaces via clj-reload. No server restart needed."
@@ -394,6 +373,4 @@
 
 ;; -- auto-start on load ------------------------------------------------------
 
-(start {:nrepl-port (parse-long (or (System/getenv "NREPL_PORT") "7888"))
-        :http-port  (parse-long (or (System/getenv "HTTP_PORT")  "3000"))
-        :db-path    (or (System/getenv "DB_PATH") "data/styrmann")})
+(start)

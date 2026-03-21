@@ -83,6 +83,17 @@
               (ui/status-badge (:task/status task))]
              [:h1 {:class "text-[24px] leading-tight"}
               (:task/description task)]]
+            (when-let [ac-edn (:task/acceptance-criteria-edn task)]
+              (let [criteria (try (edn/read-string ac-edn) (catch Exception _ nil))]
+                (when (seq criteria)
+                  [:div {:class "card p-5"}
+                   [:div {:class "field-label mb-3"} (i18n/t :ticket/acceptance-criteria)]
+                   (into [:ul {:class "space-y-2 list-none p-0 m-0"}]
+                     (mapv (fn [c]
+                             [:li {:class "flex items-start gap-2.5"}
+                              [:div {:class "flex-shrink-0 mt-0.5 w-5 h-5 rounded border-2 border-[var(--line-strong)] flex items-center justify-center bg-[var(--surface)]"}]
+                              [:span {:class "text-[14px] text-[var(--ink-secondary)] leading-relaxed"} (str c)]])
+                           criteria))])))
             (when (seq available)
               [:div {:class "flex flex-wrap items-center gap-2"}
                [:span {:class "text-[13px] text-[var(--muted)]"} (str (i18n/t :task/transition) ":")]
