@@ -1,6 +1,7 @@
 (ns com.blockether.styrmann.presentation.component.notification-list
   "Organization notification rendering — activity feed."
   (:require
+   [com.blockether.styrmann.i18n :as i18n]
    [com.blockether.styrmann.presentation.component.layout :as layout]
    [com.blockether.styrmann.presentation.component.ui :as ui]))
 
@@ -29,7 +30,7 @@
                     (get-in n [:notification/task :task/ticket :ticket/title])]]]))
           notifications)
     [:div {:class "text-[13px] text-[var(--muted)] py-4 text-center"}
-     "No activity yet."]))
+     (i18n/t :activity/empty)]))
 
 (defn render
   "Render a notification list.

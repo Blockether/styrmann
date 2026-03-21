@@ -56,10 +56,66 @@
         :details/runs "Runs"
         :details/ticket "Ticket"
 
+        ;; Settings
+        :settings/title "Settings"
+        :settings/llm-providers "LLM Providers"
+        :settings/runner-settings "Runner Settings"
+        :settings/no-providers "No providers configured."
+        :settings/add-provider "Add provider"
+        :settings/provider-name "Name"
+        :settings/provider-base-url "Base URL"
+        :settings/provider-api-key "API Key"
+        :settings/provider-set-default "Set as default provider"
+        :settings/provider-description "Configure LLM provider credentials for Svar. Each provider defines an API endpoint and key."
+        :settings/runner-description "Configure the execution environment for agent sessions. Each workspace can use a different LLM provider."
+        :settings/runner-workspace "Workspace"
+        :settings/runner-provider "Provider"
+        :settings/runner-model "Model"
+        :settings/runner-working-directory "Working directory"
+        :settings/runner-status "Status"
+        :settings/runner-save "Save runner settings"
+        :settings/runner-no-workspace "Create a workspace first."
+        :settings/provider-default "default"
+        :settings/provider-set-as-default "set as default"
+        :settings/status-ready "Ready"
+        :settings/status-busy "Busy"
+        :settings/status-offline "Offline"
+        :settings/status-error "Error"
+        :settings/manage-description "Manage LLM providers and execution settings for this organization."
+        :settings/current-organization "Current organization"
+        :settings/is-default-org "This organization is the default landing organization."
+        :settings/not-default-org "This organization is not the default landing organization yet."
+
+        ;; Task detail
+        :task/deliverables "Deliverables"
+        :task/events "Events"
+        :task/no-logs "No logs captured yet."
+
+        ;; Home
+        :home/headline-1 "Your organizations,"
+        :home/headline-2 "organized"
+        :home/subtitle "Manage organization boards, backlog grooming, sprint planning, and delivery tasks from one place."
+        :home/org-subtitle "Backlog, sprints, and delivery management"
+        :home/no-orgs "No organizations yet. Create your first one to get started."
+        :home/create-org "Create organization"
+        :home/org-name "Organization name"
+        :home/create-btn "Create"
+
+        ;; Workspace
+        :workspace/no-tasks "No tasks assigned to this workspace yet."
+        :workspace/all-tasks "All tasks"
+
+        ;; Board
+        :board/no-items "No items"
+
+        ;; Task card
+        :task-card/done "Done"
+
         ;; Misc
         :misc/none "None"
         :misc/no-milestones "No milestones"
-        :misc/no-sprints "No sprints"}
+        :misc/no-sprints "No sprints"
+        :misc/go-to-settings "Go to settings"}
 
    :tongue/fallback :en})
 

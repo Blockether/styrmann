@@ -1,22 +1,13 @@
 (ns com.blockether.styrmann.presentation.screen.workspace-show
   "SSR workspace screen — warm editorial task board."
   (:require
-   [clojure.string :as str]
    [com.blockether.styrmann.db.organization :as db.organization]
    [com.blockether.styrmann.domain.organization :as organization]
    [com.blockether.styrmann.domain.task :as task]
+   [com.blockether.styrmann.i18n :as i18n]
    [com.blockether.styrmann.presentation.component.layout :as layout]
    [com.blockether.styrmann.presentation.component.task-card :as task-card]
    [com.blockether.styrmann.presentation.component.ui :as ui]))
-
-(defn- group-by-status [tasks]
-  (let [statuses [:task.status/inbox :task.status/implementing :task.status/testing
-                  :task.status/reviewing :task.status/done]]
-    (map (fn [status]
-           {:status status
-            :label (str/replace (name status) "-" " ")
-            :tasks (filterv #(= status (:task/status %)) tasks)})
-         statuses)))
 
 (defn render
   "Render a workspace screen.
@@ -30,7 +21,6 @@
   [conn workspace-id]
   (if-let [workspace (db.organization/find-workspace conn workspace-id)]
     (let [tasks (task/list-by-workspace conn workspace-id)
-          columns (group-by-status tasks)
           org-name (get-in workspace [:workspace/organization :organization/name])
           org-id (get-in workspace [:workspace/organization :organization/id])
           org (db.organization/find-organization conn org-id)
@@ -48,18 +38,13 @@
             [:div {:class "flex items-center gap-3"}
              (ui/pill (str (count tasks) " tasks"))
              [:a {:href (str "/organizations/" org-id) :class "btn-secondary no-underline"} org-name]]]
-           ;; Board
+           ;; Tasks
            (if (seq tasks)
-             [:div {:class "board-scroll flex gap-3 overflow-x-auto pb-4"}
-              (for [{:keys [label tasks]} columns]
-                (ui/board-column label (count tasks) (map task-card/board-card tasks)))]
-             (ui/empty-state "No tasks assigned to this workspace yet."))
-           ;; List
-           (when (seq tasks)
-             [:div {:class "mt-8"}
-              (ui/section-heading {:title "All tasks" :count (count tasks)})
+             [:div
+              (ui/section-heading {:title (i18n/t :workspace/all-tasks) :count (count tasks)})
               (into [:div {:class "mt-4 space-y-2"}]
-                    (map task-card/view tasks))])]]
+                    (mapv task-card/view tasks))]
+             (ui/empty-state (i18n/t :workspace/no-tasks)))]]
       (layout/page (:workspace/name workspace) body
                    {:breadcrumbs [{:href "/" :label "Organizations"}
                                   {:href (str "/organizations/" org-id) :label org-name}

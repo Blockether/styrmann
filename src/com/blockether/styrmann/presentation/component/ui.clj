@@ -1,7 +1,8 @@
 (ns com.blockether.styrmann.presentation.component.ui
   "Reusable Hiccup UI helpers — warm editorial design."
   (:require
-   [clojure.string :as str]))
+   [clojure.string :as str]
+   [com.blockether.styrmann.i18n :as i18n]))
 
 ;; -- Badges ------------------------------------------------------------------
 
@@ -159,7 +160,7 @@
     [:span {:class "rounded-full bg-[var(--surface)] px-2 py-0.5 text-[11px] font-bold text-[var(--ink-secondary)] shadow-sm"} count-n]]
    (if (seq cards)
      (into [:div {:class "flex-1 space-y-2 overflow-y-auto pt-1"}] cards)
-     [:div {:class "px-2 py-4 text-[12px] text-[var(--muted)] italic text-center"} "No items"])])
+     [:div {:class "px-2 py-4 text-[12px] text-[var(--muted)] italic text-center"} (i18n/t :board/no-items)])])
 
 ;; -- Board card --------------------------------------------------------------
 
@@ -280,7 +281,7 @@
       [:a {:href (str "/organizations/" (:organization/id org) "/settings")
            :class "topbar-menu-link"}
        [:i {:data-lucide "settings-2" :class "size-4 text-[var(--muted)]"}]
-       [:span "Go to settings"]]
+       [:span (i18n/t :misc/go-to-settings)]]
       [:div {:class "my-2 h-px bg-[var(--line)]"}]
       (into [:div {:class "space-y-1"}]
             (for [candidate organizations]

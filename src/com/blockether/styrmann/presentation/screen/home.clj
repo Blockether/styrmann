@@ -2,6 +2,7 @@
   "SSR home screen — warm editorial organization listing."
   (:require
    [com.blockether.styrmann.domain.organization :as organization]
+   [com.blockether.styrmann.i18n :as i18n]
    [com.blockether.styrmann.presentation.component.layout :as layout]
    [com.blockether.styrmann.presentation.component.ui :as ui]))
 
@@ -18,7 +19,7 @@
             :style "font-family: 'DM Serif Display', Georgia, serif"}
       (:organization/name org)]
      [:div {:class "text-[13px] text-[var(--muted)] mt-0.5"}
-      "Backlog, sprints, and delivery management"]]
+      (i18n/t :home/org-subtitle)]]
     [:i {:data-lucide "arrow-right" :class "size-5 text-[var(--line-strong)] group-hover:text-[var(--accent)] transition-colors flex-shrink-0"}]]])
 
 (defn- body-content [conn]
@@ -26,28 +27,28 @@
     [:div
      [:div {:class "text-center mb-10"}
       [:h1 {:class "text-[36px] sm:text-[44px] leading-tight"}
-       "Your organizations,"]
+       (i18n/t :home/headline-1)]
       [:h1 {:class "text-[36px] sm:text-[44px] leading-tight"}
        [:span {:class "italic text-[var(--accent)]"
-               :style "font-family: 'DM Serif Display', Georgia, serif"} "organized"]
+               :style "font-family: 'DM Serif Display', Georgia, serif"} (i18n/t :home/headline-2)]
        "."]
       [:p {:class "mt-4 text-[15px] text-[var(--muted)] max-w-lg mx-auto leading-relaxed"}
-       "Manage organization boards, backlog grooming, sprint planning, and delivery tasks from one place."]]
+       (i18n/t :home/subtitle)]]
      [:div {:class "max-w-2xl mx-auto"}
       (if (seq organizations)
         (into [:div {:class "space-y-3"}]
               (map org-card organizations))
-        (ui/empty-state "No organizations yet. Create your first one to get started."))
+        (ui/empty-state (i18n/t :home/no-orgs)))
       [:div {:class "card p-6 mt-8"}
        [:div {:class "flex items-center gap-3 mb-4"}
         [:div {:class "flex items-center justify-center w-8 h-8 rounded-xl bg-[var(--cream-dark)]"}
          [:i {:data-lucide "plus" :class "size-4 text-[var(--ink-secondary)]"}]]
-        [:h2 {:class "text-[18px]"} "Create organization"]]
+        [:h2 {:class "text-[18px]"} (i18n/t :home/create-org)]]
        [:form {:class "flex flex-col sm:flex-row gap-3" :method "post" :action "/organizations"}
         [:label {:class "flex-1"}
-         [:span {:class "field-label"} "Organization name"]
+         [:span {:class "field-label"} (i18n/t :home/org-name)]
          [:input {:class "input" :type "text" :name "name" :placeholder "Blockether" :required true}]]
-        [:button {:class "btn-primary sm:self-end sm:mb-0" :type "submit"} "Create"]]]]]))
+        [:button {:class "btn-primary sm:self-end sm:mb-0" :type "submit"} (i18n/t :home/create-btn)]]]]]))
 
 (defn render
   "Render the home screen.
