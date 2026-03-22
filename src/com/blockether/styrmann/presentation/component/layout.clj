@@ -1,6 +1,7 @@
 (ns com.blockether.styrmann.presentation.component.layout
   "Shared SSR layout — warm editorial design inspired by Claura."
   (:require
+   [com.blockether.styrmann.presentation.component.command-palette :as command-palette]
    [com.blockether.styrmann.presentation.component.modal :as modal]
    [hiccup2.core :as h]
    [starfederation.datastar.clojure.api :as d*]))
@@ -123,11 +124,21 @@ a:hover { color: var(--accent-hover); }
  .board-card.is-dragging { opacity: 0.35; transform: scale(0.96); }
  .drop-zone.drag-over { background: var(--accent-soft); outline: 2px dashed var(--accent); outline-offset: -2px; border-radius: 8px; }
  .drop-zone { transition: background .15s, outline .15s; }
+ .command-palette-backdrop { position: fixed; inset: 0; background: rgba(26,26,31,0.48); display: none; align-items: flex-start; justify-content: center; padding-top: 20vh; z-index: 90; }
+ .command-palette-backdrop.is-open { display: flex; }
+ .command-palette-shell { width: 100%; max-width: 560px; background: var(--surface); border-radius: 20px; border: 1px solid var(--line); box-shadow: 0 24px 80px rgba(26,26,31,0.18); overflow: hidden; }
+ .command-palette-input-row { display: flex; align-items: center; gap: 12px; padding: 16px 20px; }
+ .command-palette-input { border: none; background: transparent; color: var(--ink); font-size: 16px; width: 100%; outline: none; font-family: inherit; }
+ .command-palette-input::placeholder { color: var(--muted); }
+ .command-palette-kbd { display: inline-flex; align-items: center; gap: 2px; padding: 4px 8px; background: var(--cream-dark); border: 1px solid var(--line); border-radius: 6px; font-size: 12px; color: var(--muted); font-family: inherit; flex-shrink: 0; }
+ .command-palette-actions { border-top: 1px solid var(--line); max-height: 320px; overflow-y: auto; }
  @media (max-width: 768px) {
    .board-scroll { flex-direction: column !important; }
    .board-scroll > * { min-width: 100% !important; max-width: 100% !important; }
    .modal-backdrop { align-items: flex-end; padding: 0; }
    .modal-shell { max-width: 100%; min-height: 50vh; max-height: 92vh; border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+   .command-palette-backdrop { padding-top: 10vh; padding-left: 8px; padding-right: 8px; }
+   .command-palette-shell { max-width: 100%; border-radius: 16px; }
  }")
 
 (defn raw-html
@@ -184,7 +195,9 @@ a:hover { color: var(--accent-hover); }
      [:script {:type "module" :src d*/CDN-url}]
      [:style (raw-html base-styles)]]
     [:body {:class "min-h-screen bg-[var(--cream)]"}
-     (modal/shell
+     (command-palette/shell
+      "command-palette" "Search tickets, tasks, or type a command...")
+      (modal/shell
       "global-create-organization" "Create organization" "Organization"
       [:form {:class "space-y-4" :method "post" :action "/organizations"}
        [:label {:class "block"}
@@ -321,7 +334,24 @@ document.addEventListener('keydown', function(evt) {
     document.querySelectorAll('.modal-backdrop.is-open').forEach(function(node) {
       node.classList.remove('is-open');
     });
+    var palette = document.querySelector('.command-palette-backdrop.is-open');
+    if (palette) { palette.classList.remove('is-open'); }
   }
+  if ((evt.metaKey || evt.ctrlKey) && evt.key === 'k') {
+    evt.preventDefault();
+    var palette = document.getElementById('command-palette');
+    if (palette) {
+      palette.classList.toggle('is-open');
+      if (palette.classList.contains('is-open')) {
+        var input = palette.querySelector('input');
+        if (input) { input.value = ''; input.focus(); }
+      }
+    }
+  }
+});
+document.addEventListener('click', function(evt) {
+  var palette = evt.target.closest('.command-palette-backdrop');
+  if (palette && evt.target === palette) { palette.classList.remove('is-open'); }
 });
 document.addEventListener('gesturestart', function(evt) {
   evt.preventDefault();
