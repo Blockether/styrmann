@@ -9,6 +9,7 @@
    [com.blockether.styrmann.domain.organization :as organization]
    [com.blockether.styrmann.domain.planning :as planning]
    [com.blockether.styrmann.domain.provider :as provider]
+   [com.blockether.styrmann.domain.execution-context :as execution-context]
    [com.blockether.styrmann.domain.task :as task]
    [com.blockether.styrmann.domain.ticket :as ticket]
    [com.blockether.styrmann.execution.session :as session]
@@ -109,9 +110,10 @@
 
 (defn- handle-update-runner-settings [conn organization-id request]
   (let [params (request-params request)
-        workspace-id (uuid (:workspace-id params))]
+        workspace-id (uuid (:workspace-id params))
+        ctx (execution-context/make-context conn)]
     (session/configure-workspace-environment!
-     conn
+     ctx
      {:workspace-id workspace-id
       :provider-id (some-> (:provider-id params) uuid)
       :model (:model params)
@@ -256,7 +258,7 @@
       ;; Reset to inbox for retry via state machine
       (when-not (= :task.status/inbox (:task/status task-record))
         (task/update-status! conn task-id :task.status/inbox))
-      (session/execute-with-rlm! conn task-id)
+      (session/execute-with-rlm! (execution-context/make-context conn) task-id)
       (redirect-to (str "/organizations/" organization-id "/tasks/" task-id)))
     (not-found-page "Task not found.")))
 
@@ -286,7 +288,8 @@
                          root-tasks (filter (fn [t] (empty? (:task/depends-on t))) tasks)]
                      (doseq [root-task root-tasks]
                        (when (= :task.status/inbox (:task/status root-task))
-                         (future (session/execute-with-rlm! conn (:task/id root-task))))))))]
+                         (let [ctx (execution-context/make-context conn)]
+                           (future (session/execute-with-rlm! ctx (:task/id root-task)))))))))]
     (when-let [ex (:error result)]
       (t/log! :error ["Handoff failed" {:ticket-id ticket-id :error (ex-message ex)}]))))
 

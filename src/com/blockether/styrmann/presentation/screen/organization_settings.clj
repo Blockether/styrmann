@@ -1,6 +1,7 @@
 (ns com.blockether.styrmann.presentation.screen.organization-settings
   "SSR organization settings screen — provider and runner configuration."
   (:require
+   [com.blockether.styrmann.domain.execution-context :as execution-context]
    [com.blockether.styrmann.domain.organization :as organization]
    [com.blockether.styrmann.domain.provider :as provider]
    [com.blockether.styrmann.execution.session :as session]
@@ -214,7 +215,7 @@
   (let [active-tab (or active-tab :providers)]
     (if-let [org (organization/overview conn organization-id)]
       (let [organizations (organization/list-organizations conn)
-            environments (session/list-environments-by-organization conn organization-id)
+            environments (session/list-environments-by-organization (execution-context/make-context conn) organization-id)
             providers (provider/list-providers conn)
             all-models (when (= active-tab :runner) (provider/fetch-all-models conn))]
         (layout/page

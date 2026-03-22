@@ -6,7 +6,7 @@
 
    Provider resolution order:
    1. Explicit :provider map passed in opts
-   2. Default provider from Datalevin (via :conn in opts)
+   2. Default provider from context (via :find-default-provider in opts)
    3. Environment variables (BLOCKETHER_OPENAI_API_KEY, etc.)
 
    Default model: glm-5-turbo (Blockether LLM)."
@@ -62,30 +62,30 @@
                           base-url (assoc :base-url base-url))))))
 
 (defn resolve-config
-  "Resolve Svar config from provider map, conn, or env vars.
+  "Resolve Svar config from provider map, find-default-provider fn, or env vars.
 
    Params:
    `opts` - Map with optional keys:
-     :provider - DB provider map (highest priority)
-     :conn     - Datalevin connection (looks up default provider)
-     :model    - Model override
-     :config   - Pre-built Svar config (bypasses resolution)
+     :provider              - DB provider map (highest priority)
+     :find-default-provider - Zero-arity fn returning default provider (replaces :conn)
+     :model                 - Model override
+     :config                - Pre-built Svar config (bypasses resolution)
 
    Returns:
    Svar config map or nil."
-  [{:keys [provider conn model config]}]
+  [{:keys [provider find-default-provider model config]}]
   (or config
       (when provider
         (provider->config provider model))
-      (when conn
-        (when-let [db-provider ((requiring-resolve 'com.blockether.styrmann.db.provider/find-default-provider) conn)]
+      (when find-default-provider
+        (when-let [db-provider (find-default-provider)]
           (provider->config db-provider model)))
       (default-config)))
 
 (defn ask!
   "Call Svar ask! with config resolution.
 
-   Config is resolved in order: explicit :config > :provider > :conn default > env vars."
+   Config is resolved in order: explicit :config > :provider > :find-default-provider > env vars."
   [opts]
   (let [cfg (resolve-config opts)
         opts (cond-> opts

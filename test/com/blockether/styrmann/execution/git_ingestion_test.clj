@@ -1,6 +1,7 @@
 (ns com.blockether.styrmann.execution.git-ingestion-test
   (:require
    [com.blockether.styrmann.db.organization :as org-db]
+   [com.blockether.styrmann.domain.execution-context :as execution-context]
    [com.blockether.styrmann.execution.corpus-loader :as corpus-loader]
    [com.blockether.styrmann.execution.git-ingestion :as sut]
    [com.blockether.styrmann.test-helpers :refer [temp-conn temp-dir
@@ -11,7 +12,8 @@
   (it "ingests mocked corpus commit history from a temporary git repository"
       (with-temp-conn [conn (temp-conn)]
         (with-temp-dir [repo-dir (temp-dir)]
-          (let [organization (org-db/create-organization! conn {:name "Blockether"})
+          (let [ctx (execution-context/make-context conn)
+                organization (org-db/create-organization! conn {:name "Blockether"})
                 workspace (org-db/create-workspace!
                            conn
                            {:organization-id (:organization/id organization)
@@ -26,7 +28,7 @@
                                        :message "feat: add deps hello world corpus"}
                                       {:project-name "clj-algorithms"
                                        :message "feat: add advanced clojure algorithms corpus"}])
-                result (sut/ingest-repo-history! conn (:workspace/id workspace) repo-dir)
+                result (sut/ingest-repo-history! ctx (:workspace/id workspace) repo-dir)
                 commits (:commits result)]
             (expect (= 3 (count commits)))
             (expect (= [sha-1 sha-2 sha-3]

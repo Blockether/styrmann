@@ -6,6 +6,7 @@
    filesystem tools — NO MOCKS."
   (:require
    [com.blockether.styrmann.db.session :as db.session]
+   [com.blockether.styrmann.domain.execution-context :as execution-context]
    [com.blockether.styrmann.domain.organization :as organization]
    [com.blockether.styrmann.domain.task :as task]
    [com.blockether.styrmann.domain.ticket :as ticket]
@@ -137,19 +138,20 @@
 (defdescribe rlm-signal-event-test
   (it "signal-event tool emits event and returns confirmation in SCI sandbox"
     (with-temp-conn [conn (temp-conn)]
-      (let [{:keys [ticket workspace]} (make-org-workspace-ticket conn)
+      (let [ctx (execution-context/make-context conn)
+            {:keys [ticket workspace]} (make-org-workspace-ticket conn)
             task-rec  (task/create! conn {:ticket-id    (:ticket/id ticket)
                                           :workspace-id (:workspace/id workspace)
                                           :description  "test task"})
             sess      (make-minimal-session conn workspace (:task/id task-rec))
             sid       (:session/id sess)
-            ctx-map   {:conn conn :session-id sid}
+            ctx-map   {:ctx ctx :session-id sid}
             signal-fn (fn [params] (system-tools/signal-event ctx-map params))
             sci-ctx   (make-rlm-env-with-tools
                        [{:sym 'signal-event :fn signal-fn :doc "signal event"}])]
         (let [result (sci-eval sci-ctx "(signal-event {:type \"progress\" :message \"halfway done\" :payload {}})")]
           (expect (= true (:ok? result)))
-          (let [events (session/list-session-events conn sid)]
+          (let [events (session/list-session-events ctx sid)]
             (expect (= 1 (count events)))
             (expect (= :session.event.type/progress (:session.event/type (first events))))
             (expect (= "halfway done" (:session.event/message (first events))))))))))
@@ -157,12 +159,13 @@
 (defdescribe rlm-record-deliverable-test
   (it "record-deliverable tool captures findings in SCI sandbox"
     (with-temp-conn [conn (temp-conn)]
-      (let [{:keys [ticket workspace]} (make-org-workspace-ticket conn)
+      (let [ctx (execution-context/make-context conn)
+            {:keys [ticket workspace]} (make-org-workspace-ticket conn)
             task-rec   (task/create! conn {:ticket-id    (:ticket/id ticket)
                                            :workspace-id (:workspace/id workspace)
                                            :description  "test task"})
             tid        (:task/id task-rec)
-            ctx-map    {:conn conn}
+            ctx-map    {:ctx ctx}
             record-fn  (fn [params] (system-tools/record-deliverable ctx-map params))
             sci-ctx    (make-rlm-env-with-tools
                         [{:sym 'record-deliverable :fn record-fn :doc "record deliverable"}])]
@@ -193,14 +196,15 @@
     (with-temp-dir [dir (temp-dir)]
       (with-temp-conn [conn (temp-conn)]
         (spit (str dir "/app.clj") "(ns app)\n(defn handler [] :old)")
-        (let [{:keys [ticket workspace]} (make-org-workspace-ticket conn)
+        (let [ctx (execution-context/make-context conn)
+              {:keys [ticket workspace]} (make-org-workspace-ticket conn)
               task-rec  (task/create! conn {:ticket-id    (:ticket/id ticket)
                                             :workspace-id (:workspace/id workspace)
                                             :description  "test task"})
               sess      (make-minimal-session conn workspace (:task/id task-rec))
               sid       (:session/id sess)
               ctx-map   {:working-directory dir}
-              sys-ctx   {:conn conn :session-id sid}
+              sys-ctx   {:ctx ctx :session-id sid}
               read-fn   (fn [params] (filesystem/read-file ctx-map params))
               edit-fn   (fn [params] (filesystem/edit-file ctx-map params))
               signal-fn (fn [params] (system-tools/signal-event sys-ctx params))
@@ -214,6 +218,6 @@
                                (signal-event {:type \"complete\" :message (str \"Changed: \" (:content updated)) :payload {}})
                                updated)")
           (expect (= "(ns app)\n(defn handler [] :new)" (slurp (str dir "/app.clj"))))
-          (let [events (session/list-session-events conn sid)]
+          (let [events (session/list-session-events ctx sid)]
             (expect (= 1 (count events)))
             (expect (= :session.event.type/complete (:session.event/type (first events))))))))))

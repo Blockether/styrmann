@@ -2,6 +2,7 @@
   (:require
    [com.blockether.styrmann.db.provider :as db.provider]
    [com.blockether.styrmann.db.session :as db.session]
+   [com.blockether.styrmann.domain.execution-context :as execution-context]
    [com.blockether.styrmann.domain.organization :as organization]
    [com.blockether.styrmann.domain.task :as task]
    [com.blockether.styrmann.domain.ticket :as ticket]
@@ -26,7 +27,8 @@
 (defdescribe execute!-test
   (it "stores a task to run to pid mapping and captures process logs"
       (with-temp-conn [conn (temp-conn)]
-        (let [organization (organization/create! conn {:name "Blockether"})
+        (let [ctx (execution-context/make-context conn)
+              organization (organization/create! conn {:name "Blockether"})
               workspace (organization/create-workspace!
                          conn
                          {:organization-id (:organization/id organization)
@@ -39,13 +41,13 @@
                              :workspace-id (:workspace/id workspace)
                              :description "Execute the task"})
               run (sut/execute!
-                   conn
+                   ctx
                    {:task-id (:task/id created-task)
                     :command ["bash" "-lc" "printf 'hello from run'; sleep 2"]})]
           ;; Poll until running (up to 2s, 50ms intervals)
           (let [running-observation
                 (loop [attempts 40]
-                  (let [obs (sut/observe conn (:session/id run))]
+                  (let [obs (sut/observe ctx (:session/id run))]
                     (if (or (= :session.runtime/running (:session/runtime-status obs))
                             (zero? attempts))
                       obs
@@ -58,7 +60,7 @@
           ;; Poll until exited (up to 6s, 100ms intervals)
           (let [finished-observation
                 (loop [attempts 60]
-                  (let [obs (sut/observe conn (:session/id run))]
+                  (let [obs (sut/observe ctx (:session/id run))]
                     (if (or (= :session.runtime/exited (:session/runtime-status obs))
                             (zero? attempts))
                       obs
@@ -70,7 +72,8 @@
 (defdescribe configure-workspace-environment!-test
   (it "stores OpenAI-compatible runtime settings for a workspace"
       (with-temp-conn [conn (temp-conn)]
-        (let [organization (organization/create! conn {:name "Blockether"})
+        (let [ctx (execution-context/make-context conn)
+              organization (organization/create! conn {:name "Blockether"})
               workspace (organization/create-workspace!
                          conn
                          {:organization-id (:organization/id organization)
@@ -83,7 +86,7 @@
                           :api-key "test-key"
                           :default? true})
               environment (sut/configure-workspace-environment!
-                           conn
+                           ctx
                            {:workspace-id (:workspace/id workspace)
                             :provider-id (:provider/id _provider)
                             :model "gpt-4.1"
@@ -96,7 +99,8 @@
 (defdescribe sync-tool-definitions!-test
   (it "syncs classpath tool definitions into Datalevin"
       (with-temp-conn [conn (temp-conn)]
-        (let [tools [{:key "tool.alpha"
+        (let [ctx (execution-context/make-context conn)
+              tools [{:key "tool.alpha"
                       :name "Alpha"
                       :description "Alpha tool"
                       :fn-symbol "foo.alpha/run"
@@ -106,7 +110,7 @@
                       :description "Beta tool"
                       :fn-symbol "foo.beta/run"
                       :input-schema {:type :map :required [:workspace-id]}}]
-              synced (sut/sync-tool-definitions! conn tools)]
+              synced (sut/sync-tool-definitions! ctx tools)]
           (expect (= 2 (count synced)))
           (expect (= ["tool.alpha" "tool.beta"]
                      (mapv :tool-definition/key synced)))
@@ -116,40 +120,42 @@
 (defdescribe ensure-explorer-agent!-test
   (it "creates explorer agent bound to explore.* tools"
       (with-temp-conn [conn (temp-conn)]
-        (sut/sync-tool-definitions!
-         conn
-         [{:key "explore.clojure-lsp-diagnostics"
-           :name "Clojure LSP Diagnostics"
-           :description "Run clojure-lsp diagnostics"
-           :fn-symbol "com.blockether.styrmann.execution.tools.explore/clojure-lsp-diagnostics"
-           :input-schema {:type :map :required [:path]}}
-          {:key "explore.namespace-map"
-           :name "Namespace Map"
-           :description "Collect namespace declarations"
-           :fn-symbol "com.blockether.styrmann.execution.tools.explore/namespace-map"
-           :input-schema {:type :map :required [:path]}}
-          {:key "tool.non-explore"
-           :name "Non Explore"
-           :description "Non explore tool"
-           :fn-symbol "foo.non/explore"
-           :input-schema {:type :map :required [:id]}}])
-        (let [agent (sut/ensure-explorer-agent! conn)
-              tool-keys (mapv :tool-definition/key (:agent/tools agent))]
-          (expect (= "explorer-v1" (:agent/key agent)))
-          (expect (= ["explore.clojure-lsp-diagnostics" "explore.namespace-map"]
-                     (sort tool-keys)))))))
+        (let [ctx (execution-context/make-context conn)]
+          (sut/sync-tool-definitions!
+           ctx
+           [{:key "explore.clojure-lsp-diagnostics"
+             :name "Clojure LSP Diagnostics"
+             :description "Run clojure-lsp diagnostics"
+             :fn-symbol "com.blockether.styrmann.execution.tools.explore/clojure-lsp-diagnostics"
+             :input-schema {:type :map :required [:path]}}
+            {:key "explore.namespace-map"
+             :name "Namespace Map"
+             :description "Collect namespace declarations"
+             :fn-symbol "com.blockether.styrmann.execution.tools.explore/namespace-map"
+             :input-schema {:type :map :required [:path]}}
+            {:key "tool.non-explore"
+             :name "Non Explore"
+             :description "Non explore tool"
+             :fn-symbol "foo.non/explore"
+             :input-schema {:type :map :required [:id]}}])
+          (let [agent (sut/ensure-explorer-agent! ctx)
+                tool-keys (mapv :tool-definition/key (:agent/tools agent))]
+            (expect (= "explorer-v1" (:agent/key agent)))
+            (expect (= ["explore.clojure-lsp-diagnostics" "explore.namespace-map"]
+                       (sort tool-keys))))))))
 
 (defdescribe execute-exploration!-test
   (it "runs explorer tools and persists session calls and events"
       (with-temp-conn [conn (temp-conn)]
-        (let [organization (organization/create! conn {:name "Blockether"})
+        (let [ctx (execution-context/make-context conn)
+              organization (organization/create! conn {:name "Blockether"})
               workspace (organization/create-workspace!
                          conn
                          {:organization-id (:organization/id organization)
                           :name "styrmann"
                           :repository "/root/repos/blockether/styrmann"})]
           (sut/sync-tool-definitions!
-           conn
+           ctx
            [{:key "explore.clojure-lsp-diagnostics"
              :name "Clojure LSP Diagnostics"
              :description "Run clojure-lsp diagnostics"
@@ -160,7 +166,7 @@
              :description "Collect namespace declarations"
              :fn-symbol "com.blockether.styrmann.execution.tools.explore/namespace-map"
              :input-schema {:type :map :required [:path]}}])
-          (let [session (sut/execute-exploration! conn {:workspace-id (:workspace/id workspace)})
+          (let [session (sut/execute-exploration! ctx {:workspace-id (:workspace/id workspace)})
                 calls (:session/calls session)
                 events (:session/events session)]
             (expect (= :session.status/succeeded (:session/status session)))
@@ -169,9 +175,9 @@
             (expect (= #{:session.calls.status/succeeded}
                        (set (map :session.calls/status calls)))))))))
 
-(defn- seed-tools! [conn]
+(defn- seed-tools! [ctx]
   (sut/sync-tool-definitions!
-   conn
+   ctx
    [{:key "explore.read-file" :name "Read File" :description "Read file"
      :fn-symbol "com.blockether.styrmann.execution.tools.filesystem/read-file"
      :input-schema {:type :map :required [:path]}}
@@ -195,7 +201,8 @@
      :input-schema {:type :map :required [:ticket-id]}}]))
 
 (defn- make-session [conn]
-  (let [organization (organization/create! conn {:name "TestOrg"})
+  (let [ctx (execution-context/make-context conn)
+        organization (organization/create! conn {:name "TestOrg"})
         workspace (organization/create-workspace!
                    conn {:organization-id (:organization/id organization)
                          :name "ws" :repository "/tmp"})
@@ -210,8 +217,8 @@
              conn {:workspace-id (:workspace/id workspace)
                    :model "test" :working-directory "/tmp"
                    :status :execution-environment.status/ready})
-        seed (seed-tools! conn)
-        agent (sut/ensure-explorer-agent! conn)
+        seed (seed-tools! ctx)
+        agent (sut/ensure-explorer-agent! ctx)
         workflow (db.session/create-workflow! conn {:task-id (:task/id task-record)})
         session (db.session/create-session!
                  conn {:workflow-id (:workflow/id workflow)
@@ -224,28 +231,30 @@
 (defdescribe with-tool-event-test
   (it "emits call-start and call-end events around tool execution"
     (with-temp-conn [conn (temp-conn)]
-      (let [session (make-session conn)
+      (let [ctx (execution-context/make-context conn)
+            session (make-session conn)
             sid (:session/id session)
-            result (sut/with-tool-event conn sid "test.tool"
+            result (sut/with-tool-event ctx sid "test.tool"
                      #(do {:computed "value"}))]
         (expect (= {:computed "value"} result))
-        (let [events (sut/list-session-events conn sid)
+        (let [events (sut/list-session-events ctx sid)
               types (mapv :session.event/type events)]
           (expect (= 2 (count events)))
           (expect (= [:session.event.type/call-start :session.event.type/call-end] types))))))
 
   (it "emits call-error event when tool throws"
     (with-temp-conn [conn (temp-conn)]
-      (let [session (make-session conn)
+      (let [ctx (execution-context/make-context conn)
+            session (make-session conn)
             sid (:session/id session)
             threw? (atom false)]
         (try
-          (sut/with-tool-event conn sid "broken.tool"
+          (sut/with-tool-event ctx sid "broken.tool"
             #(throw (ex-info "boom" {})))
           (catch Exception _
             (reset! threw? true)))
         (expect @threw?)
-        (let [events (sut/list-session-events conn sid)
+        (let [events (sut/list-session-events ctx sid)
               types (mapv :session.event/type events)]
           (expect (= 2 (count events)))
           (expect (= [:session.event.type/call-start :session.event.type/call-error] types)))))))
@@ -253,41 +262,44 @@
 (defdescribe ensure-editor-agent!-test
   (it "creates editor agent with read+write tool profile"
     (with-temp-conn [conn (temp-conn)]
-      (seed-tools! conn)
-      (let [agent (sut/ensure-editor-agent! conn)
-            tool-keys (set (mapv :tool-definition/key (:agent/tools agent)))]
-        (expect (= "editor-v1" (:agent/key agent)))
-        ;; Editor gets both explore and edit tools
-        (expect (contains? tool-keys "explore.read-file"))
-        (expect (contains? tool-keys "explore.grep"))
-        (expect (contains? tool-keys "edit.write-file"))
-        (expect (contains? tool-keys "edit.bash"))
-        (expect (contains? tool-keys "system.signal-event"))))))
+      (let [ctx (execution-context/make-context conn)]
+        (seed-tools! ctx)
+        (let [agent (sut/ensure-editor-agent! ctx)
+              tool-keys (set (mapv :tool-definition/key (:agent/tools agent)))]
+          (expect (= "editor-v1" (:agent/key agent)))
+          ;; Editor gets both explore and edit tools
+          (expect (contains? tool-keys "explore.read-file"))
+          (expect (contains? tool-keys "explore.grep"))
+          (expect (contains? tool-keys "edit.write-file"))
+          (expect (contains? tool-keys "edit.bash"))
+          (expect (contains? tool-keys "system.signal-event")))))))
 
 (defdescribe ensure-explorer-agent!-scoped-test
   (it "explorer agent gets only read-only tools, not write tools"
     (with-temp-conn [conn (temp-conn)]
-      (seed-tools! conn)
-      (let [agent (sut/ensure-explorer-agent! conn)
-            tool-keys (set (mapv :tool-definition/key (:agent/tools agent)))]
-        (expect (= "explorer-v1" (:agent/key agent)))
-        ;; Explorer gets read tools
-        (expect (contains? tool-keys "explore.read-file"))
-        (expect (contains? tool-keys "explore.grep"))
-        (expect (contains? tool-keys "system.signal-event"))
-        ;; Explorer does NOT get write tools
-        (expect (not (contains? tool-keys "edit.write-file")))
-        (expect (not (contains? tool-keys "edit.bash")))))))
+      (let [ctx (execution-context/make-context conn)]
+        (seed-tools! ctx)
+        (let [agent (sut/ensure-explorer-agent! ctx)
+              tool-keys (set (mapv :tool-definition/key (:agent/tools agent)))]
+          (expect (= "explorer-v1" (:agent/key agent)))
+          ;; Explorer gets read tools
+          (expect (contains? tool-keys "explore.read-file"))
+          (expect (contains? tool-keys "explore.grep"))
+          (expect (contains? tool-keys "system.signal-event"))
+          ;; Explorer does NOT get write tools
+          (expect (not (contains? tool-keys "edit.write-file")))
+          (expect (not (contains? tool-keys "edit.bash"))))))))
 
 (defdescribe with-tool-event-params-test
   (it "records input params in call-start event payload"
     (with-temp-conn [conn (temp-conn)]
-      (let [session (make-session conn)
+      (let [ctx (execution-context/make-context conn)
+            session (make-session conn)
             sid     (:session/id session)]
-        (sut/with-tool-event conn sid "fs.read-file"
+        (sut/with-tool-event ctx sid "fs.read-file"
           {:path "src/app.clj" :start-line 1 :end-line 10}
           #(do {:ok? true :content "1\t(ns app)"}))
-        (let [events  (sut/list-session-events conn sid)
+        (let [events  (sut/list-session-events ctx sid)
               start   (first (filter #(= :session.event.type/call-start
                                         (:session.event/type %))
                                      events))
@@ -301,13 +313,14 @@
 
   (it "truncates long string values in call-start input to 200 chars"
     (with-temp-conn [conn (temp-conn)]
-      (let [session  (make-session conn)
+      (let [ctx (execution-context/make-context conn)
+            session  (make-session conn)
             sid      (:session/id session)
             long-str (apply str (repeat 300 \x))]
-        (sut/with-tool-event conn sid "fs.write-file"
+        (sut/with-tool-event ctx sid "fs.write-file"
           {:path "out.txt" :content long-str}
           #(do {:ok? true}))
-        (let [events  (sut/list-session-events conn sid)
+        (let [events  (sut/list-session-events ctx sid)
               start   (first (filter #(= :session.event.type/call-start
                                         (:session.event/type %))
                                      events))
@@ -318,13 +331,14 @@
 
   (it "truncates call-end output summary at 500 chars"
     (with-temp-conn [conn (temp-conn)]
-      (let [session  (make-session conn)
+      (let [ctx (execution-context/make-context conn)
+            session  (make-session conn)
             sid      (:session/id session)
             big-str  (apply str (repeat 600 \a))]
-        (sut/with-tool-event conn sid "fs.read-file"
+        (sut/with-tool-event ctx sid "fs.read-file"
           nil
           #(do big-str))
-        (let [events  (sut/list-session-events conn sid)
+        (let [events  (sut/list-session-events ctx sid)
               end-ev  (first (filter #(= :session.event.type/call-end
                                         (:session.event/type %))
                                      events))
@@ -334,13 +348,14 @@
 
   (it "records result map truncating long string values in call-end output"
     (with-temp-conn [conn (temp-conn)]
-      (let [session (make-session conn)
+      (let [ctx (execution-context/make-context conn)
+            session (make-session conn)
             sid     (:session/id session)
             long-v  (apply str (repeat 300 \z))]
-        (sut/with-tool-event conn sid "tool.x"
+        (sut/with-tool-event ctx sid "tool.x"
           nil
           #(do {:ok? true :content long-v}))
-        (let [events  (sut/list-session-events conn sid)
+        (let [events  (sut/list-session-events ctx sid)
               end-ev  (first (filter #(= :session.event.type/call-end
                                         (:session.event/type %))
                                      events))

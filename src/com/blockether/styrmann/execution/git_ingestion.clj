@@ -2,8 +2,7 @@
   "Git history ingestion for corpus and workspace repositories."
   (:require
    [clojure.java.shell :as sh]
-   [clojure.string :as str]
-   [com.blockether.styrmann.db.git :as db.git]))
+   [clojure.string :as str]))
 
 (def ^:private field-sep (char 31))
 
@@ -51,46 +50,46 @@
   "Ingest a repository's git history into Datalevin git entities.
 
    Params:
-   `conn` - Datalevin connection.
+   `ctx` - Execution context map with :store/git-* callbacks.
    `workspace-id` - UUID. Target workspace.
    `repo-path` - String. Local filesystem path to git repository.
 
    Returns:
    Map with :repo, :branch, :worktree, and :commits."
-  [conn workspace-id repo-path]
+  [ctx workspace-id repo-path]
   (let [commits (list-commits repo-path)
-        repo (db.git/create-repo! conn {:workspace-id workspace-id
-                                        :origin-url (origin-url repo-path)
-                                        :default-branch (default-branch repo-path)})
+        repo ((:store/git-create-repo! ctx) {:workspace-id workspace-id
+                                              :origin-url (origin-url repo-path)
+                                              :default-branch (default-branch repo-path)})
         repo-id (:git.repo/id repo)
         sha->commit-id (volatile! {})
         created-commits
         (mapv (fn [{:keys [sha parent-shas author-name author-email authored-at message]}]
-                (let [author (db.git/upsert-author! conn {:name author-name :email author-email})
+                (let [author ((:store/git-upsert-author! ctx) {:name author-name :email author-email})
                       parent-ids (mapv (fn [parent-sha]
                                          (or (@sha->commit-id parent-sha)
                                              (throw (ex-info "Parent commit missing from ingestion order"
                                                              {:sha sha :parent-sha parent-sha}))))
                                        parent-shas)
-                      commit (db.git/create-commit! conn {:repo-id repo-id
-                                                          :sha sha
-                                                          :message message
-                                                          :author-id (:git.author/id author)
-                                                          :authored-at authored-at
-                                                          :parent-ids parent-ids})]
+                      commit ((:store/git-create-commit! ctx) {:repo-id repo-id
+                                                                :sha sha
+                                                                :message message
+                                                                :author-id (:git.author/id author)
+                                                                :authored-at authored-at
+                                                                :parent-ids parent-ids})]
                   (vswap! sha->commit-id assoc sha (:git.commit/id commit))
                   commit))
               commits)
-        branch (db.git/create-branch! conn {:repo-id repo-id
-                                            :name (default-branch repo-path)
-                                            :remote? false})
+        branch ((:store/git-create-branch! ctx) {:repo-id repo-id
+                                                  :name (default-branch repo-path)
+                                                  :remote? false})
         branch (if-let [head (last created-commits)]
-                 (db.git/update-branch-head! conn (:git.branch/id branch) (:git.commit/id head))
+                 ((:store/git-update-branch-head! ctx) (:git.branch/id branch) (:git.commit/id head))
                  branch)
-        worktree (db.git/create-worktree! conn {:repo-id repo-id
-                                                :path repo-path
-                                                :branch-id (:git.branch/id branch)
-                                                :main? true})]
+        worktree ((:store/git-create-worktree! ctx) {:repo-id repo-id
+                                                      :path repo-path
+                                                      :branch-id (:git.branch/id branch)
+                                                      :main? true})]
     {:repo repo
      :branch branch
      :worktree worktree

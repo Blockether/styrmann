@@ -7,6 +7,7 @@
    [com.blockether.styrmann.db.git :as db.git]
    [com.blockether.styrmann.db.organization :as db.organization]
    [com.blockether.styrmann.db.task :as db.task]
+   [com.blockether.styrmann.domain.execution-context :as execution-context]
    [com.blockether.styrmann.domain.organization :as organization]
    [com.blockether.styrmann.execution.session :as session]
    [com.blockether.styrmann.presentation.component.git-progress :as git-progress]
@@ -311,14 +312,15 @@
    Hiccup for the #run-history div, or nil if task not found."
   [conn task-id]
   (when-let [task (db.task/find-task conn task-id)]
-    (let [org-id (get-in task [:task/ticket :ticket/organization :organization/id])
+    (let [ctx (execution-context/make-context conn)
+          org-id (get-in task [:task/ticket :ticket/organization :organization/id])
           runs (mapv (fn [run]
                        (assoc run :run/status (:session/runtime-status run)
                          :run/logs (:session/logs run)
                          :run/exit-code (:session/exit-code run)
-                         :session/events (session/list-session-events conn (:session/id run))
-                         :session/messages (session/list-session-messages conn (:session/id run))))
-                 (session/list-by-task conn task-id))
+                         :session/events (session/list-session-events ctx (:session/id run))
+                         :session/messages (session/list-session-messages ctx (:session/id run))))
+                 (session/list-by-task ctx task-id))
           any-running? (some #(= :session.runtime/running (:run/status %)) runs)]
       {:html [:div (cond-> {:id "run-history"}
                     any-running? (merge {:hx-get (str "/fragments/tasks/" task-id "/runs")
@@ -342,12 +344,13 @@
    HTML page string."
   [conn task-id]
   (if-let [task (db.task/find-task conn task-id)]
-    (let [runs (mapv (fn [run]
+    (let [ctx (execution-context/make-context conn)
+          runs (mapv (fn [run]
                        (assoc run :run/status (:session/runtime-status run)
                          :run/logs (:session/logs run)
                          :run/exit-code (:session/exit-code run)
-                         :session/events (session/list-session-events conn (:session/id run))))
-                 (session/list-by-task conn task-id))
+                         :session/events (session/list-session-events ctx (:session/id run))))
+                 (session/list-by-task ctx task-id))
           available (get next-statuses (:task/status task) [])
           ticket-desc (or (get-in task [:task/ticket :ticket/title])
                         (get-in task [:task/ticket :ticket/description]))

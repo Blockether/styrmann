@@ -1,6 +1,7 @@
 (ns com.blockether.styrmann.execution.tools-test
   (:require
    [com.blockether.styrmann.db.git :as db.git]
+   [com.blockether.styrmann.domain.execution-context :as execution-context]
    [com.blockether.styrmann.domain.organization :as organization]
    [com.blockether.styrmann.domain.task :as task]
    [com.blockether.styrmann.domain.ticket :as ticket]
@@ -74,9 +75,10 @@
   (describe "tools.git/repo-summary"
     (it "returns workspace info even without git repo"
         (with-temp-conn [conn (temp-conn)]
-          (let [{:keys [workspace]} (setup-org-ticket conn)
+          (let [ctx (execution-context/make-context conn)
+                {:keys [workspace]} (setup-org-ticket conn)
                 result (tools.git/repo-summary
-                        {:conn conn}
+                        {:ctx ctx}
                         {:workspace-id (str (:workspace/id workspace))})]
             (expect (= true (:ok? result)))
             (expect (= "test-repo" (get-in result [:workspace :name])))
@@ -84,7 +86,8 @@
 
     (it "returns repo with branches and commits when git data exists"
         (with-temp-conn [conn (temp-conn)]
-          (let [{:keys [workspace]} (setup-org-ticket conn)
+          (let [ctx (execution-context/make-context conn)
+                {:keys [workspace]} (setup-org-ticket conn)
                 repo (db.git/create-repo!
                       conn
                       {:workspace-id (:workspace/id workspace)
@@ -105,7 +108,7 @@
                          :parent-ids []})
                 _ (db.git/update-branch-head! conn (:git.branch/id branch) (:git.commit/id commit))
                 result (tools.git/repo-summary
-                        {:conn conn}
+                        {:ctx ctx}
                         {:workspace-id (str (:workspace/id workspace))})]
             (expect (= true (:ok? result)))
             (expect (some? (:repo result)))

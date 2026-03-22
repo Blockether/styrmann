@@ -4,8 +4,7 @@
    Each agent type has a key, name, type keyword, default model, role,
    system instructions, and tool bindings."
   (:require
-   [clojure.string :as str]
-   [com.blockether.styrmann.db.session :as db.session]))
+   [clojure.string :as str]))
 
 (def agent-type-valid?
   "Set of valid agent type keywords."
@@ -84,19 +83,18 @@
   "Ensure all 5 agent types are registered in the database.
 
    Params:
-   `conn` - Datalevin connection.
+   `ctx` - Execution context map.
 
    Returns:
    Vector of agent maps."
-  [conn]
-  (let [tools (db.session/list-tool-definitions conn)]
+  [ctx]
+  (let [tools ((:store/list-tool-definitions ctx))]
     (mapv (fn [{:keys [key name type model version role instructions tool-keys]}]
-            (or (db.session/find-agent-by-key conn key)
+            (or ((:store/find-agent-by-key ctx) key)
                 (let [tool-ids (->> tools
                                     (filter #(contains? (set tool-keys) (:tool-definition/key %)))
                                     (mapv :tool-definition/id))]
-                  (db.session/create-agent!
-                   conn
+                  ((:store/create-agent! ctx)
                    {:key key
                     :name name
                     :type type
@@ -111,15 +109,15 @@
   "Find the first agent matching a given type.
 
    Params:
-   `conn` - Datalevin connection.
+   `ctx` - Execution context map.
    `agent-type` - Keyword like :agent.type/planner.
 
    Returns:
    Agent map or nil."
-  [conn agent-type]
+  [ctx agent-type]
   (when-not (agent-type-valid? agent-type)
     (throw (ex-info "Invalid agent type"
                     {:type agent-type
                      :valid (str/join ", " (map name agent-type-valid?))})))
-  (let [agents (ensure-all-agents! conn)]
+  (let [agents (ensure-all-agents! ctx)]
     (first (filter #(= agent-type (:agent/type %)) agents))))

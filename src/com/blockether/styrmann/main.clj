@@ -5,6 +5,7 @@
    [com.blockether.styrmann.app :as app]
    [com.blockether.styrmann.bootstrap :as bootstrap]
    [com.blockether.styrmann.db.core :as db]
+   [com.blockether.styrmann.domain.execution-context :as execution-context]
    [com.blockether.styrmann.execution.session :as session]
    [com.blockether.styrmann.execution.tool-registry :as tool-registry]
    [darkleaf.di.core :as di]
@@ -61,10 +62,11 @@
    Returns:
    nil."
   [conn]
-  (tool-registry/register-default-tools!)
-  (session/sync-tool-definitions! conn (tool-registry/list-tools))
-  (session/ensure-explorer-agent! conn)
-  (bootstrap/ensure-from-git! conn)
+  (let [ctx (execution-context/make-context conn)]
+    (tool-registry/register-default-tools!)
+    (session/sync-tool-definitions! ctx (tool-registry/list-tools))
+    (session/ensure-explorer-agent! ctx)
+    (bootstrap/ensure-from-git! conn))
   (t/log! :info "Tools registered and bootstrap complete"))
 
 (defn tool-registry

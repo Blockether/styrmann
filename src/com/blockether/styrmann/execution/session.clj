@@ -4,10 +4,6 @@
    [clojure.edn :as edn]
    [clojure.java.io :as io]
    [clojure.string :as str]
-   [com.blockether.styrmann.db.organization :as db.organization]
-   [com.blockether.styrmann.db.session :as db.session]
-   [com.blockether.styrmann.db.task :as db.task]
-   [com.blockether.styrmann.domain.task :as domain.task]
    [com.blockether.styrmann.execution.agent :as execution.agent]
    [com.blockether.svar.core :as svar]
    [taoensso.telemere :as t])
@@ -16,8 +12,8 @@
 
 (declare record-session-event! list-session-events with-tool-event)
 
-(defn- require-task! [conn task-id]
-  (or (db.task/find-task conn task-id)
+(defn- require-task! [ctx task-id]
+  (or ((:store/find-task ctx) task-id)
       (throw (ex-info "Task not found" {:task-id task-id}))))
 
 (defn- shell-quote [value]
@@ -74,11 +70,10 @@
     (when (.exists (io/file exit-path))
       (parse-long (str/trim (slurp exit-path))))))
 
-(defn- ensure-environment! [conn task]
+(defn- ensure-environment! [ctx task]
   (let [workspace-id (get-in task [:task/workspace :workspace/id])]
-    (or (db.session/find-environment-by-workspace conn workspace-id)
-        (db.session/create-environment!
-         conn
+    (or ((:store/find-environment-by-workspace ctx) workspace-id)
+        ((:store/create-environment! ctx)
          {:workspace-id workspace-id
           :model "glm-5-turbo"
           :working-directory (or (local-directory (get-in task [:task/workspace :workspace/repository]))
@@ -89,10 +84,9 @@
   "Sync classpath tool registry into Datalevin tool definitions.
 
    Returns vector of upserted tool definitions."
-  [conn tools]
+  [ctx tools]
   (mapv (fn [{:keys [key name description fn-symbol input-schema]}]
-          (db.session/upsert-tool-definition!
-           conn
+          ((:store/upsert-tool-definition! ctx)
            {:key key
             :name name
             :description description
@@ -101,11 +95,10 @@
             :enabled? true}))
         tools))
 
-(defn- ensure-agent! [conn]
-  (let [tools (db.session/list-tool-definitions conn)]
-    (or (db.session/find-agent-by-key conn "styrmann-default")
-        (db.session/create-agent!
-         conn
+(defn- ensure-agent! [ctx]
+  (let [tools ((:store/list-tool-definitions ctx))]
+    (or ((:store/find-agent-by-key ctx) "styrmann-default")
+        ((:store/create-agent! ctx)
          {:key "styrmann-default"
           :name "Styrmann Agent"
           :version "0.0.1"
@@ -117,19 +110,18 @@
 
 (defn- tool-ids-for-profile
   "Resolve tool definition IDs for a set of tool keys."
-  [conn profile-keys]
-  (->> (db.session/list-tool-definitions conn)
+  [ctx profile-keys]
+  (->> ((:store/list-tool-definitions ctx))
        (filter #(contains? profile-keys (:tool-definition/key %)))
        (mapv :tool-definition/id)))
 
 (defn ensure-explorer-agent!
   "Ensure the exploration agent exists with read-only tool profile."
-  [conn]
+  [ctx]
   (let [tool-registry (requiring-resolve 'com.blockether.styrmann.execution.tool-registry/explorer-tool-keys)
-        tool-ids (tool-ids-for-profile conn @tool-registry)]
-    (or (db.session/find-agent-by-key conn "explorer-v1")
-        (db.session/create-agent!
-         conn
+        tool-ids (tool-ids-for-profile ctx @tool-registry)]
+    (or ((:store/find-agent-by-key ctx) "explorer-v1")
+        ((:store/create-agent! ctx)
          {:key "explorer-v1"
           :name "Explorer Agent"
           :version "0.0.2"
@@ -140,12 +132,11 @@
 
 (defn ensure-editor-agent!
   "Ensure the editor agent exists with read+write tool profile."
-  [conn]
+  [ctx]
   (let [tool-registry (requiring-resolve 'com.blockether.styrmann.execution.tool-registry/editor-tool-keys)
-        tool-ids (tool-ids-for-profile conn @tool-registry)]
-    (or (db.session/find-agent-by-key conn "editor-v1")
-        (db.session/create-agent!
-         conn
+        tool-ids (tool-ids-for-profile ctx @tool-registry)]
+    (or ((:store/find-agent-by-key ctx) "editor-v1")
+        ((:store/create-agent! ctx)
          {:key "editor-v1"
           :name "Editor Agent"
           :version "0.0.1"
@@ -157,28 +148,26 @@
 
 (defn list-session-calls
   "List persisted session calls for a session."
-  [conn session-id]
-  (db.session/list-tool-calls-by-session conn session-id))
+  [ctx session-id]
+  ((:store/list-tool-calls-by-session ctx) session-id))
 
 (defn- resolve-tool-fn [fn-symbol]
   (requiring-resolve (symbol fn-symbol)))
 
 (defn execute-exploration!
   "Run explorer agent tools against a workspace and persist session calls/events."
-  [conn {:keys [workspace-id]}]
-  (let [workspace (or (db.organization/find-workspace conn workspace-id)
+  [ctx {:keys [workspace-id]}]
+  (let [workspace (or ((:store/find-workspace ctx) workspace-id)
                       (throw (ex-info "Workspace not found" {:workspace-id workspace-id})))
-        environment (or (db.session/find-environment-by-workspace conn workspace-id)
-                        (db.session/create-environment!
-                         conn
+        environment (or ((:store/find-environment-by-workspace ctx) workspace-id)
+                        ((:store/create-environment! ctx)
                          {:workspace-id workspace-id
                           :model "glm-5-turbo"
                           :working-directory (:workspace/repository workspace)
                           :status :execution-environment.status/ready}))
-        agent (ensure-explorer-agent! conn)
-        workflow (db.session/create-workflow! conn {})
-        session (db.session/create-session!
-                 conn
+        agent (ensure-explorer-agent! ctx)
+        workflow ((:store/create-workflow! ctx) {})
+        session ((:store/create-session! ctx)
                  {:workflow-id (:workflow/id workflow)
                   :environment-id (:execution-environment/id environment)
                   :agent-id (:agent/id agent)
@@ -193,13 +182,12 @@
         all-ok? (reduce
                  (fn [ok? tool]
                    (let [tool-key (:tool-definition/key tool)
-                         tool-call (db.session/create-tool-call!
-                                    conn
+                         tool-call ((:store/create-tool-call! ctx)
                                     {:session-id (:session/id session)
                                      :tool-id (:tool-definition/id tool)
                                      :input-edn (pr-str {:path (:workspace/repository workspace)})})]
                      (record-session-event!
-                      conn
+                      ctx
                       {:session-id (:session/id session)
                        :type :session.event.type/call-start
                        :message (str "Call started: " tool-key)
@@ -207,32 +195,30 @@
                                  :session.calls/id (:session.calls/id tool-call)}})
                      (try
                        (let [tool-fn (resolve-tool-fn (:tool-definition/fn-symbol tool))
-                             result (tool-fn {:conn conn
+                             result (tool-fn {:ctx ctx
                                               :workspace-id workspace-id
                                               :session-id (:session/id session)}
                                              {:path (:workspace/repository workspace)})]
-                         (db.session/finish-tool-call!
-                          conn
+                         ((:store/finish-tool-call! ctx)
                           (:session.calls/id tool-call)
                           {:status :session.calls.status/succeeded
                            :output-edn (pr-str result)
                            :error-message nil})
                          (record-session-event!
-                          conn
+                          ctx
                           {:session-id (:session/id session)
                            :type :session.event.type/call-end
                            :message (str "Call succeeded: " tool-key)
                            :payload {:tool-key tool-key}})
                          ok?)
                        (catch Exception ex
-                         (db.session/finish-tool-call!
-                          conn
+                         ((:store/finish-tool-call! ctx)
                           (:session.calls/id tool-call)
                           {:status :session.calls.status/failed
                            :output-edn nil
                            :error-message (.getMessage ex)})
                          (record-session-event!
-                          conn
+                          ctx
                           {:session-id (:session/id session)
                            :type :session.event.type/call-failed
                            :message (str "Call failed: " tool-key)
@@ -243,30 +229,29 @@
                  tools)
         session-status (if all-ok? :session.status/succeeded :session.status/failed)
         workflow-status (if all-ok? :workflow.status/succeeded :workflow.status/failed)]
-    (db.session/mark-session-finished! conn (:session/id session) session-status)
-    (db.session/mark-workflow-finished! conn (:workflow/id workflow) workflow-status)
+    ((:store/mark-session-finished! ctx) (:session/id session) session-status)
+    ((:store/mark-workflow-finished! ctx) (:workflow/id workflow) workflow-status)
     (record-session-event!
-     conn
+     ctx
      {:session-id (:session/id session)
       :type :session.event.type/state-change
       :message "Exploration session finished"
       :payload {:status session-status}})
-    (assoc (db.session/find-session conn (:session/id session))
-           :session/events (list-session-events conn (:session/id session))
-           :session/calls (list-session-calls conn (:session/id session)))))
+    (assoc ((:store/find-session ctx) (:session/id session))
+           :session/events (list-session-events ctx (:session/id session))
+           :session/calls (list-session-calls ctx (:session/id session)))))
 
 (defn list-environments-by-organization
   "List execution environments available in an organization."
-  [conn organization-id]
-  (db.session/list-environments-by-organization conn organization-id))
+  [ctx organization-id]
+  ((:store/list-environments-by-organization ctx) organization-id))
 
 (defn configure-workspace-environment!
   "Create or update execution environment settings for one workspace."
-  [conn {:keys [workspace-id provider-id model working-directory status]}]
-  (when-not (db.organization/find-workspace conn workspace-id)
+  [ctx {:keys [workspace-id provider-id model working-directory status]}]
+  (when-not ((:store/find-workspace ctx) workspace-id)
     (throw (ex-info "Workspace not found" {:workspace-id workspace-id})))
-  (db.session/update-environment-by-workspace!
-   conn
+  ((:store/update-environment-by-workspace! ctx)
    workspace-id
    {:provider-id provider-id
     :model model
@@ -300,12 +285,12 @@
 
 (defn- register-tools-in-env!
   "Register agent tools as SCI bindings in an RLM environment."
-  [env conn session-id agent working-directory]
+  [env ctx session-id agent working-directory]
   (let [tools (->> (:agent/tools agent)
                    (filter :tool-definition/enabled?)
                    (sort-by :tool-definition/key))
-        ctx {:conn conn :session-id session-id
-             :working-directory working-directory}]
+        tool-ctx {:ctx ctx :session-id session-id
+                  :working-directory working-directory}]
     (doseq [tool tools]
       (let [tool-key (:tool-definition/key tool)
             tool-fn-sym (:tool-definition/fn-symbol tool)
@@ -315,8 +300,8 @@
             (svar/register-env-fn!
              env sci-sym
              (fn [params]
-               (with-tool-event conn session-id tool-key (or params {})
-                 #(resolved-fn ctx (or params {}))))
+               (with-tool-event ctx session-id tool-key (or params {})
+                 #(resolved-fn tool-ctx (or params {}))))
              (str "(" sci-sym " params) - " (:tool-definition/description tool))))
           (catch Exception e
             (t/log! :warn ["Could not register tool" {:tool-key tool-key :error (ex-message e)}])))))))
@@ -329,20 +314,19 @@
    Runs asynchronously in a future.
 
    Params:
-   `conn` - Datalevin connection.
+   `ctx` - Execution context map.
    `task-id` - UUID. Task to execute.
 
    Returns:
    Session map (execution runs in background)."
-  [conn task-id]
-  (let [task (require-task! conn task-id)
-        environment (ensure-environment! conn task)
-        agent (ensure-editor-agent! conn)
-        workflow (db.session/create-workflow! conn {:task-id task-id})
+  [ctx task-id]
+  (let [task (require-task! ctx task-id)
+        environment (ensure-environment! ctx task)
+        agent (ensure-editor-agent! ctx)
+        workflow ((:store/create-workflow! ctx) {:task-id task-id})
         working-directory (or (local-directory (get-in task [:task/workspace :workspace/repository]))
                               (.getAbsolutePath (io/file ".")))
-        session (db.session/create-session!
-                 conn
+        session ((:store/create-session! ctx)
                  {:workflow-id       (:workflow/id workflow)
                   :environment-id    (:execution-environment/id environment)
                   :agent-id          (:agent/id agent)
@@ -353,8 +337,8 @@
                   :working-directory working-directory})
         session-id (:session/id session)]
     ;; inbox → implementing
-    (domain.task/update-status! conn task-id :task.status/implementing)
-    (record-session-event! conn
+    ((:domain/update-task-status! ctx) task-id :task.status/implementing)
+    (record-session-event! ctx
       {:session-id session-id
        :type :session.event.type/state-change
        :message "Task started — implementing"
@@ -362,15 +346,16 @@
     ;; Run RLM in background
     (future
       (try
-        (let [base-config (or (execution.agent/resolve-config {:conn conn})
+        (let [base-config (or (execution.agent/resolve-config
+                                {:find-default-provider (:domain/find-default-provider ctx)})
                               (execution.agent/default-config))
               ;; RLM expects :default-model, make-config stores :model
               config (assoc base-config :default-model (:model base-config))
               env (svar/create-env {:config config})
               prompt (build-rlm-prompt task working-directory)]
           ;; Register agent-scoped tools in RLM sandbox
-          (register-tools-in-env! env conn session-id agent working-directory)
-          (record-session-event! conn
+          (register-tools-in-env! env ctx session-id agent working-directory)
+          (record-session-event! ctx
             {:session-id session-id
              :type :session.event.type/state-change
              :message "RLM environment created with scoped tools, querying..."
@@ -380,7 +365,7 @@
                         {:on-iteration
                          (fn [{:keys [iteration thinking executions final?]}]
                            ;; Single iteration event with everything grouped
-                           (record-session-event! conn
+                           (record-session-event! ctx
                              {:session-id session-id
                               :type :session.event.type/iteration
                               :message (str "Iteration " (inc iteration)
@@ -401,63 +386,62 @@
                                    (and (map? answer-raw) (string? (:result answer-raw))) (:result answer-raw)
                                    (some? answer-raw) (pr-str answer-raw)
                                    :else "")]
-              (record-session-event! conn
+              (record-session-event! ctx
                 {:session-id session-id
                  :type :session.event.type/state-change
                  :message "RLM query completed"
                  :payload {:answer answer-content}})
-              (db.session/create-session-message!
-               conn
+              ((:store/create-session-message! ctx)
                {:session-id session-id
                 :role :session.messages.role/assistant
                 :content answer-content}))
             ;; implementing → testing
-            (domain.task/update-status! conn task-id :task.status/testing)
-            (record-session-event! conn
+            ((:domain/update-task-status! ctx) task-id :task.status/testing)
+            (record-session-event! ctx
               {:session-id session-id
                :type :session.event.type/state-change
                :message "Execution complete — testing"
                :payload {:status :task.status/testing}})
             ;; testing → reviewing
-            (domain.task/update-status! conn task-id :task.status/reviewing)
-            (record-session-event! conn
+            ((:domain/update-task-status! ctx) task-id :task.status/reviewing)
+            (record-session-event! ctx
               {:session-id session-id
                :type :session.event.type/state-change
                :message "Tests passed — reviewing"
                :payload {:status :task.status/reviewing}})
             ;; reviewing → done
-            (domain.task/update-status! conn task-id :task.status/done)
-            (db.session/mark-session-finished! conn session-id :session.status/succeeded)
-            (db.session/mark-workflow-finished! conn (:workflow/id workflow) :workflow.status/succeeded)
-            (record-session-event! conn
+            ((:domain/update-task-status! ctx) task-id :task.status/done)
+            ((:store/mark-session-finished! ctx) session-id :session.status/succeeded)
+            ((:store/mark-workflow-finished! ctx) (:workflow/id workflow) :workflow.status/succeeded)
+            (record-session-event! ctx
               {:session-id session-id
                :type :session.event.type/state-change
                :message "Task completed — done"
                :payload {:status :task.status/done}})
             (svar/dispose-env! env)
             ;; Workflow progression: auto-execute dependent tasks whose deps are all done
-            (doseq [ready-task (domain.task/ready-dependents conn task-id)]
+            (doseq [ready-task ((:domain/ready-dependents ctx) task-id)]
               (t/log! :info ["Auto-executing dependent task" {:task-id (:task/id ready-task)
                                                               :description (:task/description ready-task)}])
-              (future (execute-with-rlm! conn (:task/id ready-task))))))
+              (future (execute-with-rlm! ctx (:task/id ready-task))))))
         (catch Exception e
           (t/log! :error ["RLM execution failed" {:task-id task-id :error (ex-message e)}])
-          (record-session-event! conn
+          (record-session-event! ctx
             {:session-id session-id
              :type :session.event.type/state-change
              :message (str "Session failed: " (ex-message e))
              :payload {:status :session.status/failed :error (ex-message e)}})
-          (db.session/mark-session-finished! conn session-id :session.status/failed)
-          (db.session/mark-workflow-finished! conn (:workflow/id workflow) :workflow.status/failed))))
+          ((:store/mark-session-finished! ctx) session-id :session.status/failed)
+          ((:store/mark-workflow-finished! ctx) (:workflow/id workflow) :workflow.status/failed))))
     session))
 
 (defn execute!
   "Start a workflow with one running agent session for a task."
-  [conn {:keys [task-id command]}]
-  (let [task (require-task! conn task-id)
-        environment (ensure-environment! conn task)
-        agent (ensure-agent! conn)
-        workflow (db.session/create-workflow! conn {:task-id task-id})
+  [ctx {:keys [task-id command]}]
+  (let [task (require-task! ctx task-id)
+        environment (ensure-environment! ctx task)
+        agent (ensure-agent! ctx)
+        workflow ((:store/create-workflow! ctx) {:task-id task-id})
         run-directory (ensure-run-directory!)
         session-id (java.util.UUID/randomUUID)
         log-path (str run-directory "/" session-id ".log")
@@ -468,8 +452,7 @@
         process-builder (doto (ProcessBuilder. ["bash" "-lc" (build-wrapper command log-path exit-path)])
                           (.directory (io/file working-directory)))
         process (.start process-builder)
-        session (db.session/create-session!
-                 conn
+        session ((:store/create-session! ctx)
                  {:workflow-id        (:workflow/id workflow)
                   :environment-id     (:execution-environment/id environment)
                   :agent-id           (:agent/id agent)
@@ -479,7 +462,7 @@
                   :exit-path          exit-path
                   :working-directory  working-directory})]
     (record-session-event!
-     conn
+     ctx
      {:session-id (:session/id session)
       :type :session.event.type/state-change
       :message "Session started"
@@ -489,9 +472,8 @@
 
 (defn record-session-event!
   "Record an execution event for a session."
-  [conn {:keys [session-id type message payload]}]
-  (db.session/create-session-event!
-   conn
+  [ctx {:keys [session-id type message payload]}]
+  ((:store/create-session-event! ctx)
    {:session-id session-id
     :type type
     :message message
@@ -502,7 +484,7 @@
    Captures tool input parameters and output summary.
 
    Params:
-   `conn` - Datalevin connection.
+   `ctx` - Execution context map.
    `session-id` - UUID. Session identifier.
    `tool-key` - String. Tool key for event messages.
    `params` - Map. Tool input parameters (recorded in event payload).
@@ -510,11 +492,11 @@
 
    Returns:
    Result of (f)."
-  ([conn session-id tool-key f]
-   (with-tool-event conn session-id tool-key nil f))
-  ([conn session-id tool-key params f]
+  ([ctx session-id tool-key f]
+   (with-tool-event ctx session-id tool-key nil f))
+  ([ctx session-id tool-key params f]
    (record-session-event!
-    conn
+    ctx
     {:session-id session-id
      :type :session.event.type/call-start
      :message (str "Tool: " tool-key)
@@ -532,7 +514,7 @@
                  :else (pr-str result))
            summary (if (> (count raw) 500) (str (subs raw 0 500) "...") raw)]
        (record-session-event!
-        conn
+        ctx
         {:session-id session-id
          :type :session.event.type/call-end
          :message (str "Tool complete: " tool-key)
@@ -540,7 +522,7 @@
        result)
      (catch Exception ex
        (record-session-event!
-        conn
+        ctx
         {:session-id session-id
          :type :session.event.type/call-error
          :message (str "Tool error: " tool-key ": " (ex-message ex))
@@ -549,28 +531,27 @@
 
 (defn list-session-messages
   "List messages for a session."
-  [conn session-id]
-  (db.session/list-session-messages conn session-id))
+  [ctx session-id]
+  ((:store/list-session-messages ctx) session-id))
 
 (defn list-session-events
   "List timeline events for a session."
-  [conn session-id]
+  [ctx session-id]
   (mapv (fn [event]
           (cond-> event
             (seq (:session.event/payload-edn event))
             (assoc :session.event/payload (edn/read-string (:session.event/payload-edn event)))))
-        (db.session/list-session-events conn session-id)))
+        ((:store/list-session-events ctx) session-id)))
 
 (defn observe
   "Observe current process state for a session."
-  [conn session-id]
-  (when-let [session (db.session/find-session conn session-id)]
+  [ctx session-id]
+  (when-let [session ((:store/find-session ctx) session-id)]
     (let [already-finished? (#{:session.status/succeeded :session.status/failed} (:session/status session))
           status (resolve-session-status (:session/pid session) (:session/exit-path session) session)
           exit-code (read-exit-code (:session/exit-path session))
           session (if (and (= status :session.runtime/exited) (not already-finished?))
-                    (db.session/mark-session-finished!
-                     conn
+                    ((:store/mark-session-finished! ctx)
                      session-id
                      (if (zero? (or exit-code -1))
                        :session.status/succeeded
@@ -578,14 +559,13 @@
                     session)]
       ;; Only emit exit events once — skip if session was already finished before this observe
       (when (and (= status :session.runtime/exited) (not already-finished?))
-        (db.session/mark-workflow-finished!
-         conn
+        ((:store/mark-workflow-finished! ctx)
          (get-in session [:session/workflow :workflow/id])
          (if (= :session.status/succeeded (:session/status session))
            :workflow.status/succeeded
            :workflow.status/failed))
         (record-session-event!
-         conn
+         ctx
          {:session-id session-id
           :type :session.event.type/state-change
           :message "Session exited"
@@ -598,10 +578,10 @@
                              (when (and (seq lp) (.exists (io/file lp)))
                                (str/trim-newline (slurp lp))))
              :session/exit-code exit-code
-             :session/messages (db.session/list-session-messages conn session-id)))))
+             :session/messages ((:store/list-session-messages ctx) session-id)))))
 
 (defn list-by-task
   "List observed sessions for a task."
-  [conn task-id]
-  (mapv #(observe conn (:session/id %))
-        (db.session/list-sessions-by-task conn task-id)))
+  [ctx task-id]
+  (mapv #(observe ctx (:session/id %))
+        ((:store/list-sessions-by-task ctx) task-id)))
