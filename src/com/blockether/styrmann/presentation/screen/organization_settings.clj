@@ -85,7 +85,22 @@
 (defn- runner-settings-card [organization-id org environments providers]
   (let [workspaces (:organization/workspaces org)
         provider-options (into [["" "Use default provider"]]
-                               (mapv (fn [p] [(str (:provider/id p)) (:provider/name p)]) providers))]
+                               (mapv (fn [p] [(str (:provider/id p)) (:provider/name p)]) providers))
+        model-options [["" "None"]
+                       ["glm-5-turbo" "GLM 5 Turbo"]
+                       ["glm-5" "GLM 5"]
+                       ["gpt-4o" "GPT-4o"]
+                       ["gpt-4o-mini" "GPT-4o Mini"]
+                       ["gpt-4.1" "GPT-4.1"]
+                       ["gpt-4.1-mini" "GPT-4.1 Mini"]
+                       ["gpt-4.1-nano" "GPT-4.1 Nano"]
+                       ["o3" "o3"]
+                       ["o4-mini" "o4-mini"]
+                       ["claude-opus-4-6" "Claude Opus 4.6"]
+                       ["claude-sonnet-4-6" "Claude Sonnet 4.6"]
+                       ["claude-haiku-4-5" "Claude Haiku 4.5"]
+                       ["gemini-2.5-pro" "Gemini 2.5 Pro"]
+                       ["gemini-2.5-flash" "Gemini 2.5 Flash"]]]
     [:div {:class "space-y-6"}
      ;; Default runner config
      [:div {:class "card p-5"}
@@ -96,11 +111,11 @@
        [:input {:type "hidden" :name "workspace-id" :value ""}]
        [:div {:class "grid grid-cols-2 gap-4"}
         (select-field "Provider" "provider-id" provider-options "")
-        (text-field "Default model" "model" "glm-5-turbo" "glm-5-turbo")]
+        (select-field "Default model" "model" (rest model-options) "glm-5-turbo")]
        [:div {:class "grid grid-cols-3 gap-3"}
-        (text-field "Fallback model 1" "fallback-1" "" "gpt-4o" {:required? false})
-        (text-field "Fallback model 2" "fallback-2" "" "gpt-4o-mini" {:required? false})
-        (text-field "Fallback model 3" "fallback-3" "" "claude-sonnet-4-6" {:required? false})]
+        (select-field "Fallback 1" "fallback-1" model-options "gpt-4o")
+        (select-field "Fallback 2" "fallback-2" model-options "gpt-4o-mini")
+        (select-field "Fallback 3" "fallback-3" model-options "")]
        [:div {:class "flex justify-end pt-2"}
         [:button {:class "btn-primary" :type "submit"}
          [:i {:data-lucide "save" :class "size-4"}]
