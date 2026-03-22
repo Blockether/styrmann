@@ -389,19 +389,18 @@
                               :payload {:iteration iteration
                                         :final? final?
                                         :reasoning (when thinking
-                                                     (subs (str thinking) 0 (min 2000 (count (str thinking)))))
+                                                     (str thinking))
                                         :executions (mapv (fn [{:keys [code result error stdout]}]
-                                                           (cond-> {:code (subs (str code) 0 (min 500 (count (str code))))}
-                                                             result (assoc :result (let [s (pr-str result)]
-                                                                                    (if (> (count s) 300) (str (subs s 0 300) "...") s)))
+                                                           (cond-> {:code (str code)}
+                                                             result (assoc :result (pr-str result))
                                                              error (assoc :error (str error))
-                                                             stdout (assoc :stdout (subs (str stdout) 0 (min 300 (count (str stdout)))))))
+                                                             stdout (assoc :stdout (str stdout))))
                                                           executions)}}))})]
             (record-session-event! conn
               {:session-id session-id
                :type :session.event.type/state-change
                :message "RLM query completed"
-               :payload {:answer (subs (str (:answer result)) 0 (min 500 (count (str (:answer result)))))}})
+               :payload {:answer (str (:answer result))}})
             (db.session/create-session-message!
              conn
              {:session-id session-id
