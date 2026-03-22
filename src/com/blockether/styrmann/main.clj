@@ -81,8 +81,11 @@
   "Jetty HTTP server component."
   {::di/kind :component}
   [{port `cfg:http-port
-    _tools `tool-registry}]
-  (let [server (jetty/run-jetty #'app/app {:port port :join? false})]
+    _tools `tool-registry
+    datalevin `datalevin}]
+  (let [conn @datalevin
+        app-handler (app/make-app conn)
+        server (jetty/run-jetty app-handler {:port port :join? false})]
     (t/log! :info ["HTTP listening" {:port port}])
     (reify
       clojure.lang.IDeref (deref [_] server)

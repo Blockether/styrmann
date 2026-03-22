@@ -2,7 +2,6 @@
   "Ring app wiring for SSR screens and form actions."
   (:require
    [clojure.string :as str]
-   [com.blockether.styrmann.db.core :as db]
    [com.blockether.styrmann.db.organization :as db.organization]
    [com.blockether.styrmann.db.task :as db.task]
    [com.blockether.styrmann.domain.analysis :as analysis]
@@ -12,7 +11,6 @@
    [com.blockether.styrmann.domain.task :as task]
    [com.blockether.styrmann.domain.ticket :as ticket]
    [com.blockether.styrmann.execution.session :as session]
-   [datalevin.core :as d]
    [taoensso.telemere :as t]
    [com.blockether.styrmann.presentation.component.layout :as layout]
    [com.blockether.styrmann.presentation.screen.home :as home-screen]
@@ -74,33 +72,33 @@
 
 (declare handle-fragment-organization)
 
-(defn- handle-home [_request]
-  (if-let [organization (organization/default-organization (db/conn))]
+(defn- handle-home [conn _request]
+  (if-let [organization (organization/default-organization conn)]
     (redirect-to (str "/organizations/" (:organization/id organization)))
-    (html-response (home-screen/render (db/conn)))))
+    (html-response (home-screen/render conn))))
 
-(defn- handle-create-organization [request]
-  (let [organization (organization/create! (db/conn) {:name (get-in request [:params :name])})]
+(defn- handle-create-organization [conn request]
+  (let [organization (organization/create! conn {:name (get-in request [:params :name])})]
     (redirect-to (str "/organizations/" (:organization/id organization)))))
 
-(defn- handle-organization-show [organization-id]
-  (if (organization/overview (db/conn) organization-id)
-    (html-response (organization-screen/render (db/conn) organization-id))
+(defn- handle-organization-show [conn organization-id]
+  (if (organization/overview conn organization-id)
+    (html-response (organization-screen/render conn organization-id))
     (not-found-page "Organization not found.")))
 
-(defn- handle-organization-settings [organization-id request]
-  (if (organization/overview (db/conn) organization-id)
+(defn- handle-organization-settings [conn organization-id request]
+  (if (organization/overview conn organization-id)
     (let [tab (case (get-in request [:query-params "tab"])
                 "runner" :runner
                 :providers)]
-      (html-response (organization-settings-screen/render (db/conn) organization-id tab)))
+      (html-response (organization-settings-screen/render conn organization-id tab)))
     (not-found-page "Organization not found.")))
 
-(defn- handle-update-runner-settings [organization-id request]
+(defn- handle-update-runner-settings [conn organization-id request]
   (let [params (request-params request)
         workspace-id (uuid (:workspace-id params))]
     (session/configure-workspace-environment!
-     (db/conn)
+     conn
      {:workspace-id workspace-id
       :provider-id (some-> (:provider-id params) uuid)
       :model (:model params)
@@ -108,43 +106,43 @@
       :status (keyword-from-param (:status params))})
     (redirect-to (str "/organizations/" organization-id "/settings?tab=runner"))))
 
-(defn- handle-add-provider [organization-id request]
+(defn- handle-add-provider [conn organization-id request]
   (let [params (request-params request)]
     (provider/add-provider!
-     (db/conn)
+     conn
      {:name (:name params)
       :base-url (:base-url params)
       :api-key (:api-key params)
       :default? (= (:default? params) "true")})
     (redirect-to (str "/organizations/" organization-id "/settings?tab=providers"))))
 
-(defn- handle-create-workspace [organization-id request]
+(defn- handle-create-workspace [conn organization-id request]
   (organization/create-workspace!
-   (db/conn)
+   conn
    {:organization-id organization-id
     :name            (get-in request [:params :name])
     :repository      (get-in request [:params :repository])})
   (redirect-to (str "/organizations/" organization-id)))
 
-(defn- handle-create-sprint [organization-id request]
+(defn- handle-create-sprint [conn organization-id request]
   (planning/create-sprint!
-   (db/conn)
+   conn
    {:organization-id organization-id
     :name            (get-in request [:params :name])})
   (redirect-to (str "/organizations/" organization-id)))
 
-(defn- handle-create-milestone [organization-id request]
+(defn- handle-create-milestone [conn organization-id request]
   (let [params (request-params request)]
     (planning/create-milestone!
-     (db/conn)
+     conn
      {:sprint-id (uuid (:sprint-id params))
       :name      (:name params)})
     (redirect-to (str "/organizations/" organization-id))))
 
-(defn- handle-create-ticket [organization-id request]
+(defn- handle-create-ticket [conn organization-id request]
   (let [params (request-params request)
         ticket (ticket/create!
-                (db/conn)
+                conn
                 {:organization-id          organization-id
                  :type                     (keyword-from-param (:type params))
                  :title                    (:title params)
@@ -157,121 +155,121 @@
                  :attachments              (uploads params)})]
     (redirect-to (str "/organizations/" organization-id "/tickets/" (:ticket/id ticket)))))
 
-(defn- handle-ticket-show [ticket-id]
-  (if (ticket/find-by-id (db/conn) ticket-id)
-    (html-response (ticket-screen/render (db/conn) ticket-id))
+(defn- handle-ticket-show [conn ticket-id]
+  (if (ticket/find-by-id conn ticket-id)
+    (html-response (ticket-screen/render conn ticket-id))
     (not-found-page "Ticket not found.")))
 
-(defn- handle-ticket-show-in-organization [organization-id ticket-id]
-  (if-let [ticket-record (ticket/find-by-id (db/conn) ticket-id)]
+(defn- handle-ticket-show-in-organization [conn organization-id ticket-id]
+  (if-let [ticket-record (ticket/find-by-id conn ticket-id)]
     (if (= organization-id (get-in ticket-record [:ticket/organization :organization/id]))
-      (html-response (ticket-screen/render (db/conn) ticket-id))
+      (html-response (ticket-screen/render conn ticket-id))
       (not-found-page "Ticket not found in organization."))
     (not-found-page "Ticket not found.")))
 
-(defn- handle-ticket-status [organization-id ticket-id request]
+(defn- handle-ticket-status [conn organization-id ticket-id request]
   (let [status (keyword-from-param (get-in request [:params :status]))]
-    (ticket/update-status! (db/conn) ticket-id status)
+    (ticket/update-status! conn ticket-id status)
     (if (= "fetch" (get-in request [:headers "x-requested-with"]))
       (-> (response/response "")
           (response/status 204))
       (redirect-to (str "/organizations/" organization-id "/tickets/" ticket-id)))))
 
-(defn- handle-ticket-assign-sprint [ticket-id request]
-  (if-let [ticket-record (ticket/find-by-id (db/conn) ticket-id)]
+(defn- handle-ticket-assign-sprint [conn ticket-id request]
+  (if-let [ticket-record (ticket/find-by-id conn ticket-id)]
     (let [organization-id (get-in ticket-record [:ticket/organization :organization/id])]
       (planning/assign-ticket-to-sprint!
-       (db/conn)
+       conn
        {:ticket-id ticket-id
         :sprint-id (uuid (get-in request [:params :sprint-id]))})
       (redirect-to (str "/organizations/" organization-id "/tickets/" ticket-id)))
     (not-found-page "Ticket not found.")))
 
-(defn- handle-ticket-assign-milestone [ticket-id request]
-  (if-let [ticket-record (ticket/find-by-id (db/conn) ticket-id)]
+(defn- handle-ticket-assign-milestone [conn ticket-id request]
+  (if-let [ticket-record (ticket/find-by-id conn ticket-id)]
     (let [organization-id (get-in ticket-record [:ticket/organization :organization/id])]
       (planning/assign-ticket-to-milestone!
-       (db/conn)
+       conn
        {:ticket-id    ticket-id
         :milestone-id (uuid (get-in request [:params :milestone-id]))})
       (redirect-to (str "/organizations/" organization-id "/tickets/" ticket-id)))
     (not-found-page "Ticket not found.")))
 
-(defn- handle-create-task [ticket-id request]
-  (if-let [ticket-record (ticket/find-by-id (db/conn) ticket-id)]
+(defn- handle-create-task [conn ticket-id request]
+  (if-let [ticket-record (ticket/find-by-id conn ticket-id)]
     (let [organization-id (get-in ticket-record [:ticket/organization :organization/id])
           created-task (task/create!
-                        (db/conn)
+                        conn
                         {:ticket-id    ticket-id
                          :workspace-id (uuid (get-in request [:params :workspace-id]))
                          :description  (get-in request [:params :description])})]
       (redirect-to (str "/organizations/" organization-id "/tasks/" (:task/id created-task))))
     (not-found-page "Ticket not found.")))
 
-(defn- handle-workspace-show [workspace-id]
-  (if-let [_workspace (db.organization/find-workspace (db/conn) workspace-id)]
-    (html-response (workspace-screen/render (db/conn) workspace-id))
+(defn- handle-workspace-show [conn workspace-id]
+  (if-let [_workspace (db.organization/find-workspace conn workspace-id)]
+    (html-response (workspace-screen/render conn workspace-id))
     (not-found-page "Workspace not found.")))
 
-(defn- handle-workspace-show-in-organization [organization-id workspace-id]
-  (if-let [workspace (db.organization/find-workspace (db/conn) workspace-id)]
+(defn- handle-workspace-show-in-organization [conn organization-id workspace-id]
+  (if-let [workspace (db.organization/find-workspace conn workspace-id)]
     (if (= organization-id (get-in workspace [:workspace/organization :organization/id]))
-      (html-response (workspace-screen/render (db/conn) workspace-id))
+      (html-response (workspace-screen/render conn workspace-id))
       (not-found-page "Workspace not found in organization."))
     (not-found-page "Workspace not found.")))
 
-(defn- handle-task-show [task-id]
-  (if (db.task/find-task (db/conn) task-id)
-    (html-response (task-screen/render (db/conn) task-id))
+(defn- handle-task-show [conn task-id]
+  (if (db.task/find-task conn task-id)
+    (html-response (task-screen/render conn task-id))
     (not-found-page "Task not found.")))
 
-(defn- handle-task-show-in-organization [organization-id task-id]
-  (if-let [task-record (db.task/find-task (db/conn) task-id)]
+(defn- handle-task-show-in-organization [conn organization-id task-id]
+  (if-let [task-record (db.task/find-task conn task-id)]
     (if (= organization-id (get-in task-record [:task/ticket :ticket/organization :organization/id]))
-      (html-response (task-screen/render (db/conn) task-id))
+      (html-response (task-screen/render conn task-id))
       (not-found-page "Task not found in organization."))
     (not-found-page "Task not found.")))
 
-(defn- handle-task-status [task-id request]
-  (if-let [task-record (db.task/find-task (db/conn) task-id)]
+(defn- handle-task-status [conn task-id request]
+  (if-let [task-record (db.task/find-task conn task-id)]
     (let [organization-id (get-in task-record [:task/ticket :ticket/organization :organization/id])]
-      (task/update-status! (db/conn) task-id (keyword-from-param (get-in request [:params :status])))
+      (task/update-status! conn task-id (keyword-from-param (get-in request [:params :status])))
       (redirect-to (str "/organizations/" organization-id "/tasks/" task-id)))
     (not-found-page "Task not found.")))
 
-(defn- handle-task-run [task-id]
-  (if-let [task-record (db.task/find-task (db/conn) task-id)]
+(defn- handle-task-run [conn task-id]
+  (if-let [task-record (db.task/find-task conn task-id)]
     (let [organization-id (get-in task-record [:task/ticket :ticket/organization :organization/id])]
       ;; Reset to inbox for retry via state machine
       (when-not (= :task.status/inbox (:task/status task-record))
-        (task/update-status! (db/conn) task-id :task.status/inbox))
-      (session/execute-with-rlm! (db/conn) task-id)
+        (task/update-status! conn task-id :task.status/inbox))
+      (session/execute-with-rlm! conn task-id)
       (redirect-to (str "/organizations/" organization-id "/tasks/" task-id)))
     (not-found-page "Task not found.")))
 
-(defn- handle-ticket-decompose [ticket-id]
-  (if-let [t (ticket/find-by-id (db/conn) ticket-id)]
+(defn- handle-ticket-decompose [conn ticket-id]
+  (if-let [t (ticket/find-by-id conn ticket-id)]
     (let [org-id (get-in t [:ticket/organization :organization/id])]
-      (future (analysis/decompose-ticket! (db/conn) ticket-id))
+      (future (analysis/decompose-ticket! conn ticket-id))
       (redirect-to (str "/organizations/" org-id "/tickets/" ticket-id)))
     (not-found-page "Ticket not found.")))
 
-(defn- handle-ticket-handoff [ticket-id]
-  (if-let [t (ticket/find-by-id (db/conn) ticket-id)]
+(defn- handle-ticket-handoff [conn ticket-id]
+  (if-let [t (ticket/find-by-id conn ticket-id)]
     (let [org-id (get-in t [:ticket/organization :organization/id])]
       (future
         (try
           ;; Decompose into tasks if none exist
-          (when (empty? (db.task/list-tasks-by-ticket (db/conn) ticket-id))
-            (analysis/decompose-ticket! (db/conn) ticket-id))
+          (when (empty? (db.task/list-tasks-by-ticket conn ticket-id))
+            (analysis/decompose-ticket! conn ticket-id))
           ;; Transition ticket to in-progress
-          (ticket/update-status! (db/conn) ticket-id :ticket.status/in-progress)
+          (ticket/update-status! conn ticket-id :ticket.status/in-progress)
           ;; Execute root tasks (no dependencies) in the workflow
-          (let [tasks (db.task/list-tasks-by-ticket (db/conn) ticket-id)
+          (let [tasks (db.task/list-tasks-by-ticket conn ticket-id)
                 root-tasks (filter #(empty? (:task/depends-on %)) tasks)]
             (doseq [root-task root-tasks]
               (when (= :task.status/inbox (:task/status root-task))
-                (future (session/execute-with-rlm! (db/conn) (:task/id root-task))))))
+                (future (session/execute-with-rlm! conn (:task/id root-task))))))
           (catch Exception ex
             (t/log! :error ["Handoff failed" {:ticket-id ticket-id :error (ex-message ex)}]))))
       (redirect-to (str "/organizations/" org-id "/tickets/" ticket-id)))
@@ -293,28 +291,28 @@
                                                    (layout/render-topbar-context-fragment topbar-context))
                                (d*/execute-script! sse "lucide.createIcons();window.styrmannInitInteractive&&window.styrmannInitInteractive();")))}))
 
-(defn- handle-fragment-home [request]
-  (if-let [organization (organization/default-organization (db/conn))]
-    (handle-fragment-organization request (:organization/id organization))
-    (sse-fragment-response request (home-screen/render-body (db/conn)))))
+(defn- handle-fragment-home [conn request]
+  (if-let [organization (organization/default-organization conn)]
+    (handle-fragment-organization conn request (:organization/id organization))
+    (sse-fragment-response request (home-screen/render-body conn))))
 
-(defn- handle-fragment-organization [request organization-id]
-  (if-let [fragment (organization-screen/render-body (db/conn) organization-id)]
+(defn- handle-fragment-organization [conn request organization-id]
+  (if-let [fragment (organization-screen/render-body conn organization-id)]
     (sse-fragment-response request fragment)
     (sse-fragment-response request
                            {:body-html "<p>Organization not found.</p>"
                             :breadcrumbs []
                             :topbar-context ""})))
 
-(defn- handle-attachment [attachment-id]
-  (if-let [attachment (ticket/find-attachment (db/conn) attachment-id)]
+(defn- handle-attachment [conn attachment-id]
+  (if-let [attachment (ticket/find-attachment conn attachment-id)]
     (-> (response/response (:attachment/data attachment))
         (response/content-type (:attachment/content-type attachment))
         (response/header "Content-Disposition" (str "inline; filename=\"" (:attachment/name attachment) "\"")))
     (not-found-page "Attachment not found.")))
 
-(defn- handle-task-runs-fragment [request task-id]
-  (if-let [{:keys [html any-running?]} (task-screen/render-runs-fragment (db/conn) task-id)]
+(defn- handle-task-runs-fragment [conn request task-id]
+  (if-let [{:keys [html any-running?]} (task-screen/render-runs-fragment conn task-id)]
     (ds-ring/->sse-response request
       {ds-ring/on-open
        (fn [sse]
@@ -331,11 +329,12 @@
   "Handle HTTP requests for the Styrmann SSR app.
 
    Params:
+   `conn` - Datalevin connection.
    `request` - Ring request map.
 
    Returns:
    Ring response map."
-  [request]
+  [conn request]
   (let [method (:request-method request)
         uri (:uri request)
         segments (vec (remove str/blank? (str/split uri #"/")))]
@@ -347,104 +346,104 @@
 
         ;; SSE fragment routes (Datastar)
         (and (= method :get) (= segments ["fragments" "home"]))
-        (handle-fragment-home request)
+        (handle-fragment-home conn request)
 
         (and (= method :get) (= 3 (count segments)) (= "fragments" (first segments)) (= "organizations" (second segments)))
-        (handle-fragment-organization request (uuid (nth segments 2)))
+        (handle-fragment-organization conn request (uuid (nth segments 2)))
 
         (and (= method :get) (= 4 (count segments)) (= "fragments" (first segments)) (= "tasks" (second segments)) (= "runs" (nth segments 3)))
-        (handle-task-runs-fragment request (uuid (nth segments 2)))
+        (handle-task-runs-fragment conn request (uuid (nth segments 2)))
 
         ;; Full page routes
         (and (= method :get) (empty? segments))
-        (handle-home request)
+        (handle-home conn request)
 
         (and (= method :post) (= segments ["organizations"]))
-        (handle-create-organization request)
+        (handle-create-organization conn request)
 
         (and (= method :get) (= 2 (count segments)) (= "organizations" (first segments)))
-        (handle-organization-show (uuid (second segments)))
+        (handle-organization-show conn (uuid (second segments)))
 
         (and (= method :get) (= 3 (count segments)) (= "organizations" (first segments)) (= "settings" (nth segments 2)))
-        (handle-organization-settings (uuid (second segments)) request)
+        (handle-organization-settings conn (uuid (second segments)) request)
 
         (and (= method :post) (= 3 (count segments)) (= "organizations" (first segments)) (= "workspaces" (nth segments 2)))
-        (handle-create-workspace (uuid (second segments)) request)
+        (handle-create-workspace conn (uuid (second segments)) request)
 
         (and (= method :post) (= 4 (count segments)) (= "organizations" (first segments)) (= "settings" (nth segments 2)) (= "runner" (nth segments 3)))
-        (handle-update-runner-settings (uuid (second segments)) request)
+        (handle-update-runner-settings conn (uuid (second segments)) request)
 
         (and (= method :post) (= 4 (count segments)) (= "organizations" (first segments)) (= "settings" (nth segments 2)) (= "provider" (nth segments 3)))
-        (handle-add-provider (uuid (second segments)) request)
+        (handle-add-provider conn (uuid (second segments)) request)
 
         (and (= method :post) (= 3 (count segments)) (= "organizations" (first segments)) (= "sprints" (nth segments 2)))
-        (handle-create-sprint (uuid (second segments)) request)
+        (handle-create-sprint conn (uuid (second segments)) request)
 
         (and (= method :post) (= 3 (count segments)) (= "organizations" (first segments)) (= "milestones" (nth segments 2)))
-        (handle-create-milestone (uuid (second segments)) request)
+        (handle-create-milestone conn (uuid (second segments)) request)
 
         (and (= method :post) (= 3 (count segments)) (= "organizations" (first segments)) (= "tickets" (nth segments 2)))
-        (handle-create-ticket (uuid (second segments)) request)
+        (handle-create-ticket conn (uuid (second segments)) request)
 
         (and (= method :get) (= 4 (count segments)) (= "organizations" (first segments)) (= "tickets" (nth segments 2)))
-        (handle-ticket-show-in-organization (uuid (second segments)) (uuid (nth segments 3)))
+        (handle-ticket-show-in-organization conn (uuid (second segments)) (uuid (nth segments 3)))
 
         (and (= method :post) (= 5 (count segments)) (= "organizations" (first segments)) (= "tickets" (nth segments 2)) (= "status" (nth segments 4)))
-        (handle-ticket-status (uuid (second segments)) (uuid (nth segments 3)) request)
+        (handle-ticket-status conn (uuid (second segments)) (uuid (nth segments 3)) request)
 
         (and (= method :post) (= 5 (count segments)) (= "organizations" (first segments)) (= "tickets" (nth segments 2)) (= "assign-sprint" (nth segments 4)))
-        (handle-ticket-assign-sprint (uuid (nth segments 3)) request)
+        (handle-ticket-assign-sprint conn (uuid (nth segments 3)) request)
 
         (and (= method :post) (= 5 (count segments)) (= "organizations" (first segments)) (= "tickets" (nth segments 2)) (= "assign-milestone" (nth segments 4)))
-        (handle-ticket-assign-milestone (uuid (nth segments 3)) request)
+        (handle-ticket-assign-milestone conn (uuid (nth segments 3)) request)
 
         (and (= method :post) (= 5 (count segments)) (= "organizations" (first segments)) (= "tickets" (nth segments 2)) (= "tasks" (nth segments 4)))
-        (handle-create-task (uuid (nth segments 3)) request)
+        (handle-create-task conn (uuid (nth segments 3)) request)
 
         (and (= method :post) (= 5 (count segments)) (= "organizations" (first segments)) (= "tickets" (nth segments 2)) (= "decompose" (nth segments 4)))
-        (handle-ticket-decompose (uuid (nth segments 3)))
+        (handle-ticket-decompose conn (uuid (nth segments 3)))
 
         (and (= method :post) (= 5 (count segments)) (= "organizations" (first segments)) (= "tickets" (nth segments 2)) (= "handoff" (nth segments 4)))
-        (handle-ticket-handoff (uuid (nth segments 3)))
+        (handle-ticket-handoff conn (uuid (nth segments 3)))
 
         (and (= method :get) (= 4 (count segments)) (= "organizations" (first segments)) (= "workspaces" (nth segments 2)))
-        (handle-workspace-show-in-organization (uuid (second segments)) (uuid (nth segments 3)))
+        (handle-workspace-show-in-organization conn (uuid (second segments)) (uuid (nth segments 3)))
 
         (and (= method :get) (= 4 (count segments)) (= "organizations" (first segments)) (= "tasks" (nth segments 2)))
-        (handle-task-show-in-organization (uuid (second segments)) (uuid (nth segments 3)))
+        (handle-task-show-in-organization conn (uuid (second segments)) (uuid (nth segments 3)))
 
         (and (= method :post) (= 5 (count segments)) (= "organizations" (first segments)) (= "tasks" (nth segments 2)) (= "status" (nth segments 4)))
-        (handle-task-status (uuid (nth segments 3)) request)
+        (handle-task-status conn (uuid (nth segments 3)) request)
 
         (and (= method :post) (= 5 (count segments)) (= "organizations" (first segments)) (= "tasks" (nth segments 2)) (= "runs" (nth segments 4)))
-        (handle-task-run (uuid (nth segments 3)))
+        (handle-task-run conn (uuid (nth segments 3)))
 
         (and (= method :get) (= 2 (count segments)) (= "tickets" (first segments)))
-        (handle-ticket-show (uuid (second segments)))
+        (handle-ticket-show conn (uuid (second segments)))
 
         (and (= method :post) (= 3 (count segments)) (= "tickets" (first segments)) (= "assign-sprint" (nth segments 2)))
-        (handle-ticket-assign-sprint (uuid (second segments)) request)
+        (handle-ticket-assign-sprint conn (uuid (second segments)) request)
 
         (and (= method :post) (= 3 (count segments)) (= "tickets" (first segments)) (= "assign-milestone" (nth segments 2)))
-        (handle-ticket-assign-milestone (uuid (second segments)) request)
+        (handle-ticket-assign-milestone conn (uuid (second segments)) request)
 
         (and (= method :post) (= 3 (count segments)) (= "tickets" (first segments)) (= "tasks" (nth segments 2)))
-        (handle-create-task (uuid (second segments)) request)
+        (handle-create-task conn (uuid (second segments)) request)
 
         (and (= method :get) (= 2 (count segments)) (= "workspaces" (first segments)))
-        (handle-workspace-show (uuid (second segments)))
+        (handle-workspace-show conn (uuid (second segments)))
 
         (and (= method :get) (= 2 (count segments)) (= "tasks" (first segments)))
-        (handle-task-show (uuid (second segments)))
+        (handle-task-show conn (uuid (second segments)))
 
         (and (= method :post) (= 3 (count segments)) (= "tasks" (first segments)) (= "status" (nth segments 2)))
-        (handle-task-status (uuid (second segments)) request)
+        (handle-task-status conn (uuid (second segments)) request)
 
         (and (= method :post) (= 3 (count segments)) (= "tasks" (first segments)) (= "runs" (nth segments 2)))
-        (handle-task-run (uuid (second segments)))
+        (handle-task-run conn (uuid (second segments)))
 
         (and (= method :get) (= 2 (count segments)) (= "attachments" (first segments)))
-        (handle-attachment (uuid (second segments)))
+        (handle-attachment conn (uuid (second segments)))
 
         :else
         (not-found-page "Page not found."))
@@ -452,12 +451,16 @@
         (-> (html-response (layout/page "Error" (layout/panel [:p (ex-message ex)])))
             (response/status 400))))))
 
-(def app
-  "Wrapped Ring app with form and multipart parsing.
+(defn make-app
+  "Build the Ring app with the given Datalevin connection.
+
+   Params:
+   `conn` - Datalevin connection.
 
    Returns:
    Ring handler."
-  (-> handler
+  [conn]
+  (-> (partial handler conn)
       multipart-params/wrap-multipart-params
       keyword-params/wrap-keyword-params
       params/wrap-params
