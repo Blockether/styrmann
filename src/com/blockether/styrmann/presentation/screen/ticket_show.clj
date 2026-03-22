@@ -11,6 +11,7 @@
    [com.blockether.styrmann.presentation.component.layout :as layout]
    [com.blockether.styrmann.presentation.component.modal :as modal]
    [com.blockether.styrmann.presentation.component.task-card :as task-card]
+   [starfederation.datastar.clojure.api :as d*]
    [com.blockether.styrmann.presentation.component.ui :as ui]))
 
 (defn- criteria-tree [items]
@@ -267,11 +268,11 @@
               (when (and (not closed?) (seq (:organization/workspaces org-overview)))
                 [:div {:class "flex flex-col gap-2"}
                  (when (empty? (:ticket/tasks t))
-                   [:form {:method "post"
-                           :action (str "/organizations/" org-id "/tickets/" ticket-id "/decompose")}
-                    [:button {:class "btn-primary w-full" :type "submit"}
-                     [:i {:data-lucide "sparkles" :class "size-4"}]
-                     (i18n/t :ticket/decompose)]])
+                   [:button {:class "btn-primary w-full" :type "button"
+                             :data-on-click (str "$evt.preventDefault();" (d*/sse-get (str "/organizations/" org-id "/tickets/" ticket-id "/decompose")))}
+                    [:i {:data-lucide "sparkles" :class "size-4"}]
+                    (i18n/t :ticket/decompose)])
+                 [:div {:id "decompose-status"}]
                  [:form {:method "post"
                          :action (str "/organizations/" org-id "/tickets/" ticket-id "/handoff")}
                   [:button {:class "btn-primary w-full" :type "submit"}

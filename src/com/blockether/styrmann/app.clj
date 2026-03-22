@@ -247,15 +247,29 @@
       (redirect-to (str "/organizations/" organization-id "/tasks/" task-id)))
     (not-found-page "Task not found.")))
 
-(defn- handle-ticket-decompose [conn ticket-id]
+(defn- handle-ticket-decompose [conn ticket-id request]
   (if-let [t (ticket/find-by-id conn ticket-id)]
     (let [org-id (get-in t [:ticket/organization :organization/id])]
-      (try
-        (analysis/decompose-ticket! conn ticket-id)
-        (redirect-to (str "/organizations/" org-id "/tickets/" ticket-id))
-        (catch Exception ex
-          (t/log! :error ["Decompose failed" {:ticket-id ticket-id :error (ex-message ex)}])
-          (throw (ex-info (str "Decomposition failed: " (ex-message ex)) {:ticket-id ticket-id})))))
+      (ds-ring/->sse-response request
+        {ds-ring/on-open
+         (fn [sse]
+           (d*/with-open-sse sse
+             ;; Show spinner
+             (d*/patch-elements! sse
+               "<div id=\"decompose-status\" class=\"card p-4 mt-3\"><div class=\"flex items-center gap-2 text-[var(--accent)]\"><i data-lucide=\"loader\" class=\"size-4 animate-spin\"></i><span class=\"text-[13px]\">Decomposing ticket into tasks...</span></div></div>"
+               {d*/selector "#decompose-status" d*/patch-mode d*/pm-outer})
+             (d*/execute-script! sse "lucide.createIcons();")
+             (try
+               (analysis/decompose-ticket! conn ticket-id)
+               ;; Success — redirect
+               (d*/execute-script! sse (str "window.location.href='/organizations/" org-id "/tickets/" ticket-id "';"))
+               (catch Exception ex
+                 (t/log! :error ["Decompose failed" {:ticket-id ticket-id :error (ex-message ex)}])
+                 ;; Show error inline
+                 (d*/patch-elements! sse
+                   (str "<div id=\"decompose-status\" class=\"card p-4 mt-3 border-l-4\" style=\"border-color: var(--danger);\"><div class=\"text-[13px] text-[var(--danger)]\">" (ex-message ex) "</div></div>")
+                   {d*/selector "#decompose-status" d*/patch-mode d*/pm-outer})
+                 (d*/execute-script! sse "lucide.createIcons();")))))}))
     (not-found-page "Ticket not found.")))
 
 (defn- handle-ticket-handoff [conn ticket-id]
@@ -404,8 +418,8 @@
         (and (= method :post) (= 5 (count segments)) (= "organizations" (first segments)) (= "tickets" (nth segments 2)) (= "tasks" (nth segments 4)))
         (handle-create-task conn (uuid (nth segments 3)) request)
 
-        (and (= method :post) (= 5 (count segments)) (= "organizations" (first segments)) (= "tickets" (nth segments 2)) (= "decompose" (nth segments 4)))
-        (handle-ticket-decompose conn (uuid (nth segments 3)))
+        (and (= method :get) (= 5 (count segments)) (= "organizations" (first segments)) (= "tickets" (nth segments 2)) (= "decompose" (nth segments 4)))
+        (handle-ticket-decompose conn (uuid (nth segments 3)) request)
 
         (and (= method :post) (= 5 (count segments)) (= "organizations" (first segments)) (= "tickets" (nth segments 2)) (= "handoff" (nth segments 4)))
         (handle-ticket-handoff conn (uuid (nth segments 3)))
