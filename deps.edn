@@ -13,6 +13,8 @@
   ring/ring-jetty-adapter          {:mvn/version "1.15.3"}
    ;; nREPL — embedded in dev + prod
    nrepl/nrepl                      {:mvn/version "1.6.0"}
+   ;; Markdown → Hiccup rendering
+   io.github.nextjournal/markdown   {:mvn/version "0.6.157"}
    ;; Datalevin — embedded Datalog database
    datalevin/datalevin              {:mvn/version "0.10.7"}
    ;; Structural code editing — clojure-mcp (form editing core only)

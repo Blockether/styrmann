@@ -81,4 +81,144 @@
     :fn-symbol "com.blockether.styrmann.execution.tools.explore/namespace-map"
     :input-schema {:type :map
                    :required [:path]}})
+  ;; Filesystem tools
+  (register-tool!
+   {:key "explore.read-file"
+    :name "Read File"
+    :description "Read file contents. Use :start-line and :end-line (1-based) to read a range instead of the whole file."
+    :fn-symbol "com.blockether.styrmann.execution.tools.filesystem/read-file"
+    :input-schema {:type :map
+                   :required [:path]}})
+  (register-tool!
+   {:key "explore.grep"
+    :name "Grep"
+    :description "Search file contents using ripgrep patterns"
+    :fn-symbol "com.blockether.styrmann.execution.tools.filesystem/grep"
+    :input-schema {:type :map
+                   :required [:pattern]}})
+  (register-tool!
+   {:key "explore.glob-files"
+    :name "Glob Files"
+    :description "Find files matching a glob pattern"
+    :fn-symbol "com.blockether.styrmann.execution.tools.filesystem/glob-files"
+    :input-schema {:type :map
+                   :required [:pattern]}})
+  (register-tool!
+   {:key "edit.write-file"
+    :name "Write File"
+    :description "Write content to a file (scoped to workspace)"
+    :fn-symbol "com.blockether.styrmann.execution.tools.filesystem/write-file"
+    :input-schema {:type :map
+                   :required [:path :content]}})
+  (register-tool!
+   {:key "edit.edit-file"
+    :name "Edit File"
+    :description "Replace a string in a file (scoped to workspace)"
+    :fn-symbol "com.blockether.styrmann.execution.tools.filesystem/edit-file"
+    :input-schema {:type :map
+                   :required [:path :old-string :new-string]}})
+  ;; Spel tools
+  (register-tool!
+   {:key "explore.spel-snapshot"
+    :name "Spel Snapshot"
+    :description "Take a Spel DOM snapshot of a URL with optional selector"
+    :fn-symbol "com.blockether.styrmann.execution.tools.spel-tools/spel-snapshot"
+    :input-schema {:type :map
+                   :required [:url]}})
+  (register-tool!
+   {:key "explore.markdownify"
+    :name "Markdownify"
+    :description "Convert a URL to markdown text"
+    :fn-symbol "com.blockether.styrmann.execution.tools.spel-tools/markdownify"
+    :input-schema {:type :map
+                   :required [:url]}})
+  ;; System tools
+  (register-tool!
+   {:key "system.signal-event"
+    :name "Signal Event"
+    :description "Emit an event to the Styrmann execution event system"
+    :fn-symbol "com.blockether.styrmann.execution.tools.system/signal-event"
+    :input-schema {:type :map
+                   :required [:type :message]}})
+  (register-tool!
+   {:key "system.record-deliverable"
+    :name "Record Deliverable"
+    :description "Record a deliverable (finding, analysis, diff) on a task"
+    :fn-symbol "com.blockether.styrmann.execution.tools.system/record-deliverable"
+    :input-schema {:type :map
+                   :required [:task-id :title]}})
+  (register-tool!
+   {:key "task.update-status"
+    :name "Update Task Status"
+    :description "Update a task's lifecycle status"
+    :fn-symbol "com.blockether.styrmann.execution.tools.system/update-task-status"
+    :input-schema {:type :map
+                   :required [:task-id :status]}})
+  (register-tool!
+   {:key "task.verify-ac"
+    :name "Verify Acceptance Criterion"
+    :description "Mark an acceptance criterion as verified, failed, or skipped with reasoning"
+    :fn-symbol "com.blockether.styrmann.execution.tools.system/verify-acceptance-criterion"
+    :input-schema {:type :map
+                   :required [:task-id :index :verdict :reasoning]}})
+  ;; Structural edit tools
+  (register-tool!
+   {:key "edit.clojure-lsp-rename"
+    :name "Clojure LSP Rename"
+    :description "Structural rename of a symbol via clojure-lsp"
+    :fn-symbol "com.blockether.styrmann.execution.tools.structural-edit/clojure-lsp-rename"
+    :input-schema {:type :map
+                   :required [:path :line :column :new-name]}})
+  (register-tool!
+   {:key "edit.clojure-lsp-clean-ns"
+    :name "Clojure LSP Clean NS"
+    :description "Clean namespace declarations via clojure-lsp"
+    :fn-symbol "com.blockether.styrmann.execution.tools.structural-edit/clojure-lsp-clean-ns"
+    :input-schema {:type :map
+                   :required [:path]}})
+  (register-tool!
+   {:key "edit.bash"
+    :name "Bash Execute"
+    :description "Execute a shell command in the workspace directory (sandboxed)"
+    :fn-symbol "com.blockether.styrmann.execution.tools.structural-edit/bash-exec"
+    :input-schema {:type :map
+                   :required [:command]}})
+  (register-tool!
+   {:key "git.commit"
+    :name "Git Commit"
+    :description "Create a git commit in the workspace repository"
+    :fn-symbol "com.blockether.styrmann.execution.tools.structural-edit/bash-exec"
+    :input-schema {:type :map
+                   :required [:command]}})
   (list-tools))
+
+;; -- Agent profiles -----------------------------------------------------------
+
+(def explorer-tool-keys
+  "Tool keys available to the explorer agent (read-only)."
+  #{"explore.read-file" "explore.grep" "explore.glob-files"
+    "explore.clojure-lsp-diagnostics" "explore.namespace-map"
+    "explore.spel-snapshot" "explore.markdownify"
+    "system.signal-event" "system.record-deliverable"
+    "ticket.find" "task.list-by-ticket"})
+
+(def editor-tool-keys
+  "Tool keys available to the editor agent (read + write)."
+  (set/union explorer-tool-keys
+             #{"edit.write-file" "edit.edit-file"
+               "edit.clojure-lsp-rename" "edit.clojure-lsp-clean-ns"
+               "edit.bash" "git.commit" "git.repo.summary"
+               "task.update-status" "task.verify-ac" "system.record-deliverable"}))
+
+(defn tools-for-profile
+  "Return tool definitions matching a profile's tool keys.
+
+   Params:
+   `profile-keys` - Set of tool key strings.
+
+   Returns:
+   Vector of matching tool definitions."
+  [profile-keys]
+  (->> (list-tools)
+       (filter #(contains? profile-keys (:key %)))
+       vec))

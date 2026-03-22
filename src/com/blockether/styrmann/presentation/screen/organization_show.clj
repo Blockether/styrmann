@@ -4,6 +4,7 @@
    [com.blockether.styrmann.domain.organization :as organization]
    [com.blockether.styrmann.i18n :as i18n]
    [com.blockether.styrmann.presentation.component.layout :as layout]
+   [com.blockether.styrmann.presentation.component.modal :as modal]
    [com.blockether.styrmann.presentation.component.notification-list :as notification-list]
    [com.blockether.styrmann.presentation.component.ticket-card :as ticket-card]
    [com.blockether.styrmann.presentation.component.ui :as ui]))
@@ -224,15 +225,7 @@
          options)])
 
 (defn- modal-shell [modal-id title subtitle body]
-  [:div {:id modal-id :class "modal-backdrop" :role "dialog" :aria-modal "true"}
-   [:div {:class "modal-shell"}
-    [:div {:class "flex items-start justify-between gap-4 border-b border-[var(--line)] px-5 py-4"}
-     [:div
-      [:div {:class "field-label mb-1"} subtitle]
-      [:h2 {:class "text-[24px] leading-none"} title]]
-     [:button {:type "button" :class "modal-close" :data-modal-close true}
-      [:i {:data-lucide "x" :class "size-4"}]]]
-    [:div {:class "px-5 py-5"} body]]])
+  (modal/shell modal-id title subtitle body))
 
 (defn- modal-layer [organization-id org]
   [:div

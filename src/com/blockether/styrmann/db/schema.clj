@@ -124,6 +124,23 @@
                                    :db/cardinality :db.cardinality/many
                                    :db/doc         "Tasks that must complete before this task can start"}
 
+   ;; -- Task Acceptance Criterion (individual entity, parallel-safe) ----------
+   :task.ac/id                    {:db/valueType :db.type/uuid
+                                   :db/unique    :db.unique/identity
+                                   :db/doc       "Acceptance criterion UUID"}
+   :task.ac/task                  {:db/valueType :db.type/ref
+                                   :db/doc       "Parent task ref"}
+   :task.ac/index                 {:db/valueType :db.type/long
+                                   :db/doc       "0-based display order"}
+   :task.ac/text                  {:db/valueType :db.type/string
+                                   :db/doc       "Criterion text"}
+   :task.ac/verdict               {:db/valueType :db.type/keyword
+                                   :db/doc       "Verification verdict: :ac.status/pending, :ac.status/verified, :ac.status/failed, :ac.status/skipped"}
+   :task.ac/reasoning             {:db/valueType :db.type/string
+                                   :db/doc       "RLM reasoning for this verdict"}
+   :task.ac/verified-at           {:db/valueType :db.type/instant
+                                   :db/doc       "When the RLM verified this criterion"}
+
    ;; -- Notification ----------------------------------------------------------
    :notification/id          {:db/valueType :db.type/uuid
                               :db/unique    :db.unique/identity

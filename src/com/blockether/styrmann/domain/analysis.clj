@@ -90,7 +90,12 @@
          "Express execution order via depends-on-indices (0-based array indices).\n"
          "The graph MUST be a DAG — no cycles allowed.\n"
          "Every task must have at least one acceptance criterion and one CoVe verification question.\n"
-         "Use the workspace UUID strings exactly as provided above.\n")))
+         "Use the workspace UUID strings exactly as provided above.\n\n"
+         "## Description Quality\n"
+         "Each task description MUST be detailed and actionable (3-5 sentences minimum).\n"
+         "Include: what to do, where in the codebase, what patterns to follow, and expected outcome.\n"
+         "A developer reading the description alone should understand the full scope without needing the ticket.\n"
+         "BAD: 'Audit all modals'. GOOD: 'Audit every modal in the Styrmann presentation layer by using Spel to take DOM snapshots of each modal. Document overlay styles, close behaviors, animation patterns, sizing, and button placement. Produce a report listing each modal with its current properties and any deviations from the target design.'\n")))
 
 ;; -- Retry loop --------------------------------------------------------------
 

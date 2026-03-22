@@ -9,6 +9,7 @@
    [com.blockether.styrmann.domain.ticket :as ticket]
    [com.blockether.styrmann.presentation.component.git-progress :as git-progress]
    [com.blockether.styrmann.presentation.component.layout :as layout]
+   [com.blockether.styrmann.presentation.component.modal :as modal]
    [com.blockether.styrmann.presentation.component.task-card :as task-card]
    [com.blockether.styrmann.presentation.component.ui :as ui]))
 
@@ -155,9 +156,9 @@
                   (let [task-by-id (into {} (map (juxt :task/id identity) tasks))
                         depth-of (fn depth-of [task seen]
                                    (if (contains? seen (:task/id task)) 0
-                                       (let [deps (:task/depends-on task)]
-                                         (if (empty? deps) 0
-                                             (inc (apply max (map #(depth-of (get task-by-id (:task/id %) %) (conj seen (:task/id task))) deps)))))))
+                                     (let [deps (:task/depends-on task)]
+                                       (if (empty? deps) 0
+                                         (inc (apply max (map #(depth-of (get task-by-id (:task/id %) %) (conj seen (:task/id task))) deps)))))))
                         sorted (sort-by (juxt #(depth-of % #{}) :task/created-at) tasks)
                         status-icon (fn [status]
                                       (case status
@@ -223,8 +224,8 @@
                       [:span {:class "text-[14px]"} title]
                       [:span {:class "text-[12px] text-[var(--muted)] ml-auto"} _task]]))]))
             (let [workspace-ids (->> (:ticket/tasks t)
-                                    (map #(get-in % [:task/workspace :workspace/id]))
-                                    distinct)
+                                  (map #(get-in % [:task/workspace :workspace/id]))
+                                  distinct)
                   git-commits (->> workspace-ids
                                 (mapcat (fn [ws-id]
                                           (when-let [repo (db.git/find-repo-by-workspace conn ws-id)]
@@ -271,6 +272,11 @@
                     [:button {:class "btn-primary w-full" :type "submit"}
                      [:i {:data-lucide "sparkles" :class "size-4"}]
                      (i18n/t :ticket/decompose)]])
+                 [:form {:method "post"
+                         :action (str "/organizations/" org-id "/tickets/" ticket-id "/handoff")}
+                  [:button {:class "btn-primary w-full" :type "submit"}
+                   [:i {:data-lucide "rocket" :class "size-4"}]
+                   "Handoff"]]
                  [:button {:type "button"
                            :class "flex items-center justify-center gap-1.5 w-full py-2 text-[12px] font-medium text-[var(--muted)] hover:text-[var(--accent)] transition-colors cursor-pointer"
                            :data-modal-open (str "modal-add-task-" ticket-id)}
@@ -279,31 +285,24 @@
            ;; Add task modal
            (when (and (not (= :ticket.status/closed (or (:ticket/status t) :ticket.status/open)))
                    (seq (:organization/workspaces org-overview)))
-             [:div {:id (str "modal-add-task-" ticket-id) :class "modal-backdrop" :role "dialog" :aria-modal "true"}
-              [:div {:class "modal-shell"}
-               [:div {:class "flex items-start justify-between gap-4 border-b border-[var(--line)] px-5 py-4"}
-                [:div
-                 [:div {:class "field-label mb-1"} "Task"]
-                 [:h2 {:class "text-[24px] leading-none"} "Add task"]]
-                [:button {:type "button" :class "modal-close" :data-modal-close true}
-                 [:i {:data-lucide "x" :class "size-4"}]]]
-               [:div {:class "px-5 py-5"}
-                [:form {:class "space-y-4" :method "post"
-                        :action (str "/organizations/" org-id "/tickets/" ticket-id "/tasks")}
-                 [:label {:class "block"}
-                  [:span {:class "field-label"} "Workspace"]
-                  [:select {:class "input" :name "workspace-id" :required true}
-                   [:option {:value ""} "Select workspace"]
-                   (for [ws (:organization/workspaces org-overview)]
-                     [:option {:value (:workspace/id ws)} (:workspace/name ws)])]]
-                 [:label {:class "block"}
-                  [:span {:class "field-label"} "Task description"]
-                  [:textarea {:class "input" :name "description" :rows 3
-                              :placeholder "Describe the execution scope" :required true}]]
-                 [:div {:class "flex justify-end"}
-                  [:button {:class "btn-primary" :type "submit"}
-                   [:i {:data-lucide "plus" :class "size-4"}]
-                   "Create task"]]]]]])]]
+             (modal/shell
+               (str "modal-add-task-" ticket-id) "Add task" "Task"
+               [:form {:class "space-y-4" :method "post"
+                       :action (str "/organizations/" org-id "/tickets/" ticket-id "/tasks")}
+                [:label {:class "block"}
+                 [:span {:class "field-label"} "Workspace"]
+                 [:select {:class "input" :name "workspace-id" :required true}
+                  [:option {:value ""} "Select workspace"]
+                  (for [ws (:organization/workspaces org-overview)]
+                    [:option {:value (:workspace/id ws)} (:workspace/name ws)])]]
+                [:label {:class "block"}
+                 [:span {:class "field-label"} "Task description"]
+                 [:textarea {:class "input" :name "description" :rows 3
+                             :placeholder "Describe the execution scope" :required true}]]
+                [:div {:class "flex justify-end"}
+                 [:button {:class "btn-primary" :type "submit"}
+                  [:i {:data-lucide "plus" :class "size-4"}]
+                  "Create task"]]]))]]
       (layout/page "Ticket" body
         {:breadcrumbs [{:href "/" :label "Organizations"}
                        {:href (str "/organizations/" org-id) :label org-name}

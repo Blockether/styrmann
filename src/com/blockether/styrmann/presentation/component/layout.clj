@@ -1,11 +1,12 @@
 (ns com.blockether.styrmann.presentation.component.layout
   "Shared SSR layout — warm editorial design inspired by Claura."
   (:require
+   [com.blockether.styrmann.presentation.component.modal :as modal]
    [hiccup2.core :as h]
    [starfederation.datastar.clojure.api :as d*]))
 
 (def ^:private base-styles
-  "@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Inter:wght@400;500;600;700&display=swap');
+  "@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Fira+Code:wght@400;500&family=Inter:wght@400;500;600;700&family=IA+Writer+Quattro:ital,wght@0,400;0,700;1,400&display=swap');
 :root {
   --cream: #faf9f6;
   --cream-light: #fffdf9;
@@ -40,6 +41,10 @@
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
  body { background: var(--cream); color: var(--ink); margin: 0; -webkit-font-smoothing: antialiased; touch-action: manipulation; }
+ code, pre, .font-mono { font-family: 'Fira Code', ui-monospace, SFMono-Regular, monospace; }
+ .font-prose { font-family: 'IA Writer Quattro', 'Georgia', serif; }
+.dark { --cream: #0f0f12; --cream-light: #141418; --cream-dark: #1a1a20; --surface: #1e1e25; --charcoal: #e8e8ec; --charcoal-light: #d0d0d6; --ink: #e8e8ec; --ink-secondary: #a0a0aa; --muted: #6b6b78; --line: rgba(255,255,255,0.08); --line-strong: rgba(255,255,255,0.14); --accent-soft: rgba(255,107,53,0.15); --good-soft: rgba(26,127,90,0.15); --warn-soft: rgba(196,122,32,0.15); --danger-soft: rgba(196,60,44,0.15); --purple-soft: rgba(107,79,192,0.15); --teal-soft: rgba(42,143,143,0.15); --brown-soft: rgba(92,67,50,0.15); }
+.dark body { background: var(--cream); color: var(--ink); }
  * { box-sizing: border-box; }
  a, button, summary, input, select, textarea { touch-action: manipulation; }
  button, a { -webkit-tap-highlight-color: transparent; }
@@ -166,25 +171,19 @@ a:hover { color: var(--accent-hover); }
      [:link {:rel "icon" :type "image/svg+xml" :href "/icon-192.svg"}]
      [:title (str title " — Styrmann")]
      [:script {:src "https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"}]
+     [:style {:type "text/tailwindcss"} (raw-html "@custom-variant dark (&:where(.dark, .dark *));")]
      [:script {:src "https://unpkg.com/lucide@latest"}]
      [:script {:type "module" :src d*/CDN-url}]
      [:style (raw-html base-styles)]]
     [:body {:class "min-h-screen bg-[var(--cream)]"}
-     [:div {:id "global-create-organization" :class "modal-backdrop" :role "dialog" :aria-modal "true"}
-      [:div {:class "modal-shell"}
-       [:div {:class "flex items-start justify-between gap-4 border-b border-[var(--line)] px-5 py-4"}
-        [:div
-         [:div {:class "field-label mb-1"} "Organization"]
-         [:h2 {:class "text-[24px] leading-none"} "Create organization"]]
-        [:button {:type "button" :class "modal-close" :data-modal-close true}
-         [:i {:data-lucide "x" :class "size-4"}]]]
-       [:div {:class "px-5 py-5"}
-        [:form {:class "space-y-4" :method "post" :action "/organizations"}
-         [:label {:class "block"}
-          [:span {:class "field-label"} "Organization name"]
-          [:input {:class "input" :type "text" :name "name" :placeholder "Blockether" :required true}]]
-         [:div {:class "flex justify-end"}
-          [:button {:class "btn-primary" :type "submit"} "Create organization"]]]]]]
+     (modal/shell
+      "global-create-organization" "Create organization" "Organization"
+      [:form {:class "space-y-4" :method "post" :action "/organizations"}
+       [:label {:class "block"}
+        [:span {:class "field-label"} "Organization name"]
+        [:input {:class "input" :type "text" :name "name" :placeholder "Blockether" :required true}]]
+       [:div {:class "flex justify-end"}
+        [:button {:class "btn-primary" :type "submit"} "Create organization"]]])
       ;; Top nav
      [:nav {:class "sticky top-0 z-50 bg-[var(--surface)] border-b border-[var(--line)] backdrop-blur-sm"}
       [:div {:class "mx-auto max-w-6xl flex items-center justify-between px-5 h-14 gap-3"}
@@ -200,6 +199,9 @@ a:hover { color: var(--accent-hover); }
         [:button {:type "button" :class "toolbar-action whitespace-nowrap" :data-modal-open "global-create-organization"}
          [:i {:data-lucide "plus" :class "size-4 text-[var(--accent)]"}]
          [:span {:class "hidden sm:inline"} "Create organization"]]
+        [:button {:type "button" :class "toolbar-action" :data-dark-toggle true :title "Toggle dark mode"}
+         [:i {:data-lucide "moon" :class "size-4 dark:hidden"}]
+         [:i {:data-lucide "sun" :class "size-4 hidden dark:block"}]]
         [:div {:id "topbar-context"}
          (raw-html topbar-context)]]]]
       ;; Breadcrumbs
@@ -278,6 +280,19 @@ window.styrmannInitInteractive = function(root = document) {
       }
     });
   });
+  root.querySelectorAll('[data-submit-spinner]').forEach(function(button) {
+    if (button.dataset.bound === 'true') return;
+    button.dataset.bound = 'true';
+    var form = button.closest('form');
+    if (!form) return;
+    form.addEventListener('submit', function() {
+      var label = button.querySelector('.btn-label');
+      var spinner = button.querySelector('.animate-spin');
+      if (label) label.classList.add('hidden');
+      if (spinner) spinner.classList.remove('hidden');
+      button.disabled = true;
+    });
+  });
   root.querySelectorAll('[data-topbar-toggle]').forEach(function(button) {
     if (button.dataset.bound === 'true') return;
     button.dataset.bound = 'true';
@@ -311,6 +326,25 @@ document.addEventListener('touchend', function(evt) {
   }
   __styrmannLastTouchEnd = now;
 }, {passive: false});
+/* Dark mode toggle */
+(function(){
+  function applyDark(dark) {
+    document.documentElement.classList.toggle('dark', dark);
+    var meta = document.querySelector('meta[name=theme-color]');
+    if (meta) meta.content = dark ? '#0f0f12' : '#1a1a1f';
+  }
+  var stored = localStorage.getItem('styrmann-dark');
+  if (stored !== null) { applyDark(stored === 'true'); }
+  else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) { applyDark(true); }
+  document.addEventListener('click', function(evt) {
+    var btn = evt.target.closest('[data-dark-toggle]');
+    if (!btn) return;
+    var isDark = document.documentElement.classList.toggle('dark');
+    localStorage.setItem('styrmann-dark', isDark);
+    var meta = document.querySelector('meta[name=theme-color]');
+    if (meta) meta.content = isDark ? '#0f0f12' : '#1a1a1f';
+  });
+})();
 window.styrmannInitInteractive();
 lucide.createIcons();
 

@@ -351,5 +351,17 @@
     (d/transact! conn [{:session.messages/id      msg-id
                         :session.messages/session [:session/id session-id]
                         :session.messages/role    role
-                        :session.messages/content content}])
+                        :session.messages/content content
+                        :session.messages/created-at (java.util.Date.)}])
     msg-id))
+
+(defn list-session-messages
+  "List messages for a session ordered by creation time."
+  [conn session-id]
+  (->> (d/q '[:find [(pull ?m [:session.messages/id :session.messages/role
+                                :session.messages/content :session.messages/created-at]) ...]
+              :in $ ?sid
+              :where [?s :session/id ?sid] [?m :session.messages/session ?s]]
+            (d/db conn) session-id)
+       (sort-by :session.messages/created-at)
+       vec))

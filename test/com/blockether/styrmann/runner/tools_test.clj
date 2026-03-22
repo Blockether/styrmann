@@ -114,9 +114,9 @@
 
 (defdescribe registry-resolve-test
   (describe "tool registry resolves all default tools"
-    (it "all 5 default tool fn-symbols resolve without error"
+    (it "all default tool fn-symbols resolve without error"
         (registry/register-default-tools!)
         (let [tools (registry/list-tools)]
-          (expect (= 5 (count tools)))
+          (expect (= 20 (count tools)))
           (doseq [tool tools]
             (expect (some? (requiring-resolve (symbol (:fn-symbol tool))))))))))

@@ -5,6 +5,7 @@
    [com.blockether.styrmann.domain.task :as sut]
    [com.blockether.styrmann.domain.ticket :as ticket]
    [com.blockether.styrmann.test-helpers :refer [temp-conn with-temp-conn]]
+   [datalevin.core :as d]
    [lazytest.core :refer [defdescribe describe expect it]]))
 
 (defn- make-ticket [conn organization-id]
@@ -223,3 +224,147 @@
                           (ex-message ex)))]
           (expect (= "Invalid task status transition from :task.status/inbox to :task.status/done"
                      message))))))
+
+;; ---------------------------------------------------------------------------
+;; Helpers for AC entity queries
+;; ---------------------------------------------------------------------------
+
+(defn- ac-entities-for-task [conn task-id]
+  (->> (d/q '[:find ?e
+              :in $ ?tid
+              :where
+              [?t :task/id ?tid]
+              [?e :task.ac/task ?t]]
+            (d/db conn)
+            task-id)
+       (map first)
+       (map #(d/pull (d/db conn)
+                     [:task.ac/id :task.ac/index :task.ac/text :task.ac/verdict]
+                     %))
+       (sort-by :task.ac/index)
+       vec))
+
+;; ---------------------------------------------------------------------------
+;; create! — AC entity creation
+;; ---------------------------------------------------------------------------
+
+(defdescribe create!-ac-entities-test
+  (describe "creates no AC entities when acceptance-criteria-edn is nil"
+    (it "task persists but zero task.ac entities exist"
+      (with-temp-conn [conn (temp-conn)]
+        (let [organization (organization/create! conn {:name "Blockether"})
+              workspace    (organization/create-workspace!
+                            conn
+                            {:organization-id (:organization/id organization)
+                             :name "styrmann"
+                             :repository "/root/repos/blockether/styrmann"})
+              created-ticket (make-ticket conn (:organization/id organization))
+              task (sut/create!
+                    conn
+                    {:ticket-id    (:ticket/id created-ticket)
+                     :workspace-id (:workspace/id workspace)
+                     :description  "No ACs"})]
+          (expect (= 0 (count (ac-entities-for-task conn (:task/id task)))))))))
+
+  (describe "creates task.ac entities alongside the task"
+    (it "creates one AC entity per string in the EDN list"
+      (with-temp-conn [conn (temp-conn)]
+        (let [organization (organization/create! conn {:name "Blockether"})
+              workspace    (organization/create-workspace!
+                            conn
+                            {:organization-id (:organization/id organization)
+                             :name "styrmann"
+                             :repository "/root/repos/blockether/styrmann"})
+              created-ticket (make-ticket conn (:organization/id organization))
+              task (sut/create!
+                    conn
+                    {:ticket-id               (:ticket/id created-ticket)
+                     :workspace-id            (:workspace/id workspace)
+                     :description             "Task with ACs"
+                     :acceptance-criteria-edn "[\"Login works\" \"Logout works\" \"Token expires\"]"})]
+          (let [acs (ac-entities-for-task conn (:task/id task))]
+            (expect (= 3 (count acs)))
+            (expect (= "Login works"   (:task.ac/text (nth acs 0))))
+            (expect (= "Logout works"  (:task.ac/text (nth acs 1))))
+            (expect (= "Token expires" (:task.ac/text (nth acs 2))))
+            (expect (= 0 (:task.ac/index (nth acs 0))))
+            (expect (= 1 (:task.ac/index (nth acs 1))))
+            (expect (= 2 (:task.ac/index (nth acs 2)))))))
+
+    (it "initialises all AC entities with :ac.status/pending verdict"
+      (with-temp-conn [conn (temp-conn)]
+        (let [organization (organization/create! conn {:name "Blockether"})
+              workspace    (organization/create-workspace!
+                            conn
+                            {:organization-id (:organization/id organization)
+                             :name "styrmann"
+                             :repository "/root/repos/blockether/styrmann"})
+              created-ticket (make-ticket conn (:organization/id organization))
+              task (sut/create!
+                    conn
+                    {:ticket-id               (:ticket/id created-ticket)
+                     :workspace-id            (:workspace/id workspace)
+                     :description             "Task"
+                     :acceptance-criteria-edn "[\"Check A\" \"Check B\"]"})]
+          (let [acs (ac-entities-for-task conn (:task/id task))]
+            (expect (= 2 (count acs)))
+            (expect (= #{:ac.status/pending}
+                       (set (map :task.ac/verdict acs))))))))
+
+    (it "handles map-style AC entries with :text key"
+      (with-temp-conn [conn (temp-conn)]
+        (let [organization (organization/create! conn {:name "Blockether"})
+              workspace    (organization/create-workspace!
+                            conn
+                            {:organization-id (:organization/id organization)
+                             :name "styrmann"
+                             :repository "/root/repos/blockether/styrmann"})
+              created-ticket (make-ticket conn (:organization/id organization))
+              task (sut/create!
+                    conn
+                    {:ticket-id               (:ticket/id created-ticket)
+                     :workspace-id            (:workspace/id workspace)
+                     :description             "Map AC task"
+                     :acceptance-criteria-edn "[{:text \"Map AC one\"} {:text \"Map AC two\"}]"})]
+          (let [acs (ac-entities-for-task conn (:task/id task))]
+            (expect (= 2 (count acs)))
+            (expect (= "Map AC one" (:task.ac/text (nth acs 0))))
+            (expect (= "Map AC two" (:task.ac/text (nth acs 1))))))))
+
+    (it "creates no AC entities when acceptance-criteria-edn is an empty list"
+      (with-temp-conn [conn (temp-conn)]
+        (let [organization (organization/create! conn {:name "Blockether"})
+              workspace    (organization/create-workspace!
+                            conn
+                            {:organization-id (:organization/id organization)
+                             :name "styrmann"
+                             :repository "/root/repos/blockether/styrmann"})
+              created-ticket (make-ticket conn (:organization/id organization))
+              task (sut/create!
+                    conn
+                    {:ticket-id               (:ticket/id created-ticket)
+                     :workspace-id            (:workspace/id workspace)
+                     :description             "Empty AC task"
+                     :acceptance-criteria-edn "[]"})]
+          (expect (= 0 (count (ac-entities-for-task conn (:task/id task))))))))
+
+    (it "assigns unique UUIDs to each AC entity"
+      (with-temp-conn [conn (temp-conn)]
+        (let [organization (organization/create! conn {:name "Blockether"})
+              workspace    (organization/create-workspace!
+                            conn
+                            {:organization-id (:organization/id organization)
+                             :name "styrmann"
+                             :repository "/root/repos/blockether/styrmann"})
+              created-ticket (make-ticket conn (:organization/id organization))
+              task (sut/create!
+                    conn
+                    {:ticket-id               (:ticket/id created-ticket)
+                     :workspace-id            (:workspace/id workspace)
+                     :description             "UUID check"
+                     :acceptance-criteria-edn "[\"A\" \"B\" \"C\"]"})]
+          (let [acs (ac-entities-for-task conn (:task/id task))
+                ids (map :task.ac/id acs)]
+            (expect (= 3 (count (set ids))))
+            (expect (every? uuid? ids)))))))))
+

@@ -12,6 +12,7 @@
    [com.blockether.styrmann.domain.task :as task]
    [com.blockether.styrmann.domain.ticket :as ticket]
    [com.blockether.styrmann.execution.session :as session]
+   [taoensso.telemere :as t]
    [com.blockether.styrmann.presentation.component.layout :as layout]
    [com.blockether.styrmann.presentation.screen.home :as home-screen]
    [com.blockether.styrmann.presentation.screen.organization-settings :as organization-settings-screen]
@@ -240,6 +241,10 @@
 (defn- handle-task-run [task-id]
   (if-let [task-record (db.task/find-task (db/conn) task-id)]
     (let [organization-id (get-in task-record [:task/ticket :ticket/organization :organization/id])]
+      ;; Reset to inbox if failed/done so it can re-execute
+      (when (#{:task.status/done :task.status/implementing :task.status/testing :task.status/reviewing}
+             (:task/status task-record))
+        (task/update-status! (db/conn) task-id :task.status/inbox))
       (session/execute-with-rlm! (db/conn) task-id)
       (redirect-to (str "/organizations/" organization-id "/tasks/" task-id)))
     (not-found-page "Task not found.")))
@@ -248,6 +253,27 @@
   (if-let [t (ticket/find-by-id (db/conn) ticket-id)]
     (let [org-id (get-in t [:ticket/organization :organization/id])]
       (future (analysis/decompose-ticket! (db/conn) ticket-id))
+      (redirect-to (str "/organizations/" org-id "/tickets/" ticket-id)))
+    (not-found-page "Ticket not found.")))
+
+(defn- handle-ticket-handoff [ticket-id]
+  (if-let [t (ticket/find-by-id (db/conn) ticket-id)]
+    (let [org-id (get-in t [:ticket/organization :organization/id])]
+      (future
+        (try
+          ;; Decompose into tasks if none exist
+          (when (empty? (db.task/list-tasks-by-ticket (db/conn) ticket-id))
+            (analysis/decompose-ticket! (db/conn) ticket-id))
+          ;; Transition ticket to in-progress
+          (ticket/update-status! (db/conn) ticket-id :ticket.status/in-progress)
+          ;; Execute root tasks (no dependencies) in the workflow
+          (let [tasks (db.task/list-tasks-by-ticket (db/conn) ticket-id)
+                root-tasks (filter #(empty? (:task/depends-on %)) tasks)]
+            (doseq [root-task root-tasks]
+              (when (= :task.status/inbox (:task/status root-task))
+                (future (session/execute-with-rlm! (db/conn) (:task/id root-task))))))
+          (catch Exception ex
+            (t/log! :error ["Handoff failed" {:ticket-id ticket-id :error (ex-message ex)}]))))
       (redirect-to (str "/organizations/" org-id "/tickets/" ticket-id)))
     (not-found-page "Ticket not found.")))
 
@@ -287,6 +313,20 @@
         (response/header "Content-Disposition" (str "inline; filename=\"" (:attachment/name attachment) "\"")))
     (not-found-page "Attachment not found.")))
 
+(defn- handle-task-runs-fragment [request task-id]
+  (if-let [{:keys [html any-running?]} (task-screen/render-runs-fragment (db/conn) task-id)]
+    (ds-ring/->sse-response request
+      {ds-ring/on-open
+       (fn [sse]
+         (d*/with-open-sse sse
+           (when any-running?
+             (Thread/sleep 2000))
+           (d*/patch-elements! sse (layout/render-fragment html)
+                               {d*/selector "#run-history"
+                                d*/patch-mode d*/pm-outer})
+           (d*/execute-script! sse "lucide.createIcons();")))})
+    (not-found-page "Task not found.")))
+
 (defn handler
   "Handle HTTP requests for the Styrmann SSR app.
 
@@ -311,6 +351,9 @@
 
         (and (= method :get) (= 3 (count segments)) (= "fragments" (first segments)) (= "organizations" (second segments)))
         (handle-fragment-organization request (uuid (nth segments 2)))
+
+        (and (= method :get) (= 4 (count segments)) (= "fragments" (first segments)) (= "tasks" (second segments)) (= "runs" (nth segments 3)))
+        (handle-task-runs-fragment request (uuid (nth segments 2)))
 
         ;; Full page routes
         (and (= method :get) (empty? segments))
@@ -360,6 +403,9 @@
 
         (and (= method :post) (= 5 (count segments)) (= "organizations" (first segments)) (= "tickets" (nth segments 2)) (= "decompose" (nth segments 4)))
         (handle-ticket-decompose (uuid (nth segments 3)))
+
+        (and (= method :post) (= 5 (count segments)) (= "organizations" (first segments)) (= "tickets" (nth segments 2)) (= "handoff" (nth segments 4)))
+        (handle-ticket-handoff (uuid (nth segments 3)))
 
         (and (= method :get) (= 4 (count segments)) (= "organizations" (first segments)) (= "workspaces" (nth segments 2)))
         (handle-workspace-show-in-organization (uuid (second segments)) (uuid (nth segments 3)))

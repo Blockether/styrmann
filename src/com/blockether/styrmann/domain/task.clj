@@ -1,10 +1,12 @@
 (ns com.blockether.styrmann.domain.task
   "Domain rules for AI tasks and notifications."
   (:require
+   [clojure.edn :as edn]
    [clojure.string :as str]
    [com.blockether.styrmann.db.organization :as db.organization]
    [com.blockether.styrmann.db.task :as db.task]
-   [com.blockether.styrmann.db.ticket :as db.ticket])
+   [com.blockether.styrmann.db.ticket :as db.ticket]
+   [datalevin.core :as d])
   (:import
    [java.util UUID]))
 
@@ -49,14 +51,29 @@
                  (get-in workspace [:workspace/organization :organization/id]))
       (throw (ex-info "Workspace must belong to the same organization as the ticket"
                       {:ticket-id ticket-id :workspace-id workspace-id})))
-    (db.task/create-task!
-     conn
-     {:ticket-id                ticket-id
-      :workspace-id             workspace-id
-      :description              (require-text! description "Task description is required")
-      :acceptance-criteria-edn  acceptance-criteria-edn
-      :cove-questions-edn       cove-questions-edn
-      :depends-on               depends-on})))
+    (let [task (db.task/create-task!
+                conn
+                {:ticket-id                ticket-id
+                 :workspace-id             workspace-id
+                 :description              (require-text! description "Task description is required")
+                 :acceptance-criteria-edn  acceptance-criteria-edn
+                 :cove-questions-edn       cove-questions-edn
+                 :depends-on               depends-on})
+          ;; Create individual AC entities for parallel-safe verification
+          criteria (when acceptance-criteria-edn
+                     (try (clojure.edn/read-string acceptance-criteria-edn) (catch Exception _ nil)))]
+      (when (seq criteria)
+        (d/transact!
+         conn
+         (map-indexed
+          (fn [idx c]
+            {:task.ac/id      (java.util.UUID/randomUUID)
+             :task.ac/task    [:task/id (:task/id task)]
+             :task.ac/index   idx
+             :task.ac/text    (if (map? c) (:text c) (str c))
+             :task.ac/verdict :ac.status/pending})
+          criteria)))
+      task)))
 
 (defn list-by-ticket
   "List tasks for a ticket.
