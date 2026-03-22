@@ -12,6 +12,7 @@
    [com.blockether.styrmann.domain.task :as task]
    [com.blockether.styrmann.domain.ticket :as ticket]
    [com.blockether.styrmann.execution.session :as session]
+   [datalevin.core :as d]
    [taoensso.telemere :as t]
    [com.blockether.styrmann.presentation.component.layout :as layout]
    [com.blockether.styrmann.presentation.screen.home :as home-screen]
@@ -241,10 +242,10 @@
 (defn- handle-task-run [task-id]
   (if-let [task-record (db.task/find-task (db/conn) task-id)]
     (let [organization-id (get-in task-record [:task/ticket :ticket/organization :organization/id])]
-      ;; Reset to inbox if failed/done so it can re-execute
-      (when (#{:task.status/done :task.status/implementing :task.status/testing :task.status/reviewing}
-             (:task/status task-record))
-        (task/update-status! (db/conn) task-id :task.status/inbox))
+      ;; Force-reset to inbox for retry (bypass transition machine)
+      (when-not (= :task.status/inbox (:task/status task-record))
+        (d/transact! (db/conn) [{:db/id [:task/id task-id]
+                                  :task/status :task.status/inbox}]))
       (session/execute-with-rlm! (db/conn) task-id)
       (redirect-to (str "/organizations/" organization-id "/tasks/" task-id)))
     (not-found-page "Task not found.")))
