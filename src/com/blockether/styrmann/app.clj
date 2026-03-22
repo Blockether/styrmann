@@ -242,10 +242,9 @@
 (defn- handle-task-run [task-id]
   (if-let [task-record (db.task/find-task (db/conn) task-id)]
     (let [organization-id (get-in task-record [:task/ticket :ticket/organization :organization/id])]
-      ;; Force-reset to inbox for retry (bypass transition machine)
+      ;; Reset to inbox for retry via state machine
       (when-not (= :task.status/inbox (:task/status task-record))
-        (d/transact! (db/conn) [{:db/id [:task/id task-id]
-                                  :task/status :task.status/inbox}]))
+        (task/update-status! (db/conn) task-id :task.status/inbox))
       (session/execute-with-rlm! (db/conn) task-id)
       (redirect-to (str "/organizations/" organization-id "/tasks/" task-id)))
     (not-found-page "Task not found.")))

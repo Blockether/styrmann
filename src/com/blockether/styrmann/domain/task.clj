@@ -19,9 +19,9 @@
 
 (def ^:private allowed-transitions
   {:task.status/inbox        #{:task.status/implementing}
-   :task.status/implementing #{:task.status/testing}
-   :task.status/testing      #{:task.status/reviewing}
-   :task.status/reviewing    #{:task.status/done}
+   :task.status/implementing #{:task.status/testing :task.status/inbox}
+   :task.status/testing      #{:task.status/reviewing :task.status/inbox}
+   :task.status/reviewing    #{:task.status/done :task.status/inbox}
    :task.status/done         #{:task.status/inbox}})
 
 (defn- require-text! [value message]
