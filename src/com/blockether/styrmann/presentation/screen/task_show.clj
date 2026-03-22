@@ -84,10 +84,15 @@
     s))
 
 (defn- render-markdown
-  "Convert markdown string to hiccup using nextjournal/markdown."
+  "Convert markdown string to hiccup using nextjournal/markdown.
+   Escapes bare angle brackets that aren't valid HTML/markdown."
   [content]
   (when (and content (not (str/blank? (str content))))
-    (md/->hiccup (str content))))
+    (let [safe (-> (str content)
+                   ;; Escape <<>> patterns that get eaten as HTML
+                   (str/replace "<<>>" "")
+                   (str/replace #"<(?![a-zA-Z/!])" "&lt;"))]
+      (md/->hiccup safe))))
 
 (defn- unescape-edn-str
   "Unescape \\n and \\t from EDN-encoded strings."
