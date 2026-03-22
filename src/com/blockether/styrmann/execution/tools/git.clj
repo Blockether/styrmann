@@ -1,4 +1,4 @@
-(ns com.blockether.styrmann.runner.tools.git
+(ns com.blockether.styrmann.execution.tools.git
   "Tool functions for git repository operations."
   (:require
    [com.blockether.styrmann.db.git :as db.git]

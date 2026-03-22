@@ -1,4 +1,4 @@
-(ns com.blockether.styrmann.runner.tools.ticket
+(ns com.blockether.styrmann.execution.tools.ticket
   "Tool functions for ticket operations."
   (:require
    [com.blockether.styrmann.db.ticket :as db.ticket]))

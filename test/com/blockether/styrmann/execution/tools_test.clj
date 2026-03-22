@@ -1,13 +1,13 @@
-(ns com.blockether.styrmann.runner.tools-test
+(ns com.blockether.styrmann.execution.tools-test
   (:require
    [com.blockether.styrmann.db.git :as db.git]
    [com.blockether.styrmann.domain.organization :as organization]
    [com.blockether.styrmann.domain.task :as task]
    [com.blockether.styrmann.domain.ticket :as ticket]
-   [com.blockether.styrmann.runner.tool-registry :as registry]
-   [com.blockether.styrmann.runner.tools.git :as tools.git]
-   [com.blockether.styrmann.runner.tools.task :as tools.task]
-   [com.blockether.styrmann.runner.tools.ticket :as tools.ticket]
+   [com.blockether.styrmann.execution.tool-registry :as registry]
+   [com.blockether.styrmann.execution.tools.git :as tools.git]
+   [com.blockether.styrmann.execution.tools.task :as tools.task]
+   [com.blockether.styrmann.execution.tools.ticket :as tools.ticket]
    [com.blockether.styrmann.test-helpers :refer [temp-conn with-temp-conn]]
    [lazytest.core :refer [defdescribe describe expect it]]))
 
@@ -127,4 +127,4 @@
           (expect (contains? fn-symbols "com.blockether.styrmann.execution.tools.filesystem/read-file"))
           (expect (contains? fn-symbols "com.blockether.styrmann.execution.tools.filesystem/write-file"))
           (expect (contains? fn-symbols "com.blockether.styrmann.execution.tools.system/signal-event"))
-          (expect (contains? fn-symbols "com.blockether.styrmann.runner.tools.ticket/find-ticket"))))))
+          (expect (contains? fn-symbols "com.blockether.styrmann.execution.tools.ticket/find-ticket"))))))

@@ -125,7 +125,7 @@
 (defn ensure-explorer-agent!
   "Ensure the exploration agent exists with read-only tool profile."
   [conn]
-  (let [tool-registry (requiring-resolve 'com.blockether.styrmann.runner.tool-registry/explorer-tool-keys)
+  (let [tool-registry (requiring-resolve 'com.blockether.styrmann.execution.tool-registry/explorer-tool-keys)
         tool-ids (tool-ids-for-profile conn @tool-registry)]
     (or (db.session/find-agent-by-key conn "explorer-v1")
         (db.session/create-agent!
@@ -141,7 +141,7 @@
 (defn ensure-editor-agent!
   "Ensure the editor agent exists with read+write tool profile."
   [conn]
-  (let [tool-registry (requiring-resolve 'com.blockether.styrmann.runner.tool-registry/editor-tool-keys)
+  (let [tool-registry (requiring-resolve 'com.blockether.styrmann.execution.tool-registry/editor-tool-keys)
         tool-ids (tool-ids-for-profile conn @tool-registry)]
     (or (db.session/find-agent-by-key conn "editor-v1")
         (db.session/create-agent!

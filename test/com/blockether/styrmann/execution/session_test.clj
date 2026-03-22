@@ -6,7 +6,7 @@
    [com.blockether.styrmann.domain.task :as task]
    [com.blockether.styrmann.domain.ticket :as ticket]
    [com.blockether.styrmann.execution.session :as sut]
-   [com.blockether.styrmann.runner.tool-registry :as tool-registry]
+   [com.blockether.styrmann.execution.tool-registry :as tool-registry]
    [com.blockether.styrmann.test-helpers :refer [temp-conn with-temp-conn]]
    [lazytest.core :refer [defdescribe describe expect it]]))
 
@@ -191,7 +191,7 @@
      :fn-symbol "com.blockether.styrmann.execution.tools.system/signal-event"
      :input-schema {:type :map :required [:type :message]}}
     {:key "ticket.find" :name "Find Ticket" :description "Find ticket"
-     :fn-symbol "com.blockether.styrmann.runner.tools.ticket/find-ticket"
+     :fn-symbol "com.blockether.styrmann.execution.tools.ticket/find-ticket"
      :input-schema {:type :map :required [:ticket-id]}}]))
 
 (defn- make-session [conn]

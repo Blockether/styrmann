@@ -6,7 +6,7 @@
    [com.blockether.styrmann.bootstrap :as bootstrap]
    [com.blockether.styrmann.db.core :as db]
    [com.blockether.styrmann.execution.session :as session]
-   [com.blockether.styrmann.runner.tool-registry :as tool-registry]
+   [com.blockether.styrmann.execution.tool-registry :as tool-registry]
    [darkleaf.di.core :as di]
    [nrepl.server :as nrepl]
    [ring.adapter.jetty :as jetty]

@@ -2,7 +2,7 @@
   (:require
    [com.blockether.styrmann.execution.agent-types :as sut]
    [com.blockether.styrmann.execution.session :as session]
-   [com.blockether.styrmann.runner.tool-registry :as registry]
+   [com.blockether.styrmann.execution.tool-registry :as registry]
    [com.blockether.styrmann.test-helpers :refer [temp-conn with-temp-conn]]
    [lazytest.core :refer [defdescribe describe expect it]]))
 

@@ -1,4 +1,4 @@
-(ns com.blockether.styrmann.runner.tools.task
+(ns com.blockether.styrmann.execution.tools.task
   "Tool functions for task operations."
   (:require
    [com.blockether.styrmann.db.task :as db.task]))

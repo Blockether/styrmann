@@ -1,5 +1,5 @@
-(ns com.blockether.styrmann.runner.tool-registry
-  "In-memory classpath tool registry for runner integration."
+(ns com.blockether.styrmann.execution.tool-registry
+  "In-memory classpath tool registry for execution integration."
   (:require
    [clojure.set :as set]))
 
@@ -50,21 +50,21 @@
    {:key "ticket.find"
     :name "Find Ticket"
     :description "Find ticket details by id"
-    :fn-symbol "com.blockether.styrmann.runner.tools.ticket/find-ticket"
+    :fn-symbol "com.blockether.styrmann.execution.tools.ticket/find-ticket"
     :input-schema {:type :map
                    :required [:ticket-id]}})
   (register-tool!
    {:key "task.list-by-ticket"
     :name "List Tasks by Ticket"
     :description "List tasks for a ticket"
-    :fn-symbol "com.blockether.styrmann.runner.tools.task/list-by-ticket"
+    :fn-symbol "com.blockether.styrmann.execution.tools.task/list-by-ticket"
     :input-schema {:type :map
                    :required [:ticket-id]}})
   (register-tool!
    {:key "git.repo.summary"
     :name "Git Repo Summary"
     :description "Read git repository metadata and latest commit summary"
-    :fn-symbol "com.blockether.styrmann.runner.tools.git/repo-summary"
+    :fn-symbol "com.blockether.styrmann.execution.tools.git/repo-summary"
     :input-schema {:type :map
                    :required [:workspace-id]}})
   (register-tool!
