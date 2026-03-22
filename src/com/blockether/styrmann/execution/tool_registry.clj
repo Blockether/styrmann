@@ -50,14 +50,14 @@
    {:key "ticket.find"
     :name "Find Ticket"
     :description "Find ticket details by id"
-    :fn-symbol "com.blockether.styrmann.execution.tools.ticket/find-ticket"
+    :fn-symbol "com.blockether.styrmann.domain.tools.ticket/find-ticket"
     :input-schema {:type :map
                    :required [:ticket-id]}})
   (register-tool!
    {:key "task.list-by-ticket"
     :name "List Tasks by Ticket"
     :description "List tasks for a ticket"
-    :fn-symbol "com.blockether.styrmann.execution.tools.task/list-by-ticket"
+    :fn-symbol "com.blockether.styrmann.domain.tools.task/list-by-ticket"
     :input-schema {:type :map
                    :required [:ticket-id]}})
   (register-tool!

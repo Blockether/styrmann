@@ -191,7 +191,7 @@
      :fn-symbol "com.blockether.styrmann.execution.tools.system/signal-event"
      :input-schema {:type :map :required [:type :message]}}
     {:key "ticket.find" :name "Find Ticket" :description "Find ticket"
-     :fn-symbol "com.blockether.styrmann.execution.tools.ticket/find-ticket"
+     :fn-symbol "com.blockether.styrmann.domain.tools.ticket/find-ticket"
      :input-schema {:type :map :required [:ticket-id]}}]))
 
 (defn- make-session [conn]
