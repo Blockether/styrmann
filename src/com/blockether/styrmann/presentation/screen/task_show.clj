@@ -89,14 +89,140 @@
   (when (and content (not (str/blank? (str content))))
     (md/->hiccup (str content))))
 
+(defn- unescape-edn-str
+  "Unescape \\n and \\t from EDN-encoded strings."
+  [s]
+  (when s (-> s (str/replace "\\n" "\n") (str/replace "\\t" "\t"))))
+
+(defn- render-reasoning [reasoning]
+  [:div {:class "rounded-lg px-3 py-2 border-l-4"
+         :style "background: var(--purple-soft); border-color: var(--purple);"}
+   [:div {:class "text-[11px] font-prose leading-relaxed max-h-48 overflow-auto"
+          :style "color: var(--ink-secondary);"}
+    (render-markdown reasoning)]])
+
+(defn- render-tool-call
+  "Render a single tool call with smart output for read-file/grep/glob."
+  [evt tool-ends]
+  (let [payload (:session.event/payload evt)
+        tk (or (:tool-key payload) "?")
+        short-name (last (str/split tk #"\."))
+        input (sanitize-binary (:input payload))
+        end-evt (get tool-ends tk)
+        pe (when end-evt (:session.event/payload end-evt))
+        output (sanitize-binary (:output pe))
+        error (:error pe)
+        ok? (= :session.event.type/call-end (:session.event/type end-evt))
+        read? (str/includes? tk "read-file")
+        grep? (str/includes? tk "grep")
+        glob? (str/includes? tk "glob")
+        file-content (when (and read? output (not error))
+                       (second (re-find #":content\s+\"((?:[^\"\\]|\\.)*)\"" output)))
+        file-path (when input (second (re-find #":path\s+\"([^\"]+)\"" input)))
+        grep-matches (when (and grep? output (not error))
+                       (second (re-find #":matches\s+\[([^\]]*)\]" output)))
+        glob-file-list (when (and glob? output (not error))
+                         (re-seq #"\"([^\"]+)\"" (or (second (re-find #":files\s+\[([^\]]*)\]" output)) "")))
+        glob-count (when (and glob? output (not error))
+                     (second (re-find #":count\s+(\d+)" output)))
+        input-hint (when input (let [s (str/replace input #"[{}:\"]" "")]
+                                 (if (> (count s) 50) (str (subs s 0 50) "…") s)))]
+    [:details {:class "rounded-lg text-[12px]"}
+     [:summary {:class "flex items-center gap-1.5 px-2 py-1 cursor-pointer select-none hover:bg-[var(--cream-dark)] rounded-lg"}
+      (cond ok?   [:i {:data-lucide "check" :class "size-3 text-[var(--good)] flex-shrink-0"}]
+            error [:i {:data-lucide "x-circle" :class "size-3 text-[var(--danger)] flex-shrink-0"}]
+            :else [:i {:data-lucide "loader" :class "size-3 text-[var(--warn)] flex-shrink-0 animate-spin"}])
+      [:span {:class "text-[var(--ink)] font-medium text-[11px] w-[80px] flex-shrink-0"} short-name]
+      [:span {:class "text-[10px] text-[var(--muted)] truncate flex-1"} (or file-path input-hint "")]
+      (when error [:span {:class "text-[10px] text-[var(--danger)]"} "error"])]
+     (when (or input output error)
+       [:div {:class "pl-[26px] pr-2 pb-2 space-y-1 border-l-2 border-[var(--line)] ml-[9px]"}
+        (cond
+          error [:pre {:class "text-[10px] text-[var(--danger)] font-mono whitespace-pre-wrap max-h-16 overflow-auto break-words"} error]
+          (and read? file-content)
+          [:div {:class "rounded-lg overflow-hidden border border-[var(--line)]"}
+           (when file-path [:div {:class "text-[9px] px-2 py-1 bg-[var(--cream-dark)] text-[var(--muted)] border-b border-[var(--line)] font-mono"} file-path])
+           [:pre {:class "text-[10px] font-mono px-2 py-1.5 whitespace-pre-wrap max-h-48 overflow-auto break-words" :style "color: var(--ink);"} (unescape-edn-str file-content)]]
+          (and grep? grep-matches)
+          [:pre {:class "text-[10px] font-mono px-2 py-1.5 whitespace-pre-wrap max-h-32 overflow-auto break-words" :style "color: var(--ink);"}
+           (-> grep-matches (str/replace "\\\"" "\"") (str/replace "\" \"" "\n") (str/replace "\"" ""))]
+          (and glob? glob-file-list)
+          [:div {:class "rounded-lg overflow-hidden border border-[var(--line)]"}
+           [:div {:class "text-[9px] px-2 py-1 bg-[var(--cream-dark)] text-[var(--muted)] border-b border-[var(--line)] font-mono"} (str glob-count " files")]
+           [:pre {:class "text-[10px] font-mono px-2 py-1.5 whitespace-pre-wrap max-h-32 overflow-auto" :style "color: var(--ink);"}
+            (str/join "\n" (map second (take 20 glob-file-list)))
+            (when (> (count glob-file-list) 20) (str "\n… and " (- (count glob-file-list) 20) " more"))]]
+          :else
+          [:div {:class "space-y-1"}
+           (when input [:pre {:class "text-[10px] text-[var(--ink-secondary)] font-mono whitespace-pre-wrap max-h-24 overflow-auto break-words"} input])
+           (when output [:pre {:class "text-[10px] text-[var(--muted)] font-mono whitespace-pre-wrap max-h-24 overflow-auto break-words"} output])])])]))
+
+(defn- render-iteration-block
+  "Render an iteration group with border wrapping reasoning + tool calls."
+  [iter-num reasoning tool-calls tool-ends & [{:keys [final? execs]}]]
+  [:details {:class "rounded-xl border border-[var(--line)] text-[12px] my-1" :open true}
+   [:summary {:class "flex items-center gap-2 px-3 py-2 cursor-pointer select-none hover:bg-[var(--cream-dark)] rounded-xl font-medium"}
+    [:span {:class "text-[var(--accent)] text-[11px] font-bold w-6"} (str iter-num)]
+    (cond
+      final? [:span {:class "text-[var(--good)] text-[11px]"} "Final answer"]
+      execs  [:span {:class "text-[var(--ink-secondary)] text-[11px]"} (str (count execs) " code blocks")]
+      :else  [:span {:class "text-[var(--ink-secondary)] text-[11px]"} (str (count tool-calls) " tool calls")])]
+   [:div {:class "px-3 pb-3 space-y-2"}
+    (when reasoning (render-reasoning reasoning))
+    ;; New-style code executions
+    (when (seq execs)
+      (into [:div {:class "space-y-1"}]
+        (map (fn [{:keys [code result error]}]
+               [:div {:class "rounded-lg bg-[var(--cream-dark)] overflow-hidden"}
+                [:pre {:class "text-[10px] font-mono px-2 py-1.5 text-[var(--ink)] whitespace-pre-wrap max-h-20 overflow-auto"} code]
+                (when (or result error)
+                  [:div {:class (str "text-[10px] font-mono px-2 py-1 border-t border-[var(--line)] whitespace-pre-wrap max-h-16 overflow-auto "
+                                     (if error "text-[var(--danger)]" "text-[var(--muted)]"))}
+                   (or error result)])])
+             execs)))
+    ;; Legacy tool calls
+    (when (seq tool-calls)
+      (into [:div {:class "space-y-0.5"}]
+        (map #(render-tool-call % tool-ends) tool-calls)))]])
+
+(defn- group-legacy-events
+  "Group flat thinking + call-start events into iteration blocks."
+  [events]
+  (reduce
+   (fn [acc evt]
+     (case (:session.event/type evt)
+       :session.event.type/thinking
+       (conj acc {:type :iteration :reasoning (:reasoning (:session.event/payload evt)) :tool-calls [] :others []})
+
+       :session.event.type/call-start
+       (if (seq acc)
+         (update-in acc [(dec (count acc)) :tool-calls] conj evt)
+         (conj acc {:type :iteration :reasoning nil :tool-calls [evt] :others []}))
+
+       (:session.event.type/call-end :session.event.type/call-error) acc
+
+       :session.event.type/state-change
+       (if (seq acc)
+         (update-in acc [(dec (count acc)) :others] conj evt)
+         (conj acc {:type :state :evt evt}))
+
+       (if (seq acc)
+         (update-in acc [(dec (count acc)) :others] conj evt)
+         (conj acc {:type :state :evt evt}))))
+   [] events))
+
 (defn- run-card [run {:keys [task-id org-id]}]
   (let [events (:session/events run)
         msgs (filter #(= :session.messages.role/assistant (:session.messages/role %))
                (:session/messages run))
-        tool-ends (into {} (map (fn [e] [(:tool-key (:session.event/payload e)) e])
-                             (filter #(#{:session.event.type/call-end :session.event.type/call-error}
-                                       (:session.event/type %)) events)))
-        failed? (= :session.status/failed (:session/status run))]
+        tool-ends (into {} (keep (fn [e]
+                                   (when (#{:session.event.type/call-end :session.event.type/call-error}
+                                          (:session.event/type e))
+                                     [(:tool-key (:session.event/payload e)) e]))
+                                 events))
+        failed? (= :session.status/failed (:session/status run))
+        has-iterations? (some #(= :session.event.type/iteration (:session.event/type %)) events)
+        grouped (when-not has-iterations? (group-legacy-events events))]
     [:div {:class "card overflow-hidden"}
      [:div {:class "flex items-center justify-between px-4 py-3 bg-[var(--cream-dark)] border-b border-[var(--line)]"}
       (ui/status-badge (:run/status run))
@@ -106,152 +232,47 @@
           [:i {:data-lucide "rotate-ccw" :class "size-3"}]
           "Retry"]])]
      [:div {:class "p-4"}
-      ;; Chronological timeline — all events interleaved
-      (into [:div {:class "space-y-1"}]
-        (keep
-          (fn [evt]
-            (let [etype (:session.event/type evt)
-                  payload (:session.event/payload evt)]
-              (case etype
-               ;; Iteration — grouped reasoning + code executions
-                :session.event.type/iteration
-                (let [reasoning (:reasoning payload)
-                      execs (:executions payload)
-                      iter-num (inc (or (:iteration payload) 0))]
-                  [:details {:class "rounded-xl border border-[var(--line)] text-[12px] my-1" :open (boolean reasoning)}
-                   [:summary {:class "flex items-center gap-2 px-3 py-2 cursor-pointer select-none hover:bg-[var(--cream-dark)] rounded-xl font-medium"}
-                    [:span {:class "text-[var(--accent)] text-[11px] font-bold w-6"} (str iter-num)]
-                    (if (:final? payload)
-                      [:span {:class "text-[var(--good)] text-[11px]"} "Final answer"]
-                      [:span {:class "text-[var(--ink-secondary)] text-[11px]"}
-                       (str (count execs) " code blocks executed")])]
-                   [:div {:class "px-3 pb-3 space-y-2"}
-                    ;; Reasoning — rendered as markdown with prose font
-                    (when reasoning
-                      [:div {:class "rounded-lg px-3 py-2 border-l-4"
-                             :style "background: var(--purple-soft); border-color: var(--purple);"}
-                       [:div {:class "text-[11px] font-prose leading-relaxed max-h-48 overflow-auto"
-                              :style "color: var(--ink-secondary);"}
-                        (render-markdown reasoning)]])
-                    ;; Code executions
-                    (when (seq execs)
-                      (into [:div {:class "space-y-1"}]
-                        (map (fn [{:keys [code result error]}]
-                               [:div {:class "rounded-lg bg-[var(--cream-dark)] overflow-hidden"}
-                                [:pre {:class "text-[10px] font-mono px-2 py-1.5 text-[var(--ink)] whitespace-pre-wrap max-h-20 overflow-auto"} code]
-                                (when (or result error)
-                                  [:div {:class (str "text-[10px] font-mono px-2 py-1 border-t border-[var(--line)] whitespace-pre-wrap max-h-16 overflow-auto "
-                                                     (if error "text-[var(--danger)]" "text-[var(--muted)]"))}
-                                   (or error result)])])
-                             execs)))]])
+      (if has-iterations?
+        ;; New-style: iteration events from on-iteration callback
+        (into [:div {:class "space-y-1"}]
+          (keep
+           (fn [evt]
+             (let [etype (:session.event/type evt)
+                   payload (:session.event/payload evt)]
+               (case etype
+                 :session.event.type/iteration
+                 (render-iteration-block
+                  (inc (or (:iteration payload) 0))
+                  (:reasoning payload) nil tool-ends
+                  {:final? (:final? payload) :execs (:executions payload)})
+                 :session.event.type/state-change
+                 [:div {:class "flex items-center gap-1.5 px-2 py-0.5 text-[11px] text-[var(--muted)]"}
+                  [:i {:data-lucide "arrow-right" :class "size-3"}]
+                  (:session.event/message evt)]
+                 :session.event.type/ac-verification
+                 [:div {:class "flex items-center gap-1.5 px-2 py-1 text-[11px] rounded-lg"
+                        :style "background: var(--good-soft);"}
+                  [:i {:data-lucide "check-circle" :class "size-3 text-[var(--good)]"}]
+                  [:span {:style "color: var(--ink);"} (:session.event/message evt)]]
+                 (:session.event.type/call-end :session.event.type/call-error :session.event.type/thinking) nil
+                 nil)))
+           events))
 
-               ;; Thinking (legacy, from old runs)
-                :session.event.type/thinking
-                (when-let [r (:reasoning payload)]
-                  [:div {:class "rounded-lg px-3 py-2 border-l-4"
-                         :style "background: var(--purple-soft); border-color: var(--purple);"}
-                   [:div {:class "text-[11px] font-prose leading-relaxed max-h-32 overflow-auto"
-                          :style "color: var(--ink-secondary);"}
-                    (render-markdown r)]])
+        ;; Legacy: grouped thinking + tool calls into iteration blocks
+        (into [:div {:class "space-y-1"}]
+          (keep-indexed
+           (fn [idx item]
+             (case (:type item)
+               :iteration
+               (render-iteration-block (inc idx) (:reasoning item) (:tool-calls item) tool-ends)
+               :state
+               [:div {:class "flex items-center gap-1.5 px-2 py-0.5 text-[11px] text-[var(--muted)]"}
+                [:i {:data-lucide "arrow-right" :class "size-3"}]
+                (:session.event/message (:evt item))]
+               nil))
+           grouped)))
 
-               ;; Tool call start — collapsible (legacy, from old runs without on-iteration)
-                :session.event.type/call-start
-                (let [tk (or (:tool-key payload) "?")
-                      short-name (last (str/split tk #"\."))
-                      input (sanitize-binary (:input payload))
-                      end-evt (get tool-ends tk)
-                      pe (when end-evt (:session.event/payload end-evt))
-                      output (sanitize-binary (:output pe))
-                      error (:error pe)
-                      ok? (= :session.event.type/call-end (:session.event/type end-evt))
-                      input-hint (when input (let [s (str/replace input #"[{}:\"]" "")]
-                                               (if (> (count s) 50) (str (subs s 0 50) "…") s)))]
-                  (let [read? (str/includes? tk "read-file")
-                        grep? (str/includes? tk "grep")
-                        glob? (str/includes? tk "glob")
-                        ;; Extract file content from read-file output
-                        file-content (when (and read? output (not error))
-                                       (second (re-find #":content\s+\"((?:[^\"\\]|\\.)*)\"" output)))
-                        file-path (when input (second (re-find #":path\s+\"([^\"]+)\"" input)))
-                        ;; Extract grep matches
-                        grep-matches (when (and grep? output (not error))
-                                       (second (re-find #":matches\s+\[([^\]]*)\]" output)))
-                        ;; Extract glob file list
-                        glob-files (when (and glob? output (not error))
-                                     (re-seq #"\"([^\"]+)\"" (or (second (re-find #":files\s+\[([^\]]*)\]" output)) "")))
-                        glob-count (when (and glob? output (not error))
-                                     (second (re-find #":count\s+(\d+)" output)))]
-                    [:details {:class "rounded-lg text-[12px]"}
-                     [:summary {:class "flex items-center gap-1.5 px-2 py-1 cursor-pointer select-none hover:bg-[var(--cream-dark)] rounded-lg"}
-                      (cond ok?   [:i {:data-lucide "check" :class "size-3 text-[var(--good)] flex-shrink-0"}]
-                        error [:i {:data-lucide "x-circle" :class "size-3 text-[var(--danger)] flex-shrink-0"}]
-                        :else [:i {:data-lucide "loader" :class "size-3 text-[var(--warn)] flex-shrink-0 animate-spin"}])
-                      [:span {:class "text-[var(--ink)] font-medium text-[11px] w-[80px] flex-shrink-0"} short-name]
-                      [:span {:class "text-[10px] text-[var(--muted)] truncate flex-1"}
-                       (or file-path input-hint "")]
-                      (when error [:span {:class "text-[10px] text-[var(--danger)]"} "error"])]
-                     (when (or input output error)
-                       [:div {:class "pl-[26px] pr-2 pb-2 space-y-1 border-l-2 border-[var(--line)] ml-[9px]"}
-                        (cond
-                          error
-                          [:pre {:class "text-[10px] text-[var(--danger)] font-mono whitespace-pre-wrap max-h-16 overflow-auto break-words"} error]
-
-                          ;; Read-file: show file content with syntax highlighting style
-                          (and read? file-content)
-                          [:div {:class "rounded-lg overflow-hidden border border-[var(--line)]"}
-                           (when file-path
-                             [:div {:class "text-[9px] px-2 py-1 bg-[var(--cream-dark)] text-[var(--muted)] border-b border-[var(--line)] font-mono"}
-                              file-path])
-                           [:pre {:class "text-[10px] font-mono px-2 py-1.5 whitespace-pre-wrap max-h-48 overflow-auto break-words"
-                                  :style "color: var(--ink);"}
-                            (str/replace file-content "\\n" "\n")]]
-
-                          ;; Grep: show matches as file:line:content
-                          (and grep? grep-matches)
-                          [:pre {:class "text-[10px] font-mono px-2 py-1.5 whitespace-pre-wrap max-h-32 overflow-auto break-words"
-                                 :style "color: var(--ink);"}
-                           (-> grep-matches
-                               (str/replace "\\\"" "\"")
-                               (str/replace "\" \"" "\n")
-                               (str/replace "\"" ""))]
-
-                          ;; Glob: show file list
-                          (and glob? glob-files)
-                          [:div {:class "rounded-lg overflow-hidden border border-[var(--line)]"}
-                           [:div {:class "text-[9px] px-2 py-1 bg-[var(--cream-dark)] text-[var(--muted)] border-b border-[var(--line)] font-mono"}
-                            (str glob-count " files")]
-                           [:pre {:class "text-[10px] font-mono px-2 py-1.5 whitespace-pre-wrap max-h-32 overflow-auto"
-                                  :style "color: var(--ink);"}
-                            (str/join "\n" (map second (take 20 glob-files)))
-                            (when (> (count glob-files) 20)
-                              (str "\n… and " (- (count glob-files) 20) " more"))]]
-
-                          ;; Default: raw input/output
-                          :else
-                          [:div {:class "space-y-1"}
-                           (when input [:pre {:class "text-[10px] text-[var(--ink-secondary)] font-mono whitespace-pre-wrap max-h-24 overflow-auto break-words"} input])
-                           (when output [:pre {:class "text-[10px] text-[var(--muted)] font-mono whitespace-pre-wrap max-h-24 overflow-auto break-words"} output])])])]))
-
-               ;; Skip call-end/call-error
-                :session.event.type/call-end nil
-                :session.event.type/call-error nil
-
-               ;; State change — subtle
-                :session.event.type/state-change
-                [:div {:class "flex items-center gap-1.5 px-2 py-0.5 text-[11px] text-[var(--muted)]"}
-                 [:i {:data-lucide "arrow-right" :class "size-3"}]
-                 (:session.event/message evt)]
-
-               ;; AC verification
-                :session.event.type/ac-verification
-                [:div {:class "flex items-center gap-1.5 px-2 py-1 text-[11px] rounded-lg bg-green-50"}
-                 [:i {:data-lucide "check-circle" :class "size-3 text-[var(--good)]"}]
-                 [:span {:class "text-[var(--ink)]"} (:session.event/message evt)]]
-
-               ;; Default
-                [:div {:class "px-2 py-0.5 text-[11px] text-[var(--muted)]"} (:session.event/message evt)])))
-          events))
-      ;; Final assistant message at bottom
+      ;; Final assistant message
       (when-let [msg (last (seq msgs))]
         [:div {:class "mt-3 card p-4 border-l-4 border-[var(--accent)]"}
          [:div {:class "text-[11px] uppercase tracking-[0.08em] text-[var(--accent)] mb-2 flex items-center gap-1.5"}
