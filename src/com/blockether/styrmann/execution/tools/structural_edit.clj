@@ -1,9 +1,10 @@
 (ns com.blockether.styrmann.execution.tools.structural-edit
-  "Structural code editing tools: clojure-lsp rename/clean-ns and sandboxed
-   shell execution."
+  "Structural code editing tools: clojure-lsp rename/clean-ns, sandboxed
+   shell execution, and form-level Clojure file creation/modification."
   (:require
    [clojure.java.io :as io]
    [clojure.java.shell :as sh]
+   [clojure.pprint :as pprint]
    [clojure.string :as str]))
 
 (defn- working-dir [ctx]
@@ -108,3 +109,98 @@
            :stdout    stdout
            :stderr    stderr
            :error     (str "Command exited with code " exit-code)})))))
+
+;;; ---------------------------------------------------------------------------
+;;; Structural Clojure editing — form-level file creation and modification
+;;; ---------------------------------------------------------------------------
+
+(defn- format-require
+  "Format a single require entry from data to string.
+   Input:  [clojure.string :as str]  or  [lazytest.core :refer [defdescribe it]]
+   Output: \"[clojure.string :as str]\" or \"[lazytest.core :refer [defdescribe it]]\""
+  [req]
+  (let [ns-sym (first req)
+        pairs (partition 2 (rest req))]
+    (str "[" ns-sym
+         (str/join ""
+           (map (fn [[k v]]
+                  (str " " k " "
+                       (if (sequential? v)
+                         (str "[" (str/join " " v) "]")
+                         v)))
+                pairs))
+         "]")))
+
+(defn- format-import
+  "Format a single import entry from data to string.
+   Input:  [java.util UUID Date]
+   Output: \"[java.util UUID Date]\""
+  [imp]
+  (str "[" (str/join " " imp) "]"))
+
+(defn- build-ns-form
+  "Build a namespace declaration string from structured data."
+  [{:keys [ns-name doc requires imports]}]
+  (let [parts [(str "(ns " ns-name)
+               (when doc (str "  " (pr-str doc)))
+               (when (seq requires)
+                 (str "  (:require\n"
+                      (str/join "\n" (map #(str "   " (format-require %)) requires))
+                      ")"))
+               (when (seq imports)
+                 (str "  (:import\n"
+                      (str/join "\n" (map #(str "   " (format-import %)) imports))
+                      ")"))]]
+    (str (str/join "\n" (remove nil? parts)) ")\n")))
+
+(defn create-ns-file
+  "Create a new Clojure file with a namespace declaration from structured data.
+   No string escaping needed — ns form is built from data.
+
+   Context: {:working-directory dir}
+   Params:  {:path \"relative/path.clj\"
+             :ns-name com.example.foo (symbol, not string)
+             :doc \"Optional docstring\"
+             :requires [[clojure.string :as str] [lazytest.core :refer [defdescribe it]]]
+             :imports [[java.util UUID]]}
+   Returns: {:ok? true :written true :path \"...\"}
+            {:ok? false :error \"message\"}"
+  [ctx {:keys [path ns-name doc requires imports]}]
+  (when-not ns-name
+    (throw (ex-info "ns-name is required" {})))
+  (when (str/blank? path)
+    (throw (ex-info "path is required" {})))
+  (let [root (working-dir ctx)]
+    (assert-within-root! root path)
+    (let [file (io/file root path)
+          content (build-ns-form {:ns-name ns-name :doc doc
+                                  :requires requires :imports imports})]
+      (.mkdirs (.getParentFile file))
+      (spit file content)
+      {:ok? true :written true :path path})))
+
+(defn append-form
+  "Append a Clojure form to the end of a file. The form is a quoted Clojure
+   data structure that gets pretty-printed. No string escaping needed — write
+   actual Clojure data, not strings.
+
+   Context: {:working-directory dir}
+   Params:  {:path \"relative/path.clj\"
+             :form '(defn my-fn [x] (+ x 1))}
+   Returns: {:ok? true :appended true :path \"...\"}
+            {:ok? false :error \"message\"}"
+  [ctx {:keys [path form]}]
+  (when-not form
+    (throw (ex-info "form is required" {})))
+  (when (str/blank? path)
+    (throw (ex-info "path is required" {})))
+  (let [root (working-dir ctx)]
+    (assert-within-root! root path)
+    (let [file (io/file root path)]
+      (if-not (.exists file)
+        {:ok? false :error (str "File not found: " path ". Use create-ns-file first.")}
+        (let [formatted (with-out-str (pprint/write form :dispatch pprint/code-dispatch))
+              existing (slurp file)
+              separator (if (str/ends-with? (str/trimr existing) ")") "\n\n" "\n")]
+          (spit file (str existing separator formatted))
+          {:ok? true :appended true :path path})))))

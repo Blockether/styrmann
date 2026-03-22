@@ -190,6 +190,20 @@
     :fn-symbol "com.blockether.styrmann.execution.tools.structural-edit/bash-exec"
     :input-schema {:type :map
                    :required [:command]}})
+  (register-tool!
+   {:key "edit.create-ns-file"
+    :name "Create Namespace File"
+    :description "Create a new Clojure file with a namespace declaration from structured data. No string escaping needed. Pass :ns-name as a symbol, :requires as vectors of [ns :as alias] or [ns :refer [sym]], :imports as vectors of [package Class]. PREFER this over write-file for creating new Clojure files."
+    :fn-symbol "com.blockether.styrmann.execution.tools.structural-edit/create-ns-file"
+    :input-schema {:type :map
+                   :required [:path :ns-name]}})
+  (register-tool!
+   {:key "edit.append-form"
+    :name "Append Form"
+    :description "Append a quoted Clojure form to the end of a file. The form is actual Clojure data (not a string), pretty-printed and appended. Use with create-ns-file to build files incrementally. Example: (edit-append-form {:path \"test.clj\" :form '(defn greet [name] (str \"Hello \" name))})"
+    :fn-symbol "com.blockether.styrmann.execution.tools.structural-edit/append-form"
+    :input-schema {:type :map
+                   :required [:path :form]}})
   (list-tools))
 
 ;; -- Agent profiles -----------------------------------------------------------
@@ -206,6 +220,7 @@
   "Tool keys available to the editor agent (read + write)."
   (set/union explorer-tool-keys
              #{"edit.write-file" "edit.edit-file"
+               "edit.create-ns-file" "edit.append-form"
                "edit.clojure-lsp-rename" "edit.clojure-lsp-clean-ns"
                "edit.bash" "git.commit" "git.repo.summary"
                "task.update-status" "task.verify-ac" "system.record-deliverable"}))

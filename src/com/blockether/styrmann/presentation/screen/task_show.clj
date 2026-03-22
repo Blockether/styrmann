@@ -3,6 +3,7 @@
   (:require
    [clojure.edn :as edn]
    [clojure.string :as str]
+   [clojure.walk :as walk]
    [com.blockether.styrmann.db.git :as db.git]
    [com.blockether.styrmann.db.organization :as db.organization]
    [com.blockether.styrmann.db.task :as db.task]
@@ -83,16 +84,30 @@
     "[binary content hidden]"
     s))
 
+(defn- unwrap-fragments
+  "Recursively replace [:<> ...children] with children inline.
+   hiccup2 doesn't support :<> fragments from nextjournal/markdown."
+  [form]
+  (walk/postwalk
+   (fn [x]
+     (if (and (vector? x) (keyword? (first x)))
+       (into [(first x)]
+         (mapcat (fn [child]
+                   (if (and (vector? child) (= :<> (first child)))
+                     (rest child)
+                     [child]))
+           (rest x)))
+       x))
+   form))
+
 (defn- render-markdown
   "Convert markdown string to hiccup using nextjournal/markdown.
    Escapes bare angle brackets that aren't valid HTML/markdown."
   [content]
   (when (and content (not (str/blank? (str content))))
     (let [safe (-> (str content)
-                   ;; Escape <<>> patterns that get eaten as HTML
-                   (str/replace "<<>>" "")
                    (str/replace #"<(?![a-zA-Z/!])" "&lt;"))]
-      (md/->hiccup safe))))
+      (unwrap-fragments (md/->hiccup safe)))))
 
 (defn- unescape-edn-str
   "Unescape \\n and \\t from EDN-encoded strings."

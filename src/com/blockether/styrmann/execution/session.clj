@@ -395,16 +395,22 @@
                                                              error (assoc :error (str error))
                                                              stdout (assoc :stdout (str stdout))))
                                                           executions)}}))})]
-            (record-session-event! conn
-              {:session-id session-id
-               :type :session.event.type/state-change
-               :message "RLM query completed"
-               :payload {:answer (str (:answer result))}})
-            (db.session/create-session-message!
-             conn
-             {:session-id session-id
-              :role :session.messages.role/assistant
-              :content (str (:answer result))})
+            (let [answer-raw (:answer result)
+                  answer-content (cond
+                                   (string? answer-raw) answer-raw
+                                   (and (map? answer-raw) (string? (:result answer-raw))) (:result answer-raw)
+                                   (some? answer-raw) (pr-str answer-raw)
+                                   :else "")]
+              (record-session-event! conn
+                {:session-id session-id
+                 :type :session.event.type/state-change
+                 :message "RLM query completed"
+                 :payload {:answer answer-content}})
+              (db.session/create-session-message!
+               conn
+               {:session-id session-id
+                :role :session.messages.role/assistant
+                :content answer-content}))
             ;; implementing → testing
             (domain.task/update-status! conn task-id :task.status/testing)
             (record-session-event! conn
@@ -428,7 +434,12 @@
                :type :session.event.type/state-change
                :message "Task completed — done"
                :payload {:status :task.status/done}})
-            (svar/dispose-env! env)))
+            (svar/dispose-env! env)
+            ;; Workflow progression: auto-execute dependent tasks whose deps are all done
+            (doseq [ready-task (domain.task/ready-dependents conn task-id)]
+              (t/log! :info ["Auto-executing dependent task" {:task-id (:task/id ready-task)
+                                                              :description (:task/description ready-task)}])
+              (future (execute-with-rlm! conn (:task/id ready-task))))))
         (catch Exception e
           (t/log! :error ["RLM execution failed" {:task-id task-id :error (ex-message e)}])
           (record-session-event! conn

@@ -119,8 +119,8 @@
         (registry/register-default-tools!)
         (let [tools     (registry/list-tools)
               fn-symbols (set (map :fn-symbol tools))]
-          ;; 20 tools: filesystem (5), structural-edit (3), spel (2), system (4), explore (2), ticket (1), task (1), git (1), ticket-runner (1)
-          (expect (= 20 (count tools)))
+          ;; 22 tools: filesystem (5), structural-edit (5), spel (2), system (4), explore (2), ticket (1), task (1), git (1), ticket-runner (1)
+          (expect (= 22 (count tools)))
           (doseq [tool tools]
             (expect (some? (requiring-resolve (symbol (:fn-symbol tool))))))
           ;; Spot-check key tool fn-symbols are present

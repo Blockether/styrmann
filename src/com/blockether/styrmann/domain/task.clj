@@ -283,6 +283,29 @@
           :status          status}))
       updated)))
 
+(defn ready-dependents
+  "Find tasks that depend on the given task and are now ready to execute.
+   A task is ready when it is in :inbox status and ALL its dependencies are :done.
+
+   Params:
+   `conn`    - Datalevin connection.
+   `task-id` - UUID. The just-completed task.
+
+   Returns:
+   Vector of task maps ready to execute."
+  [conn task-id]
+  (let [task (db.task/find-task conn task-id)
+        ticket-id (get-in task [:task/ticket :ticket/id])]
+    (when ticket-id
+      (let [all-tasks (db.task/list-tasks-by-ticket conn ticket-id)]
+        (->> all-tasks
+             (filter (fn [t]
+                       (and (= :task.status/inbox (:task/status t))
+                            (seq (:task/depends-on t))
+                            (some #(= task-id (:task/id %)) (:task/depends-on t))
+                            (every? #(= :task.status/done (:task/status %)) (:task/depends-on t)))))
+             vec)))))
+
 (defn list-notifications
   "List organization notifications.
 
