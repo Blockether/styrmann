@@ -118,7 +118,7 @@
                 (let [reasoning (:reasoning payload)
                       execs (:executions payload)
                       iter-num (inc (or (:iteration payload) 0))]
-                  [:details {:class "rounded-xl border border-[var(--line)] text-[12px]" :open (boolean reasoning)}
+                  [:details {:class "rounded-xl border border-[var(--line)] text-[12px] my-1" :open (boolean reasoning)}
                    [:summary {:class "flex items-center gap-2 px-3 py-2 cursor-pointer select-none hover:bg-[var(--cream-dark)] rounded-xl font-medium"}
                     [:span {:class "text-[var(--accent)] text-[11px] font-bold w-6"} (str iter-num)]
                     (if (:final? payload)
@@ -166,21 +166,71 @@
                       ok? (= :session.event.type/call-end (:session.event/type end-evt))
                       input-hint (when input (let [s (str/replace input #"[{}:\"]" "")]
                                                (if (> (count s) 50) (str (subs s 0 50) "…") s)))]
-                  [:details {:class "rounded-lg text-[12px]"}
-                   [:summary {:class "flex items-center gap-1.5 px-2 py-1 cursor-pointer select-none hover:bg-[var(--cream-dark)] rounded-lg"}
-                    (cond ok?   [:i {:data-lucide "check" :class "size-3 text-[var(--good)] flex-shrink-0"}]
-                      error [:i {:data-lucide "x-circle" :class "size-3 text-[var(--danger)] flex-shrink-0"}]
-                      :else [:i {:data-lucide "loader" :class "size-3 text-[var(--warn)] flex-shrink-0 animate-spin"}])
-                    [:span {:class "text-[var(--ink)] font-medium text-[11px] w-[80px] flex-shrink-0"} short-name]
-                    [:span {:class "text-[10px] text-[var(--muted)] truncate flex-1"} (or input-hint "")]
-                    (when error [:span {:class "text-[10px] text-[var(--danger)]"} "error"])]
-                   (when (or input output error)
-                     [:div {:class "pl-[26px] pr-2 pb-2 space-y-1 border-l-2 border-[var(--line)] ml-[9px]"}
-                      (cond
-                        error [:pre {:class "text-[10px] text-[var(--danger)] font-mono whitespace-pre-wrap max-h-16 overflow-auto break-words"} error]
-                        :else [:div {:class "space-y-1"}
-                               (when input [:pre {:class "text-[10px] text-[var(--ink-secondary)] font-mono whitespace-pre-wrap max-h-24 overflow-auto break-words"} input])
-                               (when output [:pre {:class "text-[10px] text-[var(--muted)] font-mono whitespace-pre-wrap max-h-24 overflow-auto break-words"} output])])])])
+                  (let [read? (str/includes? tk "read-file")
+                        grep? (str/includes? tk "grep")
+                        glob? (str/includes? tk "glob")
+                        ;; Extract file content from read-file output
+                        file-content (when (and read? output (not error))
+                                       (second (re-find #":content\s+\"((?:[^\"\\]|\\.)*)\"" output)))
+                        file-path (when input (second (re-find #":path\s+\"([^\"]+)\"" input)))
+                        ;; Extract grep matches
+                        grep-matches (when (and grep? output (not error))
+                                       (second (re-find #":matches\s+\[([^\]]*)\]" output)))
+                        ;; Extract glob file list
+                        glob-files (when (and glob? output (not error))
+                                     (re-seq #"\"([^\"]+)\"" (or (second (re-find #":files\s+\[([^\]]*)\]" output)) "")))
+                        glob-count (when (and glob? output (not error))
+                                     (second (re-find #":count\s+(\d+)" output)))]
+                    [:details {:class "rounded-lg text-[12px]"}
+                     [:summary {:class "flex items-center gap-1.5 px-2 py-1 cursor-pointer select-none hover:bg-[var(--cream-dark)] rounded-lg"}
+                      (cond ok?   [:i {:data-lucide "check" :class "size-3 text-[var(--good)] flex-shrink-0"}]
+                        error [:i {:data-lucide "x-circle" :class "size-3 text-[var(--danger)] flex-shrink-0"}]
+                        :else [:i {:data-lucide "loader" :class "size-3 text-[var(--warn)] flex-shrink-0 animate-spin"}])
+                      [:span {:class "text-[var(--ink)] font-medium text-[11px] w-[80px] flex-shrink-0"} short-name]
+                      [:span {:class "text-[10px] text-[var(--muted)] truncate flex-1"}
+                       (or file-path input-hint "")]
+                      (when error [:span {:class "text-[10px] text-[var(--danger)]"} "error"])]
+                     (when (or input output error)
+                       [:div {:class "pl-[26px] pr-2 pb-2 space-y-1 border-l-2 border-[var(--line)] ml-[9px]"}
+                        (cond
+                          error
+                          [:pre {:class "text-[10px] text-[var(--danger)] font-mono whitespace-pre-wrap max-h-16 overflow-auto break-words"} error]
+
+                          ;; Read-file: show file content with syntax highlighting style
+                          (and read? file-content)
+                          [:div {:class "rounded-lg overflow-hidden border border-[var(--line)]"}
+                           (when file-path
+                             [:div {:class "text-[9px] px-2 py-1 bg-[var(--cream-dark)] text-[var(--muted)] border-b border-[var(--line)] font-mono"}
+                              file-path])
+                           [:pre {:class "text-[10px] font-mono px-2 py-1.5 whitespace-pre-wrap max-h-48 overflow-auto break-words"
+                                  :style "color: var(--ink);"}
+                            (str/replace file-content "\\n" "\n")]]
+
+                          ;; Grep: show matches as file:line:content
+                          (and grep? grep-matches)
+                          [:pre {:class "text-[10px] font-mono px-2 py-1.5 whitespace-pre-wrap max-h-32 overflow-auto break-words"
+                                 :style "color: var(--ink);"}
+                           (-> grep-matches
+                               (str/replace "\\\"" "\"")
+                               (str/replace "\" \"" "\n")
+                               (str/replace "\"" ""))]
+
+                          ;; Glob: show file list
+                          (and glob? glob-files)
+                          [:div {:class "rounded-lg overflow-hidden border border-[var(--line)]"}
+                           [:div {:class "text-[9px] px-2 py-1 bg-[var(--cream-dark)] text-[var(--muted)] border-b border-[var(--line)] font-mono"}
+                            (str glob-count " files")]
+                           [:pre {:class "text-[10px] font-mono px-2 py-1.5 whitespace-pre-wrap max-h-32 overflow-auto"
+                                  :style "color: var(--ink);"}
+                            (str/join "\n" (map second (take 20 glob-files)))
+                            (when (> (count glob-files) 20)
+                              (str "\n… and " (- (count glob-files) 20) " more"))]]
+
+                          ;; Default: raw input/output
+                          :else
+                          [:div {:class "space-y-1"}
+                           (when input [:pre {:class "text-[10px] text-[var(--ink-secondary)] font-mono whitespace-pre-wrap max-h-24 overflow-auto break-words"} input])
+                           (when output [:pre {:class "text-[10px] text-[var(--muted)] font-mono whitespace-pre-wrap max-h-24 overflow-auto break-words"} output])])])]))
 
                ;; Skip call-end/call-error
                 :session.event.type/call-end nil
