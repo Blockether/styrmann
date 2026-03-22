@@ -5,6 +5,7 @@
    [com.blockether.styrmann.db.organization :as db.organization]
    [com.blockether.styrmann.db.task :as db.task]
    [com.blockether.styrmann.domain.analysis :as analysis]
+   [com.blockether.styrmann.util :as util]
    [com.blockether.styrmann.domain.organization :as organization]
    [com.blockether.styrmann.domain.planning :as planning]
    [com.blockether.styrmann.domain.provider :as provider]
@@ -23,9 +24,7 @@
    [ring.middleware.multipart-params :as multipart-params]
    [ring.middleware.params :as params]
    [ring.middleware.resource :as resource]
-   [ring.util.response :as response]
-   [starfederation.datastar.clojure.adapter.ring :as ds-ring]
-   [starfederation.datastar.clojure.api :as d*])
+   [ring.util.response :as response])
   (:import
    [java.util UUID]))
 
@@ -89,30 +88,16 @@
 (defn- handle-runner-models-fragment [conn request]
   (let [params (:query-params request)
         prefix (get params "prefix" "primary")
-        provider-id-str (get params "provider-id")]
-    (if (and provider-id-str (not= "" provider-id-str))
-      (let [p (provider/get-provider conn (java.util.UUID/fromString provider-id-str))
-            models (if p (provider/fetch-models p) [])]
-        (ds-ring/->sse-response request
-          {ds-ring/on-open
-           (fn [sse]
-             (d*/with-open-sse sse
-               (d*/patch-elements! sse
-                 (layout/render-fragment
-                   (organization-settings-screen/render-model-select-fragment prefix models))
-                 {d*/selector (str "#model-select-" prefix)
-                  d*/patch-mode d*/pm-outer})
-               (d*/execute-script! sse "lucide.createIcons();")))}))
-      ;; No provider selected — show empty
-      (ds-ring/->sse-response request
-        {ds-ring/on-open
-         (fn [sse]
-           (d*/with-open-sse sse
-             (d*/patch-elements! sse
-               (layout/render-fragment
-                 (organization-settings-screen/render-model-select-fragment prefix []))
-               {d*/selector (str "#model-select-" prefix)
-                d*/patch-mode d*/pm-outer})))}))))
+        provider-id-str (get params "provider-id")
+        models (if (and provider-id-str (not= "" provider-id-str))
+                 (let [p (provider/get-provider conn (java.util.UUID/fromString provider-id-str))]
+                   (if p (provider/fetch-models p) []))
+                 [])]
+    (-> (response/response
+         (str (layout/render-fragment
+               (organization-settings-screen/render-model-select-fragment prefix models))
+              "<script>lucide.createIcons();</script>"))
+        (response/content-type "text/html; charset=utf-8"))))
 
 (defn- handle-organization-settings [conn organization-id request]
   (if (organization/overview conn organization-id)
@@ -275,80 +260,65 @@
       (redirect-to (str "/organizations/" organization-id "/tasks/" task-id)))
     (not-found-page "Task not found.")))
 
-(defn- handle-ticket-decompose [conn ticket-id request]
+(defn- handle-ticket-decompose [conn ticket-id]
   (if-let [t (ticket/find-by-id conn ticket-id)]
-    (let [org-id (get-in t [:ticket/organization :organization/id])]
-      (ds-ring/->sse-response request
-        {ds-ring/on-open
-         (fn [sse]
-           (d*/with-open-sse sse
-             ;; Show spinner
-             (d*/patch-elements! sse
-               "<div id=\"decompose-status\" class=\"card p-4 mt-3\"><div class=\"flex items-center gap-2 text-[var(--accent)]\"><i data-lucide=\"loader\" class=\"size-4 animate-spin\"></i><span class=\"text-[13px]\">Decomposing ticket into tasks...</span></div></div>"
-               {d*/selector "#decompose-status" d*/patch-mode d*/pm-outer})
-             (d*/execute-script! sse "lucide.createIcons();")
-             (try
-               (analysis/decompose-ticket! conn ticket-id)
-               ;; Success — redirect
-               (d*/execute-script! sse (str "window.location.href='/organizations/" org-id "/tickets/" ticket-id "';"))
-               (catch Exception ex
-                 (t/log! :error ["Decompose failed" {:ticket-id ticket-id :error (ex-message ex)}])
-                 ;; Show error inline
-                 (d*/patch-elements! sse
-                   (str "<div id=\"decompose-status\" class=\"card p-4 mt-3 border-l-4\" style=\"border-color: var(--danger);\"><div class=\"text-[13px] text-[var(--danger)]\">" (ex-message ex) "</div></div>")
-                   {d*/selector "#decompose-status" d*/patch-mode d*/pm-outer})
-                 (d*/execute-script! sse "lucide.createIcons();")))))}))
+    (let [org-id  (get-in t [:ticket/organization :organization/id])
+          result  (util/attempt #(analysis/decompose-ticket! conn ticket-id))]
+      (if (:ok result)
+        (redirect-to (str "/organizations/" org-id "/tickets/" ticket-id))
+        (let [ex (:error result)]
+          (t/log! :error ["Decompose failed" {:ticket-id ticket-id :error (ex-message ex)}])
+          (-> (response/response
+               (str "<div id=\"decompose-status\" class=\"card p-4 mt-3 border-l-4\" style=\"border-color: var(--danger);\">"
+                    "<div class=\"text-[13px] text-[var(--danger)]\">" (ex-message ex) "</div></div>"))
+              (response/content-type "text/html; charset=utf-8")))))
     (not-found-page "Ticket not found.")))
+
+(defn- handoff-async!
+  "Run decompose + execute pipeline for a ticket in the background."
+  [conn ticket-id]
+  (let [result (util/attempt
+                #(do
+                   (when (empty? (db.task/list-tasks-by-ticket conn ticket-id))
+                     (analysis/decompose-ticket! conn ticket-id))
+                   (ticket/update-status! conn ticket-id :ticket.status/in-progress)
+                   (let [tasks      (db.task/list-tasks-by-ticket conn ticket-id)
+                         root-tasks (filter (fn [t] (empty? (:task/depends-on t))) tasks)]
+                     (doseq [root-task root-tasks]
+                       (when (= :task.status/inbox (:task/status root-task))
+                         (future (session/execute-with-rlm! conn (:task/id root-task))))))))]
+    (when-let [ex (:error result)]
+      (t/log! :error ["Handoff failed" {:ticket-id ticket-id :error (ex-message ex)}]))))
 
 (defn- handle-ticket-handoff [conn ticket-id]
   (if-let [t (ticket/find-by-id conn ticket-id)]
     (let [org-id (get-in t [:ticket/organization :organization/id])]
-      (future
-        (try
-          ;; Decompose into tasks if none exist
-          (when (empty? (db.task/list-tasks-by-ticket conn ticket-id))
-            (analysis/decompose-ticket! conn ticket-id))
-          ;; Transition ticket to in-progress
-          (ticket/update-status! conn ticket-id :ticket.status/in-progress)
-          ;; Execute root tasks (no dependencies) in the workflow
-          (let [tasks (db.task/list-tasks-by-ticket conn ticket-id)
-                root-tasks (filter #(empty? (:task/depends-on %)) tasks)]
-            (doseq [root-task root-tasks]
-              (when (= :task.status/inbox (:task/status root-task))
-                (future (session/execute-with-rlm! conn (:task/id root-task))))))
-          (catch Exception ex
-            (t/log! :error ["Handoff failed" {:ticket-id ticket-id :error (ex-message ex)}]))))
+      (future (handoff-async! conn ticket-id))
       (redirect-to (str "/organizations/" org-id "/tickets/" ticket-id)))
     (not-found-page "Ticket not found.")))
 
-(defn- sse-fragment-response
-  "Create an SSE response that patches #main-content, #breadcrumbs, and #topbar-context."
-  [request {:keys [body-html breadcrumbs topbar-context]}]
-  (ds-ring/->sse-response request
-                          {ds-ring/on-open
-                           (fn [sse]
-                             (d*/with-open-sse sse
-                               (d*/patch-elements! sse body-html
-                                                   {d*/selector "#main-content"
-                                                    d*/patch-mode d*/pm-inner})
-                               (d*/patch-elements! sse
-                                                   (layout/render-breadcrumb-fragment breadcrumbs))
-                               (d*/patch-elements! sse
-                                                   (layout/render-topbar-context-fragment topbar-context))
-                               (d*/execute-script! sse "lucide.createIcons();window.styrmannInitInteractive&&window.styrmannInitInteractive();")))}))
+(defn- fragment-response
+  "Create an HTML response with main content and OOB swaps for breadcrumbs/topbar."
+  [_request {:keys [body-html breadcrumbs topbar-context]}]
+  (-> (response/response
+       (str (layout/render-fragment body-html)
+            (layout/render-breadcrumb-fragment breadcrumbs true)
+            (layout/render-topbar-context-fragment topbar-context true)
+            "<script>lucide.createIcons();window.styrmannInitInteractive&&window.styrmannInitInteractive();</script>"))
+      (response/content-type "text/html; charset=utf-8")))
 
 (defn- handle-fragment-home [conn request]
   (if-let [organization (organization/default-organization conn)]
     (handle-fragment-organization conn request (:organization/id organization))
-    (sse-fragment-response request (home-screen/render-body conn))))
+    (fragment-response request (home-screen/render-body conn))))
 
 (defn- handle-fragment-organization [conn request organization-id]
   (if-let [fragment (organization-screen/render-body conn organization-id)]
-    (sse-fragment-response request fragment)
-    (sse-fragment-response request
-                           {:body-html "<p>Organization not found.</p>"
-                            :breadcrumbs []
-                            :topbar-context ""})))
+    (fragment-response request fragment)
+    (fragment-response request
+                       {:body-html "<p>Organization not found.</p>"
+                        :breadcrumbs []
+                        :topbar-context ""})))
 
 (defn- handle-attachment [conn attachment-id]
   (if-let [attachment (ticket/find-attachment conn attachment-id)]
@@ -357,18 +327,12 @@
         (response/header "Content-Disposition" (str "inline; filename=\"" (:attachment/name attachment) "\"")))
     (not-found-page "Attachment not found.")))
 
-(defn- handle-task-runs-fragment [conn request task-id]
-  (if-let [{:keys [html any-running?]} (task-screen/render-runs-fragment conn task-id)]
-    (ds-ring/->sse-response request
-      {ds-ring/on-open
-       (fn [sse]
-         (d*/with-open-sse sse
-           (when any-running?
-             (Thread/sleep 2000))
-           (d*/patch-elements! sse (layout/render-fragment html)
-                               {d*/selector "#run-history"
-                                d*/patch-mode d*/pm-outer})
-           (d*/execute-script! sse "lucide.createIcons();")))})
+(defn- handle-task-runs-fragment [conn task-id]
+  (if-let [{:keys [html]} (task-screen/render-runs-fragment conn task-id)]
+    (-> (response/response
+         (str (layout/render-fragment html)
+              "<script>lucide.createIcons();</script>"))
+        (response/content-type "text/html; charset=utf-8"))
     (not-found-page "Task not found.")))
 
 (defn handler
@@ -384,13 +348,13 @@
   (let [method (:request-method request)
         uri (:uri request)
         segments (vec (remove str/blank? (str/split uri #"/")))]
-    (try
-      (cond
-        ;; API
-        (and (= method :get) (= segments ["api" "version"]))
-        (handle-version request)
+    (let [result (util/attempt
+                  #(cond
+                     ;; API
+                     (and (= method :get) (= segments ["api" "version"]))
+                     (handle-version request)
 
-        ;; SSE fragment routes (Datastar)
+        ;; Fragment routes (htmx)
         (and (= method :get) (= segments ["fragments" "home"]))
         (handle-fragment-home conn request)
 
@@ -398,7 +362,7 @@
         (handle-fragment-organization conn request (uuid (nth segments 2)))
 
         (and (= method :get) (= 4 (count segments)) (= "fragments" (first segments)) (= "tasks" (second segments)) (= "runs" (nth segments 3)))
-        (handle-task-runs-fragment conn request (uuid (nth segments 2)))
+        (handle-task-runs-fragment conn (uuid (nth segments 2)))
 
         ;; Full page routes
         (and (= method :get) (empty? segments))
@@ -450,7 +414,7 @@
         (handle-create-task conn (uuid (nth segments 3)) request)
 
         (and (= method :get) (= 5 (count segments)) (= "organizations" (first segments)) (= "tickets" (nth segments 2)) (= "decompose" (nth segments 4)))
-        (handle-ticket-decompose conn (uuid (nth segments 3)) request)
+        (handle-ticket-decompose conn (uuid (nth segments 3)))
 
         (and (= method :post) (= 5 (count segments)) (= "organizations" (first segments)) (= "tickets" (nth segments 2)) (= "handoff" (nth segments 4)))
         (handle-ticket-handoff conn (uuid (nth segments 3)))
@@ -495,10 +459,11 @@
         (handle-attachment conn (uuid (second segments)))
 
         :else
-        (not-found-page "Page not found."))
-      (catch clojure.lang.ExceptionInfo ex
+        (not-found-page "Page not found.")))]
+      (if-let [ex (:error result)]
         (-> (html-response (layout/page "Error" (layout/panel [:p (ex-message ex)])))
-            (response/status 400))))))
+            (response/status 400))
+        (:ok result)))))
 
 (defn make-app
   "Build the Ring app with the given Datalevin connection.
@@ -509,7 +474,7 @@
    Returns:
    Ring handler."
   [conn]
-  (-> (partial handler conn)
+  (-> (fn [request] (handler conn request))
       multipart-params/wrap-multipart-params
       keyword-params/wrap-keyword-params
       params/wrap-params

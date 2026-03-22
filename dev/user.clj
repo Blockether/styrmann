@@ -5,40 +5,79 @@
   (:require
    [clj-reload.core :as reload]
    [clojure.string :as str]
+   [com.blockether.styrmann.app :as app]
+   [com.blockether.styrmann.db.core :as db]
    [com.blockether.styrmann.main :as main]
-   [darkleaf.di.core :as di]
+   [nrepl.server :as nrepl]
+   [ring.adapter.jetty :as jetty]
    [taoensso.telemere :as t]))
 
 ;; -- logging -----------------------------------------------------------------
 
-;; Dev: console only (default handler), debug level
-(t/set-min-level! :debug)
+;; Dev: console only (default handler), debug level — defonce to survive reloads
+(defonce ^:private _log-init (t/set-min-level! :debug))
 
-;; -- state -------------------------------------------------------------------
+;; -- Servers (defonce — never restarted, survive reloads) ---------------------
 
-(defonce ^:private !system (atom nil))
+(defonce ^:private !nrepl
+  (let [port (parse-long (or (System/getenv "NREPL_PORT") "7888"))
+        server (nrepl/start-server :port port)]
+    (spit ".nrepl-port" (str port))
+    (t/log! :info ["nREPL listening" {:port port}])
+    server))
+
+(defonce ^:private !conn (atom nil))
+
+(defonce ^:private !jetty
+  (let [port (parse-long (or (System/getenv "HTTP_PORT") "3000"))
+        ;; Handler resolves vars on each request — code reloads picked up automatically
+        handler (fn [request] (app/handler @!conn request))
+        server (jetty/run-jetty handler {:port port :join? false})]
+    (t/log! :info ["HTTP listening" {:port port}])
+    server))
+
 
 ;; -- lifecycle ---------------------------------------------------------------
 
 (defn start
-  "Start the system via darkleaf/di. Idempotent."
+  "Start Datalevin + tools. Jetty and nREPL stay up. Idempotent."
   []
-  (when-not @!system
-    (reset! !system (di/start `main/app))
-    (t/log! :info "System started via di/start")))
+  (when-not @!conn
+    (let [conn (db/start! (or (System/getenv "DB_PATH") "data/styrmann"))]
+      (reset! !conn conn)
+      (main/init-tools! conn)
+      (t/log! :info "System started"))))
 
 (defn stop
-  "Stop the system via darkleaf/di."
+  "Stop Datalevin. Jetty and nREPL stay up."
   []
-  (when-let [sys @!system]
-    (di/stop sys)
-    (reset! !system nil)
-    (t/log! :info "System stopped via di/stop")))
+  (when @!conn
+    (db/stop!)
+    (reset! !conn nil)
+    (t/log! :info "System stopped")))
+
+(defn before-ns-unload
+  "Called by clj-reload before unloading this namespace."
+  []
+  (stop))
 
 (defn reset
-  "Reload changed namespaces via clj-reload. No server restart needed."
+  "Reload changed namespaces. Jetty picks up new code automatically."
   []
-  (reload/reload))
+  (let [result (reload/reload {:throw false})]
+    (when (:failed result)
+      (t/log! :error ["Reload failed" {:ns (:failed result) :error (:exception result)}]))
+    result))
+
+(defn restart
+  "Full stop + reload + start. Use when schema or DI wiring changes."
+  []
+  (stop)
+  (let [result (reload/reload {:throw false})]
+    (if (:failed result)
+      (do (t/log! :error ["Reload failed" {:ns (:failed result) :error (:exception result)}])
+          result)
+      (do (start) result))))
 
 ;; =============================================================================
 ;; Docstring Validation (from unbound)
@@ -53,12 +92,12 @@
 
 (defn- find-section-start-indices [lines]
   (reduce-kv
-   (fn [acc idx line]
-     (reduce-kv
-      (fn [acc' section pattern]
-        (if (re-matches pattern line) (assoc acc' section idx) acc'))
-      acc SECTION_MARKERS))
-   {} (vec lines)))
+    (fn [acc idx line]
+      (reduce-kv
+        (fn [acc' section pattern]
+          (if (re-matches pattern line) (assoc acc' section idx) acc'))
+        acc SECTION_MARKERS))
+    {} (vec lines)))
 
 (defn- extract-summary-text [lines section-indices]
   (let [first-idx (when (seq section-indices) (apply min (vals section-indices)))
@@ -117,11 +156,11 @@
       (cond
         (not valid?)
         (do (println (str "  " fn-name " - FAIL"))
-            (doseq [e errors]   (println (str "    ERROR: " e)))
-            (doseq [w warnings] (println (str "    WARN: " w))))
+          (doseq [e errors]   (println (str "    ERROR: " e)))
+          (doseq [w warnings] (println (str "    WARN: " w))))
         (seq warnings)
         (do (println (str "  " fn-name " - OK (warnings)"))
-            (doseq [w warnings] (println (str "    WARN: " w))))))
+          (doseq [w warnings] (println (str "    WARN: " w))))))
     (println)
     (if (zero? invalid-count)
       (println "All docstrings valid!")
@@ -140,7 +179,7 @@
 
 (defn- test-ns-exists? [test-ns-sym]
   (try (require test-ns-sym) true
-       (catch java.io.FileNotFoundException _ false)))
+    (catch java.io.FileNotFoundException _ false)))
 
 (defn- find-test-var [test-ns-sym fn-name]
   (get (ns-publics test-ns-sym) (fn-name->test-name fn-name)))
@@ -161,7 +200,7 @@
                         (let [fn-name (:name (meta v))]
                           {:fn-name fn-name
                            :has-test? (and test-ns-exists (some? (find-test-var test-ns-sym fn-name)))}))
-                      fn-vars)
+                  fn-vars)
         covered (count (filter :has-test? results))
         missing (- (count results) covered)]
     (println)
@@ -196,15 +235,15 @@
 
 (defn- ensure-lazytest! []
   (try (require 'lazytest.repl) true
-       (catch java.io.FileNotFoundException _
-         (throw (ex-info "Lazytest not on classpath. Start with: clj -M:dev:test" {})))))
+    (catch java.io.FileNotFoundException _
+      (throw (ex-info "Lazytest not on classpath. Start with: clj -M:dev:test" {})))))
 
 (defn- styrmann-source-namespaces []
   (->> (all-ns)
-       (map ns-name)
-       (filter #(str/starts-with? (name %) "com.blockether.styrmann."))
-       (remove #(str/ends-with? (name %) "-test"))
-       (sort)))
+    (map ns-name)
+    (filter #(str/starts-with? (name %) "com.blockether.styrmann."))
+    (remove #(str/ends-with? (name %) "-test"))
+    (sort)))
 
 (defn run-tests
   "Run tests for a specific test namespace.
@@ -243,12 +282,12 @@
                    fn-var
                    (let [test-ns (source-ns->test-ns var-ns)]
                      (try (require test-ns :reload)
-                          (find-test-var test-ns fn-name)
-                          (catch java.io.FileNotFoundException _ nil))))]
+                       (find-test-var test-ns fn-name)
+                       (catch java.io.FileNotFoundException _ nil))))]
     (when-not test-var
       (throw (ex-info (str "Test not found for: " fn-name)
-                      {:fn-name fn-name :source-ns var-ns
-                       :expected (str (source-ns->test-ns var-ns) "/" (fn-name->test-name fn-name))})))
+               {:fn-name fn-name :source-ns var-ns
+                :expected (str (source-ns->test-ns var-ns) "/" (fn-name->test-name fn-name))})))
     (when test-var?
       (when-let [source-ns (when (str/ends-with? (name var-ns) "-test")
                              (symbol (subs (name var-ns) 0 (- (count (name var-ns)) 5))))]
@@ -271,11 +310,11 @@
     (let [test-nss (reduce (fn [acc ns-sym]
                              (let [tns (source-ns->test-ns ns-sym)]
                                (try (require tns :reload) (conj acc tns)
-                                    (catch java.io.FileNotFoundException _ acc))))
-                           [] source-nss)]
+                                 (catch java.io.FileNotFoundException _ acc))))
+                     [] source-nss)]
       (if (seq test-nss)
         (do (println (str "  Running: " (count test-nss) " test namespaces"))
-            ((resolve 'lazytest.repl/run-tests) test-nss))
+          ((resolve 'lazytest.repl/run-tests) test-nss))
         (println "  No test namespaces found.")))))
 
 ;; =============================================================================
@@ -302,8 +341,8 @@
         test-path (ns-sym->test-path source-ns)
         test-name (fn-name->test-name fn-name)
         scaffold (str "(defdescribe " test-name "\n"
-                      "  (it \"does something\"\n"
-                      "    (expect (= :expected :expected))))\n")
+                   "  (it \"does something\"\n"
+                   "    (expect (= :expected :expected))))\n")
         file-exists? (.exists (java.io.File. test-path))]
     (when file-exists?
       (when (str/includes? (slurp test-path) (str "(defdescribe " test-name))
@@ -312,13 +351,13 @@
     (.mkdirs (.getParentFile (java.io.File. test-path)))
     (if file-exists?
       (do (spit test-path (str "\n" scaffold) :append true)
-          (println (str "Appended " test-name " to " test-path))
-          {:test-file test-path :test-name test-name :created? false :appended? true})
+        (println (str "Appended " test-name " to " test-path))
+        {:test-file test-path :test-name test-name :created? false :appended? true})
       (let [header (str "(ns " test-ns "\n"
-                        "  (:require\n"
-                        "   [lazytest.core :refer [defdescribe describe it expect expect-it\n"
-                        "                          before after around before-each after-each]]\n"
-                        "   [" source-ns " :as sut]))\n")]
+                     "  (:require\n"
+                     "   [lazytest.core :refer [defdescribe describe it expect expect-it\n"
+                     "                          before after around before-each after-each]]\n"
+                     "   [" source-ns " :as sut]))\n")]
         (spit test-path (str header "\n" scaffold))
         (println (str "Created " test-path " with " test-name))
         {:test-file test-path :test-name test-name :created? true :appended? false}))))
@@ -338,14 +377,14 @@
         fn-vars (get-public-functions ns-sym)
         file-exists? (.exists (java.io.File. test-path))
         test-loaded? (try (require test-ns-sym) true
-                          (catch java.io.FileNotFoundException _ false))
+                       (catch java.io.FileNotFoundException _ false))
         categorized (mapv (fn [v]
                             (let [fn-name (:name (meta v))
                                   exists? (or (and file-exists?
-                                                   (str/includes? (slurp test-path) (str "(defdescribe " (fn-name->test-name fn-name))))
-                                              (and test-loaded? (some? (find-test-var test-ns-sym fn-name))))]
+                                                (str/includes? (slurp test-path) (str "(defdescribe " (fn-name->test-name fn-name))))
+                                            (and test-loaded? (some? (find-test-var test-ns-sym fn-name))))]
                               {:fn-name fn-name :exists? exists?}))
-                          fn-vars)
+                      fn-vars)
         to-create (filterv (complement :exists?) categorized)]
     (println (str "\n=== Scaffolding: " ns-sym " ==="))
     (println (str "Total: " (count fn-vars) " | To create: " (count to-create) " | Exist: " (count (filter :exists? categorized))))
@@ -353,23 +392,31 @@
       (.mkdirs (.getParentFile (java.io.File. test-path)))
       (when-not file-exists?
         (spit test-path (str "(ns " test-ns-sym "\n"
-                             "  (:require\n"
-                             "   [lazytest.core :refer [defdescribe describe it expect expect-it\n"
-                             "                          before after around before-each after-each]]\n"
-                             "   [" ns-sym " :as sut]))\n")))
+                          "  (:require\n"
+                          "   [lazytest.core :refer [defdescribe describe it expect expect-it\n"
+                          "                          before after around before-each after-each]]\n"
+                          "   [" ns-sym " :as sut]))\n")))
       (doseq [{:keys [fn-name]} to-create]
         (spit test-path (str "\n(defdescribe " (fn-name->test-name fn-name) "\n"
-                             "  (it \"does something\"\n"
-                             "    (expect (= :expected :expected))))\n")
-              :append true)
+                          "  (it \"does something\"\n"
+                          "    (expect (= :expected :expected))))\n")
+          :append true)
         (println (str "  Created: " (fn-name->test-name fn-name)))))
     {:test-file test-path :created (count to-create) :skipped (- (count fn-vars) (count to-create))}))
 
 ;; -- clj-reload + clojure+ ---------------------------------------------------
 
-(reload/init {:dirs ["src" "dev"]})
-((requiring-resolve 'clojure+.hashp/install!))
-((requiring-resolve 'clojure+.error/install!))
+(defonce ^:private _reload-init
+  (reload/init {:dirs       ["src" "test"]
+                :no-unload '#{user}
+                :no-reload '#{taoensso.telemere
+                              taoensso.telemere.impl
+                              taoensso.encore
+                              taoensso.encore.signals}}))
+
+(defonce ^:private _clojure-plus-init
+  (do ((requiring-resolve 'clojure+.hashp/install!))
+      ((requiring-resolve 'clojure+.error/install!))))
 
 ;; -- auto-start on load ------------------------------------------------------
 

@@ -51,7 +51,7 @@
     (btn-children attrs children)))
 
 (defn action-link
-  "Link styled as a primary button (for Datastar SSE anchors)."
+  "Link styled as a primary button."
   [attrs & children]
   (into [:a (merge (clean-attrs attrs)
                {:class (merge-class "btn-primary" attrs)})]

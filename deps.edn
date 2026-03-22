@@ -7,8 +7,6 @@
   com.blockether/svar              {:local/root "../svar"}
   ;; Browser automation (Playwright)
   com.blockether/spel              {:mvn/version "0.7.7"}
-  ;; Datastar — Ring adapter (brings in sdk transitively)
-  dev.data-star.clojure/ring       {:mvn/version "1.0.0-RC8"}
   ;; Ring — Jetty adapter
   ring/ring-jetty-adapter          {:mvn/version "1.15.3"}
    ;; nREPL — embedded in dev + prod

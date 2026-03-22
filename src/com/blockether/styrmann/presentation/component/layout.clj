@@ -3,8 +3,7 @@
   (:require
    [com.blockether.styrmann.presentation.component.command-palette :as command-palette]
    [com.blockether.styrmann.presentation.component.modal :as modal]
-   [hiccup2.core :as h]
-   [starfederation.datastar.clojure.api :as d*]))
+   [hiccup2.core :as h]))
 
 (def ^:private base-styles
   "@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Fira+Code:wght@400;500&family=Inter:wght@400;500;600;700&family=IA+Writer+Quattro:ital,wght@0,400;0,700;1,400&display=swap');
@@ -192,7 +191,7 @@ a:hover { color: var(--accent-hover); }
      [:script {:src "https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"}]
      [:style {:type "text/tailwindcss"} (raw-html "@custom-variant dark (&:where(.dark, .dark *));")]
      [:script {:src "https://unpkg.com/lucide@latest"}]
-     [:script {:type "module" :src d*/CDN-url}]
+     [:script {:src "https://unpkg.com/htmx.org@2.0.4"}]
      [:style (raw-html base-styles)]]
     [:body {:class "min-h-screen bg-[var(--cream)]"}
      (command-palette/shell
@@ -209,7 +208,7 @@ a:hover { color: var(--accent-hover); }
      [:nav {:class "sticky top-0 z-50 bg-[var(--surface)] border-b border-[var(--line)] backdrop-blur-sm"}
       [:div {:class "mx-auto max-w-6xl flex items-center justify-between px-5 h-14 gap-3"}
        [:a {:href "/"
-            :data-on-click (str "$evt.preventDefault();" (d*/sse-get "/fragments/home"))
+            :hx-get "/fragments/home" :hx-target "#main-content" :hx-swap "innerHTML" :hx-push-url "/"
             :class "flex items-center gap-2.5 no-underline cursor-pointer"}
         [:div {:class "flex items-center justify-center w-8 h-8 rounded-lg bg-[var(--charcoal)]"}
          [:i {:data-lucide "anchor" :class "size-4 text-white"}]]
@@ -731,17 +730,20 @@ lucide.createIcons();
   (render-fragment (panel-node content)))
 
 (defn nav-attrs
-  "Generate href + data-on-click attrs for Datastar-enhanced navigation.
+  "Generate href + htmx attrs for enhanced navigation.
 
    Params:
-   `href` - String. The full page URL (fallback).
-   `fragment-path` - String. The SSE fragment URL.
+   `href` - String. The full page URL (also used as push-url).
+   `fragment-path` - String. The htmx fragment URL.
 
    Returns:
    Map of HTML attributes."
   [href fragment-path]
   {:href href
-   :data-on-click (str "$evt.preventDefault();" (d*/sse-get fragment-path))})
+   :hx-get fragment-path
+   :hx-target "#main-content"
+   :hx-swap "innerHTML"
+   :hx-push-url href})
 
 (defn stack
   "Join HTML fragments without separators.
@@ -768,34 +770,40 @@ lucide.createIcons();
     (raw-html body)]))
 
 (defn render-breadcrumb-fragment
-  "Render breadcrumbs as an HTML fragment for SSE patching.
+  "Render breadcrumbs as an HTML fragment for htmx OOB patching.
 
    Params:
    `breadcrumbs` - Seq of maps with :href and :label.
+   `oob?` - Boolean. When true, adds hx-swap-oob=\"outerHTML\" for htmx OOB swap.
 
    Returns:
    HTML string wrapped in a div with id=breadcrumbs."
-  [breadcrumbs]
-  (render-fragment
-   [:div {:id "breadcrumbs" :class "mx-auto max-w-6xl px-5 pt-5 pb-2"}
-    (when (seq breadcrumbs)
-      (into [:div {:class "flex items-center gap-1.5 text-[12px] text-[var(--muted)] overflow-hidden"}]
-            (interpose
-             [:span {:class "flex-shrink-0"} "/"]
-             (for [{:keys [href label]} breadcrumbs]
-               (if href
-                 [:a {:href href :class "text-[var(--muted)] hover:text-[var(--accent)] no-underline truncate max-w-[200px] sm:max-w-none"} label]
-                 [:span {:class "font-medium text-[var(--ink-secondary)] truncate max-w-[240px] sm:max-w-none"} label])))))]))
+  ([breadcrumbs] (render-breadcrumb-fragment breadcrumbs false))
+  ([breadcrumbs oob?]
+   (render-fragment
+    [:div (cond-> {:id "breadcrumbs" :class "mx-auto max-w-6xl px-5 pt-5 pb-2"}
+            oob? (assoc :hx-swap-oob "outerHTML"))
+     (when (seq breadcrumbs)
+       (into [:div {:class "flex items-center gap-1.5 text-[12px] text-[var(--muted)] overflow-hidden"}]
+             (interpose
+              [:span {:class "flex-shrink-0"} "/"]
+              (for [{:keys [href label]} breadcrumbs]
+                (if href
+                  [:a {:href href :class "text-[var(--muted)] hover:text-[var(--accent)] no-underline truncate max-w-[200px] sm:max-w-none"} label]
+                  [:span {:class "font-medium text-[var(--ink-secondary)] truncate max-w-[240px] sm:max-w-none"} label])))))])))
 
 (defn render-topbar-context-fragment
-  "Render the topbar organization context fragment for SSE patching.
+  "Render the topbar organization context fragment for htmx OOB patching.
 
    Params:
    `content` - Hiccup node or HTML string.
+   `oob?` - Boolean. When true, adds hx-swap-oob=\"outerHTML\" for htmx OOB swap.
 
    Returns:
    HTML string wrapped in a div with id=topbar-context."
-  [content]
-  (render-fragment
-   [:div {:id "topbar-context"}
-    (raw-html content)]))
+  ([content] (render-topbar-context-fragment content false))
+  ([content oob?]
+   (render-fragment
+    [:div (cond-> {:id "topbar-context"}
+            oob? (assoc :hx-swap-oob "outerHTML"))
+     (raw-html content)])))

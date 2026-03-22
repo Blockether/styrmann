@@ -6,8 +6,7 @@
    [com.blockether.styrmann.execution.session :as session]
    [com.blockether.styrmann.i18n :as i18n]
    [com.blockether.styrmann.presentation.component.layout :as layout]
-   [com.blockether.styrmann.presentation.component.ui :as ui]
-   [starfederation.datastar.clojure.api :as d*]))
+   [com.blockether.styrmann.presentation.component.ui :as ui]))
 
 ;; -- Form helpers -------------------------------------------------------------
 
@@ -88,7 +87,7 @@
     (try (java.util.UUID/fromString s) (catch Exception _ nil))))
 
 (defn- provider-model-row
-  "Render a provider + model pair. When provider changes, Datastar SSE fetches updated model options."
+  "Render a provider + model pair. When provider changes, htmx fetches updated model options."
   [label prefix provider-options models-by-provider org-id & [{:keys [selected-provider selected-model]}]]
   (let [model-options (into [["" "Select model"]]
                             (->> (if selected-provider
@@ -102,7 +101,11 @@
        [:span {:class "text-[12px] font-medium text-[var(--muted)] uppercase tracking-wider mb-1 block"} "Provider"]
        (into [:select {:class "input"
                        :name (str prefix "-provider-id")
-                       :data-on-change (str "@get('/organizations/" org-id "/settings/runner-models?prefix=" prefix "&provider-id='+this.value+'')")}]
+                       :hx-get (str "/organizations/" org-id "/settings/runner-models?prefix=" prefix)
+                       :hx-target (str "#model-select-" prefix)
+                       :hx-swap "outerHTML"
+                       :hx-trigger "change"
+                       :hx-vals "js:{\"provider-id\": this.value}"}]
              (for [[value label-text] provider-options]
                [:option (cond-> {:value value}
                           (= value (or selected-provider "")) (assoc :selected true))

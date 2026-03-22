@@ -13,7 +13,6 @@
    [com.blockether.styrmann.presentation.component.layout :as layout]
    [com.blockether.styrmann.presentation.component.modal :as modal]
    [com.blockether.styrmann.presentation.component.task-card :as task-card]
-   [starfederation.datastar.clojure.api :as d*]
    [com.blockether.styrmann.presentation.component.ui :as ui]))
 
 (defn- criteria-tree [items]
@@ -271,7 +270,10 @@
                 [:div {:class "flex flex-col gap-2"}
                  (when (empty? (:ticket/tasks t))
                    [:button {:class "btn-primary w-full" :type "button"
-                             :data-on-click (d*/sse-get (str "/organizations/" org-id "/tickets/" ticket-id "/decompose"))}
+                             :hx-get (str "/organizations/" org-id "/tickets/" ticket-id "/decompose")
+                             :hx-target "#decompose-status"
+                             :hx-swap "outerHTML"
+                             :hx-indicator "#decompose-status"}
                     [:i {:data-lucide "sparkles" :class "size-4"}]
                     (i18n/t :ticket/decompose)])
                  [:div {:id "decompose-status"}]

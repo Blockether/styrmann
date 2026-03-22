@@ -1,6 +1,6 @@
-# Styrmann - Clojure Datastar Application
+# Styrmann - Clojure HTMX Application
 
-Backend-only Clojure application with Ring/Jetty, Datastar SSE, and Tailwind CSS.
+Backend-only Clojure application with Ring/Jetty, HTMX, and Tailwind CSS.
 
 ## Quick Reference
 
@@ -288,7 +288,7 @@ clj-nrepl-eval -p 7888 "(scaffold-test-namespace 'com.blockether.styrmann.domain
 (ns com.blockether.styrmann.feature
   (:require
    [ring.adapter.jetty :as jetty]          ; External libs first
-   [starfederation.datastar.clojure.sdk :as ds]  ; Alphabetical
+   [ring.util.response :as response]              ; Alphabetical
    [com.blockether.styrmann.util :as util]))              ; Project namespaces last
 ```
 
@@ -380,7 +380,7 @@ Do not put Datalevin queries in presentation namespaces. Do not put HTML renderi
 | Layer | Technology |
 |-------|-----------|
 | **HTTP server** | Ring + Jetty |
-| **Reactivity** | Datastar (SSE) |
+| **Reactivity** | HTMX |
 | **Database** | Datalevin (embedded Datalog) |
 | **LLM output** | Svar |
 | **Browser automation** | Spel (Playwright) |
@@ -388,9 +388,9 @@ Do not put Datalevin queries in presentation namespaces. Do not put HTML renderi
 | **Icons** | Lucide (CDN) |
 | **Testing** | Lazytest |
 
-### Datastar SSE
+### HTMX
 
-All dynamic UI updates go through Datastar server-sent events via `dev.data-star.clojure/ring`. No SPA, no client-side routing — server-driven hypermedia.
+All dynamic UI updates go through HTMX. No SPA, no client-side routing — server-driven hypermedia. Endpoints return HTML fragments; HTMX swaps them into the DOM via `hx-get`, `hx-post`, `hx-target`, `hx-swap`, and OOB swaps.
 
 ### Tailwind CSS v4
 

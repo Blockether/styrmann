@@ -52,17 +52,27 @@
         (db/stop!)
         (t/log! :info "Datalevin stopped")))))
 
+(defn init-tools!
+  "Register default tools, sync to DB, and bootstrap.
+
+   Params:
+   `conn` - Datalevin connection.
+
+   Returns:
+   nil."
+  [conn]
+  (tool-registry/register-default-tools!)
+  (session/sync-tool-definitions! conn (tool-registry/list-tools))
+  (session/ensure-explorer-agent! conn)
+  (bootstrap/ensure-from-git! conn)
+  (t/log! :info "Tools registered and bootstrap complete"))
+
 (defn tool-registry
   "Register default tools and sync to DB."
   {::di/kind :component}
   [{datalevin `datalevin}]
-  (let [conn @datalevin]
-    (tool-registry/register-default-tools!)
-    (session/sync-tool-definitions! conn (tool-registry/list-tools))
-    (session/ensure-explorer-agent! conn)
-    (bootstrap/ensure-from-git! conn)
-    (t/log! :info "Tools registered and bootstrap complete")
-    (reify java.lang.AutoCloseable (close [_]))))
+  (init-tools! @datalevin)
+  (reify java.lang.AutoCloseable (close [_])))
 
 (defn nrepl-server
   "nREPL server component."
@@ -91,14 +101,16 @@
       clojure.lang.IDeref (deref [_] server)
       java.lang.AutoCloseable
       (close [_]
+        (doseq [c (.getConnectors server)]
+          (.close c))
         (.stop server)
+        (.join server)
         (t/log! :info "HTTP stopped")))))
 
 (defn app
-  "Root component that starts all services."
+  "Root component — HTTP server + DB + tools. nREPL is managed separately."
   {::di/kind :component}
-  [{http `http-server
-    _nrepl `nrepl-server}]
+  [{http `http-server}]
   (t/log! :info "Styrmann started")
   (reify
     clojure.lang.IDeref (deref [_] @http)
@@ -109,7 +121,14 @@
 ;; -- Entry point -------------------------------------------------------------
 
 (defn -main [& _args]
-  (let [system (di/start `app)]
+  (let [nrepl-port (parse-long (or (System/getenv "NREPL_PORT") "7888"))
+        nrepl (nrepl/start-server :port nrepl-port)
+        _ (spit ".nrepl-port" (str nrepl-port))
+        _ (t/log! :info ["nREPL listening" {:port nrepl-port}])
+        system (di/start `app)]
     (.addShutdownHook (Runtime/getRuntime)
-                      (Thread. #(di/stop system) "styrmann-shutdown"))
+                      (Thread. (fn []
+                                 (di/stop system)
+                                 (nrepl/stop-server nrepl))
+                               "styrmann-shutdown"))
     (.join @(di/ref `http-server))))

@@ -14,8 +14,7 @@
    [com.blockether.styrmann.presentation.component.layout :as layout]
    [com.blockether.styrmann.presentation.component.ui :as ui]
    [datalevin.core :as d]
-   [nextjournal.markdown :as md]
-   [starfederation.datastar.clojure.api :as d*]))
+   [nextjournal.markdown :as md]))
 
 (def ^:private next-statuses
   {:task.status/inbox        [:task.status/implementing]
@@ -321,9 +320,10 @@
                          :session/messages (session/list-session-messages conn (:session/id run))))
                  (session/list-by-task conn task-id))
           any-running? (some #(= :session.runtime/running (:run/status %)) runs)]
-      {:html [:div {:id "run-history"
-                    :data-on-load (when any-running?
-                                    (d*/sse-get (str "/fragments/tasks/" task-id "/runs")))}
+      {:html [:div (cond-> {:id "run-history"}
+                    any-running? (merge {:hx-get (str "/fragments/tasks/" task-id "/runs")
+                                         :hx-trigger "load delay:2s"
+                                         :hx-swap "outerHTML"}))
               (ui/section-heading {:title (i18n/t :task/run-history) :count (count runs)})
               (if (seq runs)
                 (into [:div {:class "mt-4 space-y-3"}]
@@ -430,7 +430,9 @@
                                     vec)))]
               (git-progress/commits-section git-commits {:title "Git Activity"}))
             [:div {:id "run-history"
-                   :data-on-load (d*/sse-get (str "/fragments/tasks/" task-id "/runs"))}
+                   :hx-get (str "/fragments/tasks/" task-id "/runs")
+                   :hx-trigger "load"
+                   :hx-swap "outerHTML"}
              (ui/section-heading {:title (i18n/t :task/run-history) :count (count runs)})
              (if (seq runs)
                (into [:div {:class "mt-4 space-y-3"}]
