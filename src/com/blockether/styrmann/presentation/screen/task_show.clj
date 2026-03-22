@@ -128,8 +128,10 @@
                    [:div {:class "px-3 pb-3 space-y-2"}
                     ;; Reasoning — rendered as markdown with prose font
                     (when reasoning
-                      [:div {:class "rounded-lg px-3 py-2 bg-purple-50 border-l-4 border-[var(--purple)]"}
-                       [:div {:class "text-[11px] font-prose text-[var(--ink-secondary)] leading-relaxed max-h-48 overflow-auto"}
+                      [:div {:class "rounded-lg px-3 py-2 border-l-4"
+                             :style "background: var(--purple-soft); border-color: var(--purple);"}
+                       [:div {:class "text-[11px] font-prose leading-relaxed max-h-48 overflow-auto"
+                              :style "color: var(--ink-secondary);"}
                         (render-markdown reasoning)]])
                     ;; Code executions
                     (when (seq execs)
@@ -146,8 +148,10 @@
                ;; Thinking (legacy, from old runs)
                 :session.event.type/thinking
                 (when-let [r (:reasoning payload)]
-                  [:div {:class "rounded-lg px-3 py-2 bg-purple-50 border-l-4 border-[var(--purple)]"}
-                   [:div {:class "text-[11px] font-prose text-[var(--ink-secondary)] leading-relaxed max-h-32 overflow-auto"}
+                  [:div {:class "rounded-lg px-3 py-2 border-l-4"
+                         :style "background: var(--purple-soft); border-color: var(--purple);"}
+                   [:div {:class "text-[11px] font-prose leading-relaxed max-h-32 overflow-auto"
+                          :style "color: var(--ink-secondary);"}
                     (render-markdown r)]])
 
                ;; Tool call start — collapsible (legacy, from old runs without on-iteration)
