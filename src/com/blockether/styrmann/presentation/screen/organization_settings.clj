@@ -82,40 +82,42 @@
 
 ;; -- Runner tab ---------------------------------------------------------------
 
-(defn- runner-settings-card [organization-id org environments providers]
+(defn- str->uuid [s]
+  (when (and s (not= "" s))
+    (try (java.util.UUID/fromString s) (catch Exception _ nil))))
+
+(defn- provider-model-row [label prefix provider-options models-by-provider & [{:keys [selected-provider selected-model]}]]
+  (let [model-options (if selected-provider
+                        (let [models (get models-by-provider (str->uuid selected-provider))]
+                          (into [["" "Select model"]] (mapv (fn [m] [m m]) models)))
+                        [["" "Select provider first"]])]
+    [:div {:class "card p-4"}
+     [:div {:class "text-[11px] font-medium text-[var(--muted)] uppercase tracking-wider mb-3"} label]
+     [:div {:class "grid grid-cols-2 gap-3"}
+      (select-field "Provider" (str prefix "-provider-id") provider-options (or selected-provider ""))
+      (select-field "Model" (str prefix "-model") model-options (or selected-model ""))]]))
+
+(defn- runner-settings-card [organization-id org environments providers all-models]
   (let [workspaces (:organization/workspaces org)
-        provider-options (into [["" "Use default provider"]]
+        provider-options (into [["" "—"]]
                                (mapv (fn [p] [(str (:provider/id p)) (:provider/name p)]) providers))
-        model-options [["" "None"]
-                       ["glm-5-turbo" "GLM 5 Turbo"]
-                       ["glm-5" "GLM 5"]
-                       ["gpt-4o" "GPT-4o"]
-                       ["gpt-4o-mini" "GPT-4o Mini"]
-                       ["gpt-4.1" "GPT-4.1"]
-                       ["gpt-4.1-mini" "GPT-4.1 Mini"]
-                       ["gpt-4.1-nano" "GPT-4.1 Nano"]
-                       ["o3" "o3"]
-                       ["o4-mini" "o4-mini"]
-                       ["claude-opus-4-6" "Claude Opus 4.6"]
-                       ["claude-sonnet-4-6" "Claude Sonnet 4.6"]
-                       ["claude-haiku-4-5" "Claude Haiku 4.5"]
-                       ["gemini-2.5-pro" "Gemini 2.5 Pro"]
-                       ["gemini-2.5-flash" "Gemini 2.5 Flash"]]]
+        ;; For initial render, show all models merged (JS would filter per-provider)
+        models-by-provider (into {} (map (fn [[k v]] [k (vec (sort v))]) all-models))
+        ;; Also create a merged list for static fallback
+        all-model-options (into [["" "None"]]
+                                (->> (vals all-models) (apply concat) (map str) distinct sort
+                                     (mapv (fn [m] [m m]))))]
     [:div {:class "space-y-6"}
      ;; Default runner config
      [:div {:class "card p-5"}
       [:h2 {:class "text-[16px] font-medium mb-1"} "Default Runner"]
       [:p {:class "text-[13px] text-[var(--muted)] mb-4"}
-       "Default model and provider for all workspaces. Workspace-specific overrides below."]
-      [:form {:class "space-y-4" :method "post" :action (str "/organizations/" organization-id "/settings/runner")}
+       "Primary provider and model. Fallbacks are tried in order when the primary fails."]
+      [:form {:class "space-y-3" :method "post" :action (str "/organizations/" organization-id "/settings/runner")}
        [:input {:type "hidden" :name "workspace-id" :value ""}]
-       [:div {:class "grid grid-cols-2 gap-4"}
-        (select-field "Provider" "provider-id" provider-options "")
-        (select-field "Default model" "model" (rest model-options) "glm-5-turbo")]
-       [:div {:class "grid grid-cols-3 gap-3"}
-        (select-field "Fallback 1" "fallback-1" model-options "gpt-4o")
-        (select-field "Fallback 2" "fallback-2" model-options "gpt-4o-mini")
-        (select-field "Fallback 3" "fallback-3" model-options "")]
+       (provider-model-row "Primary" "primary" provider-options models-by-provider)
+       (provider-model-row "Fallback 1" "fallback-1" provider-options models-by-provider)
+       (provider-model-row "Fallback 2" "fallback-2" provider-options models-by-provider)
        [:div {:class "flex justify-end pt-2"}
         [:button {:class "btn-primary" :type "submit"}
          [:i {:data-lucide "save" :class "size-4"}]
@@ -181,7 +183,8 @@
     (if-let [org (organization/overview conn organization-id)]
       (let [organizations (organization/list-organizations conn)
             environments (session/list-environments-by-organization conn organization-id)
-            providers (provider/list-providers conn)]
+            providers (provider/list-providers conn)
+            all-models (when (= active-tab :runner) (provider/fetch-all-models conn))]
         (layout/page
          "Organization settings"
          [:div {:class "max-w-3xl space-y-6"}
@@ -200,17 +203,8 @@
           ;; Tab content
           (case active-tab
             :providers (llm-providers-card organization-id providers)
-            :runner (runner-settings-card organization-id org environments providers))
-          ;; Org info
-          [:div {:class "card p-5"}
-           [:div {:class "text-[12px] font-medium text-[var(--muted)] uppercase tracking-wider mb-2"}
-            (i18n/t :settings/current-organization)]
-           [:div {:class "text-[20px]" :style "font-family: 'DM Serif Display', Georgia, serif"}
-            (:organization/name org)]
-           [:p {:class "mt-2 text-[13px] text-[var(--muted)]"}
-            (if (:organization/default? org)
-              (i18n/t :settings/is-default-org)
-              (i18n/t :settings/not-default-org))]]]
+            :runner (runner-settings-card organization-id org environments providers all-models))
+]
          {:breadcrumbs [{:href "/" :label "Organizations"}
                         {:href (str "/organizations/" organization-id) :label (:organization/name org)}
                         {:label (i18n/t :settings/title)}]
