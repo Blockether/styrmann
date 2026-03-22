@@ -67,7 +67,8 @@
                         {:ticket-id (str (:ticket/id ticket))})]
             (expect (= true (:ok? result)))
             (expect (= 2 (:count result)))
-            (expect (= 2 (count (:tasks result)))))))))
+            (expect (= #{"Setup OAuth provider" "Build login UI"}
+                       (set (map :task/description (:tasks result))))))))))
 
 (defdescribe git-repo-summary-test
   (describe "tools.git/repo-summary"
@@ -116,7 +117,14 @@
   (describe "tool registry resolves all default tools"
     (it "all default tool fn-symbols resolve without error"
         (registry/register-default-tools!)
-        (let [tools (registry/list-tools)]
+        (let [tools     (registry/list-tools)
+              fn-symbols (set (map :fn-symbol tools))]
+          ;; 20 tools: filesystem (5), structural-edit (3), spel (2), system (4), explore (2), ticket (1), task (1), git (1), ticket-runner (1)
           (expect (= 20 (count tools)))
           (doseq [tool tools]
-            (expect (some? (requiring-resolve (symbol (:fn-symbol tool))))))))))
+            (expect (some? (requiring-resolve (symbol (:fn-symbol tool))))))
+          ;; Spot-check key tool fn-symbols are present
+          (expect (contains? fn-symbols "com.blockether.styrmann.execution.tools.filesystem/read-file"))
+          (expect (contains? fn-symbols "com.blockether.styrmann.execution.tools.filesystem/write-file"))
+          (expect (contains? fn-symbols "com.blockether.styrmann.execution.tools.system/signal-event"))
+          (expect (contains? fn-symbols "com.blockether.styrmann.runner.tools.ticket/find-ticket"))))))

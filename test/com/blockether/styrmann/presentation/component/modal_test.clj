@@ -45,6 +45,14 @@
     (= tag (first tree)) tree
     :else (some #(find-tag % tag) (drop 2 tree))))
 
+(defn- find-by-id
+  "Walk hiccup tree and return the first element with :id = `id`."
+  [tree id]
+  (cond
+    (not (vector? tree)) nil
+    (= id (get-in tree [1 :id])) tree
+    :else (some #(find-by-id % id) (drop 2 tree))))
+
 ;; ---------------------------------------------------------------------------
 ;; shell — structure and ARIA
 ;; ---------------------------------------------------------------------------
@@ -114,18 +122,21 @@
 
   (describe "footer"
     (it "renders footer element when :footer opt is provided"
-      (let [footer [:button "Save"]
+      (let [footer [:button {:id "footer-save"} "Save"]
             result (sut/shell "m" "T" "S" [:p "b"] {:footer footer})
-            footer-divs (find-by-class result "flex-shrink-0")]
-        (expect (= 1 (count footer-divs)))))
+            footer-divs (find-by-class result "flex-shrink-0")
+            save-btn    (find-by-id result "footer-save")]
+        (expect (= 1 (count footer-divs)))
+        (expect (some? save-btn))
+        (expect (= "Save" (last save-btn)))))
 
     (it "footer contains the provided footer hiccup"
-      (let [footer  [:button {:id "save-btn"} "Save"]
-            result  (sut/shell "m" "T" "S" [:p "b"] {:footer footer})
-            save-btn (find-tag result :button)]
-        ;; The save button should appear somewhere in the tree
-        (let [all-buttons (find-by-class result "")]
-          (expect (some? (find-tag result :button))))))
+      (let [footer   [:button {:id "save-btn"} "Save"]
+            result   (sut/shell "m" "T" "S" [:p "b"] {:footer footer})
+            save-btn (find-by-id result "save-btn")]
+        (expect (some? save-btn))
+        (expect (= "save-btn" (get-in save-btn [1 :id])))
+        (expect (= "Save" (last save-btn)))))
 
     (it "does not render footer section when :footer is nil"
       (let [result      (sut/shell "m" "T" "S" [:p "b"] {:footer nil})

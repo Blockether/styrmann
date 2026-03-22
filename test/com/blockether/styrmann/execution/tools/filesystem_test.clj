@@ -68,7 +68,21 @@
   (describe "path security"
     (it "rejects path that escapes workspace root via .."
       (with-temp-dir [dir (temp-dir)]
-        (expect (throws-exception? #(sut/read-file (ctx dir) {:path "../../etc/passwd"})))))))
+        (expect (throws-exception? #(sut/read-file (ctx dir) {:path "../../etc/passwd"})))))
+
+    (it "rejects symlink that points outside the workspace root"
+      (with-temp-dir [dir (temp-dir)]
+        ;; Create a file outside the workspace
+        (let [outside-file (java.io.File/createTempFile "outside" ".txt")]
+          (try
+            (spit outside-file "secret content")
+            ;; Create a symlink inside the workspace pointing to the outside file
+            (let [link-path (java.nio.file.Paths/get (str dir "/escape-link.txt") (make-array String 0))
+                  target    (java.nio.file.Paths/get (.getAbsolutePath outside-file) (make-array String 0))]
+              (java.nio.file.Files/createSymbolicLink link-path target (make-array java.nio.file.attribute.FileAttribute 0))
+              (expect (throws-exception? #(sut/read-file (ctx dir) {:path "escape-link.txt"}))))
+            (finally
+              (.delete outside-file))))))))
 
 ;; ---------------------------------------------------------------------------
 ;; write-file
@@ -160,7 +174,7 @@
         (let [result (sut/grep (ctx dir) {:pattern "alpha-fn"})]
           (expect (= true (:ok? result)))
           (expect (= 1 (:count result)))
-          (expect (clojure.string/includes? (first (:matches result)) "alpha-fn")))))
+          (expect (clojure.string/ends-with? (first (:matches result)) "alpha.clj:1:(defn alpha-fn [] :ok)")))))
 
     (it "returns empty matches when pattern is not found"
       (with-temp-dir [dir (temp-dir)]
@@ -177,7 +191,7 @@
         (let [result (sut/grep (ctx dir) {:pattern "target-word" :glob "*.clj"})]
           (expect (= true (:ok? result)))
           (expect (= 1 (:count result)))
-          (expect (clojure.string/includes? (first (:matches result)) "match.clj"))))))
+          (expect (clojure.string/ends-with? (first (:matches result)) "match.clj:1:target-word in clj file"))))))
 
   (describe "path security"
     (it "rejects path argument that escapes workspace root"
@@ -199,7 +213,7 @@
         (let [result (sut/glob-files (ctx dir) {:pattern "**/*.clj"})]
           (expect (= true (:ok? result)))
           (expect (= 2 (:count result)))
-          (expect (every? #(clojure.string/ends-with? % ".clj") (:files result))))))
+          (expect (= #{"src/a.clj" "src/b.clj"} (set (:files result)))))))
 
     (it "returns zero files when no files match"
       (with-temp-dir [dir (temp-dir)]
@@ -217,7 +231,7 @@
         (let [result (sut/glob-files (ctx dir) {:pattern "**/*.clj" :path "sub"})]
           (expect (= true (:ok? result)))
           (expect (= 1 (:count result)))
-          (expect (clojure.string/includes? (first (:files result)) "nested.clj"))))))
+          (expect (= "pkg/nested.clj" (first (:files result))))))))
 
   (describe "path security"
     (it "rejects path argument that escapes workspace root"

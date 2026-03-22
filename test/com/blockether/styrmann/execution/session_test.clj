@@ -42,15 +42,27 @@
                    conn
                    {:task-id (:task/id created-task)
                     :command ["bash" "-lc" "printf 'hello from run'; sleep 2"]})]
-          (Thread/sleep 150)
-          (let [running-observation (sut/observe conn (:session/id run))]
+          ;; Poll until running (up to 2s, 50ms intervals)
+          (let [running-observation
+                (loop [attempts 40]
+                  (let [obs (sut/observe conn (:session/id run))]
+                    (if (or (= :session.runtime/running (:session/runtime-status obs))
+                            (zero? attempts))
+                      obs
+                      (do (Thread/sleep 50) (recur (dec attempts))))))]
             (expect (= (:task/id created-task)
                        (-> run :session/workflow :workflow/task :task/id)))
             (expect (= (:session/pid run)
                        (:session/pid running-observation)))
             (expect (= :session.runtime/running (:session/runtime-status running-observation))))
-          (Thread/sleep 2200)
-          (let [finished-observation (sut/observe conn (:session/id run))]
+          ;; Poll until exited (up to 6s, 100ms intervals)
+          (let [finished-observation
+                (loop [attempts 60]
+                  (let [obs (sut/observe conn (:session/id run))]
+                    (if (or (= :session.runtime/exited (:session/runtime-status obs))
+                            (zero? attempts))
+                      obs
+                      (do (Thread/sleep 100) (recur (dec attempts))))))]
             (expect (= :session.runtime/exited (:session/runtime-status finished-observation)))
             (expect (= "hello from run"
                        (:session/logs finished-observation))))))))
@@ -282,12 +294,15 @@
               payload (:session.event/payload start)]
           (expect (= "fs.read-file" (:tool-key payload)))
           (expect (some? (:input payload)))
-          (expect (clojure.string/includes? (:input payload) "src/app.clj"))))))
+          (let [input-map (clojure.edn/read-string (:input payload))]
+            (expect (= "src/app.clj" (:path input-map)))
+            (expect (= 1 (:start-line input-map)))
+            (expect (= 10 (:end-line input-map))))))))
 
   (it "truncates long string values in call-start input to 200 chars"
     (with-temp-conn [conn (temp-conn)]
-      (let [session (make-session conn)
-            sid     (:session/id session)
+      (let [session  (make-session conn)
+            sid      (:session/id session)
             long-str (apply str (repeat 300 \x))]
         (sut/with-tool-event conn sid "fs.write-file"
           {:path "out.txt" :content long-str}
@@ -298,8 +313,8 @@
                                      events))
               payload (:session.event/payload start)
               input   (clojure.edn/read-string (:input payload))]
-          (expect (<= (count (:content input)) 203))  ;; 200 + "..."
-          (expect (clojure.string/ends-with? (:content input) "..."))))))
+          (expect (= 203 (count (:content input))))
+          (expect (= (str (apply str (repeat 200 \x)) "...") (:content input)))))))
 
   (it "truncates call-end output summary at 500 chars"
     (with-temp-conn [conn (temp-conn)]
@@ -309,13 +324,13 @@
         (sut/with-tool-event conn sid "fs.read-file"
           nil
           #(do big-str))
-        (let [events   (sut/list-session-events conn sid)
-              end-ev   (first (filter #(= :session.event.type/call-end
-                                         (:session.event/type %))
-                                      events))
-              output   (get-in end-ev [:session.event/payload :output])]
-          (expect (<= (count output) 503))  ;; 500 + "..."
-          (expect (clojure.string/ends-with? output "...")))))
+        (let [events  (sut/list-session-events conn sid)
+              end-ev  (first (filter #(= :session.event.type/call-end
+                                        (:session.event/type %))
+                                     events))
+              output  (get-in end-ev [:session.event/payload :output])]
+          (expect (= 503 (count output)))
+          (expect (= (str (apply str (repeat 500 \a)) "...") output))))))
 
   (it "records result map truncating long string values in call-end output"
     (with-temp-conn [conn (temp-conn)]
@@ -329,7 +344,8 @@
               end-ev  (first (filter #(= :session.event.type/call-end
                                         (:session.event/type %))
                                      events))
-              output  (get-in end-ev [:session.event/payload :output])]
-          (expect (some? output))
-          (expect (clojure.string/includes? output "...")))))))
-)
+              output  (get-in end-ev [:session.event/payload :output])
+              output-map (clojure.edn/read-string output)]
+          (expect (= true (:ok? output-map)))
+          (expect (= 203 (count (:content output-map))))
+          (expect (= (str (apply str (repeat 200 \z)) "...") (:content output-map))))))))

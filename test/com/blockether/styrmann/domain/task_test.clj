@@ -193,8 +193,8 @@
                       cycle-error (first (filter #(= :cycle (:type %)) errors))]
                   (expect (false? valid))
                   (expect (some? cycle-error))
-                  (expect (seq (:indices cycle-error)))
-                  (expect (seq (:descriptions cycle-error)))))
+                  (expect (= [0 1 0] (:indices cycle-error)))
+                  (expect (= ["Task A" "Task B" "Task A"] (:descriptions cycle-error)))))
 
             (it "detects invalid workspace-id"
                 (let [specs [{:workspace-id "not-a-uuid" :description "Task A"}]
