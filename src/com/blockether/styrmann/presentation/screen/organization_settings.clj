@@ -6,7 +6,8 @@
    [com.blockether.styrmann.execution.session :as session]
    [com.blockether.styrmann.i18n :as i18n]
    [com.blockether.styrmann.presentation.component.layout :as layout]
-   [com.blockether.styrmann.presentation.component.ui :as ui]))
+   [com.blockether.styrmann.presentation.component.ui :as ui]
+   [starfederation.datastar.clojure.api :as d*]))
 
 ;; -- Form helpers -------------------------------------------------------------
 
@@ -86,16 +87,28 @@
   (when (and s (not= "" s))
     (try (java.util.UUID/fromString s) (catch Exception _ nil))))
 
-(defn- provider-model-row [label prefix provider-options models-by-provider & [{:keys [selected-provider selected-model]}]]
-  (let [model-options (if selected-provider
-                        (let [models (get models-by-provider (str->uuid selected-provider))]
-                          (into [["" "Select model"]] (mapv (fn [m] [m m]) models)))
-                        [["" "Select provider first"]])]
-    [:div {:class "card p-4"}
+(defn- provider-model-row
+  "Render a provider + model pair. When provider changes, Datastar SSE fetches updated model options."
+  [label prefix provider-options models-by-provider org-id & [{:keys [selected-provider selected-model]}]]
+  (let [model-options (into [["" "Select model"]]
+                            (->> (if selected-provider
+                                   (get models-by-provider (str->uuid selected-provider) [])
+                                   (->> (vals models-by-provider) (apply concat) distinct sort))
+                                 (mapv (fn [m] [m m]))))]
+    [:div {:class "card p-4" :id (str "row-" prefix)}
      [:div {:class "text-[11px] font-medium text-[var(--muted)] uppercase tracking-wider mb-3"} label]
      [:div {:class "grid grid-cols-2 gap-3"}
-      (select-field "Provider" (str prefix "-provider-id") provider-options (or selected-provider ""))
-      (select-field "Model" (str prefix "-model") model-options (or selected-model ""))]]))
+      [:label {:class "block"}
+       [:span {:class "text-[12px] font-medium text-[var(--muted)] uppercase tracking-wider mb-1 block"} "Provider"]
+       (into [:select {:class "input"
+                       :name (str prefix "-provider-id")
+                       :data-on-change (str "@get('/organizations/" org-id "/settings/runner-models?prefix=" prefix "&provider-id='+this.value+'')")}]
+             (for [[value label-text] provider-options]
+               [:option (cond-> {:value value}
+                          (= value (or selected-provider "")) (assoc :selected true))
+                label-text]))]
+      [:div {:id (str "model-select-" prefix)}
+       (select-field "Model" (str prefix "-model") model-options (or selected-model ""))]]]))
 
 (defn- runner-settings-card [organization-id org environments providers all-models]
   (let [workspaces (:organization/workspaces org)
@@ -115,9 +128,9 @@
        "Primary provider and model. Fallbacks are tried in order when the primary fails."]
       [:form {:class "space-y-3" :method "post" :action (str "/organizations/" organization-id "/settings/runner")}
        [:input {:type "hidden" :name "workspace-id" :value ""}]
-       (provider-model-row "Primary" "primary" provider-options models-by-provider)
-       (provider-model-row "Fallback 1" "fallback-1" provider-options models-by-provider)
-       (provider-model-row "Fallback 2" "fallback-2" provider-options models-by-provider)
+       (provider-model-row "Primary" "primary" provider-options models-by-provider organization-id)
+       (provider-model-row "Fallback 1" "fallback-1" provider-options models-by-provider organization-id)
+       (provider-model-row "Fallback 2" "fallback-2" provider-options models-by-provider organization-id)
        [:div {:class "flex justify-end pt-2"}
         [:button {:class "btn-primary" :type "submit"}
          [:i {:data-lucide "save" :class "size-4"}]
@@ -157,6 +170,22 @@
                        "Save override"]]]]])))
         [:div {:class "card p-6 text-center text-[var(--muted)] text-[13px] italic"}
          "No workspaces registered yet."])]]))
+
+;; -- SSE fragments ------------------------------------------------------------
+
+(defn render-model-select-fragment
+  "Render a model select dropdown for a provider. Used by SSE endpoint.
+
+   Params:
+   `prefix` - String. Form field prefix (e.g. 'primary', 'fallback-1').
+   `models` - Vector of model ID strings.
+
+   Returns:
+   Hiccup for the model select, wrapped in a div with matching id."
+  [prefix models]
+  (let [options (into [["" "Select model"]] (mapv (fn [m] [m m]) (sort models)))]
+    [:div {:id (str "model-select-" prefix)}
+     (select-field "Model" (str prefix "-model") options "")]))
 
 ;; -- Tabs + layout ------------------------------------------------------------
 

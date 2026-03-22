@@ -86,6 +86,34 @@
     (html-response (organization-screen/render conn organization-id))
     (not-found-page "Organization not found.")))
 
+(defn- handle-runner-models-fragment [conn request]
+  (let [params (:query-params request)
+        prefix (get params "prefix" "primary")
+        provider-id-str (get params "provider-id")]
+    (if (and provider-id-str (not= "" provider-id-str))
+      (let [p (provider/get-provider conn (java.util.UUID/fromString provider-id-str))
+            models (if p (provider/fetch-models p) [])]
+        (ds-ring/->sse-response request
+          {ds-ring/on-open
+           (fn [sse]
+             (d*/with-open-sse sse
+               (d*/patch-elements! sse
+                 (layout/render-fragment
+                   (organization-settings-screen/render-model-select-fragment prefix models))
+                 {d*/selector (str "#model-select-" prefix)
+                  d*/patch-mode d*/pm-outer})
+               (d*/execute-script! sse "lucide.createIcons();")))}))
+      ;; No provider selected — show empty
+      (ds-ring/->sse-response request
+        {ds-ring/on-open
+         (fn [sse]
+           (d*/with-open-sse sse
+             (d*/patch-elements! sse
+               (layout/render-fragment
+                 (organization-settings-screen/render-model-select-fragment prefix []))
+               {d*/selector (str "#model-select-" prefix)
+                d*/patch-mode d*/pm-outer})))}))))
+
 (defn- handle-organization-settings [conn organization-id request]
   (if (organization/overview conn organization-id)
     (let [tab (case (get-in request [:query-params "tab"])
@@ -387,6 +415,9 @@
 
         (and (= method :post) (= 3 (count segments)) (= "organizations" (first segments)) (= "workspaces" (nth segments 2)))
         (handle-create-workspace conn (uuid (second segments)) request)
+
+        (and (= method :get) (= 4 (count segments)) (= "organizations" (first segments)) (= "settings" (nth segments 2)) (= "runner-models" (nth segments 3)))
+        (handle-runner-models-fragment conn request)
 
         (and (= method :post) (= 4 (count segments)) (= "organizations" (first segments)) (= "settings" (nth segments 2)) (= "runner" (nth segments 3)))
         (handle-update-runner-settings conn (uuid (second segments)) request)
