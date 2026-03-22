@@ -269,7 +269,7 @@
                 [:div {:class "flex flex-col gap-2"}
                  (when (empty? (:ticket/tasks t))
                    [:button {:class "btn-primary w-full" :type "button"
-                             :data-on-click (str "$evt.preventDefault();" (d*/sse-get (str "/organizations/" org-id "/tickets/" ticket-id "/decompose")))}
+                             :data-on-click (d*/sse-get (str "/organizations/" org-id "/tickets/" ticket-id "/decompose"))}
                     [:i {:data-lucide "sparkles" :class "size-4"}]
                     (i18n/t :ticket/decompose)])
                  [:div {:id "decompose-status"}]
