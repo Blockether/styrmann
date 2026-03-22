@@ -15,12 +15,12 @@
 
 (defn- criteria-tree [items]
   (when (seq items)
-    (into [:div {:class "space-y-2"}]
+    (into [:div {:class "space-y-2.5"}]
       (for [{:keys [text children]} items]
         (let [display-text (str/replace (or text "") #"^\[[ x]?\]\s*" "")]
           [:div
            [:div {:class "flex items-start gap-2.5"}
-            [:div {:class "flex-shrink-0 mt-0.5 w-5 h-5 rounded border-2 border-[var(--line-strong)] flex items-center justify-center bg-[var(--surface)]"}]
+            [:i {:data-lucide "circle-dashed" :class "size-4 mt-0.5 flex-shrink-0 text-[var(--muted)]"}]
             [:span {:class "text-[14px] text-[var(--ink-secondary)] leading-relaxed"} display-text]]
            (when (seq children)
              [:div {:class "ml-7"} (criteria-tree children)])])))))

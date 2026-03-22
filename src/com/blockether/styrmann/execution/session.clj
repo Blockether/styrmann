@@ -305,7 +305,6 @@
                    (filter :tool-definition/enabled?)
                    (sort-by :tool-definition/key))
         ctx {:conn conn :session-id session-id
-             :workspace-id (get-in agent [:agent/tools 0 :tool-definition/id])
              :working-directory working-directory}]
     (doseq [tool tools]
       (let [tool-key (:tool-definition/key tool)
