@@ -250,8 +250,12 @@
 (defn- handle-ticket-decompose [conn ticket-id]
   (if-let [t (ticket/find-by-id conn ticket-id)]
     (let [org-id (get-in t [:ticket/organization :organization/id])]
-      (future (analysis/decompose-ticket! conn ticket-id))
-      (redirect-to (str "/organizations/" org-id "/tickets/" ticket-id)))
+      (try
+        (analysis/decompose-ticket! conn ticket-id)
+        (redirect-to (str "/organizations/" org-id "/tickets/" ticket-id))
+        (catch Exception ex
+          (t/log! :error ["Decompose failed" {:ticket-id ticket-id :error (ex-message ex)}])
+          (throw (ex-info (str "Decomposition failed: " (ex-message ex)) {:ticket-id ticket-id})))))
     (not-found-page "Ticket not found.")))
 
 (defn- handle-ticket-handoff [conn ticket-id]
